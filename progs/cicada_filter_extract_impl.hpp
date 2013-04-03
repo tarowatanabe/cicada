@@ -1027,6 +1027,46 @@ struct Cross
   position_type  position_source;
 };
 
+struct Fisher
+{
+  typedef int64_t count_type;
+  
+  Fisher() {}
+  
+  double operator()(const count_type cfe, const count_type cf, const count_type ce, const count_type n) const
+  {
+    count_type a = cfe;
+    count_type b = cf - cfe;
+    count_type c = ce - cfe;
+    count_type d = n - ce - cf + cfe;
+    
+    double log_p = (utils::mathop::lgamma<double>(1+a+c)
+		    + utils::mathop::lgamma<double>(1+b+d)
+		    + utils::mathop::lgamma<double>(1+a+b)
+		    + utils::mathop::lgamma<double>(1+c+d)
+		    - utils::mathop::lgamma<double>(1+n)
+		    - utils::mathop::lgamma<double>(1+a)
+		    - utils::mathop::lgamma<double>(1+b)
+		    - utils::mathop::lgamma<double>(1+c)
+		    - utils::mathop::lgamma<double>(1+d));
+    
+    double log_total_p = log_p;
+    
+    const count_type total_count = utils::bithack::min(b, c);
+    for (count_type i = 0; i != total_count; ++ i, ++ a, -- b, -- c, ++ d) {
+      log_p += (utils::mathop::log<double>(b)
+		+ utils::mathop::log<double>(c)
+		- utils::mathop::log<double>(a + 1)
+		- utils::mathop::log<double>(d + 1));
+      
+      log_total_p = utils::mathop::logsum(log_total_p, log_p);
+    }
+    
+    return - log_total_p;
+  }
+  
+};
+
 
 #endif
 

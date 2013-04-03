@@ -75,7 +75,6 @@ int buffer_size = 1024 * 1024;
 size_t nbest = 0;
 double cutoff = 0.0;
 double threshold = 0.0;
-int    types = 0;
 double sigtest = 0.0;
 path_type statistic_file;
 
@@ -115,18 +114,14 @@ struct FilterThreshold
 
 struct FilterCutoff
 {
-  FilterCutoff(const double& __cutoff, const int __types) : cutoff(__cutoff), types(__types) {}
+  FilterCutoff(const double& __cutoff) : cutoff(__cutoff) {}
   
   bool operator()(const phrase_pair_type& phrase_pair) const
   {
-    return (phrase_pair.counts.front() < cutoff
-	    && (types <= 0
-		|| phrase_pair.observed_source > types
-		|| phrase_pair.observed_target > types));
+    return phrase_pair.counts.front() < cutoff;
   }
   
   const double cutoff;
-  const int types;
 };
 
 struct FilterSigtest
@@ -230,7 +225,7 @@ int main(int argc, char** argv)
       else if (threshold > 0.0)
 	process_kbest(FilterThreshold(threshold), is, os);
       else if (cutoff > 0.0)
-	process_kbest(FilterCutoff(cutoff, types), is, os);
+	process_kbest(FilterCutoff(cutoff), is, os);
       else
 	process(FilterNone(), is, os);
     } else {
@@ -239,7 +234,7 @@ int main(int argc, char** argv)
       else if (threshold > 0.0)
 	process(FilterThreshold(threshold), is, os);
       else if (cutoff > 0.0)
-	process(FilterCutoff(cutoff, types), is, os);
+	process(FilterCutoff(cutoff), is, os);
       else
 	process(FilterNone(), is, os);
     }
@@ -396,7 +391,6 @@ void options(int argc, char** argv)
     ("nbest",     po::value<size_t>(&nbest)->default_value(nbest),         "nbest of pairs (wrt to joint-count)")
     ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
-    ("types",     po::value<int>(&types)->default_value(types),            "cutoff variation")
     ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold")
     
     ("statistic", po::value<path_type>(&statistic_file),                   "significant test statistic")

@@ -66,6 +66,7 @@ opt_parser = OptionParser(
     
     ## additional feature functions
     make_option("--feature-root",               default=None, action="store_true", help="generative probability"),
+    make_option("--feature-fisher",             default=None, action="store_true", help="fisher's exact test"),
     make_option("--feature-type",               default=None, action="store_true", help="observation probability"),
     make_option("--feature-singleton",          default=None, action="store_true", help="singleton features"),
     make_option("--feature-cross",              default=None, action="store_true", help="cross features"),
@@ -470,6 +471,7 @@ class IndexTree:
 class Features:
     def __init__(self,
                  root=None,
+                 fisher=None,
                  types=None,
                  singleton=None,
                  cross=None,
@@ -477,6 +479,7 @@ class Features:
                  internal=None,
                  height=None):
         self.root      = root
+        self.fisher    = fisher
         self.types     = types
         self.singleton = singleton
         self.cross     = cross
@@ -488,6 +491,8 @@ class Features:
         
         if root:
             self.options += " --feature-root"
+        if fisher:
+            self.options += " --feature-fisher"
         if types:
             self.options += " --feature-type"
         if singleton:
@@ -576,6 +581,10 @@ class Index(UserString.UserString):
         if not root_target:
             raise ValueError, "no root target? %s" %(root_target)
         
+        stat_file = os.path.join(indexer.counts, "statistics")
+        if not os.path.exists(stat_file):
+            raise ValueError, "no statistics file for significant testing?" + stat_file
+
         self.name    = indexer.name + "-index"
         self.logfile = os.path.join(indexer.base, indexer.name + "-index." + name + ".log")
         
@@ -593,12 +602,6 @@ class Index(UserString.UserString):
             if threshold > 0.0:
                 command += " --threshold %g" %(threshold)
             if sigtest != 0.0:
-                
-                stat_file = os.path.join(indexer.counts, "statistics")
-
-                if not os.path.exists(stat_file):
-                    raise ValueError, "no statistics file for significant testing?" +stat_file
-
                 command += " --sigtest %g" %(sigtest)
                 command += " --statistic \"%s\"" %(stat_file)
                 
@@ -608,6 +611,7 @@ class Index(UserString.UserString):
             command += " | "
             command += indexer.filter
             command += " --dirichlet-prior %g" %(prior)
+            command += " --statistic \"%s\"" %(stat_file)
             command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
@@ -621,6 +625,7 @@ class Index(UserString.UserString):
 
             command = indexer.filter
             command += " --dirichlet-prior %g" %(prior)
+            command += " --statistic \"%s\"" %(stat_file)
             command += " --root-joint \"%s\""  %(root_joint)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
@@ -809,6 +814,7 @@ if __name__ == '__main__':
 
     scores = Scores(indexer,plain=options.plain)
     features = Features(root=options.feature_root,
+                        fisher=options.feature_fisher,
                         types=options.feature_type,
                         singleton=options.feature_singleton,
                         cross=options.feature_cross,

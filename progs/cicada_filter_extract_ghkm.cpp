@@ -1,7 +1,8 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_filter_extract_impl.hpp"
 
 #include <stdexcept>
@@ -31,6 +32,8 @@ typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std:
 
 typedef LexiconModel lexicon_model_type;
 
+typedef Statistic statistic_type;
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type root_joint_file;
@@ -40,7 +43,10 @@ path_type root_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
+path_type statistic_file;
+
 bool feature_root_mode = false;
+bool feature_fisher_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
@@ -95,6 +101,17 @@ int main(int argc, char** argv)
 	throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
 
       read_lexicon = true;
+    }
+
+    if (feature_fisher_mode) {
+      if (statistic_file.empty() || ! boost::filesystem::exists(statistic_file))
+	throw std::runtime_error("no statistic for sigtest?");
+    }
+    
+    statistic_type statistic;
+    if (! statistic_file.empty()) {
+      utils::compress_istream is(statistic_file);
+      is >> statistic;
     }
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
@@ -402,9 +419,12 @@ void options(int argc, char** argv)
     ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
     ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     
+    ("statistic", po::value<path_type>(&statistic_file),                              "significant test statistic")
+
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
 
     ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
+    ("feature-fisher",     po::bool_switch(&feature_fisher_mode),     "fisher's exact test")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")

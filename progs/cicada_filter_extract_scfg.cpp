@@ -1,7 +1,8 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "cicada_extract_impl.hpp"
 #include "cicada_filter_extract_impl.hpp"
 
 #include <stdexcept>
@@ -31,6 +32,8 @@ typedef utils::unordered_set<root_count_type, boost::hash<root_count_type>, std:
 
 typedef LexiconModel lexicon_model_type;
 
+typedef Statistic statistic_type;
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type root_joint_file;
@@ -40,12 +43,15 @@ path_type root_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 
+path_type statistic_file;
+
 double dirichlet_prior = 0.1;
 
 bool mode_cicada = false;
 bool mode_moses = false;
 
 bool feature_root_mode = false;
+bool feature_fisher_mode = false;
 bool feature_type_mode = false;
 bool feature_singleton_mode = false;
 bool feature_cross_mode = false;
@@ -65,14 +71,15 @@ int debug = 0;
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
 	     const Lexicon& lexicon);
-
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_type& root_joint,
 	     const root_count_type& root_source,
 	     const root_count_type& root_target,
@@ -108,6 +115,17 @@ int main(int argc, char** argv)
 	throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
 
       read_lexicon = true;
+    }
+    
+    if (feature_fisher_mode) {
+      if (statistic_file.empty() || ! boost::filesystem::exists(statistic_file))
+	throw std::runtime_error("no statistic for sigtest?");
+    }
+    
+    statistic_type statistic;
+    if (! statistic_file.empty()) {
+      utils::compress_istream is(statistic_file);
+      is >> statistic;
     }
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
@@ -149,9 +167,9 @@ int main(int argc, char** argv)
     utils::compress_ostream os(output_file, buffer_size);
 
     if (root_joint.size() == 1 && root_source.size() == 1 && root_target.size() == 1)
-      process<ScorerCICADA>(is, os, *root_joint.begin(), *root_source.begin(), *root_target.begin(), Lexicon(lexicon_source_target, lexicon_target_source));
+      process<ScorerCICADA>(is, os, statistic, *root_joint.begin(), *root_source.begin(), *root_target.begin(), Lexicon(lexicon_source_target, lexicon_target_source));
     else
-      process<ScorerCICADA>(is, os, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
+      process<ScorerCICADA>(is, os, statistic, root_joint, root_source, root_target, Lexicon(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -163,6 +181,7 @@ int main(int argc, char** argv)
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_set_type& root_joint,
 	     const root_count_set_type& root_source,
 	     const root_count_set_type& root_target,
@@ -179,13 +198,14 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_joint, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, statistic, root_joint, root_source, root_target, lexicon, os);
   }
 }
 
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
+	     const statistic_type& statistic,
 	     const root_count_type& root_joint,
 	     const root_count_type& root_source,
 	     const root_count_type& root_target,
@@ -202,7 +222,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_joint, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, statistic, root_joint, root_source, root_target, lexicon, os);
   }
 }
 
@@ -224,6 +244,7 @@ struct ScorerCICADA
   ExtractAlignment extract_alignment;
   Unaligned        unaligned;
   Cross            cross;
+  Fisher           fisher;
   
   typedef ExtractSCFG::sentence_type           sentence_type;
   typedef ExtractAlignment::alignment_type     alignment_type;
@@ -234,6 +255,7 @@ struct ScorerCICADA
   alignment_set_type alignments;
   
   void operator()(const phrase_pair_type& phrase_pair,
+		  const statistic_type& statistic,
 		  const root_count_set_type& root_count_joint,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
@@ -309,12 +331,13 @@ struct ScorerCICADA
 	throw std::runtime_error("failed generation");
     }
     
-    operator()(phrase_pair, lexicon, os);
+    operator()(phrase_pair, statistic, lexicon, os);
 
     os << '\n';
   }
 
   void operator()(const phrase_pair_type& phrase_pair,
+		  const statistic_type& statistic,
 		  const root_count_type& root_joint,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
@@ -383,13 +406,14 @@ struct ScorerCICADA
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
     }
-    
-    operator()(phrase_pair, lexicon, os);
+        
+    operator()(phrase_pair, statistic, lexicon, os);
     
     os << '\n';
   }
 
   void operator()(const phrase_pair_type& phrase_pair,
+		  const statistic_type& statistic,
 		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
@@ -398,6 +422,17 @@ struct ScorerCICADA
 
     std::ostream_iterator<char> iter(os);
 
+    if (feature_fisher_mode) {
+      const Fisher::count_type cfe = phrase_pair.counts[phrase_pair.counts.size() - 3];
+      const Fisher::count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
+      const Fisher::count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
+      
+      const double score = fisher(cfe, cf, ce, statistic.bitext);
+      
+      if (! karma::generate(iter, ' ' << double10, score))
+	throw std::runtime_error("failed generation");      
+    }
+    
     if (feature_cross_mode || feature_unaligned_mode || feature_lexicon_mode || feature_model1_mode || feature_noisy_or_mode || feature_insertion_deletion_mode) {
       extract_phrase(phrase_pair.source, source);
       extract_phrase(phrase_pair.target, target);
@@ -490,12 +525,15 @@ void options(int argc, char** argv)
     ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
     ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     
+    ("statistic", po::value<path_type>(&statistic_file),                              "significant test statistic")
+    
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
 
     ("cicada",   po::bool_switch(&mode_cicada),   "output in cicada format")
     ("moses",    po::bool_switch(&mode_moses),    "output in moses format")
         
     ("feature-root",       po::bool_switch(&feature_root_mode),       "feature by generative probability")
+    ("feature-fisher",     po::bool_switch(&feature_fisher_mode),     "fisher's exact test")
     ("feature-type",       po::bool_switch(&feature_type_mode),       "feature by obesrved types")
     ("feature-singleton",  po::bool_switch(&feature_singleton_mode),  "singleton features")
     ("feature-cross",      po::bool_switch(&feature_cross_mode),      "crossing features")

@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <iostream>
+#include <stdexcept>
 
 struct Statistic
 {
@@ -42,6 +43,10 @@ struct Statistic
   std::istream& operator>>(std::istream& is, Statistic& x)
   {
     is >> x.bitext;
+
+    if (x.bitext <= 0)
+      throw std::runtime_error("invalid statistic");
+
     return is;
   }
 };
