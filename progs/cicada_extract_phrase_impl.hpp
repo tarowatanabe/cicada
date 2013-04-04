@@ -303,21 +303,25 @@ struct ExtractPhrase
     }
   };
   
-  struct string_unassigned
-  {
-    const std::string& operator()() const
-    {
-      static std::string __str;
-      return __str;
-    }
-  };
-  typedef utils::compact_set<std::string,
-			     string_unassigned, string_unassigned,
-			     string_hash, std::equal_to<std::string>,
-			     std::allocator<std::string> > unique_set_type;
+  typedef utils::unordered_set<std::string,
+			       string_hash, std::equal_to<std::string>,
+			       std::allocator<std::string> >::type unique_set_type;
+
+  typedef std::pair<const std::string*, const std::string*> unique_pair_type;
   
-  unique_set_type uniques_source;
-  unique_set_type uniques_target;
+  struct unique_pair_unassigned
+  {
+    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+  };
+  
+  typedef utils::compact_set<unique_pair_type,
+			     unique_pair_unassigned, unique_pair_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
+			     std::allocator<unique_pair_type> > unique_pair_set_type;
+  
+  unique_set_type      uniques_source;
+  unique_set_type      uniques_target;
+  unique_pair_set_type uniques_pair;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -530,6 +534,7 @@ struct ExtractPhrase
     
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
     
     phrase_pair_set_type::const_iterator piter_end = phrase_pairs_local.end();
     for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; /**/) {
@@ -546,7 +551,7 @@ struct ExtractPhrase
       if (! result.second)
 	std::transform(piter->counts.begin(), piter->counts.end(), counts.begin(), counts.begin(), std::plus<count_type>());
       
-      counts[5] += 1;
+      counts[5] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;
       counts[6] += result_source.second;
       counts[7] += result_target.second;
       
@@ -556,6 +561,7 @@ struct ExtractPhrase
     phrase_pairs_local.clear();
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
   }
 };
 

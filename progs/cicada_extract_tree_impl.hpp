@@ -354,6 +354,18 @@ struct ExtractTree
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
+  typedef std::pair<const tree_rule_compact_phrase_type*, const tree_rule_compact_phrase_type*> unique_pair_type;
+  
+  struct unique_pair_unassigned
+  {
+    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+  };
+  
+  typedef utils::compact_set<unique_pair_type,
+			     unique_pair_unassigned, unique_pair_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
+			     std::allocator<unique_pair_type> > unique_pair_set_type;
+
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
   typedef cicada::Symbol     symbol_type;
@@ -1561,6 +1573,7 @@ struct ExtractTree
   rule_pair_compact_set_type rule_pairs_local;
   tree_rule_compact_set_type rules_source;
   tree_rule_compact_set_type rules_target;
+  unique_pair_set_type       uniques_pair;
   
   template <typename Dumper>
   void extract_pairs(const hypergraph_type& source,
@@ -1687,10 +1700,11 @@ struct ExtractTree
 	}
       }
     }
+
+    uniques_pair.clear();
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-
       // uncover phrasal representation!
       const bool unique_source = riter->source->second.empty();
       const bool unique_target = riter->target->second.empty();
@@ -1727,7 +1741,7 @@ struct ExtractTree
       if (! result.second)
 	rule_pair.count += riter->count;
       
-      rule_pair.freqs[0] += 1;
+      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(riter->source, riter->target)).second;
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
       
@@ -1737,6 +1751,7 @@ struct ExtractTree
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    uniques_pair.clear();
     
     dumper(rule_pairs);
     
@@ -1744,6 +1759,7 @@ struct ExtractTree
       rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       tree_rule_compact_set_type(rules_source).swap(rules_source);
       tree_rule_compact_set_type(rules_target).swap(rules_target);
+      unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
   

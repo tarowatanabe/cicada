@@ -642,21 +642,25 @@ struct ExtractSCFG
     }
   };
   
-  struct string_unassigned
+  typedef utils::unordered_set<std::string,
+			       string_hash, std::equal_to<std::string>,
+			       std::allocator<std::string> >::type unique_set_type;
+  
+  typedef std::pair<const std::string*, const std::string*> unique_pair_type;
+  
+  struct unique_pair_unassigned
   {
-    const std::string& operator()() const
-    {
-      static std::string __str;
-      return __str;
-    }
+    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
   };
-  typedef utils::compact_set<std::string,
-			     string_unassigned, string_unassigned,
-			     string_hash, std::equal_to<std::string>,
-			     std::allocator<std::string> > unique_set_type;
+  
+  typedef utils::compact_set<unique_pair_type,
+			     unique_pair_unassigned, unique_pair_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
+			     std::allocator<unique_pair_type> > unique_pair_set_type;
 
-  unique_set_type uniques_source;
-  unique_set_type uniques_target;
+  unique_set_type      uniques_source;
+  unique_set_type      uniques_target;
+  unique_pair_set_type uniques_pair;
   
   template <typename Dumper>
   void operator()(const sentence_type& source,
@@ -844,9 +848,9 @@ struct ExtractSCFG
 	const_cast<rule_pair_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
     }
     
-    
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
     
     rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
@@ -857,9 +861,12 @@ struct ExtractSCFG
       if (! result.second)
 	rule_pair.count += riter->count;
       
-      rule_pair.freqs[0] += 1;
-      rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
-      rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
+      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
+      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
+      
+      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
+      rule_pair.freqs[1] += result_source.second;
+      rule_pair.freqs[2] += result_target.second;
       
       rule_pairs_local.erase(riter ++);
     }
@@ -867,6 +874,7 @@ struct ExtractSCFG
     rule_pairs_local.clear();
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
     
     dumper(rule_pairs);
     
@@ -874,6 +882,7 @@ struct ExtractSCFG
       rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
       unique_set_type(uniques_source).swap(uniques_source);
       unique_set_type(uniques_target).swap(uniques_target);
+      unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
 
@@ -907,6 +916,7 @@ struct ExtractSCFG
       
       uniques_source.clear();
       uniques_target.clear();
+      uniques_pair.clear();
       
       rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
       for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
@@ -917,9 +927,12 @@ struct ExtractSCFG
 	if (! result.second)
 	  rule_pair.count += riter->count;
 	
-	rule_pair.freqs[0] += 1;
-	rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
-	rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
+	std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
+	std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
+	
+	rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
+	rule_pair.freqs[1] += result_source.second;
+	rule_pair.freqs[2] += result_target.second;
 
 	rule_pairs_local.erase(riter ++);
       }
@@ -927,6 +940,7 @@ struct ExtractSCFG
       rule_pairs_local.clear();
       uniques_source.clear();
       uniques_target.clear();
+      uniques_pair.clear();
       
       dumper(rule_pairs);
       
@@ -934,6 +948,7 @@ struct ExtractSCFG
 	rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
 	unique_set_type(uniques_source).swap(uniques_source);
 	unique_set_type(uniques_target).swap(uniques_target);
+	unique_pair_set_type(uniques_pair).swap(uniques_pair);
       }
     }
     
@@ -1082,6 +1097,7 @@ struct ExtractSCFG
     
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
     
     rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
@@ -1092,9 +1108,12 @@ struct ExtractSCFG
       if (! result.second)
 	rule_pair.count += riter->count;
       
-      rule_pair.freqs[0] += 1;
-      rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
-      rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
+      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
+      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
+      
+      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
+      rule_pair.freqs[1] += result_source.second;
+      rule_pair.freqs[2] += result_target.second;
       
       rule_pairs_local.erase(riter ++);
     }
@@ -1102,6 +1121,7 @@ struct ExtractSCFG
     rule_pairs_local.clear();
     uniques_source.clear();
     uniques_target.clear();
+    uniques_pair.clear();
     
     dumper(rule_pairs);
     
@@ -1109,6 +1129,7 @@ struct ExtractSCFG
       rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
       unique_set_type(uniques_source).swap(uniques_source);
       unique_set_type(uniques_target).swap(uniques_target);
+      unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
 
