@@ -150,6 +150,17 @@ struct FilterSigtest
     const count_type cf  = phrase_pair.counts_source[phrase_pair.counts_source.size() - 2];
     const count_type ce  = phrase_pair.counts_target[phrase_pair.counts_target.size() - 1];
     
+    if (cfe > cf || cfe > ce || cfe <= 0 || cf <= 0 || ce <= 0)
+      throw std::runtime_error(std::string("invalid count:")
+			       + phrase_pair.source + " ||| " + phrase_pair.target
+			       + ' ' + boost::lexical_cast<std::string>(cfe)
+			       + ' ' + boost::lexical_cast<std::string>(cf)
+			       + ' ' + boost::lexical_cast<std::string>(ce)
+			       + " |||"
+			       + ' ' + boost::lexical_cast<std::string>(phrase_pair.counts[phrase_pair.counts.size() - 3])
+			       + ' ' + boost::lexical_cast<std::string>(phrase_pair.counts_source[phrase_pair.counts_source.size() - 2])
+			       + ' ' + boost::lexical_cast<std::string>(phrase_pair.counts_target[phrase_pair.counts_target.size() - 1]));
+
     const double score = - logfisher(cfe, cf, ce);
 
     if (debug >= 2)
@@ -164,11 +175,7 @@ struct FilterSigtest
 
   double logfisher(const count_type cfe, const count_type cf, const count_type ce) const
   {
-    if (cfe > cf || cfe > ce || cfe <= 0 || cf <= 0 || ce <= 0)
-      throw std::runtime_error(std::string("invalid count:")
-			       + ' ' + boost::lexical_cast<std::string>(cfe)
-			       + ' ' + boost::lexical_cast<std::string>(cf)
-			       + ' ' + boost::lexical_cast<std::string>(ce));
+    
     
     count_type a = cfe;
     count_type b = cf - cfe;
