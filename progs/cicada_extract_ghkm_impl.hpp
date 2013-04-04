@@ -25,6 +25,7 @@
 #include "cicada/alignment.hpp"
 #include "cicada/vocab.hpp"
 #include "cicada/tree_rule.hpp"
+#include "cicada/tree_rule_compact.hpp"
 #include "cicada/hypergraph.hpp"
 #include "cicada/operation/functional.hpp"
 #include "cicada/semiring.hpp"
@@ -148,7 +149,11 @@ struct RulePair
   freqs_type     freqs;
 
   RulePair() : source(), target(), alignment(), count(0), freqs() {}
-
+  RulePair(const phrase_type& __source,
+	   const phrase_type& __target,
+	   const alignment_type& __alignment,
+	   const count_type& __count)
+    : source(__source), target(__target), alignment(__alignment), count(__count) {}
 
   friend
   size_t hash_value(RulePair const& x)
@@ -301,99 +306,55 @@ struct ExtractGHKM
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
 
-#if 0
-  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
-#endif
+  typedef cicada::TreeRuleCompact tree_rule_compact_type;
+  
+  typedef std::pair<const tree_rule_compact_type, phrase_type> tree_rule_compact_phrase_type;
 
-  struct rule_pair_set_type
+  typedef utils::unordered_map<tree_rule_compact_type,
+			       phrase_type,
+			       boost::hash<tree_rule_compact_type>,
+			       std::equal_to<tree_rule_compact_type>,
+			       std::allocator<std::pair<const tree_rule_compact_type, phrase_type> > >::type tree_rule_compact_set_type;
+  
+  struct RulePairCompact
   {
-    typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				 std::allocator<rule_pair_type> >::type count_set_type;
+    typedef rule_pair_type::alignment_type alignment_type;
     
-    typedef count_set_type::size_type       size_type;
-    typedef count_set_type::difference_type difference_type;
+    const tree_rule_compact_phrase_type* source;
+    const tree_rule_compact_phrase_type* target;
+    alignment_type                       alignment;
+    count_type                           count;
     
-    typedef count_set_type::const_iterator const_iterator;
-    typedef count_set_type::iterator       iterator;
-    
-    struct string_hash : public utils::hashmurmur3<size_t>
+    RulePairCompact() : source(), target(), alignment(), count(0) {}
+
+    friend
+    size_t hash_value(RulePairCompact const& x)
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
-      size_t operator()(const std::string& x) const
-      {
-	return hasher_type::operator()(x.begin(), x.end(), 0);
-      }
-    };
-
-    struct string_unassigned
-    {
-      const std::string& operator()() const
-      {
-	static std::string __str;
-	return __str;
-      }
-    };
-    
-#if 0
-    typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>,
-				 std::allocator<std::string> >::type unique_set_type;
-#endif
-    typedef utils::compact_set<std::string,
-			       string_unassigned, string_unassigned,
-			       string_hash, std::equal_to<std::string>,
-			       std::allocator<std::string> > unique_set_type;
-
-    void erase(iterator iter)
-    {
-      counts.erase(iter);
-    }
-
-    void erase(const_iterator iter)
-    {
-      counts.erase(iter);
-    }
-    
-    const_iterator begin() const { return counts.begin(); }
-    iterator begin() { return counts.begin(); }
-    
-    const_iterator end() const { return counts.end(); }
-    iterator end() { return counts.end(); }
-    
-    std::pair<iterator, bool> insert(const rule_pair_type& x)
-    {
-      std::pair<iterator, bool> result = counts.insert(x);
       
-      if (result.second) {
-	const_cast<rule_pair_type&>(*(result.first)).source = *(sources.insert(x.source).first);
-	const_cast<rule_pair_type&>(*(result.first)).target = *(targets.insert(x.target).first);
-      }
-      
-      return result;
+      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
     }
     
-    size_type size() const { return counts.size(); }
-    bool empty() const { return counts.empty(); }
-
-    void swap(rule_pair_set_type& x)
+    friend
+    bool operator==(const RulePairCompact& x, const RulePairCompact& y) 
     {
-      counts.swap(x.counts);
-      sources.swap(x.sources);
-      targets.swap(x.targets);
+      return x.source == y.source && x.target == y.target && x.alignment == y.alignment;
     }
     
-    void clear()
+    friend
+    bool operator!=(const RulePairCompact& x, const RulePairCompact& y)
     {
-      counts.clear();
-      sources.clear();
-      targets.clear();
+      return x.source != y.source || x.target != y.target || x.alignment != y.alignment;
     }
-    
-  private:
-    count_set_type  counts;
-    unique_set_type sources;
-    unique_set_type targets;
   };
+  
+  typedef RulePairCompact rule_pair_compact_type;
+  
+  typedef utils::unordered_set<rule_pair_compact_type, boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
+			       std::allocator<rule_pair_compact_type> >::type rule_pair_compact_set_type;
+  
+  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
   
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
@@ -552,7 +513,7 @@ struct ExtractGHKM
   typedef std::vector<bool, std::allocator<bool> > covered_type;
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
-  typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> > rule_pair_list_type;
+  typedef std::vector<rule_pair_compact_type, std::allocator<rule_pair_compact_type> > rule_pair_compact_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
 
   typedef std::vector<symbol_type, std::allocator<symbol_type> > frontier_symbol_set_type;
@@ -570,8 +531,8 @@ struct ExtractGHKM
     }
   };
 
-  typedef utils::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
-			       std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > >::type rule_pair_set_span_type;
+  typedef utils::unordered_map<edge_set_local_type, rule_pair_compact_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+			       std::allocator<std::pair<const edge_set_local_type, rule_pair_compact_list_type> > >::type rule_pair_set_span_type;
   
   ExtractGHKM(const symbol_type& __non_terminal,
 	      const int __max_sentence_length,
@@ -749,33 +710,12 @@ struct ExtractGHKM
     }
   };
   
-  rule_pair_set_type rule_pairs_local;
+  rule_pair_compact_set_type rule_pairs_local;
+
+  typedef std::vector<char, std::allocator<char> > buffer_type;
   
-  struct string_hash : public utils::hashmurmur3<size_t>
-  {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    size_t operator()(const std::string& x) const
-    {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
-    }
-  };
-    
-  struct string_unassigned
-  {
-    const std::string& operator()() const
-    {
-      static std::string __str;
-      return __str;
-    }
-  };
-
-  typedef utils::compact_set<std::string,
-			     string_unassigned, string_unassigned,
-			     string_hash, std::equal_to<std::string>,
-			     std::allocator<std::string> > unique_set_type;
-
-  unique_set_type uniques_source;
-  unique_set_type uniques_target;
+  buffer_type buffer_source;
+  buffer_type buffer_target;
 
   template <typename Dumper>
   void extract_composed(const hypergraph_type& graph,
@@ -787,8 +727,9 @@ struct ExtractGHKM
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
 
-
     rule_pairs_local.clear();
+    rules_source.clear();
+    rules_target.clear();
     
     candidate_set_type    candidates;
     candidate_heap_type   cand;
@@ -807,7 +748,7 @@ struct ExtractGHKM
     // first, we will implement naive enumeration...
     
     rule_pair_set_span_type rule_pairs_span;
-    rule_pair_type rule_pair;
+    rule_pair_compact_type rule_pair;
 
     edge_set_type edges_new;
     node_set_type tails_new;
@@ -940,18 +881,18 @@ struct ExtractGHKM
       
       rule_pair_set_span_type::iterator riter_end = rule_pairs_span.end();
       for (rule_pair_set_span_type::iterator riter = rule_pairs_span.begin(); riter != riter_end; ++ riter) {
-	rule_pair_list_type& rule_list = riter->second;
+	rule_pair_compact_list_type& rule_list = riter->second;
 	
 	const double factor = 1.0 / rule_list.size();
 	
-	rule_pair_list_type::iterator liter_end = rule_list.end();
-	for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
+	rule_pair_compact_list_type::iterator liter_end = rule_list.end();
+	for (rule_pair_compact_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
 	  liter->count *= factor;
 	  
 	  if (liter->count >= cutoff) {
-	    std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs_local.insert(*liter);
+	    std::pair<rule_pair_compact_set_type::iterator, bool> result = rule_pairs_local.insert(*liter);
 	    if (! result.second)
-	      const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
+	      const_cast<rule_pair_compact_type&>(*(result.first)).count += liter->count;
 	  }
 	}
       }
@@ -959,12 +900,39 @@ struct ExtractGHKM
       rule_pairs_span.clear();
     }
     
-    uniques_source.clear();
-    uniques_target.clear();
-    
-    rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
+    rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+      
+      // uncover phrasal representation!
+      const bool unique_source = riter->source->second.empty();
+      const bool unique_target = riter->target->second.empty();
+      
+      if (unique_source) {
+	buffer_source.clear();
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::back_inserter(buffer_source));
+	os << riter->source->first.decode();
+	os.reset();
+	
+	const_cast<phrase_type&>(riter->source->second) = phrase_type(buffer_source.begin(), buffer_source.end());
+      }
+      
+      if (unique_target) {
+	buffer_target.clear();
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::back_inserter(buffer_target));
+	os << riter->target->first.decode();
+	os.reset();
+	
+	const_cast<phrase_type&>(riter->target->second) = phrase_type(buffer_target.begin(), buffer_target.end());
+      }
+      
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->second,
+											      riter->target->second,
+											      riter->alignment,
+											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
@@ -972,22 +940,22 @@ struct ExtractGHKM
 	rule_pair.count += riter->count;
       
       rule_pair.freqs[0] += 1;
-      rule_pair.freqs[1] += uniques_source.insert(rule_pair.source).second;
-      rule_pair.freqs[2] += uniques_target.insert(rule_pair.target).second;
-
+      rule_pair.freqs[1] += unique_source;
+      rule_pair.freqs[2] += unique_target;
+      
       rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
-    uniques_source.clear();
-    uniques_target.clear();
+    rules_source.clear();
+    rules_target.clear();
     
     dumper(rule_pairs);
-
+    
     if (rule_pairs.empty()) {
-      rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
-      unique_set_type(uniques_source).swap(uniques_source);
-      unique_set_type(uniques_target).swap(uniques_target);
+      rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
+      tree_rule_compact_set_type(rules_source).swap(rules_source);
+      tree_rule_compact_set_type(rules_target).swap(rules_target);
     }
   }
 
@@ -1110,42 +1078,16 @@ struct ExtractGHKM
     
     tree_rule_set_type& trees;
   };
-
-  typedef std::vector<char, std::allocator<char> > buffer_type;
   
-  buffer_type buffer_source;
-  buffer_type buffer_target;
-
-  struct rule_cache_type : public utils::hashmurmur3<size_t>
-  {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    typedef std::string rule_type;
-    
-    typedef utils::array_power2<rule_type, 1024 * 4, std::allocator<rule_type> > rule_set_type;
-
-    const rule_type& operator()(const utils::piece& x)
-    {
-      const size_t pos = hasher_type::operator()(x.begin(), x.end(), 0) & (rules.size() - 1);
-      
-      rule_type& rule = rules[pos];
-      if (rule != x)
-	rule = x;
-      
-      return rule;
-    }
-
-    rule_set_type rules;
-  };
-
-  rule_cache_type rules_source;
-  rule_cache_type rules_target;
+  tree_rule_compact_set_type rules_source;
+  tree_rule_compact_set_type rules_target;
   
   bool construct_rule_pair(const hypergraph_type& graph,
 			   const sentence_type& sentence,
 			   const derivation_node_type& node,
 			   const edge_set_type& edges,
 			   const node_set_type& tails,
-			   rule_pair_type& rule_pair)
+			   rule_pair_compact_type& rule_pair)
   {
     frontier_symbols.clear();
     positions_source.clear();
@@ -1296,7 +1238,7 @@ struct ExtractGHKM
       rule_source.frontier(CollapseFrontierIterator(trees));
       rule_source = tree_rule_type(rule_source.label, trees.begin(), trees.end());
     }
-
+    
     if (collapse_target) {
       // collapse target-side
       
@@ -1305,22 +1247,13 @@ struct ExtractGHKM
       rule_target = tree_rule_type(rule_target.label, trees.begin(), trees.end());
     }
     
-    {
-      buffer_source.clear();
-      buffer_target.clear();
-      
-      boost::iostreams::filtering_ostream os_source;
-      boost::iostreams::filtering_ostream os_target;
-      
-      os_source.push(boost::iostreams::back_inserter(buffer_source));
-      os_target.push(boost::iostreams::back_inserter(buffer_target));
-      
-      os_source << rule_source;
-      os_target << rule_target;
-    }
+    tree_rule_compact_set_type::iterator siter = rules_source.insert(std::make_pair(tree_rule_compact_type(rule_source),
+										    phrase_type())).first;
+    tree_rule_compact_set_type::iterator titer = rules_target.insert(std::make_pair(tree_rule_compact_type(rule_target),
+										    phrase_type())).first;
     
-    rule_pair.source = rules_source(utils::piece(buffer_source.begin(), buffer_source.end()));
-    rule_pair.target = rules_target(utils::piece(buffer_target.begin(), buffer_target.end()));
+    rule_pair.source = &(*siter);
+    rule_pair.target = &(*titer);
     
     return true;
   }

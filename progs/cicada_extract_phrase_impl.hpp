@@ -329,8 +329,6 @@ struct ExtractPhrase
     const size_type target_size = target.size();
     
     phrase_pairs_local.clear();
-    uniques_source.clear();
-    uniques_target.clear();
     
     phrases_source.clear();
     phrases_target.clear();
@@ -529,6 +527,9 @@ struct ExtractPhrase
       counts[3] += (  connected_left_bottom && ! connected_right_bottom);
       counts[4] += (! connected_left_bottom &&   connected_right_bottom);
     }
+    
+    uniques_source.clear();
+    uniques_target.clear();
     
     phrase_pair_set_type::const_iterator piter_end = phrase_pairs_local.end();
     for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; /**/) {
