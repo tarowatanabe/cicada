@@ -1053,7 +1053,7 @@ struct Fisher
     double log_total_p = log_p;
     
     const count_type total_count = utils::bithack::min(b, c);
-    for (count_type i = 0; i != total_count; ++ i, ++ a, -- b, -- c, ++ d) {
+    for (count_type i = 0; i < total_count; ++ i, ++ a, -- b, -- c, ++ d) {
       log_p += (utils::mathop::log<double>(b)
 		+ utils::mathop::log<double>(c)
 		- utils::mathop::log<double>(a + 1)
