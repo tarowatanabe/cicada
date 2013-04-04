@@ -835,8 +835,8 @@ struct ExtractSCFG
 	std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
 	std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
 	
-      const_cast<phrase_type&>(riter->source) = *result_source.first;
-      const_cast<phrase_type&>(riter->target) = *result_target.first;
+	const_cast<phrase_type&>(riter->source) = *result_source.first;
+	const_cast<phrase_type&>(riter->target) = *result_target.first;
 
 	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
 	

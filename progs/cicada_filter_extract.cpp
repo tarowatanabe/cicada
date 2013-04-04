@@ -175,8 +175,6 @@ struct FilterSigtest
 
   double logfisher(const count_type cfe, const count_type cf, const count_type ce) const
   {
-    
-    
     count_type a = cfe;
     count_type b = cf - cfe;
     count_type c = ce - cfe;
