@@ -227,7 +227,7 @@ int main(int argc, char** argv)
       else if (cutoff > 0.0)
 	process_kbest(FilterCutoff(cutoff), is, os);
       else
-	process(FilterNone(), is, os);
+	process_kbest(FilterNone(), is, os);
     } else {
       if (sigtest != 0.0)
 	process(FilterSigtest(statistic, sigtest), is, os);
