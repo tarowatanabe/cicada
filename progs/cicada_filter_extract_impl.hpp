@@ -1038,7 +1038,7 @@ struct Fisher
   
   double operator()(const count_type cfe, const count_type cf, const count_type ce, const count_type n) const
   {
-    if (cfe > cf || cfe > ce || cfe < 0 || cf < 0 || ce < 0)
+    if (cfe > cf || cfe > ce || cfe <= 0 || cf <= 0 || ce <= 0)
       throw std::runtime_error("invalid count:"
 			       + ' ' + boost::lexical_cast<std::string>(cfe)
 			       + ' ' + boost::lexical_cast<std::string>(cf)
