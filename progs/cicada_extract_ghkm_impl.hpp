@@ -153,7 +153,7 @@ struct RulePair
 	   const phrase_type& __target,
 	   const alignment_type& __alignment,
 	   const count_type& __count)
-    : source(__source), target(__target), alignment(__alignment), count(__count) {}
+    : source(__source), target(__target), alignment(__alignment), count(__count), freqs() {}
 
   friend
   size_t hash_value(RulePair const& x)
