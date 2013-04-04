@@ -14,6 +14,7 @@
 #include <queue>
 
 #include <boost/program_options.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
@@ -163,6 +164,12 @@ struct FilterSigtest
 
   double logfisher(const count_type cfe, const count_type cf, const count_type ce) const
   {
+    if (cfe > cf || cfe > ce)
+      throw std::runtime_error("invalid count:"
+			       + ' ' + boost::lexical_cast<std::string>(cfe)
+			       + ' ' + boost::lexical_cast<std::string>(cf)
+			       + ' ' + boost::lexical_cast<std::string>(ce));
+    
     count_type a = cfe;
     count_type b = cf - cfe;
     count_type c = ce - cfe;

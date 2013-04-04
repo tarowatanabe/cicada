@@ -1,14 +1,17 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__FILTER_EXTRACT_IMPL__HPP__
 #define __CICADA__FILTER_EXTRACT_IMPL__HPP__ 1
 
+#include <stdexcept>
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix.hpp>
 
+#include <boost/lexical_cast.hpp>
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 #include <boost/filesystem.hpp>
@@ -1035,6 +1038,12 @@ struct Fisher
   
   double operator()(const count_type cfe, const count_type cf, const count_type ce, const count_type n) const
   {
+    if (cfe > cf || cfe > ce)
+      throw std::runtime_error("invalid count:"
+			       + ' ' + boost::lexical_cast<std::string>(cfe)
+			       + ' ' + boost::lexical_cast<std::string>(cf)
+			       + ' ' + boost::lexical_cast<std::string>(ce));
+
     count_type a = cfe;
     count_type b = cf - cfe;
     count_type c = ce - cfe;
