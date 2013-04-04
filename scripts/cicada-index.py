@@ -92,12 +92,18 @@ opt_parser = OptionParser(
     ## kbest options
     make_option("--kbest", default=0, action="store", type="int",
                 metavar="KBEST", help="kbest max count of rules (default: %default)"),
+    make_option("--kbest-count",  default=None, action="store_true",  help="kbest option: use count for sorting"),
+    make_option("--kbest-joint",  default=None, action="store_true",  help="kbest option: use joint probability for sorting"),
+    make_option("--kbest-source",  default=None, action="store_true", help="kbest option: use source probability (P(f|e)) for sorting"),
+    make_option("--kbest-target",  default=None, action="store_true", help="kbest option: use target probability (P(e|f)) for sorting"),
     make_option("--cutoff", default=0, action="store", type="float",
                 metavar="CUTOFF", help="cutoff count of rules (default: %default)"),
     make_option("--threshold", default=0, action="store", type="float",
                 metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
     make_option("--sigtest", default=0, action="store", type="float",
                 metavar="SIGTEST", help="significance testing threshold relative to 1-1-1-N log-p-value (default: %default)"),
+
+    
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -563,6 +569,10 @@ class Index(UserString.UserString):
                  temporary_dir="",
                  prior=0.1,
                  kbest=0,
+                 kbest_count=None,
+                 kbest_joint=None,
+                 kbest_source=None,
+                 kbest_target=None,
                  cutoff=0.0,
                  threshold=0.0,
                  sigtest=0.0,
@@ -594,7 +604,17 @@ class Index(UserString.UserString):
             command = cicada.cicada_filter_extract
             
             if kbest > 0:
-                command += " --nbest %d" %(kbest)
+                command += " --kbest %d" %(kbest)
+                
+                if kbest_count:
+                    command += " --kbest-count"
+                if kbest_joint:
+                    command += " --kbest-joint"
+                if kbest_source:
+                    command += " --kbest-source"
+                if kbest_target:
+                    command += " --kbest-target"                    
+                
             if cutoff > 0.0:
                 command += " --cutoff %g" %(cutoff)
             if threshold > 0.0:
@@ -856,6 +876,10 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          kbest_count=options.kbest_count,
+                          kbest_joint=options.kbest_joint,
+                          kbest_source=options.kbest_source,
+                          kbest_target=options.kbest_target,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
                           sigtest=options.sigtest,
@@ -893,6 +917,10 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          kbest_count=options.kbest_count,
+                          kbest_joint=options.kbest_joint,
+                          kbest_source=options.kbest_source,
+                          kbest_target=options.kbest_target,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
                           sigtest=options.sigtest,
@@ -926,6 +954,10 @@ if __name__ == '__main__':
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
+                          kbest_count=options.kbest_count,
+                          kbest_joint=options.kbest_joint,
+                          kbest_source=options.kbest_source,
+                          kbest_target=options.kbest_target,
                           cutoff=options.cutoff,
                           threshold=options.threshold,
                           sigtest=options.sigtest,

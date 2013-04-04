@@ -73,11 +73,16 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 int buffer_size = 1024 * 1024;
-size_t nbest = 0;
+size_t kbest = 0;
 double cutoff = 0.0;
 double threshold = 0.0;
 double sigtest = 0.0;
 path_type statistic_file;
+
+bool kbest_count = false;
+bool kbest_joint = false;
+bool kbest_source = false;
+bool kbest_target = false;
 
 int debug = 0;
 
@@ -221,6 +226,11 @@ int main(int argc, char** argv)
       if (statistic_file.empty() || ! boost::filesystem::exists(statistic_file))
 	throw std::runtime_error("no statistic for sigtest?");
     }
+
+    if (int(kbest_count) + kbest_joint + kbest_source + kbest_target > 1)
+      throw std::runtime_error("one of kbest-{count,joint,source,target}");
+    if (int(kbest_count) + kbest_joint + kbest_source + kbest_target == 0)
+      kbest_count = true;
     
     statistic_type statistic;
     if (! statistic_file.empty()) {
@@ -231,7 +241,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
 
-    if (nbest > 0) {
+    if (kbest > 0) {
       if (sigtest != 0.0)
 	process_kbest(FilterSigtest(statistic, sigtest), is, os);
       else if (threshold > 0.0)
@@ -290,10 +300,68 @@ void process(const Filter& filter,
 	      << std::endl;
 }
 
+
+struct KBestCount
+{
+  double operator()(const phrase_pair_type& phrase_pair) const
+  {
+    return phrase_pair.counts.front();
+  }
+};
+
+struct KBestJoint
+{
+  double operator()(const phrase_pair_type& phrase_pair) const
+  {
+    return ((phrase_pair.counts.front() / phrase_pair.counts_source.front())
+	    * (phrase_pair.counts.front() / phrase_pair.counts_target.front()));
+  }
+};
+
+struct KBestSource
+{
+  double operator()(const phrase_pair_type& phrase_pair) const
+  {
+    return (phrase_pair.counts.front() / phrase_pair.counts_target.front());
+  }
+};
+
+struct KBestTarget
+{
+  double operator()(const phrase_pair_type& phrase_pair) const
+  {
+    return (phrase_pair.counts.front() / phrase_pair.counts_source.front());
+  }
+};
+
+template <typename Filter, typename Scorer>
+void process_kbest_score(const Filter& filter,
+			 const Scorer& scorer,
+			 std::istream& is,
+			 std::ostream& os);
+
 template <typename Filter>
 void process_kbest(const Filter& filter,
 		   std::istream& is,
 		   std::ostream& os)
+{
+  if (kbest_count)
+    process_kbest_score(filter, KBestCount(), is, os);
+  else if (kbest_joint)
+    process_kbest_score(filter, KBestJoint(), is, os);
+  else if (kbest_source)
+    process_kbest_score(filter, KBestSource(), is, os);
+  else if (kbest_target)
+    process_kbest_score(filter, KBestTarget(), is, os);
+  else
+    throw std::runtime_error("no kbest scorer?");
+}
+
+template <typename Filter, typename Scorer>
+void process_kbest_score(const Filter& filter,
+			 const Scorer& scorer,
+			 std::istream& is,
+			 std::ostream& os)
 {
   size_t num_samples = 0;
   size_t num_survived = 0;
@@ -317,13 +385,18 @@ void process_kbest(const Filter& filter,
     
     if (phrase_pair.source != source_prev) {
       if (! heap.empty()) {
-	if (heap.size() <= nbest) {
-	  heap_type::iterator iter_end = heap.end();
-	  for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter, ++ num_survived)
-	    os << iter->line << '\n';
+	if (heap.size() <= kbest) {
+	  heap_type::iterator iter_begin = heap.begin();
+	  heap_type::iterator iter_kbest = heap.end();
+	  heap_type::iterator iter       = heap.end();
+	  
+	  for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
+	    os << iter_begin->line << '\n';
+	    std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+	  }
 	} else {
 	  heap_type::iterator iter_begin = heap.begin();
-	  heap_type::iterator iter_kbest = heap.end() - nbest;
+	  heap_type::iterator iter_kbest = heap.end() - kbest;
 	  heap_type::iterator iter       = heap.end();
 	    
 	  for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
@@ -347,9 +420,9 @@ void process_kbest(const Filter& filter,
       
     // push-heap and swap line
     // we memorize the temporary score_min and perform pruning
-    const double& score = phrase_pair.counts.front();
-      
-    if (heap.size() >= nbest) {
+    const double score = scorer(phrase_pair);
+    
+    if (heap.size() >= kbest) {
       if (score < score_min)
 	continue;
     } else
@@ -361,15 +434,20 @@ void process_kbest(const Filter& filter,
   }
     
   if (! heap.empty()) {
-    if (heap.size() <= nbest) {
-      heap_type::iterator iter_end = heap.end();
-      for (heap_type::iterator iter = heap.begin(); iter != iter_end; ++ iter, ++ num_survived)
-	os << iter->line << '\n';
+    if (heap.size() <= kbest) {
+      heap_type::iterator iter_begin = heap.begin();
+      heap_type::iterator iter_kbest = heap.end();
+      heap_type::iterator iter       = heap.end();
+      
+      for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
+	os << iter_begin->line << '\n';
+	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
+      }
     } else {
       heap_type::iterator iter_begin = heap.begin();
-      heap_type::iterator iter_kbest = heap.end() - nbest;
+      heap_type::iterator iter_kbest = heap.end() - kbest;
       heap_type::iterator iter       = heap.end();
-	    
+      
       for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
 	os << iter_begin->line << '\n';
 	std::pop_heap(iter_begin, iter, std::less<score_phrase_pair_type>());
@@ -400,7 +478,12 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("nbest",     po::value<size_t>(&nbest)->default_value(nbest),         "nbest of pairs (wrt to joint-count)")
+    ("kbest",        po::value<size_t>(&kbest)->default_value(kbest), "kbest of pairs (wrt to joint-count by default)")
+    ("kbest-count",  po::bool_switch(&kbest_count),                   "count based kbest")
+    ("kbest-joing",  po::bool_switch(&kbest_joint),                   "joint probability based kbest (P(f|e) * P(e|f))")
+    ("kbest-source", po::bool_switch(&kbest_source),                  "source probability based kbest P(f|e)")
+    ("kbest-target", po::bool_switch(&kbest_target),                  "target probability based kbest P(e|f)")
+
     ("cutoff",    po::value<double>(&cutoff)->default_value(cutoff),       "cutoff count")
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "probability threshold")
     ("sigtest",   po::value<double>(&sigtest)->default_value(sigtest),     "significant test threshold relative to 1-1-1-N log-p-value")
