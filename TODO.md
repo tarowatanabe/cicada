@@ -220,7 +220,3 @@ Revise and test restaurtna implementation:
    when decrementing counts.
 
 
-Add significance testing for phrase model and synchronous CFG (but
-probably not for synchronous-TSG...)
-
-

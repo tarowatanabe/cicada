@@ -92,7 +92,10 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
    - Tree-to-tree rule extraction from forest [17] (experimental)
    - max-scope constraints to limit the grammar size [34]
    
-   - After count extraction, you can perform map/reduce to compute model scores [19]
+   - After count extraction, you can perform map/reduce to compute
+     model scores [19]
+	 
+   - Then, prune your model based on Fisher's exact test [38]
 
 Various learning components are implemented:
 
@@ -587,4 +590,17 @@ References
   publisher = {Association for Computational Linguistics},
   pages     = {253--262},
   url       = {http://www.aclweb.org/anthology/N12-1026}
+}
+
+[38]
+@InProceedings{johnson-EtAl:2007:EMNLP-CoNLL2007,
+  author    = {Johnson, Howard  and  Martin, Joel  and  Foster, George  and  Kuhn, Roland},
+  title     = {Improving Translation Quality by Discarding Most of the Phrasetable},
+  booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
+  month     = {June},
+  year      = {2007},
+  address   = {Prague, Czech Republic},
+  publisher = {Association for Computational Linguistics},
+  pages     = {967--975},
+  url       = {http://www.aclweb.org/anthology/D/D07/D07-1103}
 }

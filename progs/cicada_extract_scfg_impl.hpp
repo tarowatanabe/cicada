@@ -310,99 +310,8 @@ struct ExtractSCFG
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
   
-#if 0
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
-#endif
-
-  struct rule_pair_set_type
-  {
-    typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-				 std::allocator<rule_pair_type> >::type count_set_type;
-    
-    typedef count_set_type::size_type       size_type;
-    typedef count_set_type::difference_type difference_type;
-    
-    typedef count_set_type::const_iterator const_iterator;
-    typedef count_set_type::iterator       iterator;
-    
-    struct string_hash : public utils::hashmurmur3<size_t>
-    {
-      typedef utils::hashmurmur3<size_t> hasher_type;
-      size_t operator()(const std::string& x) const
-      {
-	return hasher_type::operator()(x.begin(), x.end(), 0);
-      }
-    };
-    
-    struct string_unassigned
-    {
-      const std::string& operator()() const
-      {
-	static std::string __str;
-	return __str;
-      }
-    };
-    
-#if 0
-    typedef utils::unordered_set<std::string, string_hash, std::equal_to<std::string>,
-				 std::allocator<std::string> >::type unique_set_type;
-#endif
-    typedef utils::compact_set<std::string,
-			       string_unassigned, string_unassigned,
-			       string_hash, std::equal_to<std::string>,
-			       std::allocator<std::string> > unique_set_type;
-
-    void erase(iterator iter)
-    {
-      counts.erase(iter);
-    }
-
-    void erase(const_iterator iter)
-    {
-      counts.erase(iter);
-    }
-    
-    const_iterator begin() const { return counts.begin(); }
-    iterator begin() { return counts.begin(); }
-    
-    const_iterator end() const { return counts.end(); }
-    iterator end() { return counts.end(); }
-    
-    std::pair<iterator, bool> insert(const rule_pair_type& x)
-    {
-      std::pair<iterator, bool> result = counts.insert(x);
-      
-      if (result.second) {
-	const_cast<rule_pair_type&>(*(result.first)).source = *(sources.insert(x.source).first);
-	const_cast<rule_pair_type&>(*(result.first)).target = *(targets.insert(x.target).first);
-      }
-      
-      return result;
-    }
-    
-    size_type size() const { return counts.size(); }
-    bool empty() const { return counts.empty(); }
-
-    void swap(rule_pair_set_type& x)
-    {
-      counts.swap(x.counts);
-      sources.swap(x.sources);
-      targets.swap(x.targets);
-    }
-    
-    void clear()
-    {
-      counts.clear();
-      sources.clear();
-      targets.clear();
-    }
-    
-  private:
-    count_set_type  counts;
-    unique_set_type sources;
-    unique_set_type targets;
-  };
 
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
@@ -854,15 +763,18 @@ struct ExtractSCFG
     
     rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
+      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
+
+      const_cast<phrase_type&>(riter->source) = *result_source.first;
+      const_cast<phrase_type&>(riter->target) = *result_target.first;
+      
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
       if (! result.second)
 	rule_pair.count += riter->count;
-      
-      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
-      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
       
       rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
       rule_pair.freqs[1] += result_source.second;
@@ -920,15 +832,19 @@ struct ExtractSCFG
       
       rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
       for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+	std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
+	std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
+	
+      const_cast<phrase_type&>(riter->source) = *result_source.first;
+      const_cast<phrase_type&>(riter->target) = *result_target.first;
+
 	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
 	
 	rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
 	
 	if (! result.second)
 	  rule_pair.count += riter->count;
-	
-	std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
-	std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
+	else
 	
 	rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
 	rule_pair.freqs[1] += result_source.second;
@@ -1101,15 +1017,18 @@ struct ExtractSCFG
     
     rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
+      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
+
+      const_cast<phrase_type&>(riter->source) = *result_source.first;
+      const_cast<phrase_type&>(riter->target) = *result_target.first;
+      
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
       if (! result.second)
 	rule_pair.count += riter->count;
-      
-      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(rule_pair.source);
-      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(rule_pair.target);
       
       rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
       rule_pair.freqs[1] += result_source.second;
