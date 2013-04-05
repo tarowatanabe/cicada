@@ -1070,7 +1070,7 @@ struct Fisher
       log_p += std::log(b) + std::log(c) - std::log(a + 1) - std::log(d + 1);
       
       if (! std::isfinite(log_p))
-	return std::numeric_limits<double>::infinity();
+	return log_total_p;
       
       log_total_p = utils::mathop::logsum(log_total_p, log_p);
     }
