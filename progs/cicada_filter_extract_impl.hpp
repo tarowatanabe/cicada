@@ -1067,10 +1067,7 @@ struct Fisher
     
     const count_type total_count = utils::bithack::min(b, c);
     for (count_type i = 0; i < total_count; ++ i, ++ a, -- b, -- c, ++ d) {
-      log_p += (utils::mathop::log<double>(b)
-		+ utils::mathop::log<double>(c)
-		- utils::mathop::log<double>(a + 1)
-		- utils::mathop::log<double>(d + 1));
+      log_p += std::log(b) + std::log(c) - std::log(a + 1) - std::log(d + 1);
       
       if (! std::isfinite(log_p))
 	return std::numeric_limits<double>::infinity();
