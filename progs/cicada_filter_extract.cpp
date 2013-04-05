@@ -187,13 +187,13 @@ struct FilterSigtest
     const count_type n = statistic.bitext;
     
     double log_p = (utils::mathop::lgamma<double>(1+a+c)
-		    + utils::mathop::lgamma<double>(1+b+d)
 		    + utils::mathop::lgamma<double>(1+a+b)
-		    + utils::mathop::lgamma<double>(1+c+d)
-		    - utils::mathop::lgamma<double>(1+n)
 		    - utils::mathop::lgamma<double>(1+a)
 		    - utils::mathop::lgamma<double>(1+b)
 		    - utils::mathop::lgamma<double>(1+c)
+		    + utils::mathop::lgamma<double>(1+b+d)
+		    - utils::mathop::lgamma<double>(1+n)
+		    + utils::mathop::lgamma<double>(1+c+d)
 		    - utils::mathop::lgamma<double>(1+d));
     
     if (! std::isfinite(log_p))
