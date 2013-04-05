@@ -195,12 +195,9 @@ struct FilterSigtest
 		    - utils::mathop::lgamma<double>(1+b)
 		    - utils::mathop::lgamma<double>(1+c)
 		    - utils::mathop::lgamma<double>(1+d));
-
+    
     if (! std::isfinite(log_p))
-      throw std::runtime_error("invalid logfisher! " + boost::lexical_cast<std::string>(log_p)
-			       + ' ' + boost::lexical_cast<std::string>(cfe)
-			       + ' ' + boost::lexical_cast<std::string>(cf)
-			       + ' ' + boost::lexical_cast<std::string>(ce));
+      return - std::numeric_limits<double>::infinity();
     
     double log_total_p = log_p;
     
@@ -209,10 +206,7 @@ struct FilterSigtest
       log_p += (std::log(b) + std::log(c) - std::log(a + 1) - std::log(d + 1));
       
       if (! std::isfinite(log_p))
-	throw std::runtime_error("invalid logfisher....! " + boost::lexical_cast<std::string>(log_p)
-				 + ' ' + boost::lexical_cast<std::string>(cfe)
-				 + ' ' + boost::lexical_cast<std::string>(cf)
-				 + ' ' + boost::lexical_cast<std::string>(ce));
+	return - std::numeric_limits<double>::infinity();
       
       log_total_p = utils::mathop::logsum(log_total_p, log_p);
     }

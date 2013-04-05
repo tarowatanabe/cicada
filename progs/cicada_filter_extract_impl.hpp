@@ -1059,6 +1059,9 @@ struct Fisher
 		    - utils::mathop::lgamma<double>(1+b)
 		    - utils::mathop::lgamma<double>(1+c)
 		    - utils::mathop::lgamma<double>(1+d));
+
+    if (! std::isfinite(log_p))
+      return std::numeric_limits<double>::infinity();
     
     double log_total_p = log_p;
     
@@ -1068,6 +1071,9 @@ struct Fisher
 		+ utils::mathop::log<double>(c)
 		- utils::mathop::log<double>(a + 1)
 		- utils::mathop::log<double>(d + 1));
+      
+      if (! std::isfinite(log_p))
+	return std::numeric_limits<double>::infinity();
       
       log_total_p = utils::mathop::logsum(log_total_p, log_p);
     }
