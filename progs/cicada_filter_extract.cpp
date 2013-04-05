@@ -387,7 +387,7 @@ void process_kbest_score(const Filter& filter,
       if (! heap.empty()) {
 	if (heap.size() <= kbest) {
 	  heap_type::iterator iter_begin = heap.begin();
-	  heap_type::iterator iter_kbest = heap.end();
+	  heap_type::iterator iter_kbest = heap.begin();
 	  heap_type::iterator iter       = heap.end();
 	  
 	  for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
@@ -436,7 +436,7 @@ void process_kbest_score(const Filter& filter,
   if (! heap.empty()) {
     if (heap.size() <= kbest) {
       heap_type::iterator iter_begin = heap.begin();
-      heap_type::iterator iter_kbest = heap.end();
+      heap_type::iterator iter_kbest = heap.begin();
       heap_type::iterator iter       = heap.end();
       
       for (/**/; iter_kbest != iter; -- iter, ++ num_survived) {
