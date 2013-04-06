@@ -1944,11 +1944,19 @@ namespace cicada
       } else if (attribute_size != static_cast<int>(boost::fusion::get<4>(rule).size()))
 	throw std::runtime_error("invalid # of attributes...");
       
-      for (int feature = 0; feature < feature_size; ++ feature)
+      for (int feature = 0; feature < feature_size; ++ feature) {
+	if (boost::fusion::get<3>(rule)[feature] <= boost::numeric::bounds<score_type>::lowest()) 
+	  throw std::runtime_error("we are unable to handle such a lower feature value");
+	
 	score_streams[feature].ostream->write((char*) &boost::fusion::get<3>(rule)[feature], sizeof(score_type));
+      }
       
-      for (int attribute = 0; attribute < attribute_size; ++ attribute)
+      for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+	if (boost::fusion::get<4>(rule)[attribute] <= boost::numeric::bounds<score_type>::lowest())
+	  throw std::runtime_error("we are unable to handle such a lower attribute value");
+
 	attr_streams[attribute].ostream->write((char*) &boost::fusion::get<4>(rule)[attribute], sizeof(score_type));
+      }
       
       // encode target...
       encode_phrase(target, codes_target);

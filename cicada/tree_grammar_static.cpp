@@ -1947,11 +1947,19 @@ namespace cicada
       } else if (attribute_size != static_cast<int>(attrs.size()))
 	throw std::runtime_error("invalid # of attributes...");
       
-      for (int feature = 0; feature < feature_size; ++ feature)
+      for (int feature = 0; feature < feature_size; ++ feature) {
+	if (scores[feature] <= boost::numeric::bounds<score_type>::lowest())
+	  throw std::runtime_error("we are unable to handle such a lower feature value");
+	  
 	score_streams[feature].ostream->write((char*) &scores[feature], sizeof(score_type));
+      }
       
-      for (int attribute = 0; attribute < attribute_size; ++ attribute)
+      for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+	if (attrs[attribute] <= boost::numeric::bounds<score_type>::lowest())
+	  throw std::runtime_error("we are unable to handle such a lower feature value");
+	
 	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
+      }
       
       buffer_target.clear();
       //tree_rule_encode(target, std::back_inserter(buffer_target));

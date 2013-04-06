@@ -131,6 +131,11 @@ struct RulePair
   freqs_type     freqs;
 
   RulePair() : source(), target(), alignment(), count(0), freqs() {}
+  RulePair(const phrase_type& __source,
+	   const phrase_type& __target,
+	   const alignment_type& __alignment,
+	   const count_type& __count)
+    : source(__source), target(__target), alignment(__alignment), count(__count), freqs() {}
 
   friend
   size_t hash_value(RulePair const& x)
@@ -309,22 +314,87 @@ struct ExtractSCFG
   typedef RulePair rule_pair_type;
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
+
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+
+  typedef std::pair<const phrase_type, bool> rule_compact_type;
+  
+  typedef utils::unordered_map<phrase_type,
+			       bool,
+			       string_hash,
+			       std::equal_to<phrase_type>,
+			       std::allocator<std::pair<const phrase_type, bool> > >::type rule_compact_set_type;
+
+  struct RulePairCompact
+  {
+    typedef rule_pair_type::alignment_type alignment_type;
+    
+    const rule_compact_type* source;
+    const rule_compact_type* target;
+    alignment_type           alignment;
+    count_type               count;
+    
+    RulePairCompact() : source(), target(), alignment(), count(0) {}
+
+    friend
+    size_t hash_value(RulePairCompact const& x)
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      
+      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
+    }
+    
+    friend
+    bool operator==(const RulePairCompact& x, const RulePairCompact& y) 
+    {
+      return x.source == y.source && x.target == y.target && x.alignment == y.alignment;
+    }
+    
+    friend
+    bool operator!=(const RulePairCompact& x, const RulePairCompact& y)
+    {
+      return x.source != y.source || x.target != y.target || x.alignment != y.alignment;
+    }
+  };
+  
+  typedef RulePairCompact rule_pair_compact_type;
+  
+  typedef utils::unordered_set<rule_pair_compact_type, boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
+			       std::allocator<rule_pair_compact_type> >::type rule_pair_compact_set_type;
   
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
+  typedef std::pair<const rule_compact_type*, const rule_compact_type*> unique_pair_type;
+  
+  struct unique_pair_unassigned
+  {
+    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+  };
+  
+  typedef utils::compact_set<unique_pair_type,
+			     unique_pair_unassigned, unique_pair_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
+			     std::allocator<unique_pair_type> > unique_pair_set_type;
+  
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_multiple_type;
-
+  
   typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   
   typedef std::pair<span_type, span_type> span_parent_type;
-
-
+  
   ExtractSCFG(const int __max_length,
 	      const int __max_fertility,
 	      const int __max_span_source,
@@ -540,36 +610,10 @@ struct ExtractSCFG
     }
   };
 
-  rule_pair_set_type rule_pairs_local;
-  
-  struct string_hash : public utils::hashmurmur3<size_t>
-  {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    size_t operator()(const std::string& x) const
-    {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
-    }
-  };
-  
-  typedef utils::unordered_set<std::string,
-			       string_hash, std::equal_to<std::string>,
-			       std::allocator<std::string> >::type unique_set_type;
-  
-  typedef std::pair<const std::string*, const std::string*> unique_pair_type;
-  
-  struct unique_pair_unassigned
-  {
-    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
-  };
-  
-  typedef utils::compact_set<unique_pair_type,
-			     unique_pair_unassigned, unique_pair_unassigned,
-			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
-			     std::allocator<unique_pair_type> > unique_pair_set_type;
-
-  unique_set_type      uniques_source;
-  unique_set_type      uniques_target;
-  unique_pair_set_type uniques_pair;
+  rule_pair_compact_set_type rule_pairs_local;
+  rule_compact_set_type      rules_source;
+  rule_compact_set_type      rules_target;
+  unique_pair_set_type       uniques_pair;
   
   template <typename Dumper>
   void operator()(const sentence_type& source,
@@ -607,30 +651,35 @@ struct ExtractSCFG
 				const Category& category,
 				const Dumper& dumper)
   {
-    typedef utils::chunk_vector<rule_pair_type, 4096 / sizeof(rule_pair_type), std::allocator<rule_pair_type> > rule_pair_list_type;
+    typedef utils::chunk_vector<rule_pair_compact_type, 4096 / sizeof(rule_pair_compact_type), std::allocator<rule_pair_compact_type> > rule_pair_compact_list_type;
     
     const int source_length = source.size();
     const int target_length = target.size();
 
     const span_pair_type span(span_type(0, source_length), span_type(0, target_length));
     
-    rule_pair_list_type rule_pair_list;
-    rule_pair_type rule_pair;
+    rule_pair_compact_list_type rule_pair_list;
+    rule_pair_compact_type      rule_pair;
+    
+    rule_pairs_local.clear();
+    rules_source.clear();
+    rules_target.clear();
     
     if (! exclude) // phrasal rule
       if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  extract_rule(source, target, span, category, rule_pair, true);
 	  
-	  rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first));
+	  rule_pair_type& rule_pair_new = const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair_type(rule_pair.source->first,
+													 rule_pair.target->first,
+													 rule_pair.alignment,
+													 rule_pair.count)).first));
 	  
-	  rule_pair.count += 1;
-	  rule_pair.freqs[0] += 1;
-	  rule_pair.freqs[1] += 1;
-	  rule_pair.freqs[2] += 1;
+	  rule_pair_new.count += 1;
+	  rule_pair_new.freqs[0] += 1;
+	  rule_pair_new.freqs[1] += 1;
+	  rule_pair_new.freqs[2] += 1;
 	}
-
-    rule_pairs_local.clear();
     
     const int source_count = alignment_count_source[span.source.second] - alignment_count_source[span.source.first];
     //const int target_count = alignment_count_target[span.target.second] - alignment_count_target[span.target.first];
@@ -752,48 +801,49 @@ struct ExtractSCFG
     if (! rule_pair_list.empty()) {
       const double count = 1.0 / rule_pair_list.size();
       
-      rule_pair_list_type::const_iterator riter_end = rule_pair_list.end();
-      for (rule_pair_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
-	const_cast<rule_pair_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
+      rule_pair_compact_list_type::const_iterator riter_end = rule_pair_list.end();
+      for (rule_pair_compact_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
+	const_cast<rule_pair_compact_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
     }
     
-    uniques_source.clear();
-    uniques_target.clear();
     uniques_pair.clear();
     
-    rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
-      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
+    rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+      const bool unique_source = ! riter->source->second;
+      const bool unique_target = ! riter->target->second;
 
-      const_cast<phrase_type&>(riter->source) = *result_source.first;
-      const_cast<phrase_type&>(riter->target) = *result_target.first;
+      const_cast<bool&>(riter->source->second) = true;
+      const_cast<bool&>(riter->target->second) = true;
       
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
+											      riter->target->first,
+											      riter->alignment,
+											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
       if (! result.second)
 	rule_pair.count += riter->count;
       
-      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
-      rule_pair.freqs[1] += result_source.second;
-      rule_pair.freqs[2] += result_target.second;
+      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(riter->source, riter->target)).second;;
+      rule_pair.freqs[1] += unique_source;
+      rule_pair.freqs[2] += unique_target;
       
       rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
-    uniques_source.clear();
-    uniques_target.clear();
+    rules_source.clear();
+    rules_target.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
     
     if (rule_pairs.empty()) {
-      rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
-      unique_set_type(uniques_source).swap(uniques_source);
-      unique_set_type(uniques_target).swap(uniques_target);
+      rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
+      rule_compact_set_type(rules_source).swap(rules_source);
+      rule_compact_set_type(rules_target).swap(rules_target);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -806,14 +856,16 @@ struct ExtractSCFG
 		     const Category& category,
 		     const Dumper& dumper)
   {
-    typedef utils::chunk_vector<rule_pair_type, 4096 / sizeof(rule_pair_type), std::allocator<rule_pair_type> > rule_pair_list_type;
+    typedef utils::chunk_vector<rule_pair_compact_type, 4096 / sizeof(rule_pair_compact_type), std::allocator<rule_pair_compact_type> > rule_pair_compact_list_type;
 
-    rule_pair_list_type rule_pair_list;
-    rule_pair_type rule_pair;
+    rule_pair_compact_list_type rule_pair_list;
+    rule_pair_compact_type      rule_pair;
+
+    rule_pairs_local.clear();
+    rules_source.clear();
+    rules_target.clear();
     
     if (! exclude) { // phrase extraction
-      rule_pairs_local.clear();
-      
       span_pair_set_type::const_iterator iter_end = spans.end();
       for (span_pair_set_type::const_iterator iter = spans.begin(); iter != iter_end; ++ iter) {
 	const int source_length = iter->source.second - iter->source.first;
@@ -822,53 +874,10 @@ struct ExtractSCFG
 	if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
 	  if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	    extract_rule(source, target, *iter, category, rule_pair);
-	    const_cast<rule_pair_type&>(*(rule_pairs_local.insert(rule_pair).first)).count += 1;
+	    const_cast<rule_pair_compact_type&>(*(rule_pairs_local.insert(rule_pair).first)).count += 1;
 	  }
       }
-      
-      uniques_source.clear();
-      uniques_target.clear();
-      uniques_pair.clear();
-      
-      rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
-      for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-	std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
-	std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
-	
-	const_cast<phrase_type&>(riter->source) = *result_source.first;
-	const_cast<phrase_type&>(riter->target) = *result_target.first;
-
-	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
-	
-	rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
-	
-	if (! result.second)
-	  rule_pair.count += riter->count;
-	else
-	
-	rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
-	rule_pair.freqs[1] += result_source.second;
-	rule_pair.freqs[2] += result_target.second;
-
-	rule_pairs_local.erase(riter ++);
-      }
-      
-      rule_pairs_local.clear();
-      uniques_source.clear();
-      uniques_target.clear();
-      uniques_pair.clear();
-      
-      dumper(rule_pairs);
-      
-      if (rule_pairs.empty()) {
-	rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
-	unique_set_type(uniques_source).swap(uniques_source);
-	unique_set_type(uniques_target).swap(uniques_target);
-	unique_pair_set_type(uniques_pair).swap(uniques_pair);
-      }
     }
-    
-    rule_pairs_local.clear();
 
     span_pair_set_type::const_iterator iter_begin = (constrained ? spans_unique.begin() : spans.begin());
     span_pair_set_type::const_iterator iter_end   = (constrained ? spans_unique.end()   : spans.end());
@@ -1003,51 +1012,52 @@ struct ExtractSCFG
       if (! rule_pair_list.empty()) {
 	const double count = 1.0 / rule_pair_list.size();
 	
-	rule_pair_list_type::const_iterator riter_end = rule_pair_list.end();
-	for (rule_pair_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
-	  const_cast<rule_pair_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
+	rule_pair_compact_list_type::const_iterator riter_end = rule_pair_list.end();
+	for (rule_pair_compact_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
+	  const_cast<rule_pair_compact_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
 	
 	rule_pair_list.clear();
       }
     }
     
-    uniques_source.clear();
-    uniques_target.clear();
     uniques_pair.clear();
     
-    rule_pair_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(riter->source);
-      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(riter->target);
+    rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+      const bool unique_source = ! riter->source->second;
+      const bool unique_target = ! riter->target->second;
 
-      const_cast<phrase_type&>(riter->source) = *result_source.first;
-      const_cast<phrase_type&>(riter->target) = *result_target.first;
+      const_cast<bool&>(riter->source->second) = true;
+      const_cast<bool&>(riter->target->second) = true;
       
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*riter);
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
+											      riter->target->first,
+											      riter->alignment,
+											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
       
       if (! result.second)
 	rule_pair.count += riter->count;
       
-      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;;
-      rule_pair.freqs[1] += result_source.second;
-      rule_pair.freqs[2] += result_target.second;
+      rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(riter->source, riter->target)).second;;
+      rule_pair.freqs[1] += unique_source;
+      rule_pair.freqs[2] += unique_target;
       
       rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
-    uniques_source.clear();
-    uniques_target.clear();
+    rules_source.clear();
+    rules_target.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
     
     if (rule_pairs.empty()) {
-      rule_pair_set_type(rule_pairs_local).swap(rule_pairs_local);
-      unique_set_type(uniques_source).swap(uniques_source);
-      unique_set_type(uniques_target).swap(uniques_target);
+      rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
+      rule_compact_set_type(rules_source).swap(rules_source);
+      rule_compact_set_type(rules_target).swap(rules_target);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -1117,7 +1127,7 @@ struct ExtractSCFG
 		    const sentence_type& target,
 		    const span_pair_type& spans,
 		    const Category& category,
-		    rule_pair_type& rule_pair,
+		    rule_pair_compact_type& rule_pair,
 		    const bool sentential=false)
   {
     const symbol_type& lhs = (sentential ? vocab_type::S : category(spans));
@@ -1126,13 +1136,13 @@ struct ExtractSCFG
     builder << lhs;
     for (int src = spans.source.first; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = builder;
+    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
 
     builder.clear();
     builder << lhs;
     for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = builder;
+    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
     
     rule_pair.alignment.clear();
     for (int src = spans.source.first; src != spans.source.second; ++ src) {
@@ -1150,7 +1160,7 @@ struct ExtractSCFG
 		    const span_pair_type& spans,
 		    const span_pair_type& spans_nt1,
 		    const Category& category,
-		    rule_pair_type& rule_pair,
+		    rule_pair_compact_type& rule_pair,
 		    const bool sentential=false)
   {
     const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
@@ -1163,7 +1173,7 @@ struct ExtractSCFG
     builder << ' ' << nt1;
     for (int src = spans_nt1.source.second; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = builder;
+    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
     
     builder.clear();
     builder << lhs;
@@ -1172,7 +1182,7 @@ struct ExtractSCFG
     builder << ' ' << nt1;
     for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = builder;
+    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
 
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
@@ -1207,7 +1217,7 @@ struct ExtractSCFG
 		    const span_pair_type& __spans_nt1,
 		    const span_pair_type& __spans_nt2,
 		    const Category& category,
-		    rule_pair_type& rule_pair,
+		    rule_pair_compact_type& rule_pair,
 		    const bool sentential=false)
   {
     // we will reorder wrt source side spans...
@@ -1229,7 +1239,7 @@ struct ExtractSCFG
     builder << ' ' << nt2;
     for (int src = spans_nt2.source.second; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = builder;
+    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
     
     builder.clear();
     builder << lhs;
@@ -1252,7 +1262,7 @@ struct ExtractSCFG
       for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
 	builder << ' ' << target[trg];
     }
-    rule_pair.target = builder;
+    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
     
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
@@ -1312,7 +1322,7 @@ struct ExtractSCFG
 		    const span_pair_type& __spans_nt2,
 		    const span_pair_type& __spans_nt3,
 		    const Category& category,
-		    rule_pair_type& rule_pair,
+		    rule_pair_compact_type& rule_pair,
 		    const bool sentential=false)
   {
     typedef std::pair<span_type, symbol_type> span_category_type;
@@ -1346,7 +1356,7 @@ struct ExtractSCFG
     builder << ' ' << cat[2];
     for (int src = spans_nt[2].source.second; src != spans.source.second; ++ src)
       builder << ' '  << source[src];
-    rule_pair.source = builder;
+    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 3> spans_cat;
@@ -1369,7 +1379,7 @@ struct ExtractSCFG
     builder << ' ' << spans_cat[2].second;
     for (int trg = spans_cat[2].first.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = builder;
+    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
     
     const int nt1_source_size = spans_nt[0].source.second - spans_nt[0].source.first;
     const int nt2_source_size = spans_nt[1].source.second - spans_nt[1].source.first;
@@ -1424,7 +1434,7 @@ struct ExtractSCFG
 		    const span_pair_type& __spans_nt3,
 		    const span_pair_type& __spans_nt4,
 		    const Category& category,
-		    rule_pair_type& rule_pair,
+		    rule_pair_compact_type& rule_pair,
 		    const bool sentential=false)
   {
     typedef std::pair<span_type, symbol_type> span_category_type;
@@ -1463,7 +1473,7 @@ struct ExtractSCFG
     builder << ' ' << cat[3];
     for (int src = spans_nt[3].source.second; src != spans.source.second; ++ src)
       builder << ' '  << source[src];
-    rule_pair.source = builder;
+    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 4> spans_cat;
@@ -1490,7 +1500,7 @@ struct ExtractSCFG
     builder << ' ' << spans_cat[3].second;
     for (int trg = spans_cat[3].first.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = builder;
+    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
     
     const int nt1_source_size = spans_nt[0].source.second - spans_nt[0].source.first;
     const int nt2_source_size = spans_nt[1].source.second - spans_nt[1].source.first;
@@ -1821,8 +1831,6 @@ struct Task
     
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
     
-    const int iter_mask = (1 << 4) - 1;
-    
     for (int iter = 0;/**/; ++ iter) {
       bitext.clear();
       queue.pop_swap(bitext);
@@ -1830,9 +1838,6 @@ struct Task
       if (bitext.source.empty()) break;
       
       extractor(bitext.source, bitext.target, bitext.alignment, bitext.spans_source, bitext.spans_target, rule_pairs, dumper);
-      
-      if ((iter & iter_mask) == iter_mask)
-	dumper(rule_pairs);
     }
     
     dumper.dump(rule_pairs);
