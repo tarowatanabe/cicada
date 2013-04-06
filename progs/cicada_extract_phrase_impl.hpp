@@ -375,6 +375,66 @@ struct ExtractPhrase
   phrase_compact_set_type uniques_source;
   phrase_compact_set_type uniques_target;
   unique_pair_set_type    uniques_pair;
+
+  struct Builder
+  {
+    typedef std::vector<char, std::allocator<char> > buffer_type;
+    
+    typedef buffer_type::iterator       iterator;
+    typedef buffer_type::const_iterator const_iterator;
+    
+    friend
+    Builder& operator<<(Builder& builder, const Builder& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.buffer.begin(), x.buffer.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const sentence_type::value_type& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.begin(), x.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const std::string& x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x.begin(), x.end());
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const char* x)
+    {
+      builder.buffer.insert(builder.buffer.end(), x, x + std::strlen(x));
+      return builder;
+    }
+    
+    template <size_t N>
+    friend
+    Builder& operator<<(Builder& builder, const char (&x)[N])
+    {
+      builder.buffer.insert(builder.buffer.end(), x, x + N);
+      return builder;
+    }
+
+    friend
+    Builder& operator<<(Builder& builder, const char x)
+    {
+      builder.buffer.push_back(x);
+      return builder;
+    }
+    
+    void clear() { buffer.clear(); }
+
+    operator std::string() const { return std::string(buffer.begin(), buffer.end()); }
+    
+  private:
+    buffer_type buffer;
+  };
+
+  Builder builder;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -542,21 +602,23 @@ struct ExtractPhrase
       const int& target_last  = siter->target.second;
       
       if (! phrases_source(source_first, source_last)) {
-	phrase_type phrase;
-	for (int i = source_first; i != source_last - 1; ++ i)
-	  phrase += static_cast<const std::string&>(source[i]) + ' ';
-	phrase += static_cast<const std::string&>(source[source_last - 1]);
 
-	phrases_source(source_first, source_last) = &(*uniques_source.insert(std::make_pair(phrase, false)).first);
+	builder.clear();
+	for (int i = source_first; i != source_last - 1; ++ i)
+	  builder << source[i] << ' ';
+	builder << source[source_last - 1];
+	
+	phrases_source(source_first, source_last) = &(*uniques_source.insert(phrase_compact_type(builder, false)).first);
       }
       
       if (! phrases_target(target_first, target_last)) {
-	phrase_type phrase;
+	
+	builder.clear();
 	for (int i = target_first; i != target_last - 1; ++ i)
-	  phrase += static_cast<const std::string&>(target[i]) + ' ';
-	phrase += static_cast<const std::string&>(target[target_last - 1]);
+	  builder << target[i] << ' ';
+	builder << target[target_last - 1];
 
-	phrases_target(target_first, target_last) = &(*uniques_target.insert(std::make_pair(phrase, false)).first);
+	phrases_target(target_first, target_last) = &(*uniques_target.insert(phrase_compact_type(builder, false)).first);
       }
       
       // work with this span!
