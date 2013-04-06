@@ -106,15 +106,14 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
     namespace standard = boost::spirit::standard;
     
     word    %= qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
-    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))];
-    
     tokens  %= *word;
+    
+    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
+    features %= -(feature % (+standard::space));
+    
     remains %= *qi::lexeme[+(standard::char_ - standard::space)];
     
-    feature_value %= feature >> '=' >> qi::double_;
-    features %= -(feature_value % (+standard::space));
-    
-    kbest %= size >> "|||" >> tokens >> "|||" >> features >> -("|||" >> remains) >> (qi::eol | qi::eoi);
+    kbest %= size >> "|||" >> tokens >> "|||" >> features >> -qi::omit["|||" >> remains] >> (qi::eol | qi::eoi);
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
@@ -124,9 +123,8 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   boost::spirit::qi::rule<Iterator, std::string(), blank_type> word;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
   
-  boost::spirit::qi::rule<Iterator, std::string(), blank_type>        feature;
-  boost::spirit::qi::rule<Iterator, feature_value_type(), blank_type> feature_value;
-  boost::spirit::qi::rule<Iterator, features_type(), blank_type>      features;
+  boost::spirit::qi::rule<Iterator, std::pair<std::string, double>()> feature;
+  boost::spirit::qi::rule<Iterator, features_type()>                  features;
 
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
   
@@ -266,7 +264,7 @@ int main(int argc, char** argv)
 	    
 	    if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	      if (iter != iter_end)
-		throw std::runtime_error("kbest parsing failed");
+		throw std::runtime_error("kbest parsing failed: merge+directory");
 	  
 	    if (! removes.empty()) {
 	      features_removed.clear();
@@ -303,7 +301,7 @@ int main(int argc, char** argv)
 	  
 	  if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	    if (iter != iter_end)
-	      throw std::runtime_error("kbest parsing failed");
+	      throw std::runtime_error("kbest parsing failed: merge");
 	  
 	  if (! removes.empty()) {
 	    features_removed.clear();
@@ -368,6 +366,10 @@ int main(int argc, char** argv)
       }
       
     } else if (lattice_mode) {
+      namespace qi = boost::spirit::qi;
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+
       typedef std::deque<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
       typedef cicada::Sentence sentence_type;
       typedef cicada::Lattice  lattice_type;
@@ -396,9 +398,9 @@ int main(int argc, char** argv)
 	boost::fusion::get<1>(kbest).clear();
 	boost::fusion::get<2>(kbest).clear();
       
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	if (! qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	  if (iter != iter_end)
-	    throw std::runtime_error("kbest parsing failed");
+	    throw std::runtime_error("kbest parsing failed: lattice");
 	
 	if (! removes.empty()) {
 	  features_removed.clear();
@@ -500,7 +502,7 @@ int main(int argc, char** argv)
 	  
 	  if (! qi::phrase_parse(iter, iter_end, parser, standard::blank, kbest))
 	    if (iter != iter_end)
-	      throw std::runtime_error("kbest parsing failed");
+	      throw std::runtime_error("kbest parsing failed: filter");
 	  
 	  if (! removes.empty()) {
 	    features_removed.clear();

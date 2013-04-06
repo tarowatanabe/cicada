@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // evaluation tool....
@@ -24,6 +24,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/random.hpp>
+#include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
 
@@ -50,6 +51,8 @@ bool scorer_list = false;
 bool signtest = false;
 bool bootstrap = false;
 int  samples = 1000;
+
+int threads = 1;
 
 int debug = 0;
 
@@ -520,9 +523,9 @@ void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
   
-  po::options_description opts_config("configuration options");
+  po::options_description opts_command("command line options");
   
-  opts_config.add_options()
+  opts_command.add_options()
     ("tstset",   po::value<path_set_type>(&tstset_files)->multitoken(),  "test set file(s)")
     ("tstset2",  po::value<path_set_type>(&tstset2_files)->multitoken(), "test set file(s)")
     ("refset",   po::value<path_set_type>(&refset_files)->multitoken(),  "reference set file(s)")
@@ -536,18 +539,13 @@ void options(int argc, char** argv)
     ("signtest",  po::bool_switch(&signtest),  "sign test")
     ("bootstrap", po::bool_switch(&bootstrap), "bootstrap resampling")
     ("samples",   po::value<int>(&samples),    "# of samples")
-    ;
-  
-  po::options_description opts_command("command line options");
-  opts_command.add_options()
+    ("threads", po::value<int>(&threads),                "# of threads")
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
-  po::options_description desc_config;
   po::options_description desc_command;
   
-  desc_config.add(opts_config);
-  desc_command.add(opts_config).add(opts_command);
+  desc_command.add(opts_command);
   
   po::variables_map variables;
 
