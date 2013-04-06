@@ -24,6 +24,7 @@
 #include "cicada/alignment.hpp"
 
 #include "utils/unordered_set.hpp"
+#include "utils/unordered_map.hpp"
 #include "utils/chart.hpp"
 #include "utils/compact_set.hpp"
 
@@ -103,14 +104,23 @@ struct PhrasePair
   typedef cicada::Alignment alignment_type;
   typedef int64_t count_type;
   typedef boost::array<count_type, 5+3> counts_type;
-
+  
   phrase_type    source;
   phrase_type    target;
   alignment_type alignment;
   counts_type    counts;
 
   PhrasePair() : source(), target(), alignment(), counts() {}
-
+  PhrasePair(const phrase_type& __source,
+	     const phrase_type& __target,
+	     const alignment_type& __alignment)
+    : source(__source), target(__target), alignment(__alignment), counts() {}
+  PhrasePair(const phrase_type& __source,
+	     const phrase_type& __target,
+	     const alignment_type& __alignment,
+	     const counts_type& __counts)
+    : source(__source), target(__target), alignment(__alignment), counts(__counts) {}
+  
   friend
   size_t hash_value(PhrasePair const& x)
   {
@@ -259,8 +269,75 @@ struct ExtractPhrase
   typedef utils::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
 			       std::allocator<phrase_pair_type> >::type phrase_pair_set_type;
   
-  typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
-  typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
+  struct string_hash : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_t operator()(const std::string& x) const
+    {
+      return hasher_type::operator()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef std::pair<const phrase_type, bool> phrase_compact_type;
+  
+  typedef utils::unordered_map<phrase_type,
+			       bool,
+			       string_hash,
+			       std::equal_to<phrase_type>,
+			       std::allocator<std::pair<const phrase_type, bool> > >::type phrase_compact_set_type;
+  
+  struct PhrasePairCompact
+  {
+    typedef phrase_pair_type::alignment_type alignment_type;
+    
+    const phrase_compact_type* source;
+    const phrase_compact_type* target;
+    alignment_type             alignment;
+    counts_type                counts;
+    
+    PhrasePairCompact() : source(), target(), alignment(), counts() {}
+    
+    friend
+    size_t hash_value(PhrasePairCompact const& x)
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      
+      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
+    }
+    
+    friend
+    bool operator==(const PhrasePairCompact& x, const PhrasePairCompact& y) 
+    {
+      return x.source == y.source && x.target == y.target && x.alignment == y.alignment;
+    }
+    
+    friend
+    bool operator!=(const PhrasePairCompact& x, const PhrasePairCompact& y)
+    {
+      return x.source != y.source || x.target != y.target || x.alignment != y.alignment;
+    }
+  };
+  
+  typedef PhrasePairCompact phrase_pair_compact_type;
+
+  typedef utils::unordered_set<phrase_pair_compact_type, boost::hash<phrase_pair_compact_type>, std::equal_to<phrase_pair_compact_type>,
+			       std::allocator<phrase_pair_compact_type> >::type phrase_pair_compact_set_type;
+
+
+  typedef std::pair<const phrase_compact_type*, const phrase_compact_type*> unique_pair_type;
+  
+  struct unique_pair_unassigned
+  {
+    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+  };
+  
+  typedef utils::compact_set<unique_pair_type,
+			     unique_pair_unassigned, unique_pair_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
+			     std::allocator<unique_pair_type> > unique_pair_set_type;  
+  
+  typedef utils::chart<const phrase_compact_type*, std::allocator<const phrase_compact_type*> > phrase_chart_type;
+  typedef utils::chart<span_type, std::allocator<span_type> >                                   span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
   
   typedef std::vector<int, std::allocator<int> > point_set_type;
@@ -291,37 +368,13 @@ struct ExtractPhrase
 
   span_pair_set_type spans;
   corner_set_type    corners;
-
-  phrase_pair_set_type phrase_pairs_local;
-
-  struct string_hash : public utils::hashmurmur3<size_t>
-  {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    size_t operator()(const std::string& x) const
-    {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
-    }
-  };
   
-  typedef utils::unordered_set<std::string,
-			       string_hash, std::equal_to<std::string>,
-			       std::allocator<std::string> >::type unique_set_type;
-
-  typedef std::pair<const std::string*, const std::string*> unique_pair_type;
+  // local structs
+  phrase_pair_compact_set_type phrase_pairs_local;
   
-  struct unique_pair_unassigned
-  {
-    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
-  };
-  
-  typedef utils::compact_set<unique_pair_type,
-			     unique_pair_unassigned, unique_pair_unassigned,
-			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
-			     std::allocator<unique_pair_type> > unique_pair_set_type;
-  
-  unique_set_type      uniques_source;
-  unique_set_type      uniques_target;
-  unique_pair_set_type uniques_pair;
+  phrase_compact_set_type uniques_source;
+  phrase_compact_set_type uniques_target;
+  unique_pair_set_type    uniques_pair;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -333,6 +386,8 @@ struct ExtractPhrase
     const size_type target_size = target.size();
     
     phrase_pairs_local.clear();
+    uniques_source.clear();
+    uniques_target.clear();
     
     phrases_source.clear();
     phrases_target.clear();
@@ -340,8 +395,8 @@ struct ExtractPhrase
     phrases_source.reserve(source_size + 1);
     phrases_target.reserve(target_size + 1);
     
-    phrases_source.resize(source_size + 1);
-    phrases_target.resize(target_size + 1);
+    phrases_source.resize(source_size + 1, 0);
+    phrases_target.resize(target_size + 1, 0);
     
     alignment_source_target.clear();
     alignment_target_source.clear();
@@ -409,7 +464,7 @@ struct ExtractPhrase
       }
     }
     
-    phrase_pair_type phrase_pair;
+    phrase_pair_compact_type phrase_pair;
     
     // clear span..
     spans.clear();
@@ -486,18 +541,22 @@ struct ExtractPhrase
       const int& target_first = siter->target.first;
       const int& target_last  = siter->target.second;
       
-      if (phrases_source(source_first, source_last).empty()) {
-	phrase_type& phrase = phrases_source(source_first, source_last);
+      if (! phrases_source(source_first, source_last)) {
+	phrase_type phrase;
 	for (int i = source_first; i != source_last - 1; ++ i)
 	  phrase += static_cast<const std::string&>(source[i]) + ' ';
 	phrase += static_cast<const std::string&>(source[source_last - 1]);
+
+	phrases_source(source_first, source_last) = &(*uniques_source.insert(std::make_pair(phrase, false)).first);
       }
       
-      if (phrases_target(target_first, target_last).empty()) {
-	phrase_type& phrase = phrases_target(target_first, target_last);
+      if (! phrases_target(target_first, target_last)) {
+	phrase_type phrase;
 	for (int i = target_first; i != target_last - 1; ++ i)
 	  phrase += static_cast<const std::string&>(target[i]) + ' ';
 	phrase += static_cast<const std::string&>(target[target_last - 1]);
+
+	phrases_target(target_first, target_last) = &(*uniques_target.insert(std::make_pair(phrase, false)).first);
       }
       
       // work with this span!
@@ -517,7 +576,7 @@ struct ExtractPhrase
       const bool connected_left_bottom  = corners(source_first,    target_last + 1).right_top;
       const bool connected_right_bottom = corners(source_last + 1, target_last + 1).left_top;
       
-      phrase_pair_set_type::iterator iter = phrase_pairs_local.find(phrase_pair);
+      phrase_pair_compact_set_type::iterator iter = phrase_pairs_local.find(phrase_pair);
       if (iter == phrase_pairs_local.end())
 	iter = phrase_pairs_local.insert(phrase_pair).first;
       
@@ -532,28 +591,29 @@ struct ExtractPhrase
       counts[4] += (! connected_left_bottom &&   connected_right_bottom);
     }
     
-    uniques_source.clear();
-    uniques_target.clear();
     uniques_pair.clear();
     
-    phrase_pair_set_type::const_iterator piter_end = phrase_pairs_local.end();
-    for (phrase_pair_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; /**/) {
-      std::pair<unique_set_type::iterator, bool> result_source = uniques_source.insert(piter->source);
-      std::pair<unique_set_type::iterator, bool> result_target = uniques_target.insert(piter->target);
+    phrase_pair_compact_set_type::const_iterator piter_end = phrase_pairs_local.end();
+    for (phrase_pair_compact_set_type::const_iterator piter = phrase_pairs_local.begin(); piter != piter_end; /**/) {
+      const bool unique_source = ! piter->source->second;
+      const bool unique_target = ! piter->target->second;
       
-      const_cast<std::string&>(piter->source) = *result_source.first;
-      const_cast<std::string&>(piter->target) = *result_target.first;
+      const_cast<bool&>(piter->source->second) = true;
+      const_cast<bool&>(piter->target->second) = true;
       
-      std::pair<phrase_pair_set_type::iterator, bool> result = phrase_pairs.insert(*piter);
+      std::pair<phrase_pair_set_type::iterator, bool> result = phrase_pairs.insert(phrase_pair_type(piter->source->first,
+												    piter->target->first,
+												    piter->alignment,
+												    piter->counts));
       
       counts_type& counts = const_cast<counts_type&>(result.first->counts);
       
       if (! result.second)
 	std::transform(piter->counts.begin(), piter->counts.end(), counts.begin(), counts.begin(), std::plus<count_type>());
       
-      counts[5] += uniques_pair.insert(std::make_pair(&(*result_source.first), &(*result_target.first))).second;
-      counts[6] += result_source.second;
-      counts[7] += result_target.second;
+      counts[5] += uniques_pair.insert(std::make_pair(piter->source, piter->target)).second;
+      counts[6] += unique_source;
+      counts[7] += unique_target;
       
       phrase_pairs_local.erase(piter ++);
     }
