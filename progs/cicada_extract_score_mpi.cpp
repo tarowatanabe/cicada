@@ -450,7 +450,7 @@ void synchronize_reducer(utils::mpi_intercomm& mapper)
     non_found_iter = loop_sleep(found, non_found_iter);
   }
 }
-
+#if 0
 void reduce_root_counts(root_count_set_type& root_counts)
 {
   typedef utils::mpi_device_source            device_type;
@@ -522,6 +522,96 @@ void reduce_root_counts(root_count_set_type& root_counts)
     root_count_set_type::const_iterator riter_end = root_counts.end();
     for (root_count_set_type::const_iterator riter = root_counts.begin(); riter != riter_end; ++ riter)
       generator(os, *riter) << '\n';
+  }
+}
+#endif
+
+void reduce_root_counts(root_count_set_type& root_counts)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      typedef utils::mpi_device_source            device_type;
+      typedef boost::iostreams::filtering_istream stream_type;
+      
+      typedef boost::shared_ptr<device_type> device_ptr_type;
+      typedef boost::shared_ptr<stream_type> stream_ptr_type;
+      
+      typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+      typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+      
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      device_ptr_set_type device(ranks.size());
+      stream_ptr_set_type stream(ranks.size());
+      
+      for (size_t i = 0; i != ranks.size(); ++ i) {
+	device[i].reset(new device_type(ranks[i], root_count_tag, 1024 * 1024 * 4));
+	stream[i].reset(new stream_type());
+	
+	stream[i]->push(codec::lz4_decompressor());
+	stream[i]->push(*device[i]);
+      }
+      
+      RootCountParser parser;
+      root_count_type root_count;
+      std::string line;
+      
+      int non_found_iter = 0;
+      while (1) {
+	bool found = false;
+	
+	for (size_t i = 0; i != ranks.size(); ++ i)
+	  while (stream[i] && device[i] && device[i]->test()) {
+	    if (std::getline(*stream[i], line)) {
+	      if (! parser(line, root_count)) {
+		std::cerr << "warning: root-count parsing failed: " << line << std::endl;
+		continue;
+	      }
+	      
+	      std::pair<root_count_set_type::iterator, bool> result = root_counts.insert(root_count);
+	      if (! result.second) {
+		const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+		const_cast<root_count_type&>(*result.first).observed += root_count.observed;
+	      }
+	    } else {
+	      stream[i].reset();
+	      device[i].reset();
+	    }
+	    
+	    found = true;
+	  }
+	
+	if (std::count(device.begin(), device.end(), device_ptr_type()) == ranks.size()) break;
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
+    } else {
+      boost::iostreams::filtering_ostream os;
+      os.push(codec::lz4_compressor());
+      os.push(utils::mpi_device_sink(mpi_rank % reduce_size, root_count_tag, 1024 * 1024 * 4));
+      
+      RootCountGenerator generator;
+      root_count_set_type::const_iterator riter_end = root_counts.end();
+      for (root_count_set_type::const_iterator riter = root_counts.begin(); riter != riter_end; ++ riter)
+	generator(os, *riter) << '\n';
+    }
+    
+    merge_size = reduce_size;
   }
 }
 
