@@ -162,6 +162,83 @@ int main(int argc, char** argv)
   return 0;
 }
 
+struct RootCounts
+{
+  RootCounts(const root_count_set_type& __root_joint,
+	     const root_count_set_type& __root_source,
+	     const root_count_set_type& __root_target)
+    : root_joint(__root_joint), root_source(__root_source), root_target(__root_target) {}
+  
+  ExtractRootGHKM extractor;
+  
+  root_count_set_type::const_iterator jiter;
+  root_count_set_type::const_iterator siter;
+  root_count_set_type::const_iterator titer;
+  
+  std::string source;
+  std::string target;
+  std::string src;
+  std::string trg;
+  
+  void operator()(const phrase_pair_type& phrase_pair)
+  {
+    const bool diff_source = (source != phrase_pair.source);
+    const bool diff_target = (target != phrase_pair.target);
+    
+    bool diff_root_source = false;
+    bool diff_root_target = false;
+    
+    if (diff_source) {
+      source = phrase_pair.source;
+      
+      std::string root = extractor(source);
+      diff_root_source = (root != src);
+      
+      if (diff_root_source) {
+	src.swap(root);
+	
+	siter = root_source.find(src);
+	
+	if (siter == root_source.end())
+	  throw std::runtime_error("no root count for source: " + src);
+	if (siter->counts.size() < 1)
+	  throw std::runtime_error("invalid root count for source: " + src);
+      }
+    }
+
+    if (diff_target) {
+      target = phrase_pair.target;
+      
+      std::string root = extractor(target);
+      diff_root_target = (root != trg);
+
+      if (diff_root_target) {
+	trg.swap(root);
+	
+	titer = root_target.find(trg);
+	
+	if (titer == root_target.end())
+	  throw std::runtime_error("no root count for target: " + trg);
+	if (titer->counts.size() < 1)
+	  throw std::runtime_error("invalid root count for target: " + trg);
+      }
+    }
+    
+    if (diff_root_source || diff_root_target) {
+      jiter = root_joint.find(src + trg);
+      
+      if (jiter == root_joint.end())
+	throw std::runtime_error("no root count: " + src + trg);
+      if (jiter->counts.size() < 1)
+	throw std::runtime_error("invalid root count: " + src + trg);
+    }
+  }
+  
+  const root_count_set_type& root_joint;
+  const root_count_set_type& root_source;
+  const root_count_set_type& root_target;
+};
+
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
@@ -172,6 +249,7 @@ void process(std::istream& is,
 	     const Lexicon& lexicon)
 {
   Scorer scorer;
+  RootCounts roots(root_joint, root_source, root_target);
 
   phrase_pair_type phrase_pair;
   PhrasePairParser parser;
@@ -182,7 +260,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, statistic, root_joint, root_source, root_target, lexicon, os);
+    scorer(phrase_pair, statistic, roots, lexicon, os);
   }
 }
 
@@ -221,12 +299,10 @@ struct ScorerCICADA
   sentence_type      target;
   alignment_set_type alignments;
   
-  template <typename Lexicon>
+  template <typename Roots, typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const statistic_type& statistic,
-		  const root_count_set_type& root_count_joint,
-		  const root_count_set_type& root_count_source,
-		  const root_count_set_type& root_count_target,
+		  Roots& roots,
 		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
@@ -260,6 +336,21 @@ struct ScorerCICADA
       throw std::runtime_error("failed generation");
     
     if (feature_root_mode) {
+      roots(phrase_pair);
+      
+      const double logprob_root = (std::log(dirichlet_prior + count)
+				   - std::log(dirichlet_prior * roots.jiter->observed + roots.jiter->counts.front()));
+      const double logprob_root_source = (std::log(dirichlet_prior + count_source)
+					  - std::log(dirichlet_prior * roots.siter->observed + roots.siter->counts.front()));
+      const double logprob_root_target = (std::log(dirichlet_prior + count_target)
+					  - std::log(dirichlet_prior * roots.titer->observed + roots.titer->counts.front()));
+      
+      if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
+			    logprob_root,
+			    logprob_root_source,
+			    logprob_root_target))
+	throw std::runtime_error("failed generation");
+#if 0
       const std::string root_source = root_extractor(phrase_pair.source);
       const std::string root_target = root_extractor(phrase_pair.target);
       
@@ -293,6 +384,7 @@ struct ScorerCICADA
 			    logprob_root_source,
 			    logprob_root_target))
 	throw std::runtime_error("failed generation");
+#endif
     }
 
     if (feature_fisher_mode) {
