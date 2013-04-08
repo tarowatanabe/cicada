@@ -367,6 +367,7 @@ void process_kbest_score(const Filter& filter,
 			 std::ostream& os)
 {
   size_t num_samples = 0;
+  size_t num_survived_pre = 0;
   size_t num_survived = 0;
   
   std::string          source_prev;
@@ -381,10 +382,12 @@ void process_kbest_score(const Filter& filter,
   while (std::getline(is, line)) {
     if (! parser(line, phrase_pair)) continue;
     if (phrase_pair.counts.empty()) continue;
-    
+
     ++ num_samples;
     
     if (filter(phrase_pair)) continue;
+    
+    ++ num_survived_pre;
     
     if (phrase_pair.source != source_prev) {
       if (! heap.empty()) {
@@ -467,7 +470,8 @@ void process_kbest_score(const Filter& filter,
 
   if (debug)
     std::cerr << "# of samples: " << num_samples
-	      << " pruned: " << (num_samples - num_survived)
+	      << " pruned by stat: " << (num_samples - num_survived_pre)
+	      << " pruned by kbest: " << (num_survived_pre - num_survived)
 	      << std::endl;
 }
 

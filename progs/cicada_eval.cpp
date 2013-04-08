@@ -7,6 +7,16 @@
 // (or, do we compute oracle bleu after bleu-composition?)
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_container.hpp>
+#include <boost/spirit/include/phoenix_object.hpp>
+
 #include <iostream>
 #include <vector>
 #include <string>
@@ -28,6 +38,30 @@
 
 #include "cicada_text_impl.hpp"
 
+typedef std::pair<int, int> range_type;
+typedef std::vector<range_type, std::allocator<range_type> > range_set_type;
+
+template <typename Iterator>
+struct ranges_parser : boost::spirit::qi::grammar<Iterator, range_set_type(), boost::spirit::standard::space_type>
+{
+  ranges_parser() : ranges_parser::base_type(ranges)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+    
+    range = ((qi::int_ >> '-' >> qi::int_) [qi::_val = phoenix::construct<range_type>(qi::_1, qi::_2)]
+	     | (qi::int_) [qi::_val = phoenix::construct<range_type>(qi::_1, qi::_1)]);
+    
+    ranges %= range % ',';
+  }
+  
+  typedef boost::spirit::standard::space_type space_type;
+  
+  boost::spirit::qi::rule<Iterator, range_type()> range;
+  boost::spirit::qi::rule<Iterator, range_set_type(), space_type> ranges;
+};
+
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -47,6 +81,8 @@ path_set_type base_files;
 path_type     output_file = "-";
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
+
+std::string ranges_string;
 
 bool signtest = false;
 bool bootstrap = false;
@@ -87,6 +123,45 @@ int main(int argc, char** argv)
     scorer_document_type scorers(scorer_name);
   
     read_refset(refset_files, scorers);
+
+    range_set_type ranges;
+
+    if (! ranges_string.empty()) {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      ranges_parser<std::string::const_iterator > parser;
+      
+      std::string::const_iterator iter     = ranges_string.begin();
+      std::string::const_iterator iter_end = ranges_string.end();
+      
+      if (! qi::phrase_parse(iter, iter_end, parser, standard::space, ranges) || iter != iter_end)
+	throw std::runtime_error("range parsing failed? " + ranges_string);
+
+      std::vector<bool, std::allocator<bool> > checked(scorers.size(), false);
+      
+      // check ranges..
+      range_set_type::const_iterator riter_end = ranges.end();
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) {
+	if (! (riter->first < riter->second) || riter->second > scorers.size())
+	  throw std::runtime_error("invalid range: "
+				   + utils::lexical_cast<std::string>(riter->first)
+				   + '-'
+				   + utils::lexical_cast<std::string>(riter->second));
+	
+	for (int seg = riter->first; seg != riter->second; ++ seg) {
+	  if (checked[seg])
+	    throw std::runtime_error("duplicated segment? " + utils::lexical_cast<std::string>(seg));
+	  
+	  checked[seg] = true;
+	}
+
+	if (debug)
+	  std::cerr << "range: [" << riter->first << ',' << riter->second << ')' << std::endl;
+      }
+      
+    } else
+      ranges.push_back(range_type(0, scorers.size()));
 
     if (tstset_files.empty())
       tstset_files.push_back("-");
@@ -364,24 +439,25 @@ int main(int argc, char** argv)
     } else {
       score_ptr_type score;
       
-      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
-	if (scorers[seg]) {
-	  
-	  if (hyps[seg].empty()) {
-	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
-	    continue;
+      range_set_type::const_iterator riter_end = ranges.end();
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) 
+	for (int seg = riter->first; seg != riter->second; ++ seg)
+	  if (scorers[seg]) {
+	    if (hyps[seg].empty()) {
+	      std::cerr << "WARNING: no translation at: " << seg << std::endl;
+	      continue;
+	    }
+	    
+	    score_ptr_type score_segment = scorers[seg]->score(hyps[seg]);
+	    
+	    if (debug)
+	      std::cerr << "segment: " << seg << ' ' << (*score_segment) << std::endl;
+	    
+	    if (! score)
+	      score = score_segment;
+	    else
+	      *score += *score_segment;
 	  }
-	  
-	  score_ptr_type score_segment = scorers[seg]->score(hyps[seg]);
-	  
-	  if (debug)
-	    std::cerr << "segment: " << seg << ' ' << (*score_segment) << std::endl;
-	  
-	  if (! score)
-	    score = score_segment;
-	  else
-	    *score += *score_segment;
-	}
       
       if (! score)
 	throw std::runtime_error("no statistics to compute error score");
@@ -535,6 +611,7 @@ void options(int argc, char** argv)
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
+    ("ranges",      po::value<std::string>(&ranges_string), "ranges for evaluation (start-end,start1-end1,position,position etc.)")
 
     ("signtest",  po::bool_switch(&signtest),  "sign test")
     ("bootstrap", po::bool_switch(&bootstrap), "bootstrap resampling")
