@@ -1,8 +1,8 @@
 cicada
 ======
 
-A statistical machine translation toolkit based on a semiring parsing framework[1].
-Based on the generic framework, we can
+A statistical machine translation toolkit based on a semiring parsing
+framework [1]_. Based on the generic framework, we can
 
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree),
      word alignment, grammar for parsing
@@ -16,6 +16,13 @@ Based on the generic framework, we can
 
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
 
+Quick Start
+-----------
+
+
+Descriptions
+------------
+
 Basically, we have four distinct structures:
 
    - lattice: a representation of graph implemented as a two-dimentional array.
@@ -25,54 +32,71 @@ Basically, we have four distinct structures:
 
 Translation/parsing can be carried out by:
 
-   - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2,24].
-   - A lattice (or sentence) is composed with a tree-grammar, generating a hypergraph [27].
-   - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
-   - A hypergraph/forest (or parse-tree) is composed with a phrasal grammar, generating another hypergraph [3].
-   - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4].
+   - A lattice (or sentence) is composed with a grammar, generating a
+     hypergraph [2]_ [24]_.
+   - A lattice (or sentence) is composed with a tree-grammar,
+     generating a hypergraph [27]_.
+   - A lattice (or sentence) is composed with a phrasal grammar,
+     generating a phrasal hypergraph [4]_.
+   - A hypergraph/forest (or parse-tree) is composed with a phrasal
+     grammar, generating another hypergraph [3]_.
+   - A hypergraph/forest (or parse-tree) is composed with a tree
+     grammar, generating another hypergraph [4]_.
 
 Alignment can be carried out by:
 
-   - A lattice is composed with dictionary, generating alignment hypergraph, or
-   - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
+   - A lattice is composed with dictionary, generating alignment
+     hypergraph, or
+   - A hypergraph is composed with dictinary, generating alignment
+     hypergraph [20]_.
      
-   - In order to support word alignment training, we can learn Model1/HMM/Model4 lexicon model
-     by symmetized learning [22] or symmetric posterior constrained learning [23] with smoothing
-     via variational Bayes or via L0 prior.
-     Final combined alignment can be generated either by heuristic (AKA grow-diag-final-and etc.) or by ITG or
-     max-matching from posterior probabilities.
-     Also, lexicon model can be discriminatively trained [28].
+   - In order to support word alignment training, we can learn
+     Model1/HMM/Model4 lexicon model by symmetized learning [22]_ or
+     symmetric posterior constrained learning [23]_ with smoothing via
+     variational Bayes or via L0 prior.
+     Final combined alignment can be generated either by heuristic
+     (AKA grow-diag-final-and etc.) or by ITG or max-matching from
+     posterior probabilities.
+     Also, lexicon model can be discriminatively trained [28]_.
 
 Dependency parsing can be carried out by:
 
-   - A lattice is dependency parsed by compose-dependency-{arc-standard, arc-eager, hybrid, degree2}, generating
-     derivation hypergraph
+   - A lattice is dependency parsed by
+     compose-dependency-{arc-standard, arc-eager, hybrid, degree2},
+     generating derivation hypergraph
    - Forests are rescored by dependency features (TODO)
    
-     We support dependency projection [32] with Model1/HMM posterior probabilies so that we can train arbitrary
-     dependency parses after projections.
+     We support dependency projection [32]_ with Model1/HMM posterior
+     probabilies so that we can train arbitrary dependency parses
+     after projections.
 
 After the hypergraph generation, you can:
 
-   - Additional features are evaluated to generate another hypergraph [4].
-      * cicada implementes cube-pruning [4], cube-growing [4], incremental [18]
-        and exact (and stateless-inside-algorithm) methods
-      * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
-      * cube-pruning implements algorithm 2 of faster cube pruning [31].
-   - Perform variational decoding for hypergraph [10].
-   - Perform MBR decoding for hypergraph [12].
-      * Above two computations rely on expected ngram-counts over forest [13].
-   - K-best sentences are generated from hypergraph [5].
+   - Additional features are evaluated to generate another hypergraph [4]_.
+      * cicada implementes cube-pruning [4]_, cube-growing [4]_,
+	incremental [18]_ and exact (and stateless-inside-algorithm)
+	methods
+      * cube-growing employs coarse-heuristics [11]_, such as
+	lower-order ngrams etc.
+      * cube-pruning implements algorithm 2 of faster cube pruning
+	[31]_.
+   - Perform variational decoding for hypergraph [10]_.
+   - Perform MBR decoding for hypergraph [12]_.
+      * Above two computations rely on expected ngram-counts over
+	forest [13]_.
+   - K-best sentences are generated from hypergraph [5]_.
    - Generate oracle translations (BLEU only).
 
-Or, you can combine outputs from multiple systems by [29]:
+Or, you can combine outputs from multiple systems by [29]_:
 
-   - Perform parsing over nbests (use your favorite parser, such as Berkeley parser/Stanford parser etc.)
+   - Perform parsing over nbests (use your favorite parser, such as
+     Berkeley parser/Stanford parser etc.)
    - Generate context-free confusion forest by combining trees (not confusion network!)
-      * It is performed by collecting rules from parse trees, and generate by Earley algorithm
+      * It is performed by collecting rules from parse trees, and
+	generate by Earley algorithm
    - Generate k-best translations after feature application etc.
 
-   Or, a conventional strategy of [14]:
+   Or, a conventional strategy of [14]_:
    - Create lattice from n-best list by incremental merging
    - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
    - Generate k-best translations after feature application etc.
@@ -80,45 +104,56 @@ Or, you can combine outputs from multiple systems by [29]:
 Monolingual grammar learning is implemented:
 
    - A simple PCFG by simply extracting rules.
-   - Learn latent annotated PCFG by split/merge process with an EM algorihtm [25].
-   - Also, learn coarse grammars from the latent annotated PCFG for coarse-to-fine parsing [26].
+   - Learn latent annotated PCFG by split/merge process with an EM
+     algorihtm [25]_.
+   - Also, learn coarse grammars from the latent annotated PCFG for
+     coarse-to-fine parsing [26]_.
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
 
    - A conventional phrase extract algorithm in Moses
    - A conventional hierarchical phrase extraction algorithm in Hiero
-      + syntax augmented rule extraction is also supported [15]
-   - Tree-to-string/strint-to-tree extractin from forest [16,27]
-   - Tree-to-tree rule extraction from forest [17] (experimental)
-   - max-scope constraints to limit the grammar size [34]
-   
+      + syntax augmented rule extraction is also supported [15]_
+   - Tree-to-string/strint-to-tree extractin from forest [16]_ [27]_
+   - Tree-to-tree rule extraction from forest [17]_ (experimental)
+   - max-scope constraints to limit the grammar size [34]_
    - After count extraction, you can perform map/reduce to compute
-     model scores [19]
-	 
-   - Then, prune your model based on Fisher's exact test [38]
+     model scores [19]_
+   - Then, prune your model based on Fisher's exact test [38]_
 
 Various learning components are implemented:
 
-   - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
-   - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear [30]
-   - Large feature set on small devset with MIRA [6,7], but with hypergraph
-   - Small feature set on small devset learned by hypergraph-MERT [8]
-   - Small/large feature set on small devset learned by hypergraph-MaxEnt (optimized by LBFGS or SGD)
-     + softmax-margin [9]
-   - Small/large feature set learned by iteratively construncting training samples with rank-learning.
-     + optimization by LBFGS/liblinear etc. (similar to [33], but differ in kbest handling)
-     + larger batching with optimized updates [37]
+   - Large feature set from input lattice/hypergraph on large training
+     data via MaxEnt (optimized by LBFGS) [3]_
+   - Large/small featuer set from kbests on large/small traning data
+     via MaxEnt (LBFGS)/liblinear [30]_
+   - Large feature set on small devset with MIRA [6]_ [7]_, but with
+     hypergraph
+   - Small feature set on small devset learned by hypergraph-MERT [8]_
+   - Small/large feature set on small devset learned by
+     hypergraph-MaxEnt (optimized by LBFGS or SGD)
+     + softmax-margin [9]_
+   - Small/large feature set learned by iteratively construncting
+     training samples with rank-learning.
+     + optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling)
+     + larger batching with optimized updates [37]_
      + we have a script-based implementation + single-binary implementation for efficiency
-   - xBLEU objective learned either by L-BFGS or SGD, which directly maximize expected-BLEU (not BLEU expectaiton) [35]
+   - xBLEU objective learned either by L-BFGS or SGD, which directly
+     maximize expected-BLEU (not BLEU expectaiton) [35]_
      + Now, this is a recommended optimization method (either kbest or hypergraph learning)
-   - We support feature selection by kbest-feature merging [36]
+   - We support feature selection by kbest-feature merging [36]_
 
-Word clustering tool is also included to support word alignment learning + translation [20]
+Word clustering tool is also included to support word alignment
+learning + translation [20]_
 
 References
 ----------
 
-[1]
+.. [1] Zhifei Li; Jason Eisner. 2009.
+       First- and Second-Order Expectation Semirings with Applications
+       to Minimum-Risk Training on Translation Forests.
+       In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing*.
+
 @InProceedings{li-eisner:2009:EMNLP,
   author    = {Li, Zhifei  and  Eisner, Jason},
   title     = {First- and Second-Order Expectation Semirings with Applications to Minimum-Risk Training on Translation Forests},
@@ -130,6 +165,7 @@ References
   pages     = {40--51},
   url       = {http://www.aclweb.org/anthology/D/D09/D09-1005}
 }
+
 
 [2]
 @InProceedings{dyer-muresan-resnik:2008:ACLMain,
