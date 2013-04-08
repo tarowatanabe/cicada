@@ -6,6 +6,6 @@ SUBDIRS = utils codec succinct_db libstemmer_c wn liblinear liblbfgs cg_descent 
 AUTOMAKE_OPTIONS = foreign
 
 EXTRA_DIST = \
-TODO.md \
-README.md \
-COMPILE.md
+TODO.rst \
+README.rst \
+COMPILE.rst
