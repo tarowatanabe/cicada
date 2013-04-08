@@ -51,7 +51,7 @@ struct ranges_parser : boost::spirit::qi::grammar<Iterator, range_set_type(), bo
     namespace phoenix = boost::phoenix;
     
     range = ((qi::int_ >> '-' >> qi::int_) [qi::_val = phoenix::construct<range_type>(qi::_1, qi::_2)]
-	     | (qi::int_) [qi::_val = phoenix::construct<range_type>(qi::_1, qi::_1)]);
+	     | (qi::int_) [qi::_val = phoenix::construct<range_type>(qi::_1, qi::_1 + 1)]);
     
     ranges %= range % ',';
   }

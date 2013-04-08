@@ -1,35 +1,38 @@
-# hypergraph
+hypergraph
+==========
 
 JSON hypergraph foramt description and tools to convert from/to the hypergraph.
 
-## Format
+Format
+------
 
-The hypergraph, or forest in short, is represented by the [JSON data format](http://www.json.org>).
+The hypergraph, or forest in short, is represented by the `JSON data format <http://www.json.org>`_.
 Strings must be escaped (see JSON specification). You may insert
 spaces or newlines at arbitrary positions, but
 one-line-per-single-hypergraph is prefered for easier preprocessing.
 We assume topologically sorted hypergraph (or, node-id is ordered by post-traversal order), but
 input/output can handle node ids in any orders.
 
-```BNF
-hypergraph   ::= {"rules" : [ rule *(, rule)],
-	              "nodes":  [ node *(, node)],
-				  "goal": JSON-INT}
+.. code::
 
-rule         ::= "non-terminal ||| +(non-terminal | terminal)"
-non-terminal ::= [.+] | [.+,[0-9]+] (json escaped string)
-terminal     ::= .+                 (json escaped string)
+  hypergraph   ::= {"rules" : [ rule *(, rule)],
+	            "nodes":  [ node *(, node)],
+		    "goal": JSON-INT}
 
-node         ::= [edge *(, edge)]
-edge         ::= {"tail" : [ JSON-INT *(, JSON-INT) ],
-                  "feature" : features,
-                  "attribute" : attributes,
-                  "rule" : JSON-INT}
+  rule         ::= "non-terminal ||| +(non-terminal | terminal)"
+  non-terminal ::= [.+] | [.+,[0-9]+] (json escaped string)
+  terminal     ::= .+                 (json escaped string)
 
-features     ::= {JSON-STRING : JSON-FLOAT *(, JSON-STRING : JSON-FLOAT)}
-attributes   ::= {JSON-STRING : value *(, JSON-STRING : value)}
-value        ::= JSON-STRING | JSON-FLOAT | JSON-INT
-```
+  node         ::= [edge *(, edge)]
+  edge         ::= {"tail" : [ JSON-INT *(, JSON-INT) ],
+                    "feature" : features,
+                    "attribute" : attributes,
+                    "rule" : JSON-INT}
+
+  features     ::= {JSON-STRING : JSON-FLOAT *(, JSON-STRING : JSON-FLOAT)}
+  attributes   ::= {JSON-STRING : value *(, JSON-STRING : value)}
+  value        ::= JSON-STRING | JSON-FLOAT | JSON-INT
+
 
 The hypergraph consists of three fields.
 The "rules" field is a list of rules associated with each edges.
@@ -69,13 +72,15 @@ consisting of JSON string and attribute value.
 The attribute value can take either 64bit integer, floaring point
 value (double precision) or JSON string.
 Internally, it is implemented as
-[boost.variant](http://www.boost.org/doc/libs/release/libs/variant/)
+`boost.variant <http://www.boost.org/doc/libs/release/libs/variant/>`_
 which supports "enum" like storage in an efficient fashion.
 The "rule" field is a map to a rule id in the rule list.
 
-## Example
+Example
+-------
 
-```
+.. code:: json
+
   {"rules": ["[PRP] ||| I",
            "[NP] ||| [PRP]",
            "[MD] ||| 'd",
@@ -120,28 +125,28 @@ The "rule" field is a map to a rule id in the rule list.
 	   [{"tail":[1,18,19],"rule":21}],
 	   [{"tail":[20],"rule":22}]],
     "goal": 21}
-```
 
-## Tools
+Tools
+-----
 
 cicada\_filter\_penntreebank
 
->  A tool which transform Penn Treebank style constituency parse
->  tree(s) into JSON hypergrpah format.
+  A tool which transform Penn Treebank style constituency parse
+  tree(s) into JSON hypergrpah format.
 
 cicada\_filter\_dependency
 
->  A tool which transforms dependency trees into a JSON hypergraph
->  format. Currently, we support: MST, CoNLL, Malt, Cabocha and cicada
->  native format.
+  A tool which transforms dependency trees into a JSON hypergraph
+  format. Currently, we support: MST, CoNLL, Malt, Cabocha and cicada
+  native format.
 
 ciada\_filter\_charniak
 
->  A tool which transforms Charniak's parser forest output into a JSON
->  hypergraph format.
+  A tool which transforms Charniak's parser forest output into a JSON
+  hypergraph format.
 
 cicada\_unite\_forest
 
->  A tool to merge multiple hypergraphs into one. If the label of goal
->  nodes differ, then, we will introduce an additional goal node,
->  [goal].
+  A tool to merge multiple hypergraphs into one. If the label of goal
+  nodes differ, then, we will introduce an additional goal node,
+  [goal].

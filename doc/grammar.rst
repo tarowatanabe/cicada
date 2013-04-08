@@ -1,4 +1,5 @@
-# Grammar for cicada
+Grammar for cicada
+==================
 
 string-to-string rules (aka Hiero rules):
 
