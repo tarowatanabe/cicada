@@ -11,12 +11,12 @@ cicada comes with other libraries which are licensed under different
 copyrights. For details, see the licenses, briefly listed here.
 
 Murmurhash2
-~~~~~~~~~~~
+```````````
 
 All code is released to the public domain. For business purposes, Murmurhash is under the MIT license. 
 
 Murmurhash3
-~~~~~~~~~~~
+```````````
 
 MurmurHash3 was written by Austin Appleby, and is placed in the public
 domain. The author hereby disclaims copyright to this source code.
@@ -24,7 +24,7 @@ domain. The author hereby disclaims copyright to this source code.
 MIT license
 
 libstemmer\_c
-~~~~~~~~~~~~~
+`````````````
 
 Snowball stemmer <http://snowball.tartarus.org/>.
 
@@ -48,7 +48,7 @@ Snowball stemmer <http://snowball.tartarus.org/>.
 
 
 WordNet-3.0 
-~~~~~~~~~~~
+```````````
 
 WordNet <http://wordnet.princeton.edu/>.
 
@@ -90,7 +90,7 @@ Actually, we do not include data, but uses c-library.
 
 
 libLBFGS
-~~~~~~~~
+````````
 
 libLBFGS <http://www.chokkan.org/software/liblbfgs/>.
 
@@ -121,7 +121,7 @@ libLBFGS <http://www.chokkan.org/software/liblbfgs/>.
 
 
 boost.m4
-~~~~~~~~
+````````
 
 ::
 
@@ -143,7 +143,7 @@ boost.m4
 
 
 liblinear
-~~~~~~~~~
+`````````
 
 ::
 
@@ -180,7 +180,7 @@ liblinear
 
 
 edmonds_optimum_branching.hpp
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`````````````````````````````
 
 ::
 
@@ -208,7 +208,7 @@ edmonds_optimum_branching.hpp
 
 
 lz4
-~~~
+```
 
    LZ4 - Fast LZ compression algorithm
    Header File
@@ -246,7 +246,7 @@ lz4
 
 
 quicklz
-~~~~~~~
+```````
 
 Fast data compression library
 Copyright (C) 2006-2011 Lasse Mikkel Reinhold
@@ -261,7 +261,7 @@ lar@quicklz.com
 
 
 fastlz
-~~~~~~
+``````
 
   FastLZ is distributed using the MIT license, see file LICENSE
   for details.
@@ -294,12 +294,12 @@ fastlz
 
 
 Eigen
-~~~~~
+`````
 
 Since the 3.1.1 release, Eigen is licensed under the MPL2. We refer to the MPL2 FAQ for initial questions.
 
 xxhash
-~~~~~~
+``````
 
    xxHash - Fast Hash algorithm
    Header File
@@ -336,7 +336,7 @@ xxhash
 
 
 cityhash
-~~~~~~~~
+````````
 
 Copyright (c) 2011 Google, Inc.
 
@@ -366,7 +366,7 @@ Copyright (c) 2011 Google, Inc.
 
 
 CG_DESCENT
-~~~~~~~~~~
+``````````
 
 ::
 

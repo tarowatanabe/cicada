@@ -24,7 +24,7 @@ CONFIGURATION OPTIONS
 ---------------------
 
 Input Options
-~~~~~~~~~~~~~
+`````````````
 
   **--input** `arg (="-")`             input file
 
@@ -47,7 +47,7 @@ Input Options
   **--input-directory** input in directory
 
 Grammar Options
-~~~~~~~~~~~~~~~
+```````````````
 
   **--goal** `arg (=[s])`              goal symbol
 
@@ -60,7 +60,7 @@ Grammar Options
   **--tree-grammar-list** list of available grammar specifications
 
 Feature Function Options
-~~~~~~~~~~~~~~~~~~~~~~~~
+````````````````````````
 
   **--feature-function** `arg`         feature function(s)
 
@@ -69,7 +69,7 @@ Feature Function Options
   **--output-feature-function** `arg`  output feature function(s)
 
 Operation Options
-~~~~~~~~~~~~~~~~~
+`````````````````
 
   **--operation** `arg`                operations
 
@@ -77,7 +77,7 @@ Operation Options
 
 
 Other List Options
-~~~~~~~~~~~~~~~~~~
+``````````````````
 
   **--eval-list** list of available evaluators
 
