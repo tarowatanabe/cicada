@@ -664,36 +664,26 @@ class Index(UserString.UserString):
         if quantize:
             command_indexer += " --quantize"
 
-        input_path='-'
-        sep = ':'
+        input_data=[]
+
         if indexer.cky:
-            input_path += sep
-            sep = ','
-            input_path +='cky=true'
+            input_data.append('cky=true')
+        if prefix_feature:
+            input_data.append("feature-prefix=" + prefix_feature)
+        if prefix_attribute:
+            input_data.append("attribute-prefix=" + prefix_attribute)
         if features:
-            input_path += sep
-            sep = ','
-            input_path += ','.join(features)
+            input_data += features
         if attributes:
-            input_path += sep
-            sep = ','
-            input_path += ','.join(attributes)
+            input_data += attributes
         
         # add debug flag
-        input_path += sep
-        sep = ','
-        input_path +='debug=1'
+        input_data.append('debug=1')
+
+        input_path = '-'
+        if input_data:
+            input_path += ':' + ','.join(input_data)
         
-        if prefix_feature:
-            input_path += sep
-            sep = ','
-            input_path += "feature-prefix=" + prefix_feature
-
-        if prefix_attribute:
-            input_path += sep
-            sep = ','
-            input_path += "attribute-prefix=" + prefix_attribute
-
         command_indexer += " --input %s" %(input_path)
         command_indexer += " --output \"%s\"" %(output)
         
