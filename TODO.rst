@@ -1,33 +1,41 @@
 Do we allow state-less features applied during composition???
-	We need composition-based features for phrase-based MT
+      - We need composition-based features for phrase-based MT
 	to compute distortion/lexicalized reordering etc. not represented in
 	hypergraph struct
 
-	State-less features are sometimes related to composition algorithm,
+      - State-less features are sometimes related to composition algorithm,
 	such as shift-reduce etc.
 	
-	We have "parse" variant of "compose". Do we allow stateless features during "parsing" ????
+      - We have "parse" variant of "compose". Do we allow stateless features during "parsing" ????
 
 Systematic symbols:
-  - So forth, we have abused many symbols, such as |:;+ for binarization, permutation, parent, etc.
-    I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
+    - So forth, we have abused many symbols, such as :code:`|:;+` for
+      binarization, permutation, parent, etc.
+    - I think it's time to systemacically define symbols so that we
+      can de-binarize, de-parentize etc.
 
 Add head-finder?
-    Head finder requires child/parent node, therefore, requires the whole hypergraph...
+    - Head finder requires child/parent node, therefore, requires the
+      whole hypergraph...
 
 Re-engineer kbest/viterbi framework...
-  I don't like current interface, separating weight and derivation
-  Is there a workaround, like use iterator-based enumeration?
+  - I don't like current interface, separating weight and derivation.
+  - Is there a workaround, like use iterator-based enumeration?
 
 Support word alignment training!
-  We know feature-rich unsupervised training!
-  Use of syntax-tree combined with alignment
-  cube-pruning to transform source-syntactic tree into alignment-derivation! (use of "alignment" as our output...)
-  Can we integrate supervised learning and unsupervised learning sharing the same code...?
+  - We know feature-rich unsupervised training!
+  - Use of syntax-tree combined with alignment
+  - Cube-pruning to transform source-syntactic tree into alignment-derivation! (use of "alignment" as our output...)
+  - Can we integrate supervised learning and unsupervised learning sharing the same code...?
+
       We can potentially share by modifying "intersection"
-  How to encode lexical feature...?
+
+  - How to encode lexical feature...?
+
     use grammar! (source target word mapping with features!)
-  Intersection with the supplied alignment: supervised training!
+
+  - Intersection with the supplied alignment: supervised training!
+
     Can we do this, given that word alignment space is rather constrained...
 
 Implement scalable training by L1 regularized feature selection:
@@ -43,107 +51,128 @@ Implement scalable training by L1 regularized feature selection:
      features requing complex hidden variables...?
 
 POS annotated sentence input:
-  How to convert each POS into latent annotated POS?
-  Solution 1. Implemenet GrammarUnknownPOS which will give annotated POS when already in the
-  model. Otherwise use POS as a "hint"?
+  - How to convert each POS into latent annotated POS?
+
+    - Solution 1. Implemenet GrammarUnknownPOS which will give
+      annotated POS when already in the model.
+      Otherwise use POS as a "hint"?
 
 Add more tests
 
 A unified framework to collect statistics: Do we need stats from features?
-    We have a support to collect stats from operations, but not from individual features..
+    - We have a support to collect stats from operations, but not from
+      individual features..
 
 Cube summing?
-     I'm still not sure how to efficiently collect residuals... Do we include state-less features
-     to serve as residual counts?
-  
-Implement RIBES for mteval
-   Can we implement RIBES feature...?
-   It is global in that we have to perform "alignment" as in METEOR...
+     - I'm still not sure how to efficiently collect residuals... Do
+       we include state-less features to serve as residual counts?
 
 Add incremental version of MERT?
 
 Correctly implement cutting-plane algorithms:
-   we need to merge feature vector into a bundle, then, iterative add new vectors...
-   do we implement in maxlike families...?
+   - We need to merge feature vector into a bundle, then, iterative
+     add new vectors...
+   - Do we implement in maxlike families...?
 
 Add MPI version of Model1/HMM alignment?
 
 Model1 starting from dice-estimated parameters...??
 
 Dictionary constrained Model1/HMM training?
-   As in GIZA++, we will constraint by the existence of dictionary items
+   - As in GIZA++, we will constraint by the existence of dictionary
+     items
 
 Alignment constrained alignment
-   As observed in training, we will constraint the alignment space in training.
-   Do we also constrain for the viterbi/ITG/MaxMatch alignment?
+   - As observed in training, we will constraint the alignment space
+     in training.
+   - Do we also constrain for the viterbi/ITG/MaxMatch alignment?
 
 Integrate cicada-alignment.py and cicada-extract.py???
-   Currently, NO, in order to encourange user to select an alternative paths.
+   - Currently, NO, in order to encourange user to select an
+     alternative paths.
 
-Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
-   Use the same gradient,margin computers across mpi and non-mpi applications
+Integrate MPI and non-MPI of cicada\_learn{,kbest}{,mpi}
+   - Use the same gradient,margin computers across mpi and non-mpi
+     applications
 
 Global lexicon learning by liblinear...?
-   We will add bias feature, then learn...
+   - We will add bias feature, then learn...
 
 Collapse and binarize the source side of the ghkm/tree grammar
-   Perform "collapsing" and do binarization (either source or target)
-   Perform lexicalization?
-   Perform synchronous binarization? (we need to store all in memory...?)
-     and left-to-right and target-left-to-right binarization
-   How to represent intermedidate non-terminals?
-     We need to keep track of both-side....???
+   - Perform "collapsing" and do binarization (either source or target)
+   - Perform lexicalization?
+   - Perform synchronous binarization? (we need to store all in
+     memory...?) 
+       
+      And left-to-right and target-left-to-right binarization
+
+   - How to represent intermedidate non-terminals?
+
+      We need to keep track of both-side....???
      
 Do we keep pair of source-target lhs???
-  I'm pretty not sure how symbols should be handled during the CKY algorithm.
-  Probably, we need to keep both side and maintain it during unary rules...?
+  - I'm pretty not sure how symbols should be handled during the CKY
+    algorithm.
+  - Probably, we need to keep both side and maintain it during unary
+    rules...?
 
 Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
-  I'm not sure which is better..
+  - I'm not sure which is better..
 
 Support joshua training?
+
 Support cicada forest converter?
 
 Implement succinct-rtrie:
-  this is a trie-like structure, but it's purpose is a reverse index: given id, query data of string.
-  strings are stored in a trie, with an index refering to the leaf position of trie of id.
-  string is uncovered by leaf-to-parent traversal (thus, indexing requires reversing, first)
+  - This is a trie-like structure, but it's purpose is a reverse
+    index: given id, query data of string.
+  - strings are stored in a trie, with an index refering to the leaf
+    position of trie of id.
+  - string is uncovered by leaf-to-parent traversal (thus, indexing
+    requires reversing, first)
 
 remote grammar and tree-grammar:
-  set up server for grammar(s) and query from clients
-  performs composition/parse/generation at the server side with larger memory (meaning with larger grammar)
+  - set up server for grammar(s) and query from clients
+  - performs composition/parse/generation at the server side with
+    larger memory (meaning with larger grammar)
   
 revise static create interface:
-  currently, we return reference, but it is safer to return pointer...?
+  - currently, we return reference, but it is safer to return
+    pointer...?
 
 Earley composition with skipping
-   Like phrase-based SMT, allow local skipping... very hard...
+   - Like phrase-based SMT, allow local skipping... very hard...
 
 Earley composition with CFG!
-   Like phrasal composition, we perform CKY over the Earley generated forest of string.... very hard...
+   - Like phrasal composition, we perform CKY over the Earley
+     generated forest of string.... very hard...
 
 optimized variant of SGD (and xBLEU?)
-  xBLEU is impossible given that the combination is already weighted!
+  - xBLEU is impossible given that the combination is already
+    weighted!
 
 Parallel learning for PYP:
-   translit and segment
+   - translit and segment
 
 Add a shallow hiero rule by limiting the "depth" of rule instantiation...
-    level one is easier, but how to handle arbitrary depth? (or, at least, depth of 2?)
+    - level one is easier, but how to handle arbitrary depth? (or, at
+      least, depth of 2?)
 
 Revise syntactic alignment:
-  Binarize before processing
-  Use of pialign style bi-parsing algorithm
-  Allow arbitrary sub-tree alignment by a CFG-style sub-tree transformation
-  Paired with "phrases" in the target side.
+  - Binarize before processing
+  - Use of pialign style bi-parsing algorithm
+  - Allow arbitrary sub-tree alignment by a CFG-style sub-tree
+    transformation
+  - Paired with "phrases" in the target side.
 
 An analysis tool based on error metrics?
- Compute an error metric, i.e. BLEU, and visualize matched portions (such as ngrams, alignment etc.)
- TOOD: API?
+ - Compute an error metric, i.e. BLEU, and visualize matched portions
+   (such as ngrams, alignment etc.)
+ - TOOD: API?
 
 Mixture PYP-LM:
- We employ multi-floor CRP for representing mixture of multiple LM.
- Multiple: surface, prefix-4 and suffix-4! (+ class-LM or +POS-LM?)
+ - We employ multi-floor CRP for representing mixture of multiple LM.
+ - Multiple: surface, prefix-4 and suffix-4! (+ class-LM or +POS-LM?)
 
 Revise ngram-pyp so that we do not have to re-compute lower-order probabilities...
 
@@ -151,36 +180,44 @@ Implement ADMM for potentially better parallel training
 
 Better sharing python code... HOW?
 
-mpipe is buggy under mac osx... this is probaly because of the interaction between
-openmpi and fork() with unmanagable file descriptors etc. The bug is clearly exhibited by
-the difference of the # of lines read and the actual read from stdin!
+mpipe is buggy under mac osx...
+  - This is probaly because of the interaction between openmpi and
+    fork() with unmanagable file descriptors etc. The bug is clearly
+    exhibited by the difference of the # of lines read and the actual
+    read from stdin!
 
-cicada_filter_kbest to support {file,directory}-to-{file,directory}
+cicada\_filter\_kbest to support {file,directory}-to-{file,directory}
 
 add error checking for codecs
 
 msgpack for succinct storage
 
 Rearrange learning code by splitting L2 and/or L1 projection
-  Especially for online-learning, they can be set up as additional "unified" code
+  - Especially for online-learning, they can be set up as additional
+    "unified" code
 
 Add asynchronous online learning inspired by the David Chiang's parallel method
-   We will not distribute support vectors, but simply send "diffs"  and receive "result"
-   How to handle adaptive learning rate scaling?
-   Add cicada_learn_asynchronous!
+   - We will not distribute support vectors, but simply send "diffs"
+     and receive "result"
+   - How to handle adaptive learning rate scaling?
+   - Add cicada\_learn\_asynchronous!
 
 Non-linear features
-   The decoder uses non-linear combination with hidden layers... How to implement on cicada?
-   Use a special dot-product function which project all the features to the hidden layers, then, perform combination
+   - The decoder uses non-linear combination with hidden layers... How
+     to implement on cicada?
+   - Use a special dot-product function which project all the features
+     to the hidden layers, then, perform combination
+
      - Training should perform hyper-edge-wise, not a simple sentence-wise training...
-     - Thus, we will dump forest, and perform forest-wise training, or dump k-best trees represented as a set of hypergraphs.
+     - Thus, we will dump forest, and perform forest-wise training, or
+       dump k-best trees represented as a set of hypergraphs.
 
 Transform matrix into column-major to avoid confusion with fortran/BLAS etc. and use of "standard" matrix
-  Eigen, armagillo, vienna-cl?
-  I think eigen is easier since it can plug by copying headers...
+  - Eigen, armagillo, vienna-cl?
+  - I think eigen is easier since it can plug by copying headers...
 
 Use of "float" not "double" for better integration with GPUs
-#  And people will not care such precision...
+  - And people will not care such precision...
 
 Use of eigen for weight vector maintenance... (for potentially faster computation...)
 
@@ -196,27 +233,21 @@ Implement LBFGS/CG by templates since this may conflict with float/double based 
 
 Implement kenlm like probing data structure
 
-Unify the liblbfgs and cg_descent code...?
+Unify the liblbfgs and cg\_descent code...?
 
 Documentation:
-  Use MD or RST...??
+  - Use MD or RST...??
 
 Lua integration:
-  Any use...????
+  - Any use...????
 
-extract_{phrase,scfg,ghkm,tree}
-  Currently, we employ the reference counting std::string (i.e. those
-  in gcc) for sharing rules/phrases.... Is there an alternative, since
-  reference counting would be deprecated soon.... Implement an
-  alternative ref-count-string?
 
-Correctly implement alignment/distortion model estimation in
-lexicon_hmm/model4
-	Currenlty, it is very apt, and gives non-optimal parameters...
+Correctly implement alignment/distortion model estimation in lexicon\_hmm/model4
+  - Currenlty, it is very hacky, and gives non-optimal parameters...
 
 Revise and test restaurtna implementation:
-   Currently, we use a vector-based implementation, but
-   hash-based implementation is potentially faster, especially
-   when decrementing counts.
+  - Currently, we use a vector-based implementation, but hash-based
+    implementation is potentially faster, especially when decrementing
+    counts.
 
 
