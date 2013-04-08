@@ -281,23 +281,24 @@ int main(int argc, char** argv)
       score_ptr_set_type scores1;
       score_ptr_set_type scores2;
       
-      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
-	if (scorers[seg]) {
-	  if (hyps1[seg].empty() || hyps2[seg].empty()) {
-	    if (hyps1[seg].empty())
-	      std::cerr << "WARNING: no translation for system1 at: " << seg << std::endl;
-	    if (hyps2[seg].empty())
-	      std::cerr << "WARNING: no translation for system2 at: " << seg << std::endl;
+      range_set_type::const_iterator riter_end = ranges.end();
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) 
+	for (int seg = riter->first; seg != riter->second; ++ seg)
+	  if (scorers[seg]) {
+	    if (hyps1[seg].empty() || hyps2[seg].empty()) {
+	      if (hyps1[seg].empty())
+		std::cerr << "WARNING: no translation for system1 at: " << seg << std::endl;
+	      if (hyps2[seg].empty())
+		std::cerr << "WARNING: no translation for system2 at: " << seg << std::endl;
+	      
+	      continue;
+	    }
 	    
-	    continue;
+	    scores1.push_back(scorers[seg]->score(hyps1[seg]));
+	    scores2.push_back(scorers[seg]->score(hyps2[seg]));
 	  }
-	  
-	  scores1.push_back(scorers[seg]->score(hyps1[seg]));
-	  scores2.push_back(scorers[seg]->score(hyps2[seg]));
-	}
 
       if (bootstrap) {
-      
 	boost::mt19937 gen;
 	gen.seed(utils::random_seed());
 	boost::random_number_generator<boost::mt19937> generator(gen);
@@ -307,6 +308,7 @@ int main(int argc, char** argv)
 	for (int iter = 0; iter < samples; ++ iter) {
 	  score_ptr_type score1(scores1.front()->zero());
 	  score_ptr_type score2(scores2.front()->zero());
+	  
 	  for (size_t i = 0; i != scores1.size(); ++ i) {
 	    const int seg = generator(scores1.size());
 	    
@@ -400,16 +402,18 @@ int main(int argc, char** argv)
       
       score_ptr_set_type scores;
       
-      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
-	if (scorers[seg]) {
-	  if (hyps[seg].empty()) {
-	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
-	    continue;
+      range_set_type::const_iterator riter_end = ranges.end();
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) 
+	for (int seg = riter->first; seg != riter->second; ++ seg)
+	  if (scorers[seg]) {
+	    if (hyps[seg].empty()) {
+	      std::cerr << "WARNING: no translation at: " << seg << std::endl;
+	      continue;
+	    }
+	    
+	    scores.push_back(scorers[seg]->score(hyps[seg]));
 	  }
-	  
-	  scores.push_back(scorers[seg]->score(hyps[seg]));
-	}
-
+      
       if (scores.empty())
 	throw std::runtime_error("no error counts?");
       
