@@ -125,6 +125,7 @@ int main(int argc, char** argv)
     read_refset(refset_files, scorers);
 
     range_set_type ranges;
+    std::vector<bool, std::allocator<bool> > ranges_bitmap(scorers.size(), false);
 
     if (! ranges_string.empty()) {
       namespace qi = boost::spirit::qi;
@@ -138,7 +139,7 @@ int main(int argc, char** argv)
       if (! qi::phrase_parse(iter, iter_end, parser, standard::space, ranges) || iter != iter_end)
 	throw std::runtime_error("range parsing failed? " + ranges_string);
 
-      std::vector<bool, std::allocator<bool> > checked(scorers.size(), false);
+      
       
       // check ranges..
       range_set_type::const_iterator riter_end = ranges.end();
@@ -150,18 +151,20 @@ int main(int argc, char** argv)
 				   + utils::lexical_cast<std::string>(riter->second));
 	
 	for (int seg = riter->first; seg != riter->second; ++ seg) {
-	  if (checked[seg])
+	  if (ranges_bitmap[seg])
 	    throw std::runtime_error("duplicated segment? " + utils::lexical_cast<std::string>(seg));
 	  
-	  checked[seg] = true;
+	  ranges_bitmap[seg] = true;
 	}
 
 	if (debug)
 	  std::cerr << "range: [" << riter->first << ',' << riter->second << ')' << std::endl;
       }
       
-    } else
+    } else {
       ranges.push_back(range_type(0, scorers.size()));
+      std::fill(ranges_bitmap.begin(), ranges_bitmap.end(), true);
+    }
 
     if (tstset_files.empty())
       tstset_files.push_back("-");
@@ -175,28 +178,31 @@ int main(int argc, char** argv)
       score_ptr_type     base_score;
       score_ptr_set_type base_scores(scorers.size());
       
-      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
-	if (scorers[seg]) {
-	  if (base[seg].empty()) {
-	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
-	    continue;
+      range_set_type::const_iterator riter_end = ranges.end();
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) 
+	for (int seg = riter->first; seg != riter->second; ++ seg)
+	  if (scorers[seg]) {
+	    if (base[seg].empty()) {
+	      std::cerr << "WARNING: no translation at: " << seg << std::endl;
+	      continue;
+	    }
+	    
+	    base_scores[seg] = scorers[seg]->score(base[seg]);
+	    
+	    if (base_score)
+	      *base_score += *base_scores[seg];
+	    else
+	      base_score = base_scores[seg]->clone();
 	  }
-	  
-	  base_scores[seg] = scorers[seg]->score(base[seg]);
-	  
-	  if (base_score)
-	    *base_score += *base_scores[seg];
-	  else
-	    base_score = base_scores[seg]->clone();
-	}
       
       // compute adjusted score
-      for (size_t seg = 0; seg != scorers.size(); ++ seg)
-	if (base_scores[seg]) {
-	  score_ptr_type score = base_score->clone();
-	  *score -= *base_scores[seg];
-	  base_scores[seg] = score;
-	}
+      for (range_set_type::const_iterator riter = ranges.begin(); riter != riter_end; ++ riter) 
+	for (int seg = riter->first; seg != riter->second; ++ seg)
+	  if (base_scores[seg]) {
+	    score_ptr_type score = base_score->clone();
+	    *score -= *base_scores[seg];
+	    base_scores[seg] = score;
+	  }
       
       typedef boost::spirit::istream_iterator iter_type;
       typedef cicada_sentence_parser<iter_type> parser_type;
@@ -215,6 +221,7 @@ int main(int argc, char** argv)
 	    const path_type path = (*fiter) / (utils::lexical_cast<std::string>(id) + ".gz");
 	    
 	    if (! boost::filesystem::exists(path)) break;
+	    if (! ranges_bitmap[id]) continue;
 
 	    utils::compress_istream is(path, 1024 * 1024);
 	    is.unsetf(std::ios::skipws);
@@ -251,6 +258,8 @@ int main(int argc, char** argv)
 	    
 	    if (id_sentence.first >= scorers.size())
 	      throw std::runtime_error("id exceeds refset size");
+	    
+	    if (! ranges_bitmap[id_sentence.first]) continue;
 	    
 	    score_ptr_type score = scorers[id_sentence.first]->score(id_sentence.second);
 	    *score += *base_scores[id_sentence.first];
