@@ -48,7 +48,6 @@ namespace liblbfgs
       
       x_opt_.clear();
       x_opt_.reserve(n);
-      x_opt_.resize(n);
       x_opt_.insert(x_opt_.end(), x, x + n);
       
       lbfgs(n, x, &objective_, _evaluate, 0, this, &param_);
