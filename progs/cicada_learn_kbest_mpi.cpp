@@ -372,6 +372,9 @@ int main(int argc, char ** argv)
     }
     
     if (mpi_rank == 0) {
+      if (debug >= 2)
+	std::cerr << "dump weights" << std::endl;
+      
       utils::compress_ostream os(output_path, 1024 * 1024);
       os.precision(20);
       os << weights;

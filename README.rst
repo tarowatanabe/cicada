@@ -20,7 +20,66 @@ Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pron
 Quick Start
 -----------
 
+Compile
+```````
+Get the source code from `cicada <...>`_ by git and simply follow GNU
+the standard pipiline. For details, see BUILD.rst.
 
+::
+
+   ./autogen.sh
+   ./configure --prefix <prefix where you want to install. detault = /usr/local>
+   make
+   make install (optional)
+
+Run
+```
+
+You can find a sample grammar file at *doc* directory to gether with
+*ngram* language model. Here is an example run (Note that \\ indicates
+shell's newline):
+
+::
+
+   cicada \
+      --input samples/sample.input \
+      --grammar samples/sample.grammar.gz \
+      --grammar "glue:straight=true,inverted=false,non-terminal=[x],goal=[s]" \
+      --grammar "insertion:non-terminal=[x]" \
+      --feature-function "ngram:file=samples/sample.ngram.gz,order=5" \
+      --feature-function word-penalty \
+      --feature-function rule-penalty \
+      --operation compose-cky \
+      --operation apply:prune=true,size=100,weights=samples/sample.weights \
+      --operation output:file=samples/output.test,kbest=10,weights=samples/sample.weights \
+      --debug
+
+This sample means:
+  - Input is `samples/sample.init`
+  - Grammar consists of three gramamr specs:
+
+    - the grammar file is `samples/sample.grammar.gz`
+    - Additional grammar is a "glue grammar" which consists of two rules
+      of "[s] -> <[x], [x]>" and "[s] -> <[s,1] [x,1], [s,1] [x,1]>"
+    - Another additional grammar is an "insertion grammar" which simply
+      copies the input string to output string, "[x] -> <word-x, word-x>"
+  - Three feature functions
+
+    - 5-gram language model from `samples/sample.ngram.gz`.
+    - word penalty feature which penalize by the number of words in
+      the target side.
+    - rule penalty feature which penaltize by the number of words in a
+      derivation.
+  - Actual operation:
+
+    1. Input is composed by cky algorithm (compose-cky) which result
+       in a hypergraph.
+    2. Cube-pruning (apply) to apply feature functions using 100 as a
+       histogram pruning threshold using the weights at
+       `samples/sample.weights`.
+    3. 10-best derivations are computed and output at
+       `samples/output.test` using `samples/sample.weights` as a
+       weight vector to compute the score for each derivation.
 
 
 Descriptions

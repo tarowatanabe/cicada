@@ -9,6 +9,10 @@
  - INCOMPATIBLE: Use of murmur3 for hash functions. This will not
    break the compatibility with the "indexed, binary" files, but may
    affect the ordering of words, features attributes etc.
+ - INCOMPATIBLE: Added significance testing via Fisher's exact test in
+   cicada_extract_{pharse,scfg,ghkm,tree}. This affect the count
+   format and greatly affect the
+   cicada_filter_extract{,phrase,scfg,ghkm} tools.
  - Added cicada_filter_normalize which can perform normalization,
    i.e. NFKC and remove controls etc. with support for colorization of
    Katakana, katakana-marks and symbols.
@@ -16,11 +20,16 @@
    using the ICU chardet API
  - Added cg_descent as a backend for learning. TODO: use it!
  - Added attributes for each arc in the lattice data structure.
+ - Added Fisher's exact test feature. (But it is not recommended,
+   since it may take inifinity value!)
  - Faster grammar extraction and scoring by eliminating spurious
    locking
  - Better help messages in python scripts with default values
  - Reduced memory consumption in compose_tree and parse_tree
-   especially for plugging phrases
+   especially for plugging phrases.
+ - Reduced memory for cicada_extract_{pharse,scfg,ghkm,tree}.
+ - Better documentation. Now all the docs are rst-based, not mixed
+   with md-based docs.
 
 2013-1-9
 --------
