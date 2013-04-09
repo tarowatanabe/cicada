@@ -8,5 +8,5 @@ AUTOMAKE_OPTIONS = foreign
 EXTRA_DIST = \
 TODO.rst \
 README.rst \
-COMPILE.rst \
+BUILD.rst \
 LICENSES.rst

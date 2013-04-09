@@ -1,5 +1,6 @@
-cicada
-======
+========
+ cicada
+========
 
 A statistical machine translation toolkit based on a semiring parsing
 framework [1]_. Based on the generic framework, we can
@@ -18,6 +19,8 @@ Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pron
 
 Quick Start
 -----------
+
+
 
 
 Descriptions
@@ -149,494 +152,566 @@ learning + translation [20]_
 References
 ----------
 
-.. [1] Zhifei Li; Jason Eisner. 2009.
-       First- and Second-Order Expectation Semirings with Applications
-       to Minimum-Risk Training on Translation Forests.
-       In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing*.
+.. [1]
+.. code:: latex
 
-@InProceedings{li-eisner:2009:EMNLP,
-  author    = {Li, Zhifei  and  Eisner, Jason},
-  title     = {First- and Second-Order Expectation Semirings with Applications to Minimum-Risk Training on Translation Forests},
-  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
-  month     = {August},
-  year      = {2009},
-  address   = {Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {40--51},
-  url       = {http://www.aclweb.org/anthology/D/D09/D09-1005}
-}
+  @InProceedings{li-eisner:2009:EMNLP,
+    author    = {Li, Zhifei  and  Eisner, Jason},
+    title     = {First- and Second-Order Expectation Semirings with Applications to Minimum-Risk Training on Translation Forests},
+    booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
+    month     = {August},
+    year      = {2009},
+    address   = {Singapore},
+    publisher = {Association for Computational Linguistics},
+    pages     = {40--51},
+    url       = {http://www.aclweb.org/anthology/D/D09/D09-1005}
+   }
 
 
-[2]
-@InProceedings{dyer-muresan-resnik:2008:ACLMain,
-  author    = {Dyer, Christopher  and  Muresan, Smaranda  and  Resnik, Philip},
-  title     = {Generalizing Word Lattice Translation},
-  booktitle = {Proceedings of ACL-08: HLT},
-  month     = {June},
-  year      = {2008},
-  address   = {Columbus, Ohio},
-  publisher = {Association for Computational Linguistics},
-  pages     = {1012--1020},
-  url       = {http://www.aclweb.org/anthology/P/P08/P08-1115}
-}
+.. [2]
+.. code:: latex
 
-[3]
-@InProceedings{dyer-resnik:2010:NAACLHLT,
-  author    = {Dyer, Chris  and  Resnik, Philip},
-  title     = {Context-free reordering, finite-state translation},
-  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
-  month     = {June},
-  year      = {2010},
-  address   = {Los Angeles, California},
-  publisher = {Association for Computational Linguistics},
-  pages     = {858--866},
-  url       = {http://www.aclweb.org/anthology/N10-1128}
-}
+  @InProceedings{dyer-muresan-resnik:2008:ACLMain,
+    author    = {Dyer, Christopher  and  Muresan, Smaranda  and  Resnik, Philip},
+    title     = {Generalizing Word Lattice Translation},
+    booktitle = {Proceedings of ACL-08: HLT},
+    month     = {June},
+    year      = {2008},
+    address   = {Columbus, Ohio},
+    publisher = {Association for Computational Linguistics},
+    pages     = {1012--1020},
+    url       = {http://www.aclweb.org/anthology/P/P08/P08-1115}
+  }
 
-[4]
-@InProceedings{huang-chiang:2007:ACLMain,
-  author    = {Huang, Liang  and  Chiang, David},
-  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
-  booktitle = {Proceedings of the 45th Annual Meeting of the Association of Computational Linguistics},
-  month     = {June},
-  year      = {2007},
-  address   = {Prague, Czech Republic},
-  publisher = {Association for Computational Linguistics},
-  pages     = {144--151},
-  url       = {http://www.aclweb.org/anthology/P07-1019}
-}
+.. [3]
+.. code:: latex
 
-[5]
-@InProceedings{huang-chiang:2005:IWPT,
-  author    = {Huang, Liang  and  Chiang, David},
-  title     = {Better k-best Parsing},
-  booktitle = {Proceedings of the Ninth International Workshop on Parsing Technology},
-  month     = {October},
-  year      = {2005},
-  address   = {Vancouver, British Columbia},
-  publisher = {Association for Computational Linguistics},
-  pages     = {53--64},
-  url       = {http://www.aclweb.org/anthology/W/W05/W05-1506}
-}
+  @InProceedings{dyer-resnik:2010:NAACLHLT,
+    author    = {Dyer, Chris  and  Resnik, Philip},
+    title     = {Context-free reordering, finite-state translation},
+    booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+    month     = {June},
+    year      = {2010},
+    address   = {Los Angeles, California},
+    publisher = {Association for Computational Linguistics},
+    pages     = {858--866},
+    url       = {http://www.aclweb.org/anthology/N10-1128}
+  }
 
-[6]
-@InProceedings{chiang-knight-wang:2009:NAACLHLT09,
-  author    = {Chiang, David  and  Knight, Kevin  and  Wang, Wei},
-  title     = {11,001 New Features for Statistical Machine Translation},
-  booktitle = {Proceedings of Human Language Technologies: The 2009 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
-  month     = {June},
-  year      = {2009},
-  address   = {Boulder, Colorado},
-  publisher = {Association for Computational Linguistics},
-  pages     = {218--226},
-  url       = {http://www.aclweb.org/anthology/N/N09/N09-1025}
-}
+.. [4]
+.. code:: latex
 
-[7]
-@InProceedings{watanabe-EtAl:2007:EMNLP-CoNLL2007,
-  author    = {Watanabe, Taro  and  Suzuki, Jun  and  Tsukada, Hajime  and  Isozaki, Hideki},
-  title     = {Online Large-Margin Training for Statistical Machine Translation},
-  booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
-  month     = {June},
-  year      = {2007},
-  address   = {Prague, Czech Republic},
-  publisher = {Association for Computational Linguistics},
-  pages     = {764--773},
-  url       = {http://www.aclweb.org/anthology/D/D07/D07-1080}
-}
+  @InProceedings{huang-chiang:2007:ACLMain,
+    author    = {Huang, Liang  and  Chiang, David},
+    title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
+    booktitle = {Proceedings of the 45th Annual Meeting of the Association of Computational Linguistics},
+    month     = {June},
+    year      = {2007},
+    address   = {Prague, Czech Republic},
+    publisher = {Association for Computational Linguistics},
+    pages     = {144--151},
+    url       = {http://www.aclweb.org/anthology/P07-1019}
+  }
 
-[8]
-@InProceedings{kumar-EtAl:2009:ACLIJCNLP,
-  author    = {Kumar, Shankar  and  Macherey, Wolfgang  and  Dyer, Chris  and  Och, Franz},
-  title     = {Efficient Minimum Error Rate Training and Minimum Bayes-Risk Decoding for Translation Hypergraphs and Lattices},
-  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
-  month     = {August},
-  year      = {2009},
-  address   = {Suntec, Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {163--171},
-  url       = {http://www.aclweb.org/anthology/P/P09/P09-1019}
-}
+.. [5]
+.. code:: latex
 
-[9]
-@InProceedings{gimpel-smith:2010:NAACLHLT,
-  author    = {Gimpel, Kevin  and  Smith, Noah A.},
-  title     = {Softmax-Margin CRFs: Training Log-Linear Models with Cost Functions},
-  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
-  month     = {June},
-  year      = {2010},
-  address   = {Los Angeles, California},
-  publisher = {Association for Computational Linguistics},
-  pages     = {733--736},
-  url       = {http://www.aclweb.org/anthology/N10-1112}
-}
+ @InProceedings{huang-chiang:2005:IWPT,
+   author    = {Huang, Liang  and  Chiang, David},
+   title     = {Better k-best Parsing},
+   booktitle = {Proceedings of the Ninth International Workshop on Parsing Technology},
+   month     = {October},
+   year      = {2005},
+   address   = {Vancouver, British Columbia},
+   publisher = {Association for Computational Linguistics},
+   pages     = {53--64},
+   url       = {http://www.aclweb.org/anthology/W/W05/W05-1506}
+ }
 
-[10]
-@InProceedings{li-eisner-khudanpur:2009:ACLIJCNLP,
-  author    = {Li, Zhifei  and  Eisner, Jason  and  Khudanpur, Sanjeev},
-  title     = {Variational Decoding for Statistical Machine Translation},
-  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
-  month     = {August},
-  year      = {2009},
-  address   = {Suntec, Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {593--601},
-  url       = {http://www.aclweb.org/anthology/P/P09/P09-1067}
-}
+.. [6]
+.. code:: latex
 
-[11]
-@InProceedings { vilar09:coarseHeuristic,
-   author= {Vilar, David and Ney, Hermann},
-   title= {On LM Heuristics for the Cube Growing Algorithm},
-   booktitle= {Annual Conference of the European Association for Machine Translation},
-   year= 2009,
-   pages= {242-249},
-   address= {Barcelona, Spain},
-   month= may,
-   booktitlelink= {http://www.talp.cat/eamt09/},
-   pdf = {http://www-i6.informatik.rwth-aachen.de/publications/downloader.php?id=617&row=pdf}
-}
+ @InProceedings{chiang-knight-wang:2009:NAACLHLT09,
+   author    = {Chiang, David  and  Knight, Kevin  and  Wang, Wei},
+   title     = {11,001 New Features for Statistical Machine Translation},
+   booktitle = {Proceedings of Human Language Technologies: The 2009 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+   month     = {June},
+   year      = {2009},
+   address   = {Boulder, Colorado},
+   publisher = {Association for Computational Linguistics},
+   pages     = {218--226},
+   url       = {http://www.aclweb.org/anthology/N/N09/N09-1025}
+ }
 
-[12]
-@InProceedings{denero-chiang-knight:2009:ACLIJCNLP,
-  author    = {DeNero, John  and  Chiang, David  and  Knight, Kevin},
-  title     = {Fast Consensus Decoding over Translation Forests},
-  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
-  month     = {August},
-  year      = {2009},
-  address   = {Suntec, Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {567--575},
-  url       = {http://www.aclweb.org/anthology/P/P09/P09-1064}
-}
+.. [7]
+.. code:: latex
 
-[13]
-@InProceedings{denero-EtAl:2010:NAACLHLT,
-  author    = {DeNero, John  and  Kumar, Shankar  and  Chelba, Ciprian  and  Och, Franz},
-  title     = {Model Combination for Machine Translation},
-  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
-  month     = {June},
-  year      = {2010},
-  address   = {Los Angeles, California},
-  publisher = {Association for Computational Linguistics},
-  pages     = {975--983},
-  url       = {http://www.aclweb.org/anthology/N10-1141}
-}
+ @InProceedings{watanabe-EtAl:2007:EMNLP-CoNLL2007,
+   author    = {Watanabe, Taro  and  Suzuki, Jun  and  Tsukada, Hajime  and  Isozaki, Hideki},
+   title     = {Online Large-Margin Training for Statistical Machine Translation},
+   booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
+   month     = {June},
+   year      = {2007},
+   address   = {Prague, Czech Republic},
+   publisher = {Association for Computational Linguistics},
+   pages     = {764--773},
+   url       = {http://www.aclweb.org/anthology/D/D07/D07-1080}
+ }
 
-[14]
-@InProceedings{rosti-EtAl:2009:WMT-09,
-  author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
-  title     = {Incremental Hypothesis Alignment with Flexible Matching for Building Confusion Networks: {BBN} System Description for {WMT}09 System Combination Task},
-  booktitle = {Proceedings of the Fourth Workshop on Statistical Machine Translation},
-  month     = {March},
-  year      = {2009},
-  address   = {Athens, Greece},
-  publisher = {Association for Computational Linguistics},
-  pages     = {61--65},
-  url       = {http://www.aclweb.org/anthology/W/W09/W09-0409}
-}
+.. [8]
+.. code:: latex
 
-[15]
-@InProceedings{zollmann-vogel:2010:SSST,
-  author    = {Zollmann, Andreas  and  Vogel, Stephan},
-  title     = {New Parameterizations and Features for PSCFG-Based Machine Translation},
-  booktitle = {Proceedings of the 4th Workshop on Syntax and Structure in Statistical Translation},
-  month     = {August},
-  year      = {2010},
-  address   = {Beijing, China},
-  publisher = {Coling 2010 Organizing Committee},
-  pages     = {110--117},
-  url       = {http://www.aclweb.org/anthology/W10-3814}
-}
+ @InProceedings{kumar-EtAl:2009:ACLIJCNLP,
+   author    = {Kumar, Shankar  and  Macherey, Wolfgang  and  Dyer, Chris  and  Och, Franz},
+   title     = {Efficient Minimum Error Rate Training and Minimum Bayes-Risk Decoding for Translation Hypergraphs and Lattices},
+   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+   month     = {August},
+   year      = {2009},
+   address   = {Suntec, Singapore},
+   publisher = {Association for Computational Linguistics},
+   pages     = {163--171},
+   url       = {http://www.aclweb.org/anthology/P/P09/P09-1019}
+ }
 
-[16]
-@InProceedings{mi-huang:2008:EMNLP,
-  author    = {Mi, Haitao  and  Huang, Liang},
-  title     = {Forest-based Translation Rule Extraction},
-  booktitle = {Proceedings of the 2008 Conference on Empirical Methods in Natural Language Processing},
-  month     = {October},
-  year      = {2008},
-  address   = {Honolulu, Hawaii},
-  publisher = {Association for Computational Linguistics},
-  pages     = {206--214},
-  url       = {http://www.aclweb.org/anthology/D08-1022}
-}
+.. [9]
+.. code:: latex
 
-[17]
-@InProceedings{liu-lu-liu:2009:ACLIJCNLP,
-  author    = {Liu, Yang  and  L{\"{u}}, Yajuan  and  Liu, Qun},
-  title     = {Improving Tree-to-Tree Translation with Packed Forests},
-  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
-  month     = {August},
-  year      = {2009},
-  address   = {Suntec, Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {558--566},
-  url       = {http://www.aclweb.org/anthology/P/P09/P09-1063}
-}
+ @InProceedings{gimpel-smith:2010:NAACLHLT,
+   author    = {Gimpel, Kevin  and  Smith, Noah A.},
+   title     = {Softmax-Margin CRFs: Training Log-Linear Models with Cost Functions},
+   booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+   month     = {June},
+   year      = {2010},
+   address   = {Los Angeles, California},
+   publisher = {Association for Computational Linguistics},
+   pages     = {733--736},
+   url       = {http://www.aclweb.org/anthology/N10-1112}
+ }
 
-[18]
-@InProceedings{huang-mi:2010:EMNLP,
-  author    = {Huang, Liang  and  Mi, Haitao},
-  title     = {Efficient Incremental Decoding for Tree-to-String Translation},
-  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
-  month     = {October},
-  year      = {2010},
-  address   = {Cambridge, MA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {273--283},
-  url       = {http://www.aclweb.org/anthology/D10-1027}
-}
+.. [10]
+.. code:: latex
 
-[19]
-@InProceedings{dyer-EtAl:2008:WMT,
-  author    = {Dyer, Chris  and  Cordova, Aaron  and  Mont, Alex  and  Lin, Jimmy},
-  title     = {Fast, Easy, and Cheap: Construction of Statistical Machine Translation Models with {MapReduce}},
-  booktitle = {Proceedings of the Third Workshop on Statistical Machine Translation},
-  month     = {June},
-  year      = {2008},
-  address   = {Columbus, Ohio},
-  publisher = {Association for Computational Linguistics},
-  pages     = {199--207},
-  url       = {http://www.aclweb.org/anthology/W/W08/W08-0333}
-}
+ @InProceedings{li-eisner-khudanpur:2009:ACLIJCNLP,
+   author    = {Li, Zhifei  and  Eisner, Jason  and  Khudanpur, Sanjeev},
+   title     = {Variational Decoding for Statistical Machine Translation},
+   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+   month     = {August},
+   year      = {2009},
+   address   = {Suntec, Singapore},
+   publisher = {Association for Computational Linguistics},
+   pages     = {593--601},
+   url       = {http://www.aclweb.org/anthology/P/P09/P09-1067}
+ }
 
-[20]
-@InProceedings{riesa-marcu:2010:ACL,
-  author    = {Riesa, Jason  and  Marcu, Daniel},
-  title     = {Hierarchical Search for Word Alignment},
-  booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
-  month     = {July},
-  year      = {2010},
-  address   = {Uppsala, Sweden},
-  publisher = {Association for Computational Linguistics},
-  pages     = {157--166},
-  url       = {http://www.aclweb.org/anthology/P10-1017}
-}
+.. [11]
+.. code:: latex
 
-[21]
-@InProceedings{uszkoreit-brants:2008:ACLMain,
-  author    = {Uszkoreit, Jakob  and  Brants, Thorsten},
-  title     = {Distributed Word Clustering for Large Scale Class-Based Language Modeling in Machine Translation},
-  booktitle = {Proceedings of ACL-08: HLT},
-  month     = {June},
-  year      = {2008},
-  address   = {Columbus, Ohio},
-  publisher = {Association for Computational Linguistics},
-  pages     = {755--762},
-  url       = {http://www.aclweb.org/anthology/P/P08/P08-1086}
-}
+ @InProceedings { vilar09:coarseHeuristic,
+    author= {Vilar, David and Ney, Hermann},
+    title= {On LM Heuristics for the Cube Growing Algorithm},
+    booktitle= {Annual Conference of the European Association for Machine Translation},
+    year= 2009,
+    pages= {242-249},
+    address= {Barcelona, Spain},
+    month= may,
+    booktitlelink= {http://www.talp.cat/eamt09/},
+    pdf = {http://www-i6.informatik.rwth-aachen.de/publications/downloader.php?id=617&row=pdf}
+ }
 
-[22]
-@InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
-  author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
-  title     = {Alignment by Agreement},
-  booktitle = {Proceedings of the Human Language Technology Conference of the NAACL, Main Conference},
-  month     = {June},
-  year      = {2006},
-  address   = {New York City, USA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {104--111},
-  url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
-}
+.. [12]
+.. code:: latex
 
-[23]
-@InProceedings{ganchev-gracca-taskar:2008:ACLMain,
-  author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
-  title     = {Better Alignments = Better Translations?},
-  booktitle = {Proceedings of ACL-08: HLT},
-  month     = {June},
-  year      = {2008},
-  address   = {Columbus, Ohio},
-  publisher = {Association for Computational Linguistics},
-  pages     = {986--993},
-  url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
-}
+ @InProceedings{denero-chiang-knight:2009:ACLIJCNLP,
+   author    = {DeNero, John  and  Chiang, David  and  Knight, Kevin},
+   title     = {Fast Consensus Decoding over Translation Forests},
+   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+   month     = {August},
+   year      = {2009},
+   address   = {Suntec, Singapore},
+   publisher = {Association for Computational Linguistics},
+   pages     = {567--575},
+   url       = {http://www.aclweb.org/anthology/P/P09/P09-1064}
+ }
 
-[24]
-@INPROCEEDINGS{Klein01parsingand,
-    author = {Dan Klein and Christopher D. Manning},
-    title = {Parsing and Hypergraphs},
-    booktitle = {IN IWPT},
-    year = {2001},
-    pages = {123--134},
-    publisher = {}
-}
+.. [13]
+.. code:: latex
 
-[25]
-@InProceedings{petrov-EtAl:2006:COLACL,
-  author    = {Petrov, Slav  and  Barrett, Leon  and  Thibaux, Romain  and  Klein, Dan},
-  title     = {Learning Accurate, Compact, and Interpretable Tree Annotation},
-  booktitle = {Proceedings of the 21st International Conference on Computational Linguistics and 44th Annual Meeting of the Association for Computational Linguistics},
-  month     = {July},
-  year      = {2006},
-  address   = {Sydney, Australia},
-  publisher = {Association for Computational Linguistics},
-  pages     = {433--440},
-  url       = {http://www.aclweb.org/anthology/P06-1055},
-  doi       = {10.3115/1220175.1220230}
-}
+ @InProceedings{denero-EtAl:2010:NAACLHLT,
+   author    = {DeNero, John  and  Kumar, Shankar  and  Chelba, Ciprian  and  Och, Franz},
+   title     = {Model Combination for Machine Translation},
+   booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+   month     = {June},
+   year      = {2010},
+   address   = {Los Angeles, California},
+   publisher = {Association for Computational Linguistics},
+   pages     = {975--983},
+   url       = {http://www.aclweb.org/anthology/N10-1141}
+ }
 
-[26]
-@InProceedings{petrov-klein:2007:main,
-  author    = {Petrov, Slav  and  Klein, Dan},
-  title     = {Improved Inference for Unlexicalized Parsing},
-  booktitle = {Human Language Technologies 2007: The Conference of the North American Chapter of the Association for Computational Linguistics; Proceedings of the Main Conference},
-  month     = {April},
-  year      = {2007},
-  address   = {Rochester, New York},
-  publisher = {Association for Computational Linguistics},
-  pages     = {404--411},
-  url       = {http://www.aclweb.org/anthology/N/N07/N07-1051}
-}
+.. [14]
+.. code:: latex
 
-[27]
-@inproceedings{galley-EtAl:2004:HLTNAACL,
-  author    = {Galley, Michel  and  Hopkins, Mark  and  Knight, Kevin  and  Marcu, Daniel},
-  title     = {What's in a translation rule?},
-  booktitle = {HLT-NAACL 2004: Main Proceedings },
-  editor = {Susan Dumais, Daniel Marcu and Salim Roukos},
-  year      = 2004,
-  month     = {May 2 - May 7},
-  address   = {Boston, Massachusetts, USA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {273--280}
-}
+ @InProceedings{rosti-EtAl:2009:WMT-09,
+   author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
+   title     = {Incremental Hypothesis Alignment with Flexible Matching for Building Confusion Networks: {BBN} System Description for {WMT}09 System Combination Task},
+   booktitle = {Proceedings of the Fourth Workshop on Statistical Machine Translation},
+   month     = {March},
+   year      = {2009},
+   address   = {Athens, Greece},
+   publisher = {Association for Computational Linguistics},
+   pages     = {61--65},
+   url       = {http://www.aclweb.org/anthology/W/W09/W09-0409}
+ }
 
-[28]
-@InProceedings{mauser-hasan-ney:2009:EMNLP,
-  author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
-  title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
-  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
-  month     = {August},
-  year      = {2009},
-  address   = {Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {210--218},
-  url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
-}
+.. [15]
+.. code:: latex
 
-[29]
-@InProceedings{watanabe-sumita:2011:ACL-HLT2011,
-  author    = {Watanabe, Taro  and  Sumita, Eiichiro},
-  title     = {Machine Translation System Combination by Confusion Forest},
-  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
-  month     = {June},
-  year      = {2011},
-  address   = {Portland, Oregon, USA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {1249--1257},
-  url       = {http://www.aclweb.org/anthology/P11-1125}
-}
+ @InProceedings{zollmann-vogel:2010:SSST,
+   author    = {Zollmann, Andreas  and  Vogel, Stephan},
+   title     = {New Parameterizations and Features for PSCFG-Based Machine Translation},
+   booktitle = {Proceedings of the 4th Workshop on Syntax and Structure in Statistical Translation},
+   month     = {August},
+   year      = {2010},
+   address   = {Beijing, China},
+   publisher = {Coling 2010 Organizing Committee},
+   pages     = {110--117},
+   url       = {http://www.aclweb.org/anthology/W10-3814}
+ }
 
-[30]
-@Article{REF08a,
-  author =	 {Rong-En Fan and Kai-Wei Chang and Cho-Jui Hsieh and Xiang-Rui Wang and Chih-Jen Lin},
-  title = 	  {{LIBLINEAR}: A Library for Large Linear Classification},
-  journal = 	   {Journal of Machine Learning Research},
-  year =   {2008},
-  volume =  {9},
-  pages =    {1871--1874}
-}
+.. [16]
+.. code:: latex
 
-[31]
-@inproceedings{iwslt10:TP:gesmundo,
-  author = {Andrea Gesmundo and James Henderson},
-  editor = {Marcello Federico and Ian Lane and Michael Paul and Fran\c{c}ois Yvon},
-  title = {{Faster Cube Pruning}},
-  booktitle = {Proceedings of the seventh International Workshop on Spoken Language Translation (IWSLT)},
-  year = {2010},
-  pages = {267--274},
-  location = {Paris, France}
-}
+ @InProceedings{mi-huang:2008:EMNLP,
+   author    = {Mi, Haitao  and  Huang, Liang},
+   title     = {Forest-based Translation Rule Extraction},
+   booktitle = {Proceedings of the 2008 Conference on Empirical Methods in Natural Language Processing},
+   month     = {October},
+   year      = {2008},
+   address   = {Honolulu, Hawaii},
+   publisher = {Association for Computational Linguistics},
+   pages     = {206--214},
+   url       = {http://www.aclweb.org/anthology/D08-1022}
+ }
 
-[32]
-@InProceedings{jiang-liu:2010:ACL,
-  author    = {Jiang, Wenbin  and  Liu, Qun},
-  title     = {Dependency Parsing and Projection Based on Word-Pair Classification},
-  booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
-  month     = {July},
-  year      = {2010},
-  address   = {Uppsala, Sweden},
-  publisher = {Association for Computational Linguistics},
-  pages     = {12--20},
-  url       = {http://www.aclweb.org/anthology/P10-1002}
-}
+.. [17]
+.. code:: latex
 
-[33]
-@InProceedings{hopkins-may:2011:EMNLP,
-  author    = {Hopkins, Mark  and  May, Jonathan},
-  title     = {Tuning as Ranking},
-  booktitle = {Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing},
-  month     = {July},
-  year      = {2011},
-  address   = {Edinburgh, Scotland, UK.},
-  publisher = {Association for Computational Linguistics},
-  pages     = {1352--1362},
-  url       = {http://www.aclweb.org/anthology/D11-1125}
-}
+ @InProceedings{liu-lu-liu:2009:ACLIJCNLP,
+   author    = {Liu, Yang  and  L{\"{u}}, Yajuan  and  Liu, Qun},
+   title     = {Improving Tree-to-Tree Translation with Packed Forests},
+   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+   month     = {August},
+   year      = {2009},
+   address   = {Suntec, Singapore},
+   publisher = {Association for Computational Linguistics},
+   pages     = {558--566},
+   url       = {http://www.aclweb.org/anthology/P/P09/P09-1063}
+ }
 
-[34]
-@InProceedings{hopkins-langmead:2010:EMNLP,
-  author    = {Hopkins, Mark  and  Langmead, Greg},
-  title     = {{SCFG} Decoding Without Binarization},
-  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
-  month     = {October},
-  year      = {2010},
-  address   = {Cambridge, MA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {646--655},
-  url       = {http://www.aclweb.org/anthology/D10-1063}
-}
+.. [18]
+.. code:: latex
 
-[35]
-@InProceedings{rosti-EtAl:2011:WMT,
-  author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
-  title     = {Expected BLEU Training for Graphs: BBN System Description for WMT11 System Combination Task},
-  booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
-  month     = {July},
-  year      = {2011},
-  address   = {Edinburgh, Scotland},
-  publisher = {Association for Computational Linguistics},
-  pages     = {159--165},
-  url       = {http://www.aclweb.org/anthology/W11-2119}
-}
+ @InProceedings{huang-mi:2010:EMNLP,
+   author    = {Huang, Liang  and  Mi, Haitao},
+   title     = {Efficient Incremental Decoding for Tree-to-String Translation},
+   booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
+   month     = {October},
+   year      = {2010},
+   address   = {Cambridge, MA},
+   publisher = {Association for Computational Linguistics},
+   pages     = {273--283},
+   url       = {http://www.aclweb.org/anthology/D10-1027}
+ }
 
-[36]
-@InProceedings{simianer-riezler-dyer:2012:ACL2012,
-  author    = {Simianer, Patrick  and  Riezler, Stefan  and  Dyer, Chris},
-  title     = {Joint Feature Selection in Distributed Stochastic Learning for Large-Scale Discriminative Training in SMT},
-  booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
-  month     = {July},
-  year      = {2012},
-  address   = {Jeju Island, Korea},
-  publisher = {Association for Computational Linguistics},
-  pages     = {11--21},
-  url       = {http://www.aclweb.org/anthology/P12-1002}
-}
+.. [19]
+.. code:: latex
 
-[37]
-@InProceedings{watanabe:2012:NAACL-HLT,
-  author    = {Watanabe, Taro},
-  title     = {Optimized Online Rank Learning for Machine Translation},
-  booktitle = {Proceedings of the 2012 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies},
-  month     = {June},
-  year      = {2012},
-  address   = {Montr\'{e}al, Canada},
-  publisher = {Association for Computational Linguistics},
-  pages     = {253--262},
-  url       = {http://www.aclweb.org/anthology/N12-1026}
-}
+ @InProceedings{dyer-EtAl:2008:WMT,
+   author    = {Dyer, Chris  and  Cordova, Aaron  and  Mont, Alex  and  Lin, Jimmy},
+   title     = {Fast, Easy, and Cheap: Construction of Statistical Machine Translation Models with {MapReduce}},
+   booktitle = {Proceedings of the Third Workshop on Statistical Machine Translation},
+   month     = {June},
+   year      = {2008},
+   address   = {Columbus, Ohio},
+   publisher = {Association for Computational Linguistics},
+   pages     = {199--207},
+   url       = {http://www.aclweb.org/anthology/W/W08/W08-0333}
+ }
 
-[38]
-@InProceedings{johnson-EtAl:2007:EMNLP-CoNLL2007,
-  author    = {Johnson, Howard  and  Martin, Joel  and  Foster, George  and  Kuhn, Roland},
-  title     = {Improving Translation Quality by Discarding Most of the Phrasetable},
-  booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
-  month     = {June},
-  year      = {2007},
-  address   = {Prague, Czech Republic},
-  publisher = {Association for Computational Linguistics},
-  pages     = {967--975},
-  url       = {http://www.aclweb.org/anthology/D/D07/D07-1103}
-}
+.. [20]
+.. code:: latex
+
+ @InProceedings{riesa-marcu:2010:ACL,
+   author    = {Riesa, Jason  and  Marcu, Daniel},
+   title     = {Hierarchical Search for Word Alignment},
+   booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
+   month     = {July},
+   year      = {2010},
+   address   = {Uppsala, Sweden},
+   publisher = {Association for Computational Linguistics},
+   pages     = {157--166},
+   url       = {http://www.aclweb.org/anthology/P10-1017}
+ }
+
+.. [21]
+.. code:: latex
+
+ @InProceedings{uszkoreit-brants:2008:ACLMain,
+   author    = {Uszkoreit, Jakob  and  Brants, Thorsten},
+   title     = {Distributed Word Clustering for Large Scale Class-Based Language Modeling in Machine Translation},
+   booktitle = {Proceedings of ACL-08: HLT},
+   month     = {June},
+   year      = {2008},
+   address   = {Columbus, Ohio},
+   publisher = {Association for Computational Linguistics},
+   pages     = {755--762},
+   url       = {http://www.aclweb.org/anthology/P/P08/P08-1086}
+ }
+
+.. [22]
+.. code:: latex
+
+ @InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
+   author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
+   title     = {Alignment by Agreement},
+   booktitle = {Proceedings of the Human Language Technology Conference of the NAACL, Main Conference},
+   month     = {June},
+   year      = {2006},
+   address   = {New York City, USA},
+   publisher = {Association for Computational Linguistics},
+   pages     = {104--111},
+   url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
+ }
+
+.. [23]
+.. code:: latex
+
+ @InProceedings{ganchev-gracca-taskar:2008:ACLMain,
+   author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
+   title     = {Better Alignments = Better Translations?},
+   booktitle = {Proceedings of ACL-08: HLT},
+   month     = {June},
+   year      = {2008},
+   address   = {Columbus, Ohio},
+   publisher = {Association for Computational Linguistics},
+   pages     = {986--993},
+   url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
+ }
+
+.. [24]
+.. code:: latex
+
+ @INPROCEEDINGS{Klein01parsingand,
+     author = {Dan Klein and Christopher D. Manning},
+     title = {Parsing and Hypergraphs},
+     booktitle = {IN IWPT},
+     year = {2001},
+     pages = {123--134},
+     publisher = {}
+ }
+
+.. [25]
+.. code:: latex
+
+ @InProceedings{petrov-EtAl:2006:COLACL,
+   author    = {Petrov, Slav  and  Barrett, Leon  and  Thibaux, Romain  and  Klein, Dan},
+   title     = {Learning Accurate, Compact, and Interpretable Tree Annotation},
+   booktitle = {Proceedings of the 21st International Conference on Computational Linguistics and 44th Annual Meeting of the Association for Computational Linguistics},
+   month     = {July},
+   year      = {2006},
+   address   = {Sydney, Australia},
+   publisher = {Association for Computational Linguistics},
+   pages     = {433--440},
+   url       = {http://www.aclweb.org/anthology/P06-1055},
+   doi       = {10.3115/1220175.1220230}
+ }
+
+.. [26]
+.. code:: latex
+
+ @InProceedings{petrov-klein:2007:main,
+   author    = {Petrov, Slav  and  Klein, Dan},
+   title     = {Improved Inference for Unlexicalized Parsing},
+   booktitle = {Human Language Technologies 2007: The Conference of the North American Chapter of the Association for Computational Linguistics; Proceedings of the Main Conference},
+   month     = {April},
+   year      = {2007},
+   address   = {Rochester, New York},
+   publisher = {Association for Computational Linguistics},
+   pages     = {404--411},
+   url       = {http://www.aclweb.org/anthology/N/N07/N07-1051}
+ }
+
+.. [27]
+.. code:: latex
+
+ @inproceedings{galley-EtAl:2004:HLTNAACL,
+   author    = {Galley, Michel  and  Hopkins, Mark  and  Knight, Kevin  and  Marcu, Daniel},
+   title     = {What's in a translation rule?},
+   booktitle = {HLT-NAACL 2004: Main Proceedings },
+   editor = {Susan Dumais, Daniel Marcu and Salim Roukos},
+   year      = 2004,
+   month     = {May 2 - May 7},
+   address   = {Boston, Massachusetts, USA},
+   publisher = {Association for Computational Linguistics},
+   pages     = {273--280}
+ }
+
+.. [28]
+.. code:: latex
+
+ @InProceedings{mauser-hasan-ney:2009:EMNLP,
+   author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
+   title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
+   booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
+   month     = {August},
+   year      = {2009},
+   address   = {Singapore},
+   publisher = {Association for Computational Linguistics},
+   pages     = {210--218},
+   url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
+ }
+
+.. [29]
+.. code:: latex
+
+ @InProceedings{watanabe-sumita:2011:ACL-HLT2011,
+   author    = {Watanabe, Taro  and  Sumita, Eiichiro},
+   title     = {Machine Translation System Combination by Confusion Forest},
+   booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+   month     = {June},
+   year      = {2011},
+   address   = {Portland, Oregon, USA},
+   publisher = {Association for Computational Linguistics},
+   pages     = {1249--1257},
+   url       = {http://www.aclweb.org/anthology/P11-1125}
+ }
+
+.. [30]
+.. code:: latex
+
+ @Article{REF08a,
+   author =	 {Rong-En Fan and Kai-Wei Chang and Cho-Jui Hsieh and Xiang-Rui Wang and Chih-Jen Lin},
+   title = 	  {{LIBLINEAR}: A Library for Large Linear Classification},
+   journal = 	   {Journal of Machine Learning Research},
+   year =   {2008},
+   volume =  {9},
+   pages =    {1871--1874}
+ }
+
+.. [31]
+.. code:: latex
+
+ @inproceedings{iwslt10:TP:gesmundo,
+   author = {Andrea Gesmundo and James Henderson},
+   editor = {Marcello Federico and Ian Lane and Michael Paul and Fran\c{c}ois Yvon},
+   title = {{Faster Cube Pruning}},
+   booktitle = {Proceedings of the seventh International Workshop on Spoken Language Translation (IWSLT)},
+   year = {2010},
+   pages = {267--274},
+   location = {Paris, France}
+ }
+
+.. [32]
+.. code:: latex
+
+ @InProceedings{jiang-liu:2010:ACL,
+   author    = {Jiang, Wenbin  and  Liu, Qun},
+   title     = {Dependency Parsing and Projection Based on Word-Pair Classification},
+   booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
+   month     = {July},
+   year      = {2010},
+   address   = {Uppsala, Sweden},
+   publisher = {Association for Computational Linguistics},
+   pages     = {12--20},
+   url       = {http://www.aclweb.org/anthology/P10-1002}
+ }
+
+.. [33]
+.. code:: latex
+
+ @InProceedings{hopkins-may:2011:EMNLP,
+   author    = {Hopkins, Mark  and  May, Jonathan},
+   title     = {Tuning as Ranking},
+   booktitle = {Proceedings of the 2011 Conference on Empirical Methods in Natural Language Processing},
+   month     = {July},
+   year      = {2011},
+   address   = {Edinburgh, Scotland, UK.},
+   publisher = {Association for Computational Linguistics},
+   pages     = {1352--1362},
+   url       = {http://www.aclweb.org/anthology/D11-1125}
+ }
+
+.. [34]
+.. code:: latex
+
+ @InProceedings{hopkins-langmead:2010:EMNLP,
+   author    = {Hopkins, Mark  and  Langmead, Greg},
+   title     = {{SCFG} Decoding Without Binarization},
+   booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
+   month     = {October},
+   year      = {2010},
+   address   = {Cambridge, MA},
+   publisher = {Association for Computational Linguistics},
+   pages     = {646--655},
+   url       = {http://www.aclweb.org/anthology/D10-1063}
+ }
+
+.. [35]
+.. code:: latex
+
+ @InProceedings{rosti-EtAl:2011:WMT,
+   author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
+   title     = {Expected BLEU Training for Graphs: BBN System Description for WMT11 System Combination Task},
+   booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
+   month     = {July},
+   year      = {2011},
+   address   = {Edinburgh, Scotland},
+   publisher = {Association for Computational Linguistics},
+   pages     = {159--165},
+   url       = {http://www.aclweb.org/anthology/W11-2119}
+ }
+
+.. [36]
+.. code:: latex
+
+  @InProceedings{simianer-riezler-dyer:2012:ACL2012,
+    author    = {Simianer, Patrick  and  Riezler, Stefan  and  Dyer, Chris},
+    title     = {Joint Feature Selection in Distributed Stochastic Learning for Large-Scale Discriminative Training in SMT},
+    booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+    month     = {July},
+    year      = {2012},
+    address   = {Jeju Island, Korea},
+    publisher = {Association for Computational Linguistics},
+    pages     = {11--21},
+    url       = {http://www.aclweb.org/anthology/P12-1002}
+  }
+
+.. [37]
+.. code:: latex
+
+  @InProceedings{watanabe:2012:NAACL-HLT,
+    author    = {Watanabe, Taro},
+    title     = {Optimized Online Rank Learning for Machine Translation},
+    booktitle = {Proceedings of the 2012 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies},
+    month     = {June},
+    year      = {2012},
+    address   = {Montr\'{e}al, Canada},
+    publisher = {Association for Computational Linguistics},
+    pages     = {253--262},
+    url       = {http://www.aclweb.org/anthology/N12-1026}
+  }
+
+.. [38]
+.. code:: latex
+
+  @InProceedings{johnson-EtAl:2007:EMNLP-CoNLL2007,
+    author    = {Johnson, Howard  and  Martin, Joel  and  Foster, George  and  Kuhn, Roland},
+    title     = {Improving Translation Quality by Discarding Most of the Phrasetable},
+    booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
+    month     = {June},
+    year      = {2007},
+    address   = {Prague, Czech Republic},
+    publisher = {Association for Computational Linguistics},
+    pages     = {967--975},
+    url       = {http://www.aclweb.org/anthology/D/D07/D07-1103}
+  }
