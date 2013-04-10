@@ -48,6 +48,8 @@
 #include <boost/random.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 
+#include "codec/lz4.hpp"
+
 #include "liblbfgs/lbfgs.h"
 #include "liblbfgs/lbfgs_error.hpp"
 #include "liblbfgs/lbfgs.hpp"
@@ -146,7 +148,6 @@ void read_forest(const path_set_type& forest_path,
 		 hypergraph_set_type& graphs_forest,
 		 hypergraph_set_type& graphs_intersected);
 void bcast_weights(const int rank, weight_set_type& weights);
-void send_weights(const weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 
 
@@ -676,7 +677,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	std::random_shuffle(ids.begin(), ids.end(), gen);
 	
 	optimizer.weights *= (optimizer.samples + 1);
-	send_weights(optimizer.weights);
+	reduce_weights(optimizer.weights);
 	
 	double objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
@@ -1816,10 +1817,10 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 	// reduce g_*
 	for (int n = 1; n <= order; ++ n) {
 	  // reduce matched counts..
-	  send_weights(task.g_matched[n]);
-	  send_weights(task.g_hypo[n]);
+	  reduce_weights(task.g_matched[n]);
+	  reduce_weights(task.g_hypo[n]);
 	}
-	send_weights(task.g_entropy);
+	reduce_weights(task.g_entropy);
       }
     }
     
@@ -1895,7 +1896,7 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
 	task_type task(graphs_forest, graphs_intersected, weights, instances);
 	task();
 	
-	send_weights(task.g);
+	reduce_weights(task.g);
 	
 	double objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
@@ -2199,42 +2200,88 @@ void read_forest(const path_set_type& forest_path,
   }
 }
 
-void reduce_weights(weight_set_type& weights)
+void send_weights(const int rank, const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(codec::lz4_compressor());
+  os.push(utils::mpi_device_sink(rank, weights_tag, 1024 * 1024));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0) {
+      os << feature_type(id) << ' ';
+      utils::encode_base64(weights[id], std::ostream_iterator<char>(os));
+      os << '\n';
+    }
+}
+
+void reduce_weights(const int rank, weight_set_type& weights)
+{
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(codec::lz4_decompressor());
+  is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
+  
+  std::string line;
+  
+  while (std::getline(is, line)) {
+    const utils::piece line_piece(line);
+    tokenizer_type tokenizer(line_piece);
+    
+    tokenizer_type::iterator iter = tokenizer.begin();
+    if (iter == tokenizer.end()) continue;
+    const utils::piece feature = *iter;
+    ++ iter;
+    if (iter == tokenizer.end()) continue;
+    const utils::piece value = *iter;
+    
+    weights[feature] += utils::decode_base64<double>(value);
+  }
+}
+
+template <typename Iterator>
+void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
 {
   typedef utils::mpi_device_source            device_type;
   typedef boost::iostreams::filtering_istream stream_type;
 
   typedef boost::shared_ptr<device_type> device_ptr_type;
   typedef boost::shared_ptr<stream_type> stream_ptr_type;
-
+  
   typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
   typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
-
+  
   typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  device_ptr_set_type device;
+  stream_ptr_set_type stream;
   
-  device_ptr_set_type device(mpi_size);
-  stream_ptr_set_type stream(mpi_size);
-
-  for (int rank = 1; rank < mpi_size; ++ rank) {
-    device[rank].reset(new device_type(rank, weights_tag, 4096));
-    stream[rank].reset(new stream_type());
+  for (/**/; first != last; ++ first) {
+    device.push_back(device_ptr_type(new device_type(*first, weights_tag, 1024 * 1024)));
+    stream.push_back(stream_ptr_type(new stream_type()));
     
-    stream[rank]->push(boost::iostreams::zlib_decompressor());
-    stream[rank]->push(*device[rank]);
+    stream.back()->push(codec::lz4_decompressor());
+    stream.back()->push(*device.back());
   }
-
+  
   std::string line;
   
   int non_found_iter = 0;
   while (1) {
     bool found = false;
     
-    for (int rank = 1; rank < mpi_size; ++ rank)
-      while (stream[rank] && device[rank] && device[rank]->test()) {
-	if (std::getline(*stream[rank], line)) {
+    for (size_t i = 0; i != device.size(); ++ i)
+      while (stream[i] && device[i] && device[i]->test()) {
+	if (std::getline(*stream[i], line)) {
 	  const utils::piece line_piece(line);
 	  tokenizer_type tokenizer(line_piece);
 	  
@@ -2247,35 +2294,49 @@ void reduce_weights(weight_set_type& weights)
 	  
 	  weights[feature] += utils::decode_base64<double>(value);
 	} else {
-	  stream[rank].reset();
-	  device[rank].reset();
+	  stream[i].reset();
+	  device[i].reset();
 	}
 	found = true;
       }
     
-    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == static_cast<int>(device.size())) break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
-  
 }
 
-
-void send_weights(const weight_set_type& weights)
+void reduce_weights(weight_set_type& weights)
 {
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
   
-  boost::iostreams::filtering_ostream os;
-  os.push(boost::iostreams::zlib_compressor());
-  os.push(utils::mpi_device_sink(0, weights_tag, 4096));
-  
-  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
-    if (! feature_type(id).empty() && weights[id] != 0.0) {
-      os << feature_type(id) << ' ';
-      utils::encode_base64(weights[id], std::ostream_iterator<char>(os));
-      os << '\n';
-    }
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_weights(ranks.front(), weights);
+      else
+	reduce_weights(ranks.begin(), ranks.end(), weights);
+      
+    } else
+      send_weights(mpi_rank % reduce_size, weights);
+    
+    merge_size = reduce_size;
+  }
 }
 
 void bcast_weights(const int rank, weight_set_type& weights)
@@ -2287,8 +2348,8 @@ void bcast_weights(const int rank, weight_set_type& weights)
   
   if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::zlib_compressor());
-    os.push(utils::mpi_device_bcast_sink(rank, 4096));
+    os.push(codec::lz4_compressor());
+    os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
     
     static const weight_set_type::feature_type __empty;
     
@@ -2309,8 +2370,8 @@ void bcast_weights(const int rank, weight_set_type& weights)
     weights.allocate();
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::zlib_decompressor());
-    is.push(utils::mpi_device_bcast_source(rank, 4096));
+    is.push(codec::lz4_decompressor());
+    is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
     
     std::string feature;
     std::string value;
