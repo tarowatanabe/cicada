@@ -1,7 +1,5 @@
 2013-x-x
 --------
- - INCOMPATIBLE: ngram language models assume back-sorted-trie data
-   structure
  - INCOMPATIBLE: feature application by
    apply_cube_{prune,grow,grow_coarse} are modified:
    If two candidates share the same score, we prefer
@@ -18,7 +16,7 @@
    Katakana, katakana-marks and symbols.
  - Added cicada_filter_chardet which can detect character in a text
    using the ICU chardet API
- - Added cg_descent as a backend for learning. TODO: use it!
+ - Added cg_descent as an optimization algorithm.
  - Added attributes for each arc in the lattice data structure.
  - Added Fisher's exact test feature. (But it is not recommended,
    since it may take inifinity value!)
@@ -30,6 +28,8 @@
  - Reduced memory for cicada_extract_{pharse,scfg,ghkm,tree}.
  - Better documentation. Now all the docs are rst-based, not mixed
    with md-based docs.
+ - Potential speed up for mpi-based learning algorithm especially when
+   exchanging parameters.
 
 2013-1-9
 --------
