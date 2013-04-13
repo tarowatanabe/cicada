@@ -998,20 +998,37 @@ void cicada_process(operation_set_type& operations)
       }
 
     } else {
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
       utils::compress_istream is(input_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iter_type iter(is);
+      iter_type iter_end;
       
       operation_set_type::operation_type::id_type id = 0;
       std::string line;
       
       int non_found_iter = 0;
-      while (is) {
+      
+      while (iter != iter_end) {
 	bool found = false;
 	
-	for (int rank = 1; rank < mpi_size && is; ++ rank)
-	  if (stream[rank]->test() && std::getline(is, line)) {
-	    if (input_id_mode)
+	for (int rank = 1; rank < mpi_size && iter != iter_end; ++ rank)
+	  if (stream[rank]->test()) {
+	    line.clear();
+	    if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	      throw std::runtime_error("line parsing failed?");
+	    
+	    if (input_id_mode) {
+	      if (line.empty())
+		throw std::runtime_error("invalid empty input!");
+	      
 	      stream[rank]->write(line);
-	    else
+	    } else
 	      stream[rank]->write(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	    
 	    ++ id;
@@ -1019,10 +1036,17 @@ void cicada_process(operation_set_type& operations)
 	    found = true;
 	  }
 	
-	if (queue.empty() && std::getline(is, line)) {
-	  if (input_id_mode)
+	if (queue.empty() && iter != iter_end) {
+	  line.clear();
+	  if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	    throw std::runtime_error("line parsing failed?");
+	  
+	  if (input_id_mode) {
+	    if (line.empty())
+	      throw std::runtime_error("invalid empty input!");
+	    
 	    queue.push(line);
-	  else
+	  } else
 	    queue.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	  
 	  ++ id;
