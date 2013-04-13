@@ -588,8 +588,8 @@ viterbi: compute viterbi tree\n\
 		  << std::endl;
       
     } else if (input_forest) {
-      	if (debug)
-	  std::cerr << "input-forest: " << data.id << std::endl;
+      if (debug)
+	std::cerr << "input-forest: " << data.id << std::endl;
 
       utils::resource start;
       if (! data.hypergraph.assign(iter, end))
