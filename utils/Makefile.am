@@ -165,6 +165,7 @@ compact_map_main \
 compress_stream_main \
 double_base64_main \
 filesystem_main \
+getline_main \
 group_aligned_code_main \
 hash_main \
 hashmurmur_main \
@@ -339,6 +340,9 @@ compress_stream_main_LDADD = $(LIBUTILS)
 
 double_base64_main_SOURCES = double_base64_main.cpp
 double_base64_main_LDADD = $(LIBUTILS)
+
+getline_main_SOURCES = getline_main.cpp
+getline_main_LDADD = $(LIBUTILS)
 
 filesystem_main_SOURCES = filesystem_main.cpp
 filesystem_main_LDADD = $(LIBUTILS)

@@ -276,11 +276,6 @@ struct TaskFile : public MapReduceFile
 				  debug);
 
     if (input_directory_mode) {
-      typedef boost::spirit::istream_iterator iter_type;
-      
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-
       std::string file;
       std::string line;
 
@@ -451,11 +446,6 @@ struct TaskDirectory
 				  debug);
     
     if (input_directory_mode) {
-      typedef boost::spirit::istream_iterator iter_type;
-      
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-
       std::string file;
       std::string line;
       
@@ -531,11 +521,6 @@ void cicada_file(const operation_set_type& operations,
       queue_is.push(path_input.string());
     }
   } else {
-    typedef boost::spirit::istream_iterator iter_type;
-    
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
     utils::compress_istream is(input_file, 1024 * 1024);
     
     operation_set_type::operation_type::id_type id = 0;
@@ -592,11 +577,6 @@ void cicada_directory(const operation_set_type& operations,
 	queue.push(file);
     }
   } else {
-    typedef boost::spirit::istream_iterator iter_type;
-    
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
     utils::compress_istream is(input_file, 1024 * 1024);
     
     operation_set_type::operation_type::id_type id = 0;

@@ -2,11 +2,6 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#define BOOST_SPIRIT_THREADSAFE
-#define PHOENIX_THREADSAFE
-
-#include <boost/spirit/include/qi.hpp>
-
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -36,6 +31,7 @@
 #include "utils/base64.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/tokenizer.hpp>
@@ -264,7 +260,7 @@ void merge_features()
       is.push(utils::mpi_device_source(rank, feature_tag, 4096));
       
       std::string line;
-      while (std::getline(is, line))
+      while (utils::getline(is, line))
 	if (! line.empty())
 	  feature_type(line);
     }
@@ -300,7 +296,7 @@ void merge_statistics(const operation_set_type& operations,
       is.push(utils::mpi_device_source(rank, stat_tag, 4096));
       
       std::string line;
-      while (std::getline(is, line)) {
+      while (utils::getline(is, line)) {
 	const utils::piece line_piece(line);
 	tokenizer_type tokenizer(line_piece);
 	
@@ -512,25 +508,12 @@ struct MapStdout
 	queue.push(std::make_pair(path_input.string(), false));
       }
     } else {
-      typedef boost::spirit::istream_iterator iter_type;
-      
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-      
       utils::compress_istream is(path, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
       
       operation_set_type::operation_type::id_type id = 0;
       std::string line;
-
-      iter_type iter(is);
-      iter_type iter_end;
       
-      while (iter != iter_end) {
-	line.clear();
-	if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
-	  throw std::runtime_error("line parsing failed?");
-	
+      while (utils::getline(is, line)) {
 	if (input_id_mode) {
 	  if (line.empty())
 	    throw std::runtime_error("invalid empty input!");
@@ -538,22 +521,10 @@ struct MapStdout
 	  queue.push(std::make_pair(line, false));
 	} else
 	  queue.push(std::make_pair(utils::lexical_cast<std::string>(id) + " ||| " + line, false));
-
-
-	++ id;
-      }
-      
-#if 0
-      while (std::getline(is, line)) {
 	
-	if (input_id_mode)
-	  queue.push(std::make_pair(line, false));
-	else
-	  queue.push(std::make_pair(utils::lexical_cast<std::string>(id) + " ||| " + line, false));
 	
 	++ id;
       }
-#endif
     }
     
     queue.push(std::make_pair(std::string(), true));
@@ -591,16 +562,11 @@ struct TaskStdout
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
 	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	line.clear();
-	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	if (utils::getline(is, line) && ! line.empty())
+	  operations(line);
+	else
 	  throw std::runtime_error("invalid file? " + file);
-	
-	operations(line);
 	
 	queue_is.ready();
 	
@@ -896,11 +862,6 @@ struct Task
   void operator()()
   {
     if (input_directory_mode) {
-      typedef boost::spirit::istream_iterator iter_type;
-      
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-      
       std::string file;
       std::string line;
       
@@ -910,13 +871,10 @@ struct Task
 	if (file.empty()) break;
 
 	utils::compress_istream is(file, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
 	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	line.clear();
-	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	if (utils::getline(is, line) && ! line.empty())
+	  operations(line);
+	else
 	  throw std::runtime_error("invalid file? " + file);
 	
 	operations(line);
@@ -998,31 +956,18 @@ void cicada_process(operation_set_type& operations)
       }
 
     } else {
-      typedef boost::spirit::istream_iterator iter_type;
-      
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-      
       utils::compress_istream is(input_file, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
-      
-      iter_type iter(is);
-      iter_type iter_end;
       
       operation_set_type::operation_type::id_type id = 0;
       std::string line;
       
       int non_found_iter = 0;
       
-      while (iter != iter_end) {
+      while (is) {
 	bool found = false;
 	
-	for (int rank = 1; rank < mpi_size && iter != iter_end; ++ rank)
-	  if (stream[rank]->test()) {
-	    line.clear();
-	    if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
-	      throw std::runtime_error("line parsing failed?");
-	    
+	for (int rank = 1; rank < mpi_size && is; ++ rank)
+	  if (stream[rank]->test() && utils::getline(is, line)) {
 	    if (input_id_mode) {
 	      if (line.empty())
 		throw std::runtime_error("invalid empty input!");
@@ -1036,11 +981,7 @@ void cicada_process(operation_set_type& operations)
 	    found = true;
 	  }
 	
-	if (queue.empty() && iter != iter_end) {
-	  line.clear();
-	  if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
-	    throw std::runtime_error("line parsing failed?");
-	  
+	if (queue.empty() && utils::getline(is, line)) {
 	  if (input_id_mode) {
 	    if (line.empty())
 	      throw std::runtime_error("invalid empty input!");

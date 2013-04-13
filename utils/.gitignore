@@ -44,6 +44,7 @@ compact_map_main
 compress_stream_main
 double_base64_main
 filesystem_main
+getline_main
 group_aligned_code_main
 hash_main
 hashmurmur_main
