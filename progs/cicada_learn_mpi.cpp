@@ -38,6 +38,7 @@
 #include "utils/random_seed.hpp"
 #include "utils/mathop.hpp"
 #include "utils/indexed_trie.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -1979,7 +1980,7 @@ void read_forest(const path_set_type& forest_path,
 	if (! boost::filesystem::exists(path_forest)) break;
 	
 	utils::compress_istream is(path_forest);
-	std::getline(is, line);
+	utils::getline(is, line);
 	
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end  = line.end();
@@ -2022,7 +2023,7 @@ void read_forest(const path_set_type& forest_path,
 	if (! boost::filesystem::exists(path_forest)) break;
 	
 	utils::compress_istream is(path_forest);
-	std::getline(is, line);
+	utils::getline(is, line);
 	
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end  = line.end();
@@ -2078,7 +2079,7 @@ void read_forest(const path_set_type& forest_path,
 	if (! boost::filesystem::exists(path_forest)) break;
       
 	utils::compress_istream is(path_forest);
-	std::getline(is, line);
+	utils::getline(is, line);
       
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end  = line.end();
@@ -2115,7 +2116,7 @@ void read_forest(const path_set_type& forest_path,
 	if (! boost::filesystem::exists(path_intersected)) continue;
       
 	utils::compress_istream is(path_intersected);
-	std::getline(is, line);
+	utils::getline(is, line);
       
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
@@ -2158,7 +2159,7 @@ void read_forest(const path_set_type& forest_path,
 	
 	{
 	  utils::compress_istream is(path_forest);
-	  std::getline(is, line);
+	  utils::getline(is, line);
 	  
 	  std::string::const_iterator iter = line.begin();
 	  std::string::const_iterator end = line.end();
@@ -2178,7 +2179,7 @@ void read_forest(const path_set_type& forest_path,
 	
 	{
 	  utils::compress_istream is(path_intersected);
-	  std::getline(is, line);
+	  utils::getline(is, line);
 	  
 	  std::string::const_iterator iter = line.begin();
 	  std::string::const_iterator end = line.end();

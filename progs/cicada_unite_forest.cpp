@@ -12,6 +12,7 @@
 #include "cicada_impl.hpp"
 
 #include "utils/program_options.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -87,7 +88,7 @@ int main(int argc, char ** argv)
 	utils::compress_istream is(input_files.front(), 1024 * 1024);
 	std::string line;
 	
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  int rank = 1;
 	  int id = 0;
 	  
@@ -143,7 +144,7 @@ int main(int argc, char ** argv)
       
       int rank = 1;
       int id = 0;
-      for (/**/; std::getline(is, line); ++ id, ++ rank) {
+      for (/**/; utils::getline(is, line); ++ id, ++ rank) {
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
 	
@@ -211,7 +212,7 @@ int main(int argc, char ** argv)
 	
 	size_t num_failed = 0;
 	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
-	  if (std::getline(*istreams[id], line)) {
+	  if (utils::getline(*istreams[id], line)) {
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
 	    

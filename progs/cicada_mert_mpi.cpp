@@ -51,6 +51,7 @@
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -989,7 +990,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	
-	if (! std::getline(is, line))
+	if (! utils::getline(is, line))
 	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
 	
 	std::string::const_iterator iter = line.begin();
@@ -1020,7 +1021,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
       size_t id;
       hypergraph_type hypergraph;
       
-      while (std::getline(is, line)) {
+      while (utils::getline(is, line)) {
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end  = line.end();
 	
