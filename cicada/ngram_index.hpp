@@ -26,7 +26,6 @@
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/hashmurmur3.hpp>
-#include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
 
@@ -133,22 +132,22 @@ namespace cicada
 	cache_suffix_type() : state(), suffix() {}
       };
       
-      typedef utils::array_power2<cache_pos_type,    1024 * 64, std::allocator<cache_pos_type> >    cache_pos_set_type;
-      typedef utils::array_power2<cache_suffix_type, 1024 * 64, std::allocator<cache_suffix_type> > cache_suffix_set_type;
+      typedef std::vector<cache_pos_type,    std::allocator<cache_pos_type> >    cache_pos_set_type;
+      typedef std::vector<cache_suffix_type, std::allocator<cache_suffix_type> > cache_suffix_set_type;
       
     public:
       Shard() {}
       Shard(const path_type& path) { open(path); }
       
-      Shard(const Shard& x) : ids(x.ids), positions(x.positions), offsets(x.offsets) {}
+      Shard(const Shard& x) : ids(x.ids), positions(x.positions), offsets(x.offsets) { clear_cache(); }
       Shard& operator=(const Shard& x)
       {
 	ids = x.ids;
 	positions = x.positions;
 	offsets = x.offsets;
 	
-	caches_pos.clear();
-	caches_suffix.clear();
+	clear_cache();
+	
 	return *this;
       }
       
@@ -160,10 +159,11 @@ namespace cicada
 	positions.clear();
 	offsets.clear();
 	
-	caches_pos.clear();
-	caches_suffix.clear();
+	clear_cache();
       };
       
+      void clear_cache();
+
       void open(const path_type& path);
       
       void populate()
@@ -276,7 +276,7 @@ namespace cicada
 	  first -= offset;
 	  last  -= offset;
 	  
-	  if (length <= 128) {
+	  if (length <= 32) {
 	    for (/**/; first != last && ids[first] < id; ++ first);
 	    return first + offset;
 	  } else {
