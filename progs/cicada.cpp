@@ -321,26 +321,29 @@ struct ReduceFile
       } else
 	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
       
-      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
 	os << iter->second;
 	dump = true;
 	maps.erase(iter ++);
+	++ id;
       }
       
       if (dump && flush_output)
 	os << std::flush;
     }
     
-    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
       os << iter->second;
       maps.erase(iter ++);
+      ++ id;
     }
     
     // we will do twice, in case we have wrap-around for id...!
     if (! maps.empty())
-      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
 	os << iter->second;
 	maps.erase(iter ++);
+	++ id;
       }
     
     if (flush_output)
@@ -348,7 +351,8 @@ struct ReduceFile
     
     if (! maps.empty())
       throw std::runtime_error("id mismatch! expecting: " + utils::lexical_cast<std::string>(id)
-			       + " next: " + utils::lexical_cast<std::string>(maps.begin()->first));
+			       + " next: " + utils::lexical_cast<std::string>(maps.begin()->first)
+			       + " renamining: " + utils::lexical_cast<std::string>(maps.size()));
   }
   
   queue_type& queue;
