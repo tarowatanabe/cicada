@@ -497,8 +497,6 @@ struct MapStdout
   void operator()()
   {
     if (input_directory_mode) {
-      std::string line;
-      
       for (size_t i = 0; /**/; ++ i) {
 	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
 	
@@ -544,23 +542,41 @@ struct TaskStdout
 
   void operator()()
   {
-    std::string line;
-    while (1) {
-      line.clear();
-      queue_is.pop_swap(line);
-      if (line.empty()) break;
+    if (input_directory_mode) {
+      std::string file;
+      std::string line;
       
-      if (input_directory_mode) {
-	utils::compress_istream is(line, 1024 * 1024);
+      while (1) {
+	file.clear();
+	queue_is.pop_swap(file);
+	if (file.empty()) break;
+	
+	utils::compress_istream is(file, 1024 * 1024);
 	
 	if (std::getline(is, line) && ! line.empty())
-	  operations(line);
-      } else
-	operations(line);
-
-      queue_is.ready();
+	  operations(line);	
+	else
+	  throw std::runtime_error("invalid file! " + file);
+	
+	
+	queue_is.ready();
+	
+	queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+      }
+    } else {
+      std::string line;
       
-      queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+      while (1) {
+	line.clear();
+	queue_is.pop_swap(line);
+	if (line.empty()) break;
+	
+	operations(line);
+	
+	queue_is.ready();
+	
+	queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+      }
     }
     
     operations.clear();
@@ -836,22 +852,36 @@ struct Task
 
   void operator()()
   {
-    std::string line;
+    if (input_directory_mode) {
+      std::string file;
+      std::string line;
     
-    while (1) {
-      line.clear();
-      queue.pop_swap(line);
-      if (line.empty()) break;
+      while (1) {
+	file.clear();
+	queue.pop_swap(file);
+	if (file.empty()) break;
 
-      if (input_directory_mode) {
-	utils::compress_istream is(line, 1024 * 1024);
+	utils::compress_istream is(file, 1024 * 1024);
 	
 	if (std::getline(is, line) && ! line.empty())
 	  operations(line);
-      } else
-	operations(line);
+	else
+	  throw std::runtime_error("invalid file! " + file);
+	
+	queue.ready();
+      }
+    } else {
+      std::string line;
+      
+      while (1) {
+	line.clear();
+	queue.pop_swap(line);
+	if (line.empty()) break;
 
-      queue.ready();
+	operations(line);
+	
+	queue.ready();
+      }
     }
     
     operations.clear();
@@ -887,8 +917,6 @@ void cicada_process(operation_set_type& operations)
     if (input_directory_mode) {
       boost::filesystem::directory_iterator iter_end;
       boost::filesystem::directory_iterator iter(input_file);
-      
-      std::string line;
       
       int non_found_iter = 0;
       while (iter != iter_end) {
