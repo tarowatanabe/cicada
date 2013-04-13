@@ -11,6 +11,8 @@
    cicada_extract_{pharse,scfg,ghkm,tree}. This affect the count
    format and greatly affect the
    cicada_filter_extract{,phrase,scfg,ghkm} tools.
+ - Added debug messages for "inputs" so that we can know when
+   lattices/forests are loaded.
  - Added cicada_filter_normalize which can perform normalization,
    i.e. NFKC and remove controls etc. with support for colorization of
    Katakana, katakana-marks and symbols.
