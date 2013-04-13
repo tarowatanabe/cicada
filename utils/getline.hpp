@@ -17,20 +17,21 @@ namespace utils
   std::istream& getline(std::istream& is, std::string& line)
   {
     char buf[4096];
-    std::vector<char, std::allocator<char> > buffer;
-
-    line.clear();
     
+    int iter = 0;
+    line.clear();
     do {
       is.clear();
       is.getline(buf, 4096);
-      buffer.insert(buffer.end(), buf, buf + std::strlen(buf));
+      line.append(buf);
+      
+      if ((iter & 0x03) == 0x03)
+	std::string(line).swap(line);
+      ++ iter;
     } while (! is.eof() && is.fail());
     
     if (! is.eof())
       is.clear();
-    
-    line.assign(buffer.begin(), buffer.end());
     
     return is;
   }
