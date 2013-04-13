@@ -1,6 +1,11 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
 
 #include <iostream>
 #include <vector>
@@ -203,12 +208,45 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct TaskFile
+struct MapReduceFile
 {
-  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  typedef operation_set_type::operation_type::id_type id_type;
+
+  struct id_buffer_type
+  {
+    typedef operation_set_type::operation_type::id_type id_type;
+    typedef std::string buffer_type;
+    
+    id_type     id;
+    buffer_type buffer;
+
+    id_buffer_type() : id(id_type(-1)), buffer() {}
+    id_buffer_type(const id_type& __id, const buffer_type& __buffer) : id(__id), buffer(__buffer) {}
+    
+    void swap(id_buffer_type& x)
+    {
+      std::swap(id, x.id);
+      buffer.swap(x.buffer);
+    }
+  };
   
-  TaskFile(queue_type&   __queue_is,
-	   queue_type&   __queue_os,
+  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_is_type;
+  typedef utils::lockfree_list_queue<id_buffer_type, std::allocator<id_buffer_type> > queue_os_type;
+};
+
+namespace std
+{
+  inline
+  void swap(MapReduceFile::id_buffer_type& x, MapReduceFile::id_buffer_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+struct TaskFile : public MapReduceFile
+{
+  TaskFile(queue_is_type&   __queue_is,
+	   queue_os_type&   __queue_os,
 	   const model_type& __model,
 	   const grammar_type& __grammar,
 	   const tree_grammar_type& __tree_grammar)
@@ -242,8 +280,15 @@ struct TaskFile
 				  debug);
 
     if (input_directory_mode) {
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+
       std::string file;
       std::string line;
+
+      id_buffer_type id_buffer;
       
       while (1) {
 	file.clear();
@@ -251,16 +296,26 @@ struct TaskFile
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	if (std::getline(is, line) && ! line.empty())
-	  operations(line);
-	else
-	  throw std::runtime_error("invalid file! " + file);
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+	line.clear();
+	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	  throw std::runtime_error("invalid file? " + file);
+	
+	operations(line);
+	
+	id_buffer.id     = operations.get_data().id;
+	id_buffer.buffer = operations.get_output_data().buffer;
+	
+	queue_os.push_swap(id_buffer);
       }
     } else {
       std::string line;
+
+      id_buffer_type id_buffer;
       
       while (1) {
 	line.clear();
@@ -269,7 +324,10 @@ struct TaskFile
 	
 	operations(line);
 	
-	queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+	id_buffer.id     = operations.get_data().id;
+	id_buffer.buffer = operations.get_output_data().buffer;
+	
+	queue_os.push_swap(id_buffer);
       }
     }
     
@@ -279,8 +337,8 @@ struct TaskFile
     stats = operations.get_statistics();
   }
   
-  queue_type&   queue_is;
-  queue_type&   queue_os;
+  queue_is_type&   queue_is;
+  queue_os_type&   queue_os;
   const model_type& _model;
   const grammar_type& _grammar;
   const tree_grammar_type& _tree_grammar;  
@@ -288,22 +346,20 @@ struct TaskFile
   operation_set_type::statistics_type stats;
 };
 
-struct ReduceFile
+struct ReduceFile : public MapReduceFile
 {
-  typedef TaskFile::queue_type queue_type;
-  
-  ReduceFile(queue_type& __queue, const path_type& __path)
+  ReduceFile(queue_os_type& __queue, const path_type& __path)
     : queue(__queue), path(__path) {}
   
   void operator()()
   {
-    typedef operation_set_type::operation_type::id_type id_type;
     typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
     
     buffer_map_type maps;
-    std::string buffer;
     
-    id_type     id = 0;
+    id_type id = 0;
+    
+    id_buffer_type id_buffer;
     
     const bool flush_output = (path == "-"
 			       || (boost::filesystem::exists(path)
@@ -312,29 +368,20 @@ struct ReduceFile
     utils::compress_ostream os(path, 1024 * 1024);
     
     for (;;) {
-      buffer.clear();
-      queue.pop_swap(buffer);
+      id_buffer.buffer.clear();
+      queue.pop_swap(id_buffer);
       
-      if (buffer.empty()) break;
-
+      if (id_buffer.id == id_type(-1) && id_buffer.buffer.empty()) break;
+      
       bool dump = false;
       
-      utils::piece buffer_piece(buffer);
-      
-      utils::piece::const_iterator iter = buffer_piece.begin();
-      for (/**/; iter != buffer_piece.end() && ! std::isspace(*iter); ++ iter);
-      
-      // tokenize here...
-      const id_type      buffer_id        = utils::lexical_cast<id_type>(buffer_piece.substr(0, iter - buffer_piece.begin()));
-      const utils::piece buffer_tokenized = buffer_piece.substr(iter + 1 - buffer_piece.begin());
-      
-      if (buffer_id == id) {
-	os << buffer_tokenized;
+      if (id_buffer.id == id) {
+	os << id_buffer.buffer;
 	dump = true;
 	
 	++ id;
       } else
-	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
+	maps[id_buffer.id].swap(id_buffer.buffer);
       
       for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; /**/) {
 	os << iter->second;
@@ -370,8 +417,8 @@ struct ReduceFile
 			       + " renamining: " + utils::lexical_cast<std::string>(maps.size()));
   }
   
-  queue_type& queue;
-  path_type   path;
+  queue_os_type& queue;
+  path_type      path;
 };
 
 struct TaskDirectory
@@ -411,6 +458,11 @@ struct TaskDirectory
 				  debug);
     
     if (input_directory_mode) {
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+
       std::string file;
       std::string line;
       
@@ -420,11 +472,16 @@ struct TaskDirectory
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	if (std::getline(is, line) && ! line.empty())
-	  operations(line);
-	else
-	  throw std::runtime_error("invalid file! " + file);
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	line.clear();
+	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	  throw std::runtime_error("invalid file? " + file);
+	
+	operations(line);
       }
     } else {
       std::string line;
@@ -459,11 +516,12 @@ void cicada_file(const operation_set_type& operations,
 		 const tree_grammar_type& tree_grammar,
 		 operation_set_type::statistics_type& stats)
 {
-  typedef TaskFile   task_type;
-  typedef ReduceFile reducer_type;
+  typedef MapReduceFile map_reduce_type;
+  typedef TaskFile      task_type;
+  typedef ReduceFile    reducer_type;
   
-  task_type::queue_type queue_is(threads);
-  task_type::queue_type queue_os;
+  map_reduce_type::queue_is_type queue_is(threads);
+  map_reduce_type::queue_os_type queue_os;
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(queue_os, operations.get_output_data().file)));
@@ -484,21 +542,33 @@ void cicada_file(const operation_set_type& operations,
       
       queue_is.push(path_input.string());
     }
-    
   } else {
+    typedef boost::spirit::istream_iterator iter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
     utils::compress_istream is(input_file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
     
     operation_set_type::operation_type::id_type id = 0;
     std::string line;
-    
-    while (std::getline(is, line)) {
 
-      if (! line.empty()) {
-	if (input_id_mode)
-	  queue_is.push_swap(line);
-	else
-	  queue_is.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
-      }
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      line.clear();
+      if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	throw std::runtime_error("line parsing failed?");
+      
+      if (input_id_mode) {
+	if (line.empty())
+	  throw std::runtime_error("invalid empty input!");
+	
+	queue_is.push_swap(line);
+      } else
+	queue_is.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
       
       ++ id;
     }
@@ -509,7 +579,7 @@ void cicada_file(const operation_set_type& operations,
   
   mapper.join_all();
   
-  queue_os.push(std::string());
+  queue_os.push(map_reduce_type::id_buffer_type());
   reducer.join_all();
 
   for (int i = 0; i != threads; ++ i)
@@ -542,19 +612,32 @@ void cicada_directory(const operation_set_type& operations,
 	queue.push(file);
     }
   } else {
+    typedef boost::spirit::istream_iterator iter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
     utils::compress_istream is(input_file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
     
     operation_set_type::operation_type::id_type id = 0;
     std::string line;
-    
-    while (std::getline(is, line)) {
 
-      if (! line.empty()) {
-	if (input_id_mode)
-	  queue.push_swap(line);
-	else
-	  queue.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
-      }
+    iter_type iter(is);
+    iter_type iter_end;
+
+    while (iter != iter_end) {
+      line.clear();
+      if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	throw std::runtime_error("line parsing failed?");
+      
+      if (input_id_mode) {
+	if (line.empty())
+	  throw std::runtime_error("invalid empty input!");
+	
+	queue.push_swap(line);
+      } else
+	queue.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
       
       ++ id;
     }
