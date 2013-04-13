@@ -2,11 +2,6 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#define BOOST_SPIRIT_THREADSAFE
-#define PHOENIX_THREADSAFE
-
-#include <boost/spirit/include/qi.hpp>
-
 #include <iostream>
 #include <vector>
 #include <string>
@@ -31,6 +26,7 @@
 #include "utils/filesystem.hpp"
 #include "utils/bithack.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
@@ -296,13 +292,10 @@ struct TaskFile : public MapReduceFile
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
 	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	line.clear();
-	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	if (utils::getline(is, line) && ! line.empty())
+	  operations(line);
+	else
 	  throw std::runtime_error("invalid file? " + file);
 	
 	operations(line);
@@ -472,16 +465,11 @@ struct TaskDirectory
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
 	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	line.clear();
-	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	if (utils::getline(is, line) && ! line.empty())
+	  operations(line);
+	else
 	  throw std::runtime_error("invalid file? " + file);
-	
-	operations(line);
       }
     } else {
       std::string line;
@@ -549,19 +537,11 @@ void cicada_file(const operation_set_type& operations,
     namespace standard = boost::spirit::standard;
     
     utils::compress_istream is(input_file, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
     
     operation_set_type::operation_type::id_type id = 0;
     std::string line;
-
-    iter_type iter(is);
-    iter_type iter_end;
     
-    while (iter != iter_end) {
-      line.clear();
-      if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
-	throw std::runtime_error("line parsing failed?");
-      
+    while (utils::getline(is, line)) {
       if (input_id_mode) {
 	if (line.empty())
 	  throw std::runtime_error("invalid empty input!");
@@ -618,19 +598,11 @@ void cicada_directory(const operation_set_type& operations,
     namespace standard = boost::spirit::standard;
     
     utils::compress_istream is(input_file, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
     
     operation_set_type::operation_type::id_type id = 0;
     std::string line;
 
-    iter_type iter(is);
-    iter_type iter_end;
-
-    while (iter != iter_end) {
-      line.clear();
-      if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
-	throw std::runtime_error("line parsing failed?");
-      
+    while (utils::getline(is, line)) {
       if (input_id_mode) {
 	if (line.empty())
 	  throw std::runtime_error("invalid empty input!");

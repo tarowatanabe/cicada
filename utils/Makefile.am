@@ -60,6 +60,7 @@ config.h \
 double_base64_generator.hpp \
 double_base64_parser.hpp \
 filesystem.hpp \
+getline.hpp \
 group_aligned_code.hpp \
 group_aligned_code_offsets.hpp \
 hashmurmur.hpp \
