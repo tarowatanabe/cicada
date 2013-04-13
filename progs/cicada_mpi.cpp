@@ -2,6 +2,11 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -507,10 +512,38 @@ struct MapStdout
 	queue.push(std::make_pair(path_input.string(), false));
       }
     } else {
-      operation_set_type::operation_type::id_type id = 0;
-      utils::compress_istream is(path, 1024 * 1024);
+      typedef boost::spirit::istream_iterator iter_type;
       
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      operation_set_type::operation_type::id_type id = 0;
       std::string line;
+
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      while (iter != iter_end) {
+	line.clear();
+	if (! qi::parse(iter, iter_end, *(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	  throw std::runtime_error("line parsing failed?");
+	
+	if (input_id_mode) {
+	  if (line.empty())
+	    throw std::runtime_error("invalid empty input!");
+	  
+	  queue.push(std::make_pair(line, false));
+	} else
+	  queue.push(std::make_pair(utils::lexical_cast<std::string>(id) + " ||| " + line, false));
+
+
+	++ id;
+      }
+      
+#if 0
       while (std::getline(is, line)) {
 	
 	if (input_id_mode)
@@ -520,6 +553,7 @@ struct MapStdout
 	
 	++ id;
       }
+#endif
     }
     
     queue.push(std::make_pair(std::string(), true));
@@ -543,6 +577,11 @@ struct TaskStdout
   void operator()()
   {
     if (input_directory_mode) {
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
       std::string file;
       std::string line;
       
@@ -552,12 +591,16 @@ struct TaskStdout
 	if (file.empty()) break;
 	
 	utils::compress_istream is(file, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	if (std::getline(is, line) && ! line.empty())
-	  operations(line);	
-	else
-	  throw std::runtime_error("invalid file! " + file);
+	iter_type iter(is);
+	iter_type iter_end;
 	
+	line.clear();
+	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	  throw std::runtime_error("invalid file? " + file);
+	
+	operations(line);
 	
 	queue_is.ready();
 	
@@ -853,20 +896,30 @@ struct Task
   void operator()()
   {
     if (input_directory_mode) {
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
       std::string file;
       std::string line;
-    
+      
       while (1) {
 	file.clear();
 	queue.pop_swap(file);
 	if (file.empty()) break;
 
 	utils::compress_istream is(file, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	if (std::getline(is, line) && ! line.empty())
-	  operations(line);
-	else
-	  throw std::runtime_error("invalid file! " + file);
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	line.clear();
+	if (! qi::parse(iter, iter_end, +(standard::char_ - qi::eol) >> (qi::eol || qi::eoi), line))
+	  throw std::runtime_error("invalid file? " + file);
+	
+	operations(line);
 	
 	queue.ready();
       }
