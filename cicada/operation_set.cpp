@@ -294,7 +294,7 @@ viterbi: compute viterbi tree\n\
 				const bool __input_dependency,
 				const bool __input_bitext,
 				const bool __input_mpi,
-				const int debug)
+				const int __debug)
   {
     typedef cicada::Parameter param_type;
 
@@ -311,6 +311,8 @@ viterbi: compute viterbi tree\n\
     input_dependency = __input_dependency;
     input_bitext     = __input_bitext;
     input_mpi        = __input_mpi;
+
+    debug = __debug;
     
     // default to sentence input...
     if (! input_lattice && ! input_forest && ! input_sentence)
@@ -473,6 +475,9 @@ viterbi: compute viterbi tree\n\
     
     if (input_lattice && input_forest) {
       {
+	if (debug)
+	  std::cerr << "input-lattice: " << data.id << std::endl;
+
 	utils::resource start;
 	
 	if (input_sentence) {
@@ -494,12 +499,28 @@ viterbi: compute viterbi tree\n\
 	stat.user_time += (end.user_time() - start.user_time());
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
 	stat.thread_time  += (end.thread_time() - start.thread_time());
+
+	if (debug)
+	  std::cerr << "input-lattice: " << data.id
+		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		    << " user time: " << (end.user_time() - start.user_time())
+		    << " thread time: " << (end.thread_time() - start.thread_time())
+		    << std::endl;
+	if (debug)
+	  std::cerr << "input-lattice: " << data.id
+		    << " # of nodes: " << data.lattice.node_size()
+		    << " shortest distance: " << data.lattice.shortest_distance()
+		    << " longest distance: " << data.lattice.longest_distance()
+		    << std::endl;
       }
 
       if (! qi::phrase_parse(iter, end, "|||", standard::space))
 	throw std::runtime_error("invalid lattice/hypergraph format (separator): " + line);
       
       {
+	if (debug)
+	  std::cerr << "input-forest: " << data.id << std::endl;
+
 	utils::resource start;
 	if (! data.hypergraph.assign(iter, end))
 	  throw std::runtime_error("invalid hypergraph format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
@@ -513,8 +534,24 @@ viterbi: compute viterbi tree\n\
 	stat.user_time += (end.user_time() - start.user_time());
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
 	stat.thread_time  += (end.thread_time() - start.thread_time());
+
+	if (debug)
+	  std::cerr << "input-forest: " << data.id
+		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		    << " user time: " << (end.user_time() - start.user_time())
+		    << " thread time: " << (end.thread_time() - start.thread_time())
+		    << std::endl;
+	if (debug)
+	  std::cerr << "input-forest: " << data.id
+		    << " # of nodes: " << data.hypergraph.nodes.size()
+		    << " # of edges: " << data.hypergraph.edges.size()
+		    << " valid? " << utils::lexical_cast<std::string>(data.hypergraph.is_valid())
+		    << std::endl;
       }
     } else if (input_lattice) {
+      if (debug)
+	std::cerr << "input-lattice: " << data.id << std::endl;
+      
       utils::resource start;
       
       if (input_sentence) {
@@ -536,7 +573,24 @@ viterbi: compute viterbi tree\n\
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
       stat.thread_time  += (end.thread_time() - start.thread_time());
+
+      if (debug)
+	std::cerr << "input-lattice: " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << " thread time: " << (end.thread_time() - start.thread_time())
+		  << std::endl;
+      if (debug)
+	std::cerr << "input-lattice: " << data.id
+		  << " # of nodes: " << data.lattice.node_size()
+		  << " shortest distance: " << data.lattice.shortest_distance()
+		  << " longest distance: " << data.lattice.longest_distance()
+		  << std::endl;
+      
     } else if (input_forest) {
+      	if (debug)
+	  std::cerr << "input-forest: " << data.id << std::endl;
+
       utils::resource start;
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
@@ -550,6 +604,20 @@ viterbi: compute viterbi tree\n\
       stat.user_time += (end.user_time() - start.user_time());
       stat.cpu_time  += (end.cpu_time() - start.cpu_time());
       stat.thread_time  += (end.thread_time() - start.thread_time());
+
+      
+      if (debug)
+	std::cerr << "input-forest: " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << " thread time: " << (end.thread_time() - start.thread_time())
+		  << std::endl;
+      if (debug)
+	std::cerr << "input-forest: " << data.id
+		  << " # of nodes: " << data.hypergraph.nodes.size()
+		  << " # of edges: " << data.hypergraph.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(data.hypergraph.is_valid())
+		  << std::endl;
     }
     
     if (input_span) {

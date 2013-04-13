@@ -68,11 +68,11 @@ namespace cicada
 		 const bool __input_dependency,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
-		 const int debug)
+		 const int __debug)
     {
       initialize(parameter_set_type(first, last), model, grammar, tree_grammar, goal, 
 		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_dependency, __input_bitext, __input_mpi,
-		 debug);
+		 __debug);
     }
     
     OperationSet(const parameter_set_type& parameters,
@@ -89,11 +89,11 @@ namespace cicada
 		 const bool __input_dependency,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
-		 const int debug)
+		 const int __debug)
     {
       initialize(parameters, model, grammar, tree_grammar, goal, 
 		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_dependency, __input_bitext, __input_mpi,
-		 debug);
+		 __debug);
     }
     
   public:
@@ -137,7 +137,7 @@ namespace cicada
 		    const bool __input_dependency,
 		    const bool __input_bitext,
 		    const bool __input_mpi,
-		    const int debug);
+		    const int __debug);
     
   private:
     bool input_id;
@@ -155,6 +155,8 @@ namespace cicada
     
     operation_ptr_set_type operations;
     statistics_type        statistics;
+
+    int debug;
   };
 };
 
