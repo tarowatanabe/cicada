@@ -79,8 +79,8 @@ int debug = 0;
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
 
-void cicada_stdout(operation_set_type& operations);
-void cicada_process(operation_set_type& operations);
+void cicada_file(operation_set_type& operations);
+void cicada_directory(operation_set_type& operations);
 void synchronize();
 void merge_features();
 void merge_statistics(const operation_set_type& operations, operation_set_type::statistics_type& statistics);
@@ -188,9 +188,9 @@ int main(int argc, char ** argv)
     ::sync();
     
     if (! operations.get_output_data().file.empty())
-      cicada_stdout(operations);
+      cicada_file(operations);
     else
-      cicada_process(operations);
+      cicada_directory(operations);
     
     synchronize();
     
@@ -484,7 +484,7 @@ private:
   int busy;
 };
 
-struct MapStdout
+struct MapFile
 {
   typedef std::pair<std::string, bool> value_type;
   typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
@@ -492,7 +492,7 @@ struct MapStdout
   path_type   path;
   queue_type& queue;
   
-  MapStdout(const path_type& _path, queue_type& _queue)
+  MapFile(const path_type& _path, queue_type& _queue)
     : path(_path), queue(_queue) {}
   
   void operator()()
@@ -532,13 +532,13 @@ struct MapStdout
 };
 
 
-struct TaskStdout
+struct TaskFile
 {
   typedef single_queue<std::string, std::allocator<std::string> > queue_single_type;
   //typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_single_type;
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
 
-  TaskStdout(queue_single_type&   __queue_is,
+  TaskFile(queue_single_type&   __queue_is,
 	     queue_type&   __queue_os,
 	     operation_set_type& __operations)
     : queue_is(__queue_is),
@@ -599,11 +599,11 @@ struct TaskStdout
   operation_set_type& operations;
 };
 
-struct ReduceStdout
+struct ReduceFile
 {
-  typedef TaskStdout::queue_type queue_type;
+  typedef TaskFile::queue_type queue_type;
   
-  ReduceStdout(queue_type& __queue, const path_type& __path)
+  ReduceFile(queue_type& __queue, const path_type& __path)
     : queue(__queue), path(__path) {}
   
   void operator()()
@@ -685,12 +685,12 @@ struct ReduceStdout
   path_type   path;
 };
 
-void cicada_stdout(operation_set_type& operations)
+void cicada_file(operation_set_type& operations)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  typedef TaskStdout   task_type;
+  typedef TaskFile   task_type;
   
   task_type::queue_single_type queue_is(1);
   task_type::queue_type        queue_os;
@@ -698,8 +698,8 @@ void cicada_stdout(operation_set_type& operations)
   boost::thread thread(task_type(queue_is, queue_os, operations));
   
   if (mpi_rank == 0) {
-    typedef MapStdout    map_type;
-    typedef ReduceStdout reduce_type;
+    typedef MapFile    map_type;
+    typedef ReduceFile reduce_type;
     
     typedef utils::mpi_ostream        ostream_type;
     typedef utils::mpi_istream_simple istream_type;
@@ -901,7 +901,7 @@ struct Task
   operation_set_type& operations;
 };
 
-void cicada_process(operation_set_type& operations)
+void cicada_directory(operation_set_type& operations)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
