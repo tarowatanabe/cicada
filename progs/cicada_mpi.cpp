@@ -877,8 +877,6 @@ struct Task
 	else
 	  throw std::runtime_error("invalid file? " + file);
 	
-	operations(line);
-	
 	queue.ready();
       }
     } else {

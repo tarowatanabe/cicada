@@ -293,8 +293,6 @@ struct TaskFile : public MapReduceFile
 	else
 	  throw std::runtime_error("invalid file? " + file);
 	
-	operations(line);
-	
 	id_buffer.id     = operations.get_data().id;
 	id_buffer.buffer = operations.get_output_data().buffer;
 	
