@@ -1,7 +1,7 @@
+// -*- mode: c++ -*-
 //
 //  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
-// -*- mode: c++ -*-
 
 #ifndef __UTILS__GETLINE__HPP__
 #define __UTILS__GETLINE__HPP__ 1
