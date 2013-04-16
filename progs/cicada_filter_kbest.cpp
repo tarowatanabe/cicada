@@ -24,6 +24,8 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
+#include <boost/variant.hpp>
+
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/fusion/include/std_pair.hpp>
@@ -131,6 +133,41 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   boost::spirit::qi::rule<Iterator, kbest_type(), blank_type>  kbest;
 };
 
+
+typedef boost::fusion::tuple<size_type, std::string, features_type> kbest_json_type;
+
+template <typename Iterator>
+struct kbest_json_parser : boost::spirit::qi::grammar<Iterator, kbest_json_type(), boost::spirit::standard::blank_type>
+{
+  typedef int64_t     int_type;
+  typedef double      float_type;
+  typedef std::string string_type;
+  
+  kbest_json_parser() : kbest_json_parser::base_type(kbest)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    
+    
+    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi)) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
+    features %= -(feature % (+standard::space));
+    
+    remains %= *qi::lexeme[+(standard::char_ - standard::space)];
+    
+  }
+  
+  typedef boost::spirit::standard::blank_type blank_type;
+  
+  boost::spirit::qi::uint_parser<size_type, 10, 1, -1> size;
+  
+  boost::spirit::qi::rule<Iterator, std::pair<std::string, double>()> feature;
+  boost::spirit::qi::rule<Iterator, features_type()>                  features;
+  
+  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
+  
+  boost::spirit::qi::rule<Iterator, kbest_json_type(), blank_type>  kbest;
+};
 
 struct real_precision20 : boost::spirit::karma::real_policies<double>
 {
