@@ -91,7 +91,7 @@ Integrate cicada-alignment.py and cicada-extract.py???
    - Currently, NO, in order to encourange user to select an
      alternative paths.
 
-Integrate MPI and non-MPI of cicada\_learn{,kbest}{,mpi}
+Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
    - Use the same gradient,margin computers across mpi and non-mpi
      applications
 
@@ -186,7 +186,7 @@ mpipe is buggy under mac osx...
     exhibited by the difference of the # of lines read and the actual
     read from stdin!
 
-cicada\_filter\_kbest to support {file,directory}-to-{file,directory}
+cicada_filter_kbest to support {file,directory}-to-{file,directory}
 
 add error checking for codecs
 
@@ -200,7 +200,7 @@ Add asynchronous online learning inspired by the David Chiang's parallel method
    - We will not distribute support vectors, but simply send "diffs"
      and receive "result"
    - How to handle adaptive learning rate scaling?
-   - Add cicada\_learn\_asynchronous!
+   - Add cicada_learn_asynchronous_mpi and cicada_learn_asynchronous_kbest_mpi
 
 Non-linear features
    - The decoder uses non-linear combination with hidden layers... How
@@ -233,7 +233,7 @@ Implement LBFGS/CG by templates since this may conflict with float/double based 
 
 Implement kenlm like probing data structure
 
-Unify the liblbfgs and cg\_descent code...?
+Unify the liblbfgs and cg_descent code...?
 
 Documentation:
   - Use MD or RST...??
@@ -242,12 +242,10 @@ Lua integration:
   - Any use...????
 
 
-Correctly implement alignment/distortion model estimation in lexicon\_hmm/model4
+Correctly implement alignment/distortion model estimation in lexicon_hmm/model4
   - Currenlty, it is very hacky, and gives non-optimal parameters...
 
 Revise and test restaurtna implementation:
   - Currently, we use a vector-based implementation, but hash-based
     implementation is potentially faster, especially when decrementing
     counts.
-
-
