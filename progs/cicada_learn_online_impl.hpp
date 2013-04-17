@@ -44,10 +44,6 @@
 
 #include <codec/lz4.hpp>
 
-#if 0
-#include <snappy.h>
-#endif
-
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
@@ -723,8 +719,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
-      finalize(weights);
+    //if (weight_scale < 0.001 || 1000 < weight_scale)
+    finalize(weights);
     
     clear();
     
@@ -1031,8 +1027,8 @@ struct LearnSGDL2 : public LearnLR
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
-      finalize(weights);
+    //if (weight_scale < 0.001 || 1000 < weight_scale)
+    finalize(weights);
     
     clear();
     
@@ -1590,26 +1586,6 @@ public:
     os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
     os.write(data.c_str(), data.size());
     os.reset();    
-    
-#if 0
-#if 0
-    const size_t max_length = snappy::MaxCompressedLength(data.size());
-    buffer.reserve(max_length);
-    buffer.resize(max_length);
-    size_t length = 0;
-    snappy::RawCompress(data.c_str(), data.size(), &(*buffer.begin()), &length);
-    buffer.resize(length);
-    buffer_type(buffer).swap(buffer);
-#else
-    buffer.clear();
-    
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::zlib_compressor());
-    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
-    os.write(data.c_str(), data.size());
-    os.reset();
-#endif
-#endif
   }
   
   std::string decode() const
@@ -1630,31 +1606,6 @@ public:
     is.reset();
 
     return output;    
-    
-#if 0
-#if 0
-    std::string output;
-    snappy::Uncompress(&(*buffer.begin()), buffer.size(), &output);
-    return output;
-#else
-    std::string output;
-    
-    boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::zlib_decompressor());
-    is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
-
-    char buf[1024];
-    
-    do {
-      is.read(buf, 1024);
-      std::copy(buf, buf + is.gcount(), std::back_inserter(output));
-    } while (is);
-    
-    is.reset();
-
-    return output;
-#endif
-#endif
   }
   
 private:
