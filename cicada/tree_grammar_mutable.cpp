@@ -13,9 +13,7 @@
 
 #include "utils/trie_compact.hpp"
 #include "utils/trie_set_compact.hpp"
-
 #include "utils/compress_stream.hpp"
-
 #include "utils/bithack.hpp"
 #include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
@@ -31,6 +29,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/resource.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -290,7 +289,7 @@ namespace cicada
     utils::resource start;
     
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();

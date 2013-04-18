@@ -22,6 +22,7 @@
 #include "utils/config.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/getline.hpp"
 
 namespace cicada
 {  
@@ -151,7 +152,7 @@ namespace cicada
     x.clear();
     
     std::string line;
-    if (std::getline(is, line) && ! line.empty())
+    if (utils::getline(is, line) && ! line.empty())
       x.assign(line);
     
     return is;

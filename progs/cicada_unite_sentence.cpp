@@ -21,6 +21,7 @@
 #include "utils/resource.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/compact_set.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -1047,7 +1048,7 @@ int main(int argc, char ** argv)
 	utils::compress_istream is(input_files.front(), 1024 * 1024);
 	std::string line;
 	
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  sentences.assign(line);
 	  
 	  if (merge_all)
@@ -1067,7 +1068,7 @@ int main(int argc, char ** argv)
 	std::string   line;
 	
 	utils::compress_istream is(input_files.front(), 1024 * 1024);
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  std::string::const_iterator iter = line.begin();
 	  std::string::const_iterator end = line.end();
 	  
@@ -1117,7 +1118,7 @@ int main(int argc, char ** argv)
 	sentences.clear();
 	size_t num_failed = 0;
 	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
-	  if (std::getline(*istreams[id], line)) {
+	  if (utils::getline(*istreams[id], line)) {
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
 	    

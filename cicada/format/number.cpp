@@ -28,6 +28,7 @@
 #include "utils/array_power2.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/functional/hash.hpp>
 #include <boost/filesystem.hpp>
@@ -373,7 +374,7 @@ namespace cicada
 	
 	utils::compress_istream is(path_source);
 	std::string line;
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  rules += icu::UnicodeString::fromUTF8(line);
 	  rules += '\n';
 	}
@@ -497,7 +498,7 @@ namespace cicada
 	
 	utils::compress_istream is(path_target);
 	std::string line;
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  rules += icu::UnicodeString::fromUTF8(line);
 	  rules += '\n';
 	}

@@ -31,6 +31,7 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/random_seed.hpp>
 #include <utils/compact_map.hpp>
+#include "utils/getline.hpp"
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -609,7 +610,7 @@ void read_bigram(const path_type& file,
   
   word_count_set_type word_counts;
     
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     utils::piece line_piece(line);
     tokenizer_type tokenizer(line_piece);
 
@@ -671,7 +672,7 @@ void read_corpus(const path_type& file,
   
   word_count_set_type word_counts;
     
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     utils::piece line_piece(line);
     tokenizer_type tokenizer(line_piece);
     

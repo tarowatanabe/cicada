@@ -19,6 +19,7 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/lexical_cast.hpp>
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path                                    path_type;
 typedef std::vector<path_type, std::allocator<path_type> >         path_set_type;
@@ -109,7 +110,7 @@ int main(int argc, char** argv)
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	std::string line;
-	while (std::getline(is, line))
+	while (utils::getline(is, line))
 	  if (! line.empty()) {
 	    const path_type path(*fiter / line);
 	    
@@ -324,33 +325,33 @@ struct TaskMerge
 	rule_pair_type rule1;
 	rule_pair_type rule2;
       
-	bool parsed1 = std::getline(is1, line1) && parser(line1, rule1);
-	bool parsed2 = std::getline(is2, line2) && parser(line2, rule2);
+	bool parsed1 = utils::getline(is1, line1) && parser(line1, rule1);
+	bool parsed2 = utils::getline(is2, line2) && parser(line2, rule2);
       
 	while (parsed1 && parsed2) {
 	  if (rule1 < rule2) {
 	    os << rule1 << '\n';
-	    parsed1 = std::getline(is1, line1) && parser(line1, rule1);
+	    parsed1 = utils::getline(is1, line1) && parser(line1, rule1);
 	  } else if (rule2 < rule1) {
 	    os << rule2 << '\n';
-	    parsed2 = std::getline(is2, line2) && parser(line2, rule2);
+	    parsed2 = utils::getline(is2, line2) && parser(line2, rule2);
 	  } else {
 	    rule1.increment(rule2.counts.begin(), rule2.counts.end());
 	    os << rule1 << '\n';
-	    parsed1 = std::getline(is1, line1) && parser(line1, rule1);
-	    parsed2 = std::getline(is2, line2) && parser(line2, rule2);
+	    parsed1 = utils::getline(is1, line1) && parser(line1, rule1);
+	    parsed2 = utils::getline(is2, line2) && parser(line2, rule2);
 	  }
 	}
       
 	// dump remaining...
 	while (parsed1) {
 	  os << rule1 << '\n';
-	  parsed1 = std::getline(is1, line1) && parser(line1, rule1);
+	  parsed1 = utils::getline(is1, line1) && parser(line1, rule1);
 	}
       
 	while (parsed2) {
 	  os << rule2 << '\n';
-	  parsed2 = std::getline(is2, line2) && parser(line2, rule2);
+	  parsed2 = utils::getline(is2, line2) && parser(line2, rule2);
 	}
       }
       

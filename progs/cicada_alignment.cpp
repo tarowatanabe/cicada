@@ -42,6 +42,7 @@
 #include "utils/mathop.hpp"
 #include "utils/vector2.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/getline.hpp"
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
@@ -1772,13 +1773,13 @@ void process_posterior(std::istream& is_src_trg, std::istream& is_trg_src, std::
   size_t id = 0;
 
   while (is_src_trg && is_trg_src && (! is_src || *is_src) && (! is_trg || *is_trg)) {
-    std::getline(is_src_trg, posteriors.source_target);
-    std::getline(is_trg_src, posteriors.target_source);
+    utils::getline(is_src_trg, posteriors.source_target);
+    utils::getline(is_trg_src, posteriors.target_source);
     
     if (is_src)
-      std::getline(*is_src, posteriors.span_source);
+      utils::getline(*is_src, posteriors.span_source);
     if (is_trg)
-      std::getline(*is_trg, posteriors.span_target);
+      utils::getline(*is_trg, posteriors.span_target);
     
     if (! is_src_trg || ! is_trg_src || (is_src && ! *is_src) || (is_trg && ! *is_trg)) break;
     

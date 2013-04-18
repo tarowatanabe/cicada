@@ -21,6 +21,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/unordered_set.hpp>
 #include <utils/mathop.hpp>
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -284,7 +285,7 @@ void process(const Filter& filter,
   PhrasePairParser  parser;
   std::string line;
   
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     if (! parser(line, phrase_pair)) continue;
     if (phrase_pair.counts.empty()) continue;
     
@@ -379,7 +380,7 @@ void process_kbest_score(const Filter& filter,
   PhrasePairParser  parser;
   std::string line;
   
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     if (! parser(line, phrase_pair)) continue;
     if (phrase_pair.counts.empty()) continue;
 

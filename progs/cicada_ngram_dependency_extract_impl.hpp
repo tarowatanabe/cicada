@@ -24,6 +24,7 @@
 #include <utils/compact_map.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/compress_stream.hpp>
+#include <utils/getline.hpp>
 
 #include "cicada_output_impl.hpp"
 
@@ -608,7 +609,7 @@ struct DependencyCounts
 	
 	utils::compress_istream is(file, 1024 * 1024);
 	
-	for (/**/; std::getline(is, line); ++ iteration) {
+	for (/**/; utils::getline(is, line); ++ iteration) {
 	  if (! DependencyCounts::parse(line, sentence, dependency))
 	    throw std::runtime_error("invalid depdendency format");
 

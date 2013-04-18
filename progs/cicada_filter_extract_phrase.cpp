@@ -19,6 +19,7 @@
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -146,15 +147,15 @@ int main(int argc, char** argv)
       std::string line;
 
       utils::compress_istream is_joint(root_joint_file);
-      while (std::getline(is_joint, line))
+      while (utils::getline(is_joint, line))
         if (parser(line, root_joint)) break;
       
       utils::compress_istream is_source(root_source_file);
-      while (std::getline(is_source, line))
+      while (utils::getline(is_source, line))
         if (parser(line, root_source)) break;
       
       utils::compress_istream is_target(root_target_file);
-      while (std::getline(is_target, line))
+      while (utils::getline(is_target, line))
         if (parser(line, root_target)) break;
 
       if (root_joint.counts.empty())
@@ -199,7 +200,7 @@ void process(std::istream& is,
   PhrasePairParser parser;
   std::string line;
   
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     phrase_pair.clear();
     
     if (! parser(line, phrase_pair)) continue;

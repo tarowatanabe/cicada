@@ -50,6 +50,7 @@
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 #include <utils/hashmurmur3.hpp>
+#include <utils/getline.hpp>
 
 struct Bitext
 {
@@ -106,7 +107,7 @@ struct Bitext
     bitext.clear();
     
     std::string line;
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       bitext.assign(line);
     
     return is;

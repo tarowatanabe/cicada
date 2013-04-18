@@ -11,9 +11,9 @@
 #include "symbol_vector.hpp"
 
 #include "utils/space_separator.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/tokenizer.hpp>
-
 
 namespace cicada
 {
@@ -39,7 +39,7 @@ namespace cicada
     
     std::string line;
     x.clear();
-    if (std::getline(is, line)) {
+    if (utils::getline(is, line)) {
       utils::piece line_piece(line);
       tokenizer_type tokenizer(line_piece);
       x.assign(tokenizer.begin(), tokenizer.end());

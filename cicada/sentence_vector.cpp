@@ -20,6 +20,7 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/getline.hpp"
 
 namespace cicada
 {
@@ -108,7 +109,7 @@ namespace cicada
     std::string line;
     
     x.clear();
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       x.assign(line);
     return is;
   }

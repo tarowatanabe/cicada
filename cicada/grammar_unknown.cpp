@@ -27,6 +27,7 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/getline.hpp"
 
 namespace cicada
 {
@@ -104,7 +105,7 @@ namespace cicada
     std::string line;
     tokens_type tokens;
     
-    while (std::getline(is, line)) {
+    while (utils::getline(is, line)) {
       const utils::piece line_piece(line);
       tokenizer_type tokenizer(line_piece);
       

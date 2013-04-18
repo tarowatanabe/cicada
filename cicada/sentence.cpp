@@ -15,6 +15,8 @@
 
 #include "sentence.hpp"
 
+#include "utils/getline.hpp"
+
 namespace cicada
 {
   bool Sentence::assign(std::string::const_iterator& iter, std::string::const_iterator end)
@@ -63,7 +65,7 @@ namespace cicada
     std::string line;
     
     x.clear();
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       x.assign(line);
     
     return is;

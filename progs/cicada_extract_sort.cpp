@@ -16,6 +16,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
+#include "utils/getline.hpp"
 
 typedef PhrasePair       rule_pair_type;
 typedef PhrasePairParser rule_pair_parser_type;
@@ -159,7 +160,7 @@ int main(int argc, char** argv)
 	
 	std::string list;
 	utils::compress_istream is_list(*fiter / "files");
-	while (std::getline(is_list, list)) 
+	while (utils::getline(is_list, list)) 
 	  if (! list.empty()) {
 	    const path_type path = *fiter / list;
 	    
@@ -168,14 +169,14 @@ int main(int argc, char** argv)
 	    
 	    utils::compress_istream is(path, 1024 * 1024);
 	    
-	    while (std::getline(is, line)) 
+	    while (utils::getline(is, line)) 
 	      if (! line.empty())
 		queue.push_swap(line);
 	  }
       } else {
 	utils::compress_istream is(*fiter, 1024 * 1024);
 	
-	while (std::getline(is, line)) 
+	while (utils::getline(is, line)) 
 	  if (! line.empty())
 	    queue.push_swap(line);
       }

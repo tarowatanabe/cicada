@@ -31,6 +31,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path                                    path_type;
 typedef std::vector<path_type, std::allocator<path_type> >         path_set_type;
@@ -247,7 +248,7 @@ int main(int argc, char** argv)
 	    
 	    utils::compress_istream is(path, 1024 * 1024);
 	    std::string line;
-	    while (std::getline(is, line))
+	    while (utils::getline(is, line))
 	      if (! line.empty()) {
 		const path_type path(*fiter / line);
 		

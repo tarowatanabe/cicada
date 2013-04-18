@@ -41,6 +41,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/hashmurmur3.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/tokenizer.hpp>
@@ -1522,7 +1523,7 @@ namespace cicada
     utils::resource read_start;
     
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
@@ -1856,7 +1857,7 @@ namespace cicada
     utils::resource read_start;
     
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       source.clear();

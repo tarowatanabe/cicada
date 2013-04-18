@@ -29,6 +29,7 @@
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
 #include "utils/compact_map.hpp"
+#include "utils/getline.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
@@ -336,7 +337,7 @@ namespace cicada
     std::string line;
     
     x.clear();
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       x.assign(line);
     
     return is;

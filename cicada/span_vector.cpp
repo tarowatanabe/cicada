@@ -21,6 +21,7 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/getline.hpp"
 
 #include "span_vector.hpp"
 
@@ -169,7 +170,7 @@ namespace cicada
     std::string line;
     
     x.clear();
-    if (std::getline(is, line)) {
+    if (utils::getline(is, line)) {
       
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end = line.end();

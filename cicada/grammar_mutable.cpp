@@ -34,6 +34,7 @@
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/resource.hpp"
+#include "utils/getline.hpp"
 
 namespace std
 {
@@ -359,7 +360,7 @@ namespace cicada
     utils::resource start;
     
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
       
       boost::fusion::get<0>(rule_parsed).clear();

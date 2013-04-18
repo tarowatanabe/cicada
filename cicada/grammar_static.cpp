@@ -37,7 +37,7 @@
 #include "utils/resource.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/vector2.hpp"
-
+#include "utils/getline.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/hashmurmur3.hpp"
 
@@ -1538,7 +1538,7 @@ namespace cicada
     utils::resource read_start;
     
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();
@@ -1821,7 +1821,7 @@ namespace cicada
     utils::resource read_start;
 
     size_t num_line = 0;
-    for (/**/; std::getline(is, line); ++ num_line) {
+    for (/**/; utils::getline(is, line); ++ num_line) {
       if (line.empty()) continue;
 
       boost::fusion::get<0>(rule).clear();

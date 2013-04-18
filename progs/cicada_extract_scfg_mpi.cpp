@@ -21,6 +21,7 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+#include "utils/getline.hpp"
 
 #include "codec/lz4.hpp"
 
@@ -174,14 +175,14 @@ int main(int argc, char** argv)
 	    
 	    if (device[rank]->flush(true)) continue;
 	    
-	    std::getline(is_src, line_source);
-	    std::getline(is_trg, line_target);
-	    std::getline(is_alg, line_alignment);
+	    utils::getline(is_src, line_source);
+	    utils::getline(is_trg, line_target);
+	    utils::getline(is_alg, line_alignment);
 	    
 	    if (is_span_src.get())
-	      std::getline(*is_span_src, line_span_source);
+	      utils::getline(*is_span_src, line_span_source);
 	    if (is_span_trg.get())
-	      std::getline(*is_span_trg, line_span_target);
+	      utils::getline(*is_span_trg, line_span_target);
 	    
 	    if (! is_src || ! is_trg || ! is_alg || (is_span_src.get() && ! *is_span_src) || (is_span_trg.get() && ! *is_span_trg)) break;
 	    

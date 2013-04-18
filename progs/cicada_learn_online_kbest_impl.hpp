@@ -36,6 +36,7 @@
 #include "utils/config.hpp"
 #include "utils/mathop.hpp"
 #include "utils/hashmurmur3.hpp"
+#include "utils/readline.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -3062,7 +3063,7 @@ void read_events(const path_type& input_path,
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
-	std::getline(is, line);
+	utils::getline(is, line);
 	
 	if (line.empty()) continue;
 	
@@ -3089,7 +3090,7 @@ void read_events(const path_type& input_path,
     
     size_t id;
     std::string line;
-    while (std::getline(is, line)) 
+    while (utils::getline(is, line)) 
       if (! line.empty()) {
 	std::string::const_iterator iter     = line.begin();
 	std::string::const_iterator iter_end = line.end();
@@ -3110,7 +3111,7 @@ void read_events(const path_type& input_path,
     utils::compress_istream is(input_path, 1024 * 1024);
     
     std::string line;
-    for (size_t id = 0; std::getline(is, line); ++ id) 
+    for (size_t id = 0; utils::getline(is, line); ++ id) 
       if (shard_size == 0 || id % shard_size == shard_rank) {
 	if (! line.empty())
 	  events.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);

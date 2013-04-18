@@ -33,6 +33,7 @@
 #include "utils/python_string_parser.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
+#include "utils/getline.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
@@ -292,7 +293,7 @@ namespace cicada
     std::string line;
     
     x.clear();
-    if (std::getline(is, line) && ! line.empty())
+    if (utils::getline(is, line) && ! line.empty())
       x.assign(line);
     
     return is;

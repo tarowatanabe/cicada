@@ -26,6 +26,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/mathop.hpp>
 #include <utils/compact_map.hpp>
+#include <utils/readline.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -205,7 +206,7 @@ struct RootCountParser
     root_count.clear();
     
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
     
     return operator()(line, root_count);
   }
@@ -267,7 +268,7 @@ struct PhrasePairParser
     phrase_pair.clear();
     
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
     
     return operator()(line, phrase_pair);
   }
@@ -546,7 +547,7 @@ struct LexiconModel
     std::string line;
     parsed_type parsed;
 
-    while (std::getline(is, line)) {
+    while (utils::getline(is, line)) {
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end = line.end();
       

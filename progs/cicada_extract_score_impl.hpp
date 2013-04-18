@@ -68,6 +68,7 @@
 #include <utils/double_base64_parser.hpp>
 #include <utils/double_base64_generator.hpp>
 #include <utils/map_file_allocator.hpp>
+#include <utils/getline.hpp>
 
 #include <codec/lz4.hpp>
 
@@ -545,7 +546,7 @@ struct RootCountParser
     root_count.clear();
 
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
 
     return operator()(line, root_count);
   }
@@ -631,7 +632,7 @@ struct PhrasePairParser
     phrase_pair.clear();
     
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
     
     return operator()(line, phrase_pair);
   }
@@ -718,7 +719,7 @@ struct PhrasePairSimpleParser
     phrase_pair.clear();
     
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
     
     return operator()(line, phrase_pair);
   }
@@ -799,7 +800,7 @@ struct PhraseCountParser
     phrase_count.clear();
     
     std::string line;
-    if (! getline(is, line)) return false;
+    if (! utils::getline(is, line)) return false;
     
     return operator()(line, phrase_count);
   }
@@ -941,7 +942,7 @@ struct PhrasePairSourceMapper
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
@@ -1371,7 +1372,7 @@ struct PhrasePairReverseMapper
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
       if (counts.empty() || counts.back().source != phrase_pair.source)
@@ -1620,34 +1621,34 @@ struct PhrasePairReverseReducer
     simple_type simple1;
     simple_type simple2;
     
-    bool parsed1 = std::getline(is1, line1) && parser(line1, simple1);
-    bool parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+    bool parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
+    bool parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
     
     while (parsed1 && parsed2) {
       if (simple1 < simple2) {
 	generator(os, simple1) << '\n';
-	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+	parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
       } else if (simple2 < simple1) {
 	generator(os, simple2) << '\n';
-	parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+	parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
       } else {
 	simple1.increment(simple2.counts.begin(), simple2.counts.end());
 	generator(os, simple1) << '\n';
 	
-	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
-	parsed2 = std::getline(is2, line2) && parser(line2, simple2);	
+	parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
+	parsed2 = utils::getline(is2, line2) && parser(line2, simple2);	
       }
     }
     
     // dump remaining...
     while (parsed1) {
       generator(os, simple1) << '\n';
-      parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+      parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
     }
     
     while (parsed2) {
       generator(os, simple2) << '\n';
-      parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+      parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
     }
   }
   
@@ -2058,7 +2059,7 @@ struct PhrasePairTargetMapper
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {    
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! parser(line, phrase_pair)) continue;
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
@@ -2365,34 +2366,34 @@ struct PhrasePairTargetReducer
     simple_type simple1;
     simple_type simple2;
     
-    bool parsed1 = std::getline(is1, line1) && parser(line1, simple1);
-    bool parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+    bool parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
+    bool parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
     
     while (parsed1 && parsed2) {
       if (simple1 < simple2) {
 	generator(os, simple1) << '\n';
-	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+	parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
       } else if (simple2 < simple1) {
 	generator(os, simple2) << '\n';
-	parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+	parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
       } else {
 	simple1.increment(simple2.counts.begin(), simple2.counts.end());
 	generator(os, simple1) << '\n';
 	
-	parsed1 = std::getline(is1, line1) && parser(line1, simple1);
-	parsed2 = std::getline(is2, line2) && parser(line2, simple2);	
+	parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
+	parsed2 = utils::getline(is2, line2) && parser(line2, simple2);	
       }
     }
     
     // dump remaining...
     while (parsed1) {
       generator(os, simple1) << '\n';
-      parsed1 = std::getline(is1, line1) && parser(line1, simple1);
+      parsed1 = utils::getline(is1, line1) && parser(line1, simple1);
     }
     
     while (parsed2) {
       generator(os, simple2) << '\n';
-      parsed2 = std::getline(is2, line2) && parser(line2, simple2);
+      parsed2 = utils::getline(is2, line2) && parser(line2, simple2);
     }
   }
   
@@ -2665,7 +2666,7 @@ struct PhrasePairScoreMapper
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {    
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
       if (counts.empty() || counts.back().source != phrase_pair.source)
@@ -2966,7 +2967,7 @@ struct PhrasePairScoreReducer
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
   {
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! simple_parser(line, phrase_pair)) continue;
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
@@ -2985,7 +2986,7 @@ struct PhrasePairScoreReducer
     std::string line;
     phrase_count_type phrase;
     
-    while (counts.size() < 256 && std::getline(is, line)) {
+    while (counts.size() < 256 && utils::getline(is, line)) {
       if (! phrase_parser(line, phrase)) continue;
       
       if (counts.empty() || counts.back().phrase != phrase.phrase)

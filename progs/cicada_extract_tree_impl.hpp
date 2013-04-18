@@ -100,11 +100,9 @@ struct Bitext
   friend
   std::istream& operator>>(std::istream& is, Bitext& bitext)
   {
-    
-    
     bitext.clear();
     std::string line;
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       bitext.assign(line);
     
     return is;

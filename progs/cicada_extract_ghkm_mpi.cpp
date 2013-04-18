@@ -23,6 +23,7 @@
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/random_seed.hpp"
+#include "utils/getline.hpp"
 
 #include "codec/lz4.hpp"
 
@@ -179,9 +180,9 @@ int main(int argc, char** argv)
 	    
 	    if (device[*riter]->flush(true)) continue;
 	    
-	    std::getline(is_src, line_source);
-	    std::getline(is_trg, line_target);
-	    std::getline(is_alg, line_alignment);
+	    utils::getline(is_src, line_source);
+	    utils::getline(is_trg, line_target);
+	    utils::getline(is_alg, line_alignment);
 	    
 	    if (! is_src || ! is_trg || ! is_alg) break;
 	    

@@ -18,6 +18,7 @@
 
 #include "alignment.hpp"
 
+#include "utils/getline.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Alignment::point_type,
@@ -113,7 +114,7 @@ namespace cicada
   {
     std::string line;
     x.clear();
-    if (std::getline(is, line))
+    if (utils::getline(is, line))
       x.assign(line);
     
     return is;
