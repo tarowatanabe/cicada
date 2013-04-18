@@ -11,6 +11,9 @@
    cicada_extract_{pharse,scfg,ghkm,tree}. This affect the count
    format and greatly affect the
    cicada_filter_extract{,phrase,scfg,ghkm} tools.
+ - INCOMPATIBLE: added tree-insertion-terminal-penalty feature to
+   TreeGrammarFallback (or fallback tree grammar) which captures the
+   number of "copied" terminals.
  - Bugfix: strange getline behavior when line is very long.
  - Added debug messages for "inputs" so that we can know when
    lattices/forests are loaded.

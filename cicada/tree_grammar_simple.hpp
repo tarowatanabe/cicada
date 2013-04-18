@@ -23,6 +23,8 @@ namespace cicada
     typedef hypergraph_type::rule_type     graph_rule_type;
     typedef hypergraph_type::rule_ptr_type graph_rule_ptr_type;
 
+    typedef feature_set_type::feature_type feature_type;
+
   private:
     struct rule_ptr_hash
     {
@@ -46,16 +48,26 @@ namespace cicada
   public:
 
     TreeGrammarFallback(const symbol_type& __non_terminal)
-      : non_terminal(__non_terminal)
+      : non_terminal(__non_terminal),
+	feat_penalty("tree-insertion-penalty"),
+	feat_terminal_penalty("tree-insertion-terminal-penalty")
     {
-      features["tree-insertion-penalty"] = -1.0;
+      features[feat_penalty] = -1.0;
+      features_terminal[feat_terminal_penalty] = -1.0;
+      features_terminal[feat_penalty] = -1.0;
+      
       attributes["insertion"] = attribute_set_type::int_type(1);
     }
     
     TreeGrammarFallback()
-      : non_terminal()
+      : non_terminal(),
+	feat_penalty("tree-insertion-penalty"),
+	feat_terminal_penalty("tree-insertion-terminal-penalty")
     {
-      features["tree-insertion-penalty"] = -1.0;
+      features[feat_penalty] = -1.0;
+      features_terminal[feat_terminal_penalty] = -1.0;
+      features_terminal[feat_penalty] = -1.0;
+      
       attributes["insertion"] = attribute_set_type::int_type(1);
     }
     
@@ -81,20 +93,22 @@ namespace cicada
 	
 	if (! rules.insert(edge.rule).second) continue;
 	
-	bool has_terminal = false;
+	difference_type num_terminal = 0;
 	non_terminals.clear();
 	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
 	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(riter->non_terminal_index()) : *riter);
-	  has_terminal |= (! riter->is_non_terminal());
+	  num_terminal += (! riter->is_non_terminal());
 	}
 	
 	rule_ptr_type rule_source(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, non_terminals.begin(), non_terminals.end())));
 	
-	if (has_terminal)
-	  insert(rule_pair_type(rule_source, rule_target, features, attributes));
-	else
+	if (num_terminal) {
+	  features_terminal[feat_terminal_penalty] = - num_terminal;
+	  
+	  insert(rule_pair_type(rule_source, rule_target, features_terminal, attributes));
+	} else
 	  insert(rule_pair_type(rule_source, rule_target, features));
       }
     }
@@ -111,25 +125,31 @@ namespace cicada
 	
 	if (! rules.insert(edge.rule).second) continue;
 
-	bool has_terminal = false;
+	difference_type num_terminal = 0;
 	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	  has_terminal |= (! riter->is_non_terminal());
+	  num_terminal += (! riter->is_non_terminal());
 	
 	rule_ptr_type rule(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	
-	if (has_terminal)
-	  insert(rule_pair_type(rule, rule, features, attributes));
-	else
+	if (num_terminal) {
+	  features_terminal[feat_terminal_penalty] = - num_terminal;
+	  
+	  insert(rule_pair_type(rule, rule, features_terminal, attributes));
+	} else
 	  insert(rule_pair_type(rule, rule, features));
       }
     }
     
   private:
     symbol_type non_terminal;
-
+    
+    feature_type feat_penalty;
+    feature_type feat_terminal_penalty;
+    
     graph_rule_ptr_set_type rules;
     feature_set_type        features;
+    feature_set_type        features_terminal;
     attribute_set_type      attributes;
     non_terminal_set_type   non_terminals;
   };
