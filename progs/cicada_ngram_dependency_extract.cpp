@@ -24,6 +24,7 @@
 #include <boost/thread.hpp>
 
 #include <utils/compress_stream.hpp>
+#include "utils/getline.hpp"
 
 typedef DependencyCounts::path_type     path_type;
 typedef DependencyCounts::path_set_type path_set_type;
@@ -69,7 +70,7 @@ int main(int argc, char** argv)
     if (corpus_list_file == "-" || boost::filesystem::exists(corpus_list_file)) {
       utils::compress_istream is(corpus_list_file);
       std::string line;
-      while (std::getline(is, line)) {
+      while (utils::getline(is, line)) {
 	boost::algorithm::trim(line);
 	if (! line.empty()) {
 	  if (boost::filesystem::exists(line))
@@ -127,7 +128,7 @@ void accumulate(const path_set_type& corpus_files,
       utils::compress_istream is(*fiter, 1024 * 1024);
       std::string line;
       
-      while (std::getline(is, line)) {
+      while (utils::getline(is, line)) {
 	if (line.empty()) continue;
 	
 	lines.push_back(line);

@@ -23,6 +23,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -105,7 +106,7 @@ int main(int argc, char** argv)
 	utils::compress_istream is(*iter, 1024 * 1024);
 	std::string line;
 	
-	for (size_t seg = 0; std::getline(is, line); ++ seg) {
+	for (size_t seg = 0; utils::getline(is, line); ++ seg) {
 	  if (seg >= refsets.size())
 	    refsets.resize(seg + 1);
 	  

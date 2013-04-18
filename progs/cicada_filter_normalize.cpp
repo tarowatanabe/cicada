@@ -14,6 +14,7 @@
 #include "utils/icu_filter.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/getline.hpp"
 
 #include <unicode/utypes.h>
 #include <unicode/unistr.h>
@@ -307,7 +308,7 @@ int main(int argc, char** argv)
     ostream_sink sink(os);
     
     std::string line;
-    while (std::getline(is, line)) {
+    while (utils::getline(is, line)) {
       icu::UnicodeString uline = icu::UnicodeString::fromUTF8(line);
       
       trans->transliterate(uline);

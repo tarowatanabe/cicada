@@ -52,6 +52,7 @@
 #include "utils/succinct_vector.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/hashmurmur3.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -618,7 +619,7 @@ void read_data(const path_type& path, data_set_type& data)
   utils::compress_istream is(path, 1024 * 1024);
   
   std::string line;
-  while (std::getline(is, line))
+  while (utils::getline(is, line))
     data.push_back(line);
 }
 

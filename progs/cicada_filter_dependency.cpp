@@ -52,6 +52,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/chart.hpp"
 #include "utils/piece.hpp"
+#include "utils/getline.hpp"
 
 typedef cicada::Alignment  alignment_type;
 typedef cicada::Dependency dependency_type;
@@ -1254,7 +1255,7 @@ struct Cabocha
     TransformForest transform_forest(goal, head_mode);
     TransformSpan   transform_span(goal, binarize_mode, category_mode);
     
-    while (std::getline(is, line)) {
+    while (utils::getline(is, line)) {
       utils::piece line_piece(line);
       tokenizer_type tokenizer(line_piece);
 	

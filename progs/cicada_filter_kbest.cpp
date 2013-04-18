@@ -49,6 +49,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/getline.hpp"
 
 #include "cicada_output_impl.hpp"
 
@@ -214,7 +215,7 @@ struct Task
       if (boost::fusion::get<0>(kbest) == size_type(-1)) break;
       
       // read from is...
-      if (! std::getline(is, line))
+      if (! utils::getline(is, line))
 	throw std::runtime_error("# of lines do not match");
       
       os << boost::fusion::get<0>(kbest) << " ||| ";

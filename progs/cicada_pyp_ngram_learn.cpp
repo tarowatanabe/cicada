@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // PYP-LM!
@@ -64,6 +64,7 @@
 #include "utils/atomicop.hpp"
 #include "utils/piece.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -1250,7 +1251,7 @@ void read_training(const path_set_type& corpus_files,
     
     sentence_type ngram;
     
-    while (std::getline(is, line)) {
+    while (utils::getline(is, line)) {
       utils::piece line_piece(line);
       tokenizer_type tokenizer(line_piece);
 	

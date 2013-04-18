@@ -36,7 +36,7 @@
 #include "utils/config.hpp"
 #include "utils/mathop.hpp"
 #include "utils/hashmurmur3.hpp"
-#include "utils/readline.hpp"
+#include "utils/getline.hpp"
 
 #include <boost/tokenizer.hpp>
 

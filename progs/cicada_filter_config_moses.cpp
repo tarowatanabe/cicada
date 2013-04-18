@@ -26,6 +26,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -112,13 +113,13 @@ int main(int argc, char** argv)
       
       std::string weight_prefix;
       std::string line;
-      bool consumed = std::getline(is, line);
+      bool consumed = utils::getline(is, line);
       while (consumed) {
 	xpressive::smatch what;
       
 	if (! xpressive::regex_match(line, what, pattern_section_weight)) {
 	  //os << line << '\n';
-	  consumed = std::getline(is, line);
+	  consumed = utils::getline(is, line);
 	  continue;
 	}
 	
@@ -133,7 +134,7 @@ int main(int argc, char** argv)
 	
 	int pos = 0;
 	do {
-	  consumed = std::getline(is, line);
+	  consumed = utils::getline(is, line);
 	  if (! consumed || xpressive::regex_match(line, what, pattern_section)) break;
 	  
 	  if (xpressive::regex_match(line, what, pattern_comment) || xpressive::regex_match(line, what, pattern_empty)) {
@@ -173,7 +174,7 @@ int main(int argc, char** argv)
 	std::string line;
 	feature_weight_parser<std::string::const_iterator> parser;
       
-	while (std::getline(is, line)) {
+	while (utils::getline(is, line)) {
 	  boost::fusion::get<0>(feature_weight).clear();
 	  
 	  std::string::const_iterator iter = line.begin();
@@ -260,13 +261,13 @@ int main(int argc, char** argv)
 					   >> *xpressive::_s);
     
       std::string line;
-      bool consumed = std::getline(is, line);
+      bool consumed = utils::getline(is, line);
       while (consumed) {
 	xpressive::smatch what;
       
 	if (! xpressive::regex_match(line, what, pattern_section_weight)) {
 	  os << line << '\n';
-	  consumed = std::getline(is, line);
+	  consumed = utils::getline(is, line);
 	  continue;
 	}
       
@@ -284,7 +285,7 @@ int main(int argc, char** argv)
       
 	int pos = 0;
 	do {
-	  consumed = std::getline(is, line);
+	  consumed = utils::getline(is, line);
 	  if (! consumed || xpressive::regex_match(line, what, pattern_section)) break;
 	
 	  if (xpressive::regex_match(line, what, pattern_comment) || xpressive::regex_match(line, what, pattern_empty))

@@ -33,6 +33,7 @@
 #include "utils/chart.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -249,7 +250,7 @@ int main(int argc, char** argv)
       hypergraph.clear();
 
       if (mapping) {	
-	if (! std::getline(*ms, line))
+	if (! utils::getline(*ms, line))
 	  throw std::runtime_error("# of lines do not match with map-file");
 	
 	utils::piece line_piece(line);

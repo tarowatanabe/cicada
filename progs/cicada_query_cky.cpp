@@ -34,7 +34,7 @@
 #include "utils/json_string_generator.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/filesystem.hpp"
-
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -274,7 +274,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     
     std::string line;
-    while (std::getline(is, line))
+    while (utils::getline(is, line))
       if (! line.empty())
 	queue.push_swap(line);
     

@@ -14,6 +14,7 @@
 #include <iterator>
 
 #include "utils/compress_stream.hpp"
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -54,7 +55,7 @@ int main(int argc, char** argv)
       bool terminated = false;
       
       for (size_t i = 0; i != istreams.size(); ++ i)
-	terminated |= (! std::getline(*istreams[i], lines[i]));
+	terminated |= (! utils::getline(*istreams[i], lines[i]));
       
       if (terminated) break;
       

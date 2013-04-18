@@ -30,6 +30,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/getline.hpp"
 
 typedef cicada::Vocab     vocab_type;
 typedef cicada::Alignment alignment_type;
@@ -306,7 +307,7 @@ void read_list(const path_type& path, path_set_type& files)
   
   utils::compress_istream is(path);
   std::string file;
-  while (std::getline(is, file)) {
+  while (utils::getline(is, file)) {
     if (file.empty()) continue;
     if (! boost::filesystem::exists(file))
       throw std::runtime_error("no file? " + file);

@@ -38,6 +38,7 @@
 #include <utils/array_power2.hpp>
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
+#include "utils/getline.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -461,7 +462,7 @@ void read_grammar(const path_type& path, grammar_type& grammar)
   rule_type rule;
   double logprob;
   
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     if (! parse_rule(line, rule, logprob)) continue;
     
     grammar[rule_type::create(rule)] = cicada::semiring::traits<weight_type>::exp(logprob);
@@ -476,7 +477,7 @@ void read_lexicon(const path_type& path, lexicon_type& lexicon)
   rule_type rule;
   double logprob;
   
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     if (! parse_rule(line, rule, logprob)) continue;
     
     lexicon.insert(rule.lhs);
