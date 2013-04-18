@@ -19,7 +19,7 @@ namespace cicada
     // minimum size is 1024 * 64
     //
     
-    const size_type cache_size = utils::bithack::max(size_type(utils::bithack::next_largest_power2(ids.size()) >> 11),
+    const size_type cache_size = utils::bithack::max(size_type(utils::bithack::next_largest_power2(ids.size()) >> 12),
 						     size_type(1024 * 64));
     
     caches_pos.clear();
