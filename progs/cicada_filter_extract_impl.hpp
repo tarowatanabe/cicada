@@ -26,7 +26,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/mathop.hpp>
 #include <utils/compact_map.hpp>
-#include <utils/readline.hpp>
+#include <utils/getline.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>

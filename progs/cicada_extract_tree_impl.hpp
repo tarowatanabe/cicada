@@ -35,6 +35,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
+#include "utils/getline.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
