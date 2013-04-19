@@ -50,6 +50,10 @@ namespace cicada
     typedef utils::unordered_map<binarized_type, hypergraph_type::id_type, binarized_hash, std::equal_to<binarized_type>,
 				 std::allocator<std::pair<const binarized_type, hypergraph_type::id_type> > >::type binarized_map_type;
 
+    BinarizeDependency(const bool __top_down=false) : top_down(__top_down) {}
+    
+    const bool top_down;
+    
     binarized_map_type binarized;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
@@ -148,7 +152,7 @@ namespace cicada
 					      ? tag_right
 					      : tag_middle)));
 	      
-	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(tag, *riter, *titer, target);
+	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(lhs, tag, *riter, *titer, target);
 	      
 	      rhs_new.push_back(result.first);
 	      tails_new.push_back(result.second);
@@ -180,7 +184,8 @@ namespace cicada
     node_chart_type   node_chart;
     label_chart_type  label_chart;
     
-    std::pair<symbol_type, hypergraph_type::id_type> binarize(const std::string& tag,
+    std::pair<symbol_type, hypergraph_type::id_type> binarize(const symbol_type& root,
+							      const std::string& tag,
 							      const rhs_type& rhs,
 							      const tails_type& tails,
 							      hypergraph_type& target)
@@ -199,6 +204,10 @@ namespace cicada
 	label_chart(i, i + 1) = rhs[i];
 	node_chart(i, i + 1)  = tails[i];
       }
+
+      symbol_type lhs_root;
+      if (top_down)
+	lhs_root = '[' + root.non_terminal_strip() + tag + ']';
       
       symbol_set_type rhs_binarized(2);
       tail_set_type   tails_binarized(2);
@@ -206,8 +215,10 @@ namespace cicada
       for (size_type length = 2; length <= child_size; ++ length)
 	for (size_type first = 0; first + length <= child_size; ++ first) {
 	  const size_type last = first + length;
-	  
-	  {
+
+	  if (top_down)
+	    label_chart(first, last) = lhs_root;
+	  else {
 	    const symbol_type::piece_type left = label_chart(first, last - 1).non_terminal_strip();
 	    const symbol_type::piece_type right = label_chart(last - 1, last).non_terminal_strip();
 	    
@@ -259,19 +270,19 @@ namespace cicada
   };
 
   inline
-  void binarize_dependency(const HyperGraph& source, HyperGraph& target)
+  void binarize_dependency(const HyperGraph& source, HyperGraph& target, const bool top_down=false)
   {
-    BinarizeDependency binarizer;
+    BinarizeDependency binarizer(top_down);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_dependency(HyperGraph& source)
+  void binarize_dependency(HyperGraph& source, const bool top_down=false)
   {
     HyperGraph target;
 
-    BinarizeDependency binarizer;
+    BinarizeDependency binarizer(top_down);
     
     binarizer(source, target);
     

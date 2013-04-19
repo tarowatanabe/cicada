@@ -19,7 +19,8 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : order(-1), left(false), right(false), all(false), cyk(false), dependency(false),
+      : order(-1), top_down(false),
+	left(false), right(false), all(false), cyk(false), dependency(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -31,6 +32,8 @@ namespace cicada
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "top-down")
+	  top_down = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "direction") {
 	  const utils::ipiece dir = piter->second;
 	  
@@ -57,7 +60,7 @@ namespace cicada
 	throw std::runtime_error("we do not binarization in many directions!");
 
       name = (std::string("binarize-")
-	      + (left ? "left" : (right ? "right" : (all ? "all" : (cyk ? "cyk" : "dependency")))));
+	      + (left ? "left" : (right ? "right" : (all ? "all" : (cyk ? "cyk" : (top_down ? "dependency-top-down" : "dependency"))))));
     }
 
     void Binarize::operator()(data_type& data) const
@@ -80,7 +83,7 @@ namespace cicada
       else if (cyk)
 	cicada::binarize_cyk(data.hypergraph, binarized, order);
       else if (dependency)
-	cicada::binarize_dependency(data.hypergraph, binarized);
+	cicada::binarize_dependency(data.hypergraph, binarized, top_down);
       else
 	throw std::runtime_error("unsupported direction!");
     
