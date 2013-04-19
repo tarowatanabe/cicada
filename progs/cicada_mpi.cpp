@@ -314,7 +314,6 @@ void merge_features()
 void merge_statistics(const operation_set_type& operations,
 		      operation_set_type::statistics_type& statistics)
 {
-  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
   typedef operation_set_type::statistics_type statistics_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -323,54 +322,87 @@ void merge_statistics(const operation_set_type& operations,
   statistics.clear();
   
   if (mpi_rank == 0) {
+    typedef utils::mpi_device_source            device_type;
+    typedef boost::iostreams::filtering_istream stream_type;
+    
+    typedef boost::shared_ptr<device_type> device_ptr_type;
+    typedef boost::shared_ptr<stream_type> stream_ptr_type;
+    
+    typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+    typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+    
+    device_ptr_set_type device(mpi_size);
+    stream_ptr_set_type stream(mpi_size);
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      device.push_back(device_ptr_type(new device_type(rank, stat_tag, 4096)));
+      stream.push_back(stream_ptr_type(new stream_type()));
+      
+      stream.back()->push(boost::iostreams::zlib_decompressor());
+      stream.back()->push(*device.back());
+    }
     
     statistics = operations.get_statistics();
 
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::zlib_decompressor());
-      is.push(utils::mpi_device_source(rank, stat_tag, 4096));
+    std::string line;
+    
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
       
-      std::string line;
-      while (std::getline(is, line)) {
-	const utils::piece line_piece(line);
-	tokenizer_type tokenizer(line_piece);
+      for (int rank = 1; rank != mpi_size; ++ rank)
+	while (stream[rank] && device[rank] && device[rank]->test()) {
+	  if (std::getline(*stream[rank], line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
+	    
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece name = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece count = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece node = *iter;
 	
-	tokenizer_type::iterator iter = tokenizer.begin();
-	if (iter == tokenizer.end()) continue;
-	const utils::piece name = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece edge = *iter;
 	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece count = *iter;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece node = *iter;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece edge = *iter;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece user_time = *iter;
-	
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece cpu_time = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece user_time = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece cpu_time = *iter;
 
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	const utils::piece thread_time = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece thread_time = *iter;
 	
-	statistics[name] += statistics_type::statistic_type(utils::lexical_cast<statistics_type::count_type>(count),
-							    utils::lexical_cast<statistics_type::count_type>(node),
-							    utils::lexical_cast<statistics_type::count_type>(edge),
-							    utils::decode_base64<statistics_type::second_type>(user_time),
-							    utils::decode_base64<statistics_type::second_type>(cpu_time),
-							    utils::decode_base64<statistics_type::second_type>(thread_time));
-      }
+	    statistics[name] += statistics_type::statistic_type(utils::lexical_cast<statistics_type::count_type>(count),
+								utils::lexical_cast<statistics_type::count_type>(node),
+								utils::lexical_cast<statistics_type::count_type>(edge),
+								utils::decode_base64<statistics_type::second_type>(user_time),
+								utils::decode_base64<statistics_type::second_type>(cpu_time),
+								utils::decode_base64<statistics_type::second_type>(thread_time));
+	  } else {
+	    stream[rank].reset();
+	    device[rank].reset();
+	  }
+	  
+	  found = true;
+	}
+      
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_rank) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
     
   } else {
