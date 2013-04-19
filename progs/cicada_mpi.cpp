@@ -269,11 +269,11 @@ void merge_features()
     stream_ptr_set_type stream(mpi_size);
     
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      device.push_back(device_ptr_type(new device_type(rank, feature_tag, 1024 * 1024)));
-      stream.push_back(stream_ptr_type(new stream_type()));
+      device[rank].reset(new device_type(rank, feature_tag, 1024 * 1024));
+      stream[rank].reset(new stream_type());
       
-      stream.back()->push(boost::iostreams::zlib_decompressor());
-      stream.back()->push(*device.back());
+      stream[rank]->push(boost::iostreams::zlib_decompressor());
+      stream[rank]->push(*device[rank]);
     }
     
     std::string line;
@@ -295,7 +295,7 @@ void merge_features()
 	  found = true;
 	}
       
-      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_rank) break;
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
@@ -337,11 +337,11 @@ void merge_statistics(const operation_set_type& operations,
     stream_ptr_set_type stream(mpi_size);
     
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      device.push_back(device_ptr_type(new device_type(rank, stat_tag, 4096)));
-      stream.push_back(stream_ptr_type(new stream_type()));
+      device[rank].reset(new device_type(rank, stat_tag, 4096));
+      stream[rank].reset(new stream_type());
       
-      stream.back()->push(boost::iostreams::zlib_decompressor());
-      stream.back()->push(*device.back());
+      stream[rank]->push(boost::iostreams::zlib_decompressor());
+      stream[rank]->push(*device[rank]);
     }
     
     statistics = operations.get_statistics();
@@ -400,7 +400,7 @@ void merge_statistics(const operation_set_type& operations,
 	  found = true;
 	}
       
-      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_rank) break;
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
