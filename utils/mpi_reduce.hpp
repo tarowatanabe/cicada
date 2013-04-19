@@ -60,7 +60,7 @@ namespace utils
 	ranks.clear();
 	
 	for (int i = reduce_size; i < merge_size; ++ i)
-	  if (i % raduce_size == mpi_rank_logical)
+	  if (i % reduce_size == mpi_rank_logical)
 	    ranks.push_back(i == rank ? 0 : (i == 0 ? rank : i));
 	
 	if (ranks.empty()) continue;
@@ -141,8 +141,7 @@ namespace utils
 	}
       }
     }
-    
-    
+        
     template <typename Reducer>
     inline
     void mpi_reduce_recv(Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size)
@@ -151,11 +150,10 @@ namespace utils
       is.push(boost::iostreams::zlib_decompressor());
       is.push(utils::mpi_device_source(comm, rank, tag, buffer_size));
       
-      while (is)
-	reducer(is);
+      // loop forever...
+      while (reducer(is)) {}
     }
     
-
     template <typename Reducer>
     inline
     void mpi_reduce_send(const Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size)
