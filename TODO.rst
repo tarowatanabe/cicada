@@ -249,3 +249,5 @@ Revise and test restaurtna implementation:
   - Currently, we use a vector-based implementation, but hash-based
     implementation is potentially faster, especially when decrementing
     counts.
+
+Revise the merge features in cicada_mpi for large # of features

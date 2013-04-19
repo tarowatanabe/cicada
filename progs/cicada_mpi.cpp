@@ -195,22 +195,24 @@ int main(int argc, char ** argv)
     synchronize();
     
     ::sync();
-    
+
     operation_set_type::statistics_type statistics;
     merge_statistics(operations, statistics);
     
     if (mpi_rank == 0 && debug)
       std::cerr << "statistics"<< '\n'
 		<< statistics;
-
-    merge_features();
     
-    if (mpi_rank == 0 && ! output_feature.empty()) {
-      utils::compress_ostream os(output_feature, 1024 * 1024);
+    if (! output_feature.empty()) {
+      merge_features();
       
-      for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
-	if (! feature_type(id).empty())
-	  os << feature_type(id) << '\n';
+      if (mpi_rank == 0) {
+	utils::compress_ostream os(output_feature, 1024 * 1024);
+	
+	for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+	  if (! feature_type(id).empty())
+	    os << feature_type(id) << '\n';
+      }
     }
   }
   catch (const std::exception& err) {
@@ -257,17 +259,17 @@ void merge_features()
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::zlib_decompressor());
-      is.push(utils::mpi_device_source(rank, feature_tag, 4096));
+      is.push(utils::mpi_device_source(rank, feature_tag, 1024 * 1024));
       
       std::string line;
-      while (utils::getline(is, line))
+      while (std::getline(is, line))
 	if (! line.empty())
 	  feature_type(line);
     }
   } else {
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::zlib_compressor());
-    os.push(utils::mpi_device_sink(0, feature_tag, 4096));
+    os.push(utils::mpi_device_sink(0, feature_tag, 1024 * 1024));
     
     for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
       if (! feature_type(id).empty())
@@ -296,7 +298,7 @@ void merge_statistics(const operation_set_type& operations,
       is.push(utils::mpi_device_source(rank, stat_tag, 4096));
       
       std::string line;
-      while (utils::getline(is, line)) {
+      while (std::getline(is, line)) {
 	const utils::piece line_piece(line);
 	tokenizer_type tokenizer(line_piece);
 	
