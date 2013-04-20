@@ -50,9 +50,9 @@ namespace cicada
     typedef utils::unordered_map<binarized_type, hypergraph_type::id_type, binarized_hash, std::equal_to<binarized_type>,
 				 std::allocator<std::pair<const binarized_type, hypergraph_type::id_type> > >::type binarized_map_type;
 
-    BinarizeDependency(const bool __top_down=false) : top_down(__top_down) {}
+    BinarizeDependency(const bool __head_mode=false) : head_mode(__head_mode) {}
     
-    const bool top_down;
+    const bool head_mode;
     
     binarized_map_type binarized;
     
@@ -86,7 +86,8 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  
-	  if (edge_source.tails.size() <= 1) continue;
+	  // for head_mode mode, even single non-terminal should be checked!
+	  if (edge_source.tails.size() < 2 - head_mode) continue;
 	  
 	  rhs.clear();
 	  tails.clear();
@@ -138,9 +139,15 @@ namespace cicada
 	  rhs_map_type::const_iterator riter_begin = rhs.begin();
 	  rhs_map_type::const_iterator riter_end   = rhs.end();
 	  for (rhs_map_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter, ++ titer) {
-	    if (titer->empty())
-	      rhs_new.insert(rhs_new.end(), riter->begin(), riter->end());
-	    else if (titer->size() == 1) {
+	    if (titer->empty()) {
+	      if (head_mode) {
+		const std::pair<symbol_type, hypergraph_type::id_type> result = headlize(lhs, *riter, target);
+		
+		rhs_new.push_back(result.first);
+		tails_new.push_back(result.second);
+	      } else
+		rhs_new.insert(rhs_new.end(), riter->begin(), riter->end());
+	    } else if (titer->size() == 1) {
 	      rhs_new.push_back(riter->front());
 	      tails_new.push_back(titer->front());
 	    } else {
@@ -152,7 +159,7 @@ namespace cicada
 					      ? tag_right
 					      : tag_middle)));
 	      
-	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(lhs, tag, *riter, *titer, target);
+	      const std::pair<symbol_type, hypergraph_type::id_type> result = binarize(tag, *riter, *titer, target);
 	      
 	      rhs_new.push_back(result.first);
 	      tails_new.push_back(result.second);
@@ -183,9 +190,23 @@ namespace cicada
   private:
     node_chart_type   node_chart;
     label_chart_type  label_chart;
+
+    std::pair<symbol_type, hypergraph_type::id_type> headlize(const symbol_type& root,
+							      const rhs_type& rhs,
+							      hypergraph_type& target)
+    {
+      const symbol_type lhs = '[' + root.non_terminal_strip() + std::string("^H") + ']';
+      
+      const hypergraph_type::id_type head = target.add_node().id;
+      
+      hypergraph_type::edge_type& edge_new = target.add_edge();
+      edge_new.rule = rule_type::create(rule_type(lhs, rhs.begin(), rhs.end()));
+      target.connect_edge(edge_new.id, head);
+      
+      return std::make_pair(lhs, head);
+    }
     
-    std::pair<symbol_type, hypergraph_type::id_type> binarize(const symbol_type& root,
-							      const std::string& tag,
+    std::pair<symbol_type, hypergraph_type::id_type> binarize(const std::string& tag,
 							      const rhs_type& rhs,
 							      const tails_type& tails,
 							      hypergraph_type& target)
@@ -204,10 +225,6 @@ namespace cicada
 	label_chart(i, i + 1) = rhs[i];
 	node_chart(i, i + 1)  = tails[i];
       }
-
-      symbol_type lhs_root;
-      if (top_down)
-	lhs_root = '[' + root.non_terminal_strip() + tag + ']';
       
       symbol_set_type rhs_binarized(2);
       tail_set_type   tails_binarized(2);
@@ -216,9 +233,7 @@ namespace cicada
 	for (size_type first = 0; first + length <= child_size; ++ first) {
 	  const size_type last = first + length;
 
-	  if (top_down)
-	    label_chart(first, last) = lhs_root;
-	  else {
+	  {
 	    const symbol_type::piece_type left = label_chart(first, last - 1).non_terminal_strip();
 	    const symbol_type::piece_type right = label_chart(last - 1, last).non_terminal_strip();
 	    
@@ -270,19 +285,19 @@ namespace cicada
   };
 
   inline
-  void binarize_dependency(const HyperGraph& source, HyperGraph& target, const bool top_down=false)
+  void binarize_dependency(const HyperGraph& source, HyperGraph& target, const bool head_mode=false)
   {
-    BinarizeDependency binarizer(top_down);
+    BinarizeDependency binarizer(head_mode);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_dependency(HyperGraph& source, const bool top_down=false)
+  void binarize_dependency(HyperGraph& source, const bool head_mode=false)
   {
     HyperGraph target;
 
-    BinarizeDependency binarizer(top_down);
+    BinarizeDependency binarizer(head_mode);
     
     binarizer(source, target);
     

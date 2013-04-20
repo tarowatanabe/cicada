@@ -76,7 +76,7 @@ apply: feature application\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|cyk|cky|dep|dependency] binarization direction\n\
 \torder=binarization order (default: -1 == all context)\n\
-\ttop-down=top down lable assignment\n\
+\thead=[true|false] head non-terminal for dependency binarization\n\
 clear: clear data structure\n\
 \tforest=[true|false] clear forest\n\
 \tlattice=[true|false] clear lattice\n\
