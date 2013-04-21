@@ -18,20 +18,18 @@ namespace utils
   {
     char buf[4096];
     
-    int iter = 0;
     line.clear();
     do {
       is.clear();
       is.getline(buf, 4096);
       line.append(buf);
-      
-      if ((iter & 0x03) == 0x03)
-	std::string(line).swap(line);
-      ++ iter;
     } while (! is.eof() && is.fail());
     
     if (! is.eof())
       is.clear();
+    
+    if (line.capacity() > (1 << 30))
+      std::string(line).swap(line);
     
     return is;
   }
