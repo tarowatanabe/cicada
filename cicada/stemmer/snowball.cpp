@@ -49,8 +49,15 @@ namespace cicada
     Snowball::Snowball(const std::string& language)
       : pimpl(new impl_type(language))
     {
-      if (! pimpl->pimpl)
-	throw std::runtime_error("we do not support stemming algorithm: " + language);
+      if (! pimpl->pimpl) {
+	std::string message = "We do not support the stemming algorithm: " + language + ". Supported languages are:";
+	
+	const char **names = sb_stemmer_list();
+	for (const char** first = names; *first; ++ first)
+	  message += std::string(first != names ? ", " : " ") + *first;
+	
+	throw std::runtime_error(message);
+      }
     }
     
     Snowball::~Snowball() { std::auto_ptr<impl_type> tmp(pimpl); }
