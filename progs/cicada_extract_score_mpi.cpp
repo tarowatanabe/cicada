@@ -489,7 +489,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
       
       for (int rank = 1; rank < mpi_size; ++ rank)
 	while (stream[rank] && device[rank] && device[rank]->test()) {
-	  if (std::getline(*stream[rank], line)) {
+	  if (utils::getline(*stream[rank], line)) {
 	    if (! parser(line, root_count)) {
 	      std::cerr << "warning: root-count parsing failed: " << line << std::endl;
 	      continue;
@@ -578,7 +578,7 @@ void reduce_root_counts(root_count_set_type& root_counts)
 	
 	for (size_t i = 0; i != ranks.size(); ++ i)
 	  while (stream[i] && device[i] && device[i]->test()) {
-	    if (std::getline(*stream[i], line)) {
+	    if (utils::getline(*stream[i], line)) {
 	      if (! parser(line, root_count)) {
 		std::cerr << "warning: root-count parsing failed: " << line << std::endl;
 		continue;
@@ -841,7 +841,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     
     for (int rank = 0; rank < mpi_size; ++ rank)
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
-	if (std::getline(*stream[rank], line)) {
+	if (utils::getline(*stream[rank], line)) {
 	  if (parser(line, phrase_pair))
 	    queues[rank]->push_swap(phrase_pair);
 	  else
@@ -1063,7 +1063,7 @@ void source_counts_reducer(utils::mpi_intercomm& mapper,
     
     for (int rank = 0; rank < mpi_size; ++ rank)
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
-	if (std::getline(*stream[rank], line)) {
+	if (utils::getline(*stream[rank], line)) {
 	  if (parser(line, source))
 	    queues[rank]->push_swap(source);
 	  else
@@ -1283,7 +1283,7 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
       const int rank = *riter;
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
-	if (std::getline(*stream[rank], line)) {
+	if (utils::getline(*stream[rank], line)) {
 	  if (parser(line, target))
 	    queue.push_swap(target);
 	  else
@@ -1446,7 +1446,7 @@ void reverse_counts_mapper(utils::mpi_intercomm& reducer,
   is.push(utils::mpi_device_source(reducer.comm, mpi_rank, file_tag, 4096));
   
   std::string line;
-  while (std::getline(is, line)) {
+  while (utils::getline(is, line)) {
     const path_type path(line);
     
     if (! boost::filesystem::exists(path))
@@ -1536,7 +1536,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
       const int rank = *riter;
       
       for (int i = 0; i != 128 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ i) {
-	if (std::getline(*stream[rank], line)) {
+	if (utils::getline(*stream[rank], line)) {
 	  if (parser(line, reversed))
 	    queue.push_swap(reversed);
 	  else
