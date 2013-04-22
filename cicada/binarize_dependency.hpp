@@ -50,9 +50,13 @@ namespace cicada
     typedef utils::unordered_map<binarized_type, hypergraph_type::id_type, binarized_hash, std::equal_to<binarized_type>,
 				 std::allocator<std::pair<const binarized_type, hypergraph_type::id_type> > >::type binarized_map_type;
 
-    BinarizeDependency(const bool __head_mode=false) : head_mode(__head_mode) {}
+    BinarizeDependency(const bool __head_mode=false,
+		       const bool __label_mode=false)
+      : head_mode(__head_mode),
+	label_mode(__label_mode) {}
     
     const bool head_mode;
+    const bool label_mode;
     
     binarized_map_type binarized;
     
@@ -72,7 +76,7 @@ namespace cicada
       removed_type removed(source.edges.size(), false);
       
       binarized.clear();
-
+      
       const std::string tag_neutral("^");
       const std::string tag_left("^L");
       const std::string tag_right("^R");
@@ -151,7 +155,7 @@ namespace cicada
 	      rhs_new.push_back(riter->front());
 	      tails_new.push_back(titer->front());
 	    } else {
-	      const std::string& tag = (rhs.size() == 1
+	      const std::string& tag = (! label_mode || rhs.size() == 1
 					? tag_neutral
 					: (riter == riter_begin
 					   ? tag_left
@@ -195,7 +199,9 @@ namespace cicada
 							      const rhs_type& rhs,
 							      hypergraph_type& target)
     {
-      const symbol_type lhs = '[' + root.non_terminal_strip() + "^H]";
+      const symbol_type lhs = (label_mode
+			       ? '[' + root.non_terminal_strip() + "^H]"
+			       : '[' + root.non_terminal_strip() + "^]");
       
       const hypergraph_type::id_type head = target.add_node().id;
       
@@ -285,19 +291,19 @@ namespace cicada
   };
 
   inline
-  void binarize_dependency(const HyperGraph& source, HyperGraph& target, const bool head_mode=false)
+  void binarize_dependency(const HyperGraph& source, HyperGraph& target, const bool head_mode=false, const bool label_mode=false)
   {
-    BinarizeDependency binarizer(head_mode);
+    BinarizeDependency binarizer(head_mode, label_mode);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_dependency(HyperGraph& source, const bool head_mode=false)
+  void binarize_dependency(HyperGraph& source, const bool head_mode=false, const bool label_mode=true)
   {
     HyperGraph target;
 
-    BinarizeDependency binarizer(head_mode);
+    BinarizeDependency binarizer(head_mode, label_mode);
     
     binarizer(source, target);
     

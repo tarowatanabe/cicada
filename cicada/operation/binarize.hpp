@@ -24,6 +24,7 @@ namespace cicada
   
       int order;
       bool head;
+      bool label;
   
       bool left;
       bool right;
