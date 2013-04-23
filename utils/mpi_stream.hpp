@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__MPI_STREAM__HPP__
@@ -200,9 +200,14 @@ namespace utils
   {
     utils::atomicop::memory_barrier();
     
+    MPI::Status status;
+
     switch (state) {
     case tag_size:
-      if (! request_size.Test()) return false;
+      if (! request_size.Test(status)) return false;
+
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_ostream size-test error");
       
       if (buffer_size < 0) {	
 	state = tag_ready;
@@ -210,17 +215,29 @@ namespace utils
       } else if (buffer_size == 0) {
 	request_ack.Start();
 	state = tag_ack;
-	if (! request_ack.Test()) return false;
+	if (! request_ack.Test(status)) return false;
+	
+	if (status.Get_error() != MPI::SUCCESS)
+	  throw std::runtime_error("mpi_ostream ack-test error");
+
 	state = tag_ready;
 	return true;
       } else
 	state = tag_buffer;
     case tag_buffer:
-      if (! request_buffer.Test()) return false;
+      if (! request_buffer.Test(status)) return false;
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_ostream buffer-test error");
+
       request_ack.Start();
       state = tag_ack;
     case tag_ack:
-      if (! request_ack.Test()) return false;
+      if (! request_ack.Test(status)) return false;
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_ostream ack-test error");
+
       state = tag_ready;
     default:
       return true;
@@ -407,13 +424,23 @@ namespace utils
   {
     utils::atomicop::memory_barrier();
     
+    MPI::Status status;
+
     switch (state) {
     case tag_ack:
-      if (! request_ack.Test()) return false;
+      if (! request_ack.Test(status)) return false;
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_istream ack-test error");
+      
       request_size.Start();
       state = tag_size;
     case tag_size:
-      if (! request_size.Test()) return false;
+      if (! request_size.Test(status)) return false;
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_istream size-test error");
+      
       if (buffer_size <= 0) {
 	state = tag_ready;
 	return true;
@@ -423,7 +450,11 @@ namespace utils
 	state = tag_buffer;
       }
     case tag_buffer:
-      if (! request_buffer.Test()) return false;
+      if (! request_buffer.Test(status)) return false;
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_istream buffer-test error");
+
       state = tag_ready;
     default:
       return true;

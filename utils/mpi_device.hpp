@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__MPI_DEVICE__HPP__
@@ -262,11 +262,23 @@ namespace utils
     if (! is_open())
       return;
 
-    if (! const_cast<mpi_device_sink::impl&>(*this).request_size.Test())
-      const_cast<mpi_device_sink::impl&>(*this).request_size.Wait();
+    MPI::Status status;
+
+    if (! const_cast<mpi_device_sink::impl&>(*this).request_size.Test(status)) {
+      const_cast<mpi_device_sink::impl&>(*this).request_size.Wait(status);
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_device_sink size-wait error");
+    } else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink size-test error");
     
-    if (! const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test())
-      const_cast<mpi_device_sink::impl&>(*this).request_buffer.Wait();    
+    if (! const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test(status)) {
+      const_cast<mpi_device_sink::impl&>(*this).request_buffer.Wait(status);
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_device_sink buffer-wait error");
+    } else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink buffer-test error");
   }
 
   void mpi_device_source::impl::wait() const
@@ -276,11 +288,23 @@ namespace utils
     if (! is_open())
       return;
 
-    if (! const_cast<mpi_device_source::impl&>(*this).request_size.Test())
-      const_cast<mpi_device_source::impl&>(*this).request_size.Wait();
+    MPI::Status status;
     
-    if (! const_cast<mpi_device_source::impl&>(*this).request_buffer.Test())
-      const_cast<mpi_device_source::impl&>(*this).request_buffer.Wait();    
+    if (! const_cast<mpi_device_source::impl&>(*this).request_size.Test(status)) {
+      const_cast<mpi_device_source::impl&>(*this).request_size.Wait(status);
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_device_source size-wait error");
+    } else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_source size-test error");
+    
+    if (! const_cast<mpi_device_source::impl&>(*this).request_buffer.Test(status)) {
+      const_cast<mpi_device_source::impl&>(*this).request_buffer.Wait(status);
+      
+      if (status.Get_error() != MPI::SUCCESS)
+	throw std::runtime_error("mpi_device_source buffer-wait error");
+    } else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_source buffer-test error");
   }
   
   bool mpi_device_sink::impl::test() const
@@ -290,7 +314,19 @@ namespace utils
     if (! is_open())
       return true;
 
-    return const_cast<mpi_device_sink::impl&>(*this).request_size.Test() && const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test();
+    MPI::Status status;
+
+    if (! const_cast<mpi_device_sink::impl&>(*this).request_size.Test(status))
+      return false;
+    else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink size-test error");
+    
+    if (! const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test(status))
+      return false;
+    else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink buffer-test error");
+
+    return true;
   }
   
   bool mpi_device_source::impl::test() const
@@ -299,8 +335,20 @@ namespace utils
 
     if (! is_open()) 
       return true;
+
+    MPI::Status status;
+
+    if (! const_cast<mpi_device_source::impl&>(*this).request_size.Test(status))
+      return false;
+    else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_source size-test error");
+
+    if (! const_cast<mpi_device_source::impl&>(*this).request_buffer.Test(status))
+      return false;
+    else if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_source buffer-test error");
     
-    return const_cast<mpi_device_source::impl&>(*this).request_size.Test() && const_cast<mpi_device_source::impl&>(*this).request_buffer.Test();
+    return true;
   }
   
   bool mpi_device_sink::impl::is_open() const
@@ -413,9 +461,18 @@ namespace utils
     
     if (send_size != 0)
       terminate();
+
+    MPI::Status status;
     
-    request_size.Wait();
-    request_buffer.Wait();
+    request_size.Wait(status);
+    
+    if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink size-wait error");
+    
+    request_buffer.Wait(status);
+    
+    if (status.Get_error() != MPI::SUCCESS)
+      throw std::runtime_error("mpi_device_sink buffer-wait error");
     
     //request_size.Free();
     //request_buffer.Free();
