@@ -204,6 +204,7 @@ Various learning components are implemented:
      maximize expected-BLEU (not BLEU expectaiton) [35]_
      + Now, this is a recommended optimization method (either kbest or hypergraph learning)
    - We support feature selection by kbest-feature merging [36]_
+   - Asynchronous online learning employed in [6]_.
 
 Word clustering tool is also included to support word alignment
 learning + translation [20]_
