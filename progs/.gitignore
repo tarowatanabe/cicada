@@ -83,6 +83,7 @@ cicada_index_lexicon
 cicada_index_tree_grammar
 cicada_learn
 cicada_learn_mpi
+cicada_learn_asynchronous_mpi
 cicada_learn_kbest
 cicada_learn_kbest_mpi
 cicada_learn_online_mpi
