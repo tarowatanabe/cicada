@@ -3,16 +3,19 @@
 //
 
 //
-// asynchronous learning
+// New: blocked learning
 //
 // In each iteration, we sample a block and decode, and update "support vectors" and learn.
 // For learning, we employ lbfgs or liblinear for faster training (but we will use reranking training)
 // We will parallelize in each block, and perform oracle computation in parallel.
-// The update to the weight vector is performed asynchronously, not synchronously thus named 
-// "asynchronous" not "online"
+
 //
-// This implementation is motivated by (Chiang et al., 2008) and (Chiang et al., 2009)
-// 
+// The idea is taken from the cicada-learn*.sh scripts, but adapted so that:
+// we will discard or keep old support vectors
+// we will compute error metric wrt "block"
+// run in online fashion for faster convergence on larger data
+// we will keep only support vectors, not actual translations
+//
 
 #include <iostream>
 #include <vector>
@@ -23,6 +26,7 @@
 #include <cstdlib>
 
 #include "cicada_impl.hpp"
+#include "cicada_kbest_impl.hpp"
 #include "cicada_text_impl.hpp"
 #include "cicada_output_impl.hpp"
 
@@ -87,7 +91,6 @@ path_type weights_file;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
-double scorer_beam = 1e-5;
 bool yield_sentence   = false;
 bool yield_alignment  = false;
 bool yield_dependency = false;
@@ -95,15 +98,26 @@ bool yield_dependency = false;
 // learning parameters
 int iteration = 10;
 int batch_size = 8;
+int kbest_size = 1000;
+bool kbest_diverse_mode = false;
 
 // solver parameters
 bool learn_xbleu = false;
+bool learn_pegasos = false;
+bool learn_opegasos = false;
+bool learn_pa = false;
+bool learn_cw = false;
+bool learn_arow = false;
+bool learn_nherd = false;
+bool learn_mira   = false;
 bool learn_sgd    = false;
+bool learn_osgd   = false;
+bool learn_el     = false;
+bool learn_oel     = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
 double temperature = 0.0;
-double eps = std::numeric_limits<double>::infinity();
 double scale = 1.0;
 double eta0 = 0.2;
 int order = 4;
@@ -118,18 +132,17 @@ bool dump_weights_mode   = false; // dump current weights... for debugging purpo
 
 int debug = 0;
 
-#include "cicada_learn_asynchronous_impl.hpp"
+#include "cicada_learn_asynchronous_kbest_impl.hpp"
 
 // forward declarations...
 
 void options(int argc, char** argv);
 
-template <typename Learner, typename OracleGenerator>
+template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
 		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
-		  const function_document_type& functions,
 		  weight_set_type& weights);
 void synchronize();
 
@@ -192,17 +205,22 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_xbleu) + learn_sgd  > 1)
-      throw std::runtime_error("you can specify either --learn-{xbleu,sgd}");
-    if (int(learn_xbleu) + learn_sgd == 0)
-      learn_xbleu = true;
+    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,mira,sgd,osgd,el,oel,pegasos,opegasos,pa,cw,arow}");
+    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+      learn_sgd = true;
 
     
     if (int(regularize_l1) + regularize_l2 > 1)
       throw std::runtime_error("either L1 or L2 regularization");
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
-    
+
+    if (learn_osgd && regularize_l1)
+      throw std::runtime_error("no optimized-SGD with L1");
+    if (learn_oel && regularize_l1)
+      throw std::runtime_error("no optimized-ExpectedLoss with L1");
+
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     if (scale <= 0.0)
@@ -210,6 +228,8 @@ int main(int argc, char ** argv)
 
     if (batch_size <= 0)
       throw std::runtime_error("batch size must be possitive: " + utils::lexical_cast<std::string>(batch_size));
+    if (kbest_size <= 0)
+      throw std::runtime_error("kbest size must be possitive: " + utils::lexical_cast<std::string>(kbest_size));
     
     if (order <= 0)
       throw std::runtime_error("ngram order for xBLEU must be positive");
@@ -273,13 +293,9 @@ int main(int argc, char ** argv)
     
     // read reference data
     scorer_document_type scorers(scorer_name);
-    function_document_type functions;
-    read_refset(refset_file, scorers, functions, mpi_rank, mpi_size);
+    read_refset(refset_file, scorers, mpi_rank, mpi_size);
     
     if (scorers.size() != events.size())
-      throw std::runtime_error("training sample size and reference translation size does not match");
-
-    if (functions.size() != events.size())
       throw std::runtime_error("training sample size and reference translation size does not match");
     
     if (! events_oracle.empty())
@@ -300,32 +316,98 @@ int main(int argc, char ** argv)
     
     // perform learning...
     if (yield_sentence) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
+      if (learn_pa)
+	cicada_learn<LearnPA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osgd && regularize_l2)
+	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEUL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEUL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_pegasos)
+	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else
+	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_alignment) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
+      if (learn_pa)
+	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osgd && regularize_l2)
+	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEUL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEUL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_pegasos)
+	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else
+	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
     } else if (yield_dependency) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
+      if (learn_pa)
+	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_cw)
+	cicada_learn<LearnCW, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_arow)
+	cicada_learn<LearnAROW, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_nherd)
+	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_mira)
+	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_sgd && regularize_l1)
+	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osgd && regularize_l2)
+	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEUL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEUL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l1)
+	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_pegasos)
+	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else
+	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
     } else
       throw std::runtime_error("invalid yield");
     
@@ -437,7 +519,6 @@ void synchronize()
   }
 }
 
-
 struct Dumper
 {
   typedef std::pair<path_type, weight_set_type > value_type;
@@ -463,8 +544,7 @@ struct Dumper
   queue_type& queue;
 };
 
-
-template <typename Learner, typename OracleGenerator, typename Generator>
+template <typename Learner, typename KBestGenerator, typename OracleGenerator, typename Generator>
 struct Task
 {
   typedef size_t    size_type;
@@ -541,7 +621,6 @@ struct Task
        const event_set_type& events,
        const event_set_type& events_oracle,
        const scorer_document_type& scorers,
-       const function_document_type& functions,
        const segment_set_type& segments,
        weight_set_type& weights,
        const size_type& num_instance,
@@ -552,7 +631,6 @@ struct Task
       events_(events),
       events_oracle_(events_oracle),
       scorers_(scorers),
-      functions_(functions),
       segments_(segments),
       weights_(weights),
       learner_(num_instance),
@@ -567,15 +645,15 @@ struct Task
   const event_set_type&         events_;
   const event_set_type&         events_oracle_;
   const scorer_document_type&   scorers_;
-  const function_document_type& functions_;
   const segment_set_type&       segments_;
   weight_set_type&              weights_;
   
   Learner         learner_;
+  KBestGenerator  kbest_generator_;
   OracleGenerator oracle_generator_;
   size_type       num_instance_;
 
-  Generator& generator_;
+  Generator&      generator_;
   
   Encoder         encoder_;
   Decoder         decoder_;
@@ -585,12 +663,13 @@ struct Task
   
   void operator()()
   {
-    segment_set_type         segments_batch;
-    hypergraph_document_type forests_batch;
-    hypergraph_document_type forests_oracle_batch;
-    hypergraph_document_type oracles_batch;
-    scorer_document_type     scorers_batch(scorers_);
-    function_document_type   functions_batch;
+    hypothesis_set_type kbests;
+    
+    segment_set_type     segments_batch;
+    hypothesis_map_type  kbests_batch;
+    hypothesis_map_type  kbests_oracle_batch;
+    hypothesis_map_type  oracles_batch;
+    scorer_document_type scorers_batch(scorers_);
     
     learner_.initialize(weights_);
     
@@ -623,60 +702,48 @@ struct Task
       if (! learn_finished) {
 	while (siter != siter_end) {
 	  segments_batch.clear();
-	  forests_batch.clear();
-	  forests_oracle_batch.clear();
+	  kbests_batch.clear();
+	  kbests_oracle_batch.clear();
 	  oracles_batch.clear();
 	  scorers_batch.clear();
-	  functions_batch.clear();
 	  
 	  segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
 	  for (/**/; siter != siter_last; ++ siter) {
 	    const size_t id = *siter;
 	
 	    if (events_[id].empty() || ! scorers_[id]) continue;
-	  
-	    operations_.assign(weights_);
-	  
-	    operations_(events_[id]);
-	  
-	    const hypergraph_type& graph = operations_.get_data().hypergraph;
+
+	    kbest_generator_(operations_, events_[id], weights_, kbests);
+
+	    if (kbests.empty()) continue;
 	  
 	    segments_batch.push_back(id);
-	    forests_batch.push_back(graph);
+	    kbests_batch.push_back(kbests);
 	    scorers_batch.push_back(scorers_[id]);
-	    functions_batch.push_back(functions_[id]);
 	  
 	    if (! events_oracle_.empty()) {
 	      if (events_oracle_[id].empty())
 		throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
 	      
-	      operations_.assign(weights_);
-	      
-	      operations_(events_oracle_[id]);
-	      
-	      const hypergraph_type& graph = operations_.get_data().hypergraph;
+	      kbest_generator_(operations_, events_oracle_[id], weights_, kbests);
+
+	      if (kbests.empty())
+		throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
 	      
 	      if (merge_oracle_mode)
-		forests_batch.back().unite(graph);
+		kbests_batch.back().insert(kbests_batch.back().end(), kbests.begin(), kbests.end());
 	      else
-		forests_oracle_batch.push_back(graph);
+		kbests_oracle_batch.push_back(kbests);
 	    }
 	  }
 	  
 	  // if we have segments!
 	  if (! segments_batch.empty()) {
 	    // oracle computation
-	    std::pair<score_ptr_type, score_ptr_type> scores;
-	  
-	    if (forests_oracle_batch.empty())
-	      scores = oracle_generator_(weights_, forests_batch, scorers_batch, functions_batch, oracles_batch, generator_);
-	    else {
-	      oracles_batch.swap(forests_oracle_batch);
-	      forests_oracle_batch.clear();
+	    std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_batch.empty()
+								? oracle_generator_(kbests_batch, scorers_batch, oracles_batch, generator_)
+								: oracle_generator_(kbests_batch, kbests_oracle_batch, scorers_batch, oracles_batch, generator_));
 	    
-	      scores = oracle_generator_(weights_, forests_batch, oracles_batch, scorers_batch, generator_);
-	    }
-	  
 	    if (! score_1best_)
 	      score_1best_ = scores.first;
 	    else
@@ -686,17 +753,17 @@ struct Task
 	      score_oracle_ = scores.second;
 	    else
 	      *score_oracle_ += *(scores.second);
-	  
+	    
 	    if (debug >= 2)
 	      std::cerr << "batch 1best:  " << *scores.first << std::endl
 			<< "batch oracle: " << *scores.second << std::endl
 			<< "accumulated 1best:  " << *score_1best_ << std::endl
 			<< "accumulated oracle: " << *score_oracle_ << std::endl;
-	  
+	    
 	    // encode into learner...
-	    for (size_t i = 0; i != forests_batch.size(); ++ i)
-	      learner_.encode(segments_batch[i], weights_, forests_batch[i], oracles_batch[i], scorers_batch[i]);
-	  
+	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	      learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
+	    
 	    // perform learning...
 	    learner_.learn(weights_, updates);
 	    
@@ -718,21 +785,22 @@ struct Task
   }
 };
 
-template <typename Learner, typename OracleGenerator>
+
+
+template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
 		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
-		  const function_document_type& functions,
 		  weight_set_type& weights)
 {
   typedef Dumper dumper_type;
-  
-  typedef Task<Learner, OracleGenerator, boost::mt19937> task_type;
+
+  typedef Task<Learner, KBestGenerator, OracleGenerator, boost::mt19937> task_type;
   
   typedef typename task_type::segment_set_type    segment_set_type;
   typedef typename task_type::update_encoded_type encoded_type;
-  
+
   typedef encoded_type                   buffer_type;
   typedef boost::shared_ptr<buffer_type> buffer_ptr_type;
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> >  buffer_set_type;
@@ -751,11 +819,12 @@ void cicada_learn(operation_set_type& operations,
   buffer_map_type      buffers(mpi_size);
   ostream_ptr_set_type ostreams(mpi_size);
   istream_ptr_set_type istreams(mpi_size);
-    
+  
   // random number generator...
   boost::mt19937 generator;
   generator.seed(utils::random_seed());
   boost::random_number_generator<boost::mt19937> gen(generator);
+  
   
   segment_set_type segments;
   for (size_t seg = 0; seg != segments.size(); ++ seg)
@@ -777,19 +846,18 @@ void cicada_learn(operation_set_type& operations,
 		    events,
 		    events_oracle,
 		    scorers,
-		    functions,
 		    segments,
 		    weights,
 		    instances,
 		    generator);
-  
+
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
   
   // first, bcast weights...
   bcast_weights(weights);
-  
+
   // start training
   for (int iter = 0; iter != iteration; ++ iter) {
     // perform learning
@@ -895,6 +963,7 @@ void cicada_learn(operation_set_type& operations,
       queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
   }
   
+  // termination...!
   if (mpi_rank == 0) {
     queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
     dumper->join();
@@ -966,7 +1035,7 @@ void reduce_weights(const int rank, weight_set_type& weights)
   
   std::string line;
   
-  while (utils::getline(is, line)) {
+  while (std::getline(is, line)) {
     const utils::piece line_piece(line);
     tokenizer_type tokenizer(line_piece);
     
@@ -1017,7 +1086,7 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
     
     for (size_t i = 0; i != device.size(); ++ i)
       while (stream[i] && device[i] && device[i]->test()) {
-	if (utils::getline(*stream[i], line)) {
+	if (std::getline(*stream[i], line)) {
 	  const utils::piece line_piece(line);
 	  tokenizer_type tokenizer(line_piece);
 	  
@@ -1182,21 +1251,31 @@ void options(int argc, char** argv)
     ("weights", po::value<path_type>(&weights_file), "initial model (or weights)")
     
     ("scorer",           po::value<std::string>(&scorer_name)->default_value(scorer_name), "evaluation scorer")
-    ("scorer-beam",      po::value<double>(&scorer_beam)->default_value(scorer_beam),      "beam threshold for scorer")
     ("yield-sentence",   po::bool_switch(&yield_sentence),                                 "sentence yield")
     ("yield-alignment",  po::bool_switch(&yield_alignment),                                "alignment yield")
     ("yield-dependency", po::bool_switch(&yield_dependency),                               "dependency yield")
     
     ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
     ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
+    ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
+    ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
     
-    ("learn-sgd",     po::bool_switch(&learn_sgd),      "online SGD algorithm")
-    ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
+    ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
+    ("learn-pegasos",  po::bool_switch(&learn_pegasos),  "online Pegasos algorithm")
+    ("learn-opegasos", po::bool_switch(&learn_opegasos), "online optimized-Pegasos algorithm")
+    ("learn-pa",       po::bool_switch(&learn_pa),       "online PA algorithm")
+    ("learn-cw",       po::bool_switch(&learn_cw),       "online CW algorithm")
+    ("learn-arow",     po::bool_switch(&learn_arow),     "online AROW algorithm")
+    ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
+    ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
+    ("learn-osgd",     po::bool_switch(&learn_osgd),     "online optimized-SGD algorithm")
+    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
+    ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
+    ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected-loss")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
-    ("eps",           po::value<double>(&eps),                      "tolerance for liblinear")
     ("scale",         po::value<double>(&scale),                    "scaling for weight")
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
@@ -1205,7 +1284,7 @@ void options(int argc, char** argv)
     ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
-    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle forests")
+    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle kbests")
     ("dump-weights",        po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
     ;
     
