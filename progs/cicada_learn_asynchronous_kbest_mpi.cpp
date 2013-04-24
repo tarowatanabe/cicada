@@ -625,7 +625,9 @@ struct Task
        const segment_set_type& segments,
        weight_set_type& weights,
        const size_type& num_instance,
-       Generator& generator)
+       Generator& generator,
+       score_ptr_type& score_1best,
+       score_ptr_type& score_oracle)
     : rank_(rank),
       queue_merge_(queue_merge),
       queue_bcast_(queue_bcast),
@@ -637,7 +639,10 @@ struct Task
       weights_(weights),
       learner_(num_instance),
       num_instance_(num_instance),
-      generator_(generator)
+      generator_(generator),
+      score_1best_(score_1best),
+      score_oracle_(score_oracle)
+
   {}
   
   const int rank_;
@@ -662,8 +667,8 @@ struct Task
   Encoder         encoder_;
   Decoder         decoder_;
 
-  score_ptr_type score_1best_;
-  score_ptr_type score_oracle_;
+  score_ptr_type& score_1best_;
+  score_ptr_type& score_oracle_;
   
   void operator()()
   {
@@ -861,6 +866,9 @@ void cicada_learn(operation_set_type& operations,
   typename task_type::queue_type queue_merge;
   typename task_type::queue_type queue_bcast;
 
+  score_ptr_type score_1best;
+  score_ptr_type score_oracle;
+
   task_type learner(mpi_rank,
 		    queue_merge,
 		    queue_bcast,
@@ -871,7 +879,9 @@ void cicada_learn(operation_set_type& operations,
 		    segments,
 		    weights,
 		    instances,
-		    generator);
+		    generator,
+		    score_1best,
+		    score_oracle);
 
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
@@ -974,9 +984,6 @@ void cicada_learn(operation_set_type& operations,
     std::random_shuffle(segments.begin(), segments.end(), gen);
     
     if (debug) {
-            score_ptr_type score_1best(learner.score_1best_);
-      score_ptr_type score_oracle(learner.score_oracle_);
-      
       if (debug >= 2 && mpi_rank == 0)
 	std::cerr << "reducing evaluation scores" << std::endl;
       
