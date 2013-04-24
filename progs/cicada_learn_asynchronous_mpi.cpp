@@ -612,7 +612,9 @@ struct Task
     
     while (! merge_finished || ! learn_finished) {
       
-      if (! merge_finished)
+      if (! merge_finished) {
+	size_t num_updated = 0;
+	
 	while (queue_merge_.pop_swap(encoded, true)) {
 	  if (encoded.empty()) {
 	    merge_finished = true;
@@ -623,9 +625,12 @@ struct Task
 	  
 	  learner_.update(weights_, updates);
 	  
-	  if (debug >= 2)
-	    std::cerr << "rank: " << rank_ << " updated weights" << std::endl;
+	  ++ num_updated;
 	}
+	
+	if (num_updated && debug >= 2)
+	  std::cerr << "rank: " << rank_ << " updated weights: " << num_updated << std::endl;
+      }
       
       if (! learn_finished) {
 	segments_batch.clear();
