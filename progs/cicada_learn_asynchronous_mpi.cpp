@@ -906,13 +906,19 @@ void cicada_learn(operation_set_type& operations,
     
     // randomize..
     std::random_shuffle(segments.begin(), segments.end(), gen);
-    
+
     if (debug) {
-      reduce_score_pair(learner.score_1best_, learner.score_oracle_);
+      score_ptr_type score_1best(learner.score_1best_);
+      score_ptr_type score_oracle(learner.score_oracle_);
+      
+      if (debug >= 2 && mpi_rank == 0)
+	std::cerr << "reducing evaluation scores" << std::endl;
+      
+      reduce_score_pair(score_1best, score_oracle);
       
       if (mpi_rank == 0)
-	std::cerr << "total 1best:  " << *learner.score_1best_ << std::endl
-		  << "total oracle: " << *learner.score_oracle_ << std::endl;
+	std::cerr << "total 1best:  " << (score_1best ? score_1best->description() : std::string("?")) << std::endl
+		  << "total oracle: " << (score_oracle ? score_oracle->description() : std::string("?")) << std::endl;
     }
     
     // dump...
@@ -942,22 +948,26 @@ void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle
       is >> score_str_1best;
       is >> score_str_oracle;
       
-      if (! score_1best)
-	score_1best = scorer_type::score_type::decode(score_str_1best);
-      else
-	*score_1best += *scorer_type::score_type::decode(score_str_1best);
+      if (score_str_1best != "?") {
+	if (! score_1best)
+	  score_1best = scorer_type::score_type::decode(score_str_1best);
+	else
+	  *score_1best += *scorer_type::score_type::decode(score_str_1best);
+      }
       
-      if (! score_oracle)
-	score_oracle = scorer_type::score_type::decode(score_str_oracle);
-      else
-	*score_oracle += *scorer_type::score_type::decode(score_str_oracle);      
+      if (score_str_oracle != "?") {
+	if (! score_oracle)
+	  score_oracle = scorer_type::score_type::decode(score_str_oracle);
+	else
+	  *score_oracle += *scorer_type::score_type::decode(score_str_oracle);      
+      }
     }
   } else {
     boost::iostreams::filtering_ostream os;
     os.push(utils::mpi_device_sink(0, score_tag, 256));
-    os << score_1best->encode();
+    os << (score_1best ? score_1best->encode() : "?");
     os << ' ';
-    os << score_oracle->encode();
+    os << (score_oracle ? score_oracle->encode() : "?");
   }
 }
 
