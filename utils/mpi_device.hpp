@@ -512,8 +512,8 @@ namespace utils
     close();
     
     // minimum of 4-bytes...
-    buffer.reserve(std::max(buffer_size, size_t(4)));
-    buffer.resize(std::max(buffer_size, size_t(4)));
+    buffer.reserve(std::max(buffer_size, size_t(128)));
+    buffer.resize(std::max(buffer_size, size_t(128)));
     
     buffer_overcommit.clear();
     buffer_type(buffer_overcommit).swap(buffer_overcommit);
@@ -559,6 +559,8 @@ namespace utils
     
     //request_size.Free();
     //request_buffer.Free();
+
+    buffer.clear();
     
     recv_size = 0;
     buffer_offset = 0;
@@ -573,8 +575,8 @@ namespace utils
   {
     close();
     
-    buffer.reserve(std::max(buffer_size, size_t(4)));
-    buffer.resize(std::max(buffer_size, size_t(4)));
+    buffer.reserve(std::max(buffer_size, size_t(128)));
+    buffer.resize(std::max(buffer_size, size_t(128)));
     
     recv_size = 0;
     buffer_offset = 0;
