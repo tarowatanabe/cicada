@@ -689,7 +689,9 @@ struct Task
     feature_set_type    updates;
     update_encoded_type encoded;
     
+    int non_found_iter = 0;
     while (! merge_finished || ! learn_finished) {
+      bool found = false;
       
       if (! merge_finished) {
 	size_t num_updated = 0;
@@ -709,6 +711,8 @@ struct Task
 	
 	if (num_updated && debug >= 2)
 	  std::cerr << "rank: " << rank_ << " updated weights: " << num_updated << std::endl;
+
+	found |= num_updated;
       }
       
       if (! learn_finished) {
@@ -788,7 +792,11 @@ struct Task
 	  learn_finished = true;
 	  queue_bcast_.push(update_encoded_type());
 	}
+	
+	found = true;
       }
+
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
 
     learner_.finalize(weights_);
@@ -898,9 +906,10 @@ void cicada_learn(operation_set_type& operations,
       // reduce samples...
       for (int rank = 0; rank != mpi_size; ++ rank)
 	if (rank != mpi_rank && istreams[rank] && istreams[rank]->test()) {
-	  if (istreams[rank]->read(buffer))
+	  if (istreams[rank]->read(buffer)) {
+	    buffer_type(buffer).swap(buffer);
 	    queue_merge.push_swap(buffer);
-	  else
+	  } else
 	    istreams[rank].reset();
 	  
 	  buffer.clear();
