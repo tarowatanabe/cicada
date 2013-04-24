@@ -535,7 +535,8 @@ struct Task
     buffer_type buffer;
   };
   
-  Task(queue_type& queue_merge,
+  Task(const int rank,
+       queue_type& queue_merge,
        queue_type& queue_bcast,
        operation_set_type& operations,
        const event_set_type& events,
@@ -546,7 +547,8 @@ struct Task
        weight_set_type& weights,
        const size_type& num_instance,
        Generator& generator)
-    : queue_merge_(queue_merge),
+    : rank_(rank),
+      queue_merge_(queue_merge),
       queue_bcast_(queue_bcast),
       operations_(operations),
       events_(events),
@@ -559,6 +561,8 @@ struct Task
       num_instance_(num_instance),
       generator_(generator)
   {}
+
+  const int rank_;
   
   queue_type& queue_merge_;
   queue_type& queue_bcast_;
@@ -620,7 +624,7 @@ struct Task
 	  learner_.update(weights_, updates);
 	  
 	  if (debug >= 2)
-	    std::cerr << "updated weights" << std::endl;
+	    std::cerr << "rank: " << rank_ << " updated weights" << std::endl;
 	}
       
       if (! learn_finished) {
@@ -690,10 +694,10 @@ struct Task
 	    *score_oracle_ += *(scores.second);
 	  
 	  if (debug >= 2)
-	    std::cerr << "batch 1best:  " << *scores.first << std::endl
-		      << "batch oracle: " << *scores.second << std::endl
-		      << "accumulated 1best:  " << *score_1best_ << std::endl
-		      << "accumulated oracle: " << *score_oracle_ << std::endl;
+	    std::cerr << "rank: " << rank_ << " batch 1best:  " << *scores.first << std::endl
+		      << "rank: " << rank_ << " batch oracle: " << *scores.second << std::endl
+		      << "rank: " << rank_ << " accumulated 1best:  " << *score_1best_ << std::endl
+		      << "rank: " << rank_ << " accumulated oracle: " << *score_oracle_ << std::endl;
 	  
 	  // encode into learner...
 	  for (size_t i = 0; i != forests_batch.size(); ++ i)
@@ -775,7 +779,8 @@ void cicada_learn(operation_set_type& operations,
   typename task_type::queue_type queue_merge;
   typename task_type::queue_type queue_bcast;
 
-  task_type learner(queue_merge,
+  task_type learner(mpi_rank,
+		    queue_merge,
 		    queue_bcast,
 		    operations,
 		    events,

@@ -281,10 +281,21 @@ if __name__ == '__main__':
     print "operation = apply:prune=true,size=%d,${weights}" %(options.beam)
     print
     
+    print "# forest-pruning"
+    print "# this is an example of pruning by density. Alternatives are: beam, edge or kbest. "
+    print "# operation = prune:density=10,${weights}"
+    print
+    
     print "# remove <s> and </s>"
     print "operation = remove-bos-eos:forest=true"
     print
     
+    print "# expand-ngram"
+    print "# This is used to expand forest so that collecting ngrams are easier without memorizig states."
+    print "# This is required when optimizing via xBLEU over forest."
+    print "# operation = expand-ngram:order=4"
+    print
+
     print "# non-MBR decoding, and output forest or kbests"
     print "# kbest=0 implies forest output, otherwise, kbest outputs"
     print "operation = output:${file},kbest=${kbest},unique=true,${weights}"
