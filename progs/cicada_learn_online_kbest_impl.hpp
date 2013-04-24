@@ -2967,8 +2967,12 @@ void read_refset(const path_type& refset_path,
 class Event
 {
 public:
-  Event() {}
-  Event(const Event& x) : buffer(x.buffer) {}
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+public:
+  Event() : buffer(), size(0) {}
+  Event(const Event& x) : buffer(x.buffer), size(x.size) {}
   Event(const std::string& data) { encode(data); }
   Event& operator=(const std::string& data)
   {
@@ -2979,43 +2983,45 @@ public:
   Event& operator=(const Event& x)
   {
     buffer = x.buffer;
+    size   = x.size;
     return *this;
   }
 
   operator std::string() const { return decode(); }
 
   bool empty() const { return buffer.empty(); }
-  void swap(Event& x) { buffer.swap(x.buffer); }
+  void swap(Event& x)
+  {
+    buffer.swap(x.buffer);
+    std::swap(size, x.size);
+  }
   
   void encode(const std::string& data)
   {
     buffer.clear();
+    buffer.reserve(data.size() >> 2);
     
     boost::iostreams::filtering_ostream os;
     os.push(codec::lz4_compressor());
-    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+    os.push(boost::iostreams::back_inserter(buffer));
     os.write(data.c_str(), data.size());
     os.reset();
+    
+    buffer_type(buffer).swap(buffer);
+    
+    size = data.size();
   }
   
   std::string decode() const
   {
-    std::string output;
+    buffer_type output(size);
     
     boost::iostreams::filtering_istream is;
     is.push(codec::lz4_decompressor());
     is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
-
-    char buf[1024];
+    is.read(&(*output.begin()), size);
     
-    do {
-      is.read(buf, 1024);
-      std::copy(buf, buf + is.gcount(), std::back_inserter(output));
-    } while (is);
-    
-    is.reset();
-
-    return output;
+    return std::string(output.begin(), output.end());
   }
   
 private:
@@ -3023,6 +3029,7 @@ private:
 
 private:
   buffer_type buffer;
+  size_type   size;
 };
 
 namespace std
