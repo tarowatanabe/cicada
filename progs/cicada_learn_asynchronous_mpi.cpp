@@ -756,7 +756,7 @@ void cicada_learn(operation_set_type& operations,
   boost::random_number_generator<boost::mt19937> gen(generator);
   
   segment_set_type segments;
-  for (size_t seg = 0; seg != segments.size(); ++ seg)
+  for (size_t seg = 0; seg != events.size(); ++ seg)
     if (! events[seg].empty())
       segments.push_back(seg);
   
@@ -765,9 +765,9 @@ void cicada_learn(operation_set_type& operations,
   size_t instances_local = segments.size();
   size_t instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
-
+  
   if (debug && mpi_rank == 0)
-    std::cerr << "# of trainint instances: " << instances << std::endl;
+    std::cerr << "# of training instances: " << instances << std::endl;
 
   typename task_type::queue_type queue_merge;
   typename task_type::queue_type queue_bcast;
