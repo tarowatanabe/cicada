@@ -618,6 +618,9 @@ struct Task
 	  decoder_(encoded, updates);
 	  
 	  learner_.update(weights_, updates);
+	  
+	  if (debug >= 2)
+	    std::cerr << "updated weights" << std::endl;
 	}
       
       if (! learn_finished) {
