@@ -621,95 +621,93 @@ struct Task
 	}
       
       if (! learn_finished) {
-	while (siter != siter_end) {
-	  segments_batch.clear();
-	  forests_batch.clear();
-	  forests_oracle_batch.clear();
-	  oracles_batch.clear();
-	  scorers_batch.clear();
-	  functions_batch.clear();
-	  
-	  segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
-	  for (/**/; siter != siter_last; ++ siter) {
-	    const size_t id = *siter;
+	segments_batch.clear();
+	forests_batch.clear();
+	forests_oracle_batch.clear();
+	oracles_batch.clear();
+	scorers_batch.clear();
+	functions_batch.clear();
 	
-	    if (events_[id].empty() || ! scorers_[id]) continue;
+	segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
+	for (/**/; siter != siter_last; ++ siter) {
+	  const size_t id = *siter;
 	  
+	  if (events_[id].empty() || ! scorers_[id]) continue;
+	  
+	  operations_.assign(weights_);
+	  
+	  operations_(events_[id]);
+	  
+	  const hypergraph_type& graph = operations_.get_data().hypergraph;
+	  
+	  segments_batch.push_back(id);
+	  forests_batch.push_back(graph);
+	  scorers_batch.push_back(scorers_[id]);
+	  functions_batch.push_back(functions_[id]);
+	  
+	  if (! events_oracle_.empty()) {
+	    if (events_oracle_[id].empty())
+	      throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
+	      
 	    operations_.assign(weights_);
-	  
-	    operations_(events_[id]);
-	  
+	      
+	    operations_(events_oracle_[id]);
+	      
 	    const hypergraph_type& graph = operations_.get_data().hypergraph;
-	  
-	    segments_batch.push_back(id);
-	    forests_batch.push_back(graph);
-	    scorers_batch.push_back(scorers_[id]);
-	    functions_batch.push_back(functions_[id]);
-	  
-	    if (! events_oracle_.empty()) {
-	      if (events_oracle_[id].empty())
-		throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
 	      
-	      operations_.assign(weights_);
-	      
-	      operations_(events_oracle_[id]);
-	      
-	      const hypergraph_type& graph = operations_.get_data().hypergraph;
-	      
-	      if (merge_oracle_mode)
-		forests_batch.back().unite(graph);
-	      else
-		forests_oracle_batch.push_back(graph);
-	    }
-	  }
-	  
-	  // if we have segments!
-	  if (! segments_batch.empty()) {
-	    // oracle computation
-	    std::pair<score_ptr_type, score_ptr_type> scores;
-	  
-	    if (forests_oracle_batch.empty())
-	      scores = oracle_generator_(weights_, forests_batch, scorers_batch, functions_batch, oracles_batch, generator_);
-	    else {
-	      oracles_batch.swap(forests_oracle_batch);
-	      forests_oracle_batch.clear();
-	    
-	      scores = oracle_generator_(weights_, forests_batch, oracles_batch, scorers_batch, generator_);
-	    }
-	  
-	    if (! score_1best_)
-	      score_1best_ = scores.first;
+	    if (merge_oracle_mode)
+	      forests_batch.back().unite(graph);
 	    else
-	      *score_1best_ += *(scores.first);
+	      forests_oracle_batch.push_back(graph);
+	  }
+	}
 	  
-	    if (! score_oracle_)
-	      score_oracle_ = scores.second;
-	    else
-	      *score_oracle_ += *(scores.second);
+	// if we have segments!
+	if (! segments_batch.empty()) {
+	  // oracle computation
+	  std::pair<score_ptr_type, score_ptr_type> scores;
 	  
-	    if (debug >= 2)
-	      std::cerr << "batch 1best:  " << *scores.first << std::endl
-			<< "batch oracle: " << *scores.second << std::endl
-			<< "accumulated 1best:  " << *score_1best_ << std::endl
-			<< "accumulated oracle: " << *score_oracle_ << std::endl;
-	  
-	    // encode into learner...
-	    for (size_t i = 0; i != forests_batch.size(); ++ i)
-	      learner_.encode(segments_batch[i], weights_, forests_batch[i], oracles_batch[i], scorers_batch[i]);
-	  
-	    // perform learning...
-	    learner_.learn(weights_, updates);
+	  if (forests_oracle_batch.empty())
+	    scores = oracle_generator_(weights_, forests_batch, scorers_batch, functions_batch, oracles_batch, generator_);
+	  else {
+	    oracles_batch.swap(forests_oracle_batch);
+	    forests_oracle_batch.clear();
 	    
-	    // here, we will bcast the updated amount to others...
-	    if (! updates.empty())
-	      queue_bcast_.push(encoder_(updates.begin(), updates.end()));
+	    scores = oracle_generator_(weights_, forests_batch, oracles_batch, scorers_batch, generator_);
 	  }
 	  
-	  // signal finished!
-	  if (siter == siter_end) {
-	    learn_finished = true;
-	    queue_bcast_.push(update_encoded_type());
-	  }
+	  if (! score_1best_)
+	    score_1best_ = scores.first;
+	  else
+	    *score_1best_ += *(scores.first);
+	  
+	  if (! score_oracle_)
+	    score_oracle_ = scores.second;
+	  else
+	    *score_oracle_ += *(scores.second);
+	  
+	  if (debug >= 2)
+	    std::cerr << "batch 1best:  " << *scores.first << std::endl
+		      << "batch oracle: " << *scores.second << std::endl
+		      << "accumulated 1best:  " << *score_1best_ << std::endl
+		      << "accumulated oracle: " << *score_oracle_ << std::endl;
+	  
+	  // encode into learner...
+	  for (size_t i = 0; i != forests_batch.size(); ++ i)
+	    learner_.encode(segments_batch[i], weights_, forests_batch[i], oracles_batch[i], scorers_batch[i]);
+	  
+	  // perform learning...
+	  learner_.learn(weights_, updates);
+	  
+	  // here, we will bcast the updated amount to others...
+	  if (! updates.empty())
+	    queue_bcast_.push(encoder_(updates.begin(), updates.end()));
+	}
+	
+	// signal finished!
+	if (siter == siter_end) {
+	  learn_finished = true;
+	  queue_bcast_.push(update_encoded_type());
 	}
       }
     }
@@ -767,6 +765,9 @@ void cicada_learn(operation_set_type& operations,
   size_t instances_local = segments.size();
   size_t instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+
+  if (debug && mpi_rank == 0)
+    std::cerr << "# of trainint instances: " << instances << std::endl;
 
   typename task_type::queue_type queue_merge;
   typename task_type::queue_type queue_bcast;

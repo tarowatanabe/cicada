@@ -700,83 +700,81 @@ struct Task
 	}
       
       if (! learn_finished) {
-	while (siter != siter_end) {
-	  segments_batch.clear();
-	  kbests_batch.clear();
-	  kbests_oracle_batch.clear();
-	  oracles_batch.clear();
-	  scorers_batch.clear();
+	segments_batch.clear();
+	kbests_batch.clear();
+	kbests_oracle_batch.clear();
+	oracles_batch.clear();
+	scorers_batch.clear();
 	  
-	  segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
-	  for (/**/; siter != siter_last; ++ siter) {
-	    const size_t id = *siter;
+	segment_set_type::const_iterator siter_last = std::min(siter + batch_size, siter_end);
+	for (/**/; siter != siter_last; ++ siter) {
+	  const size_t id = *siter;
 	
-	    if (events_[id].empty() || ! scorers_[id]) continue;
+	  if (events_[id].empty() || ! scorers_[id]) continue;
 
-	    kbest_generator_(operations_, events_[id], weights_, kbests);
+	  kbest_generator_(operations_, events_[id], weights_, kbests);
 
-	    if (kbests.empty()) continue;
+	  if (kbests.empty()) continue;
 	  
-	    segments_batch.push_back(id);
-	    kbests_batch.push_back(kbests);
-	    scorers_batch.push_back(scorers_[id]);
+	  segments_batch.push_back(id);
+	  kbests_batch.push_back(kbests);
+	  scorers_batch.push_back(scorers_[id]);
 	  
-	    if (! events_oracle_.empty()) {
-	      if (events_oracle_[id].empty())
-		throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
+	  if (! events_oracle_.empty()) {
+	    if (events_oracle_[id].empty())
+	      throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(id));
 	      
-	      kbest_generator_(operations_, events_oracle_[id], weights_, kbests);
+	    kbest_generator_(operations_, events_oracle_[id], weights_, kbests);
 
-	      if (kbests.empty())
-		throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
+	    if (kbests.empty())
+	      throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
 	      
-	      if (merge_oracle_mode)
-		kbests_batch.back().insert(kbests_batch.back().end(), kbests.begin(), kbests.end());
-	      else
-		kbests_oracle_batch.push_back(kbests);
-	    }
-	  }
-	  
-	  // if we have segments!
-	  if (! segments_batch.empty()) {
-	    // oracle computation
-	    std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_batch.empty()
-								? oracle_generator_(kbests_batch, scorers_batch, oracles_batch, generator_)
-								: oracle_generator_(kbests_batch, kbests_oracle_batch, scorers_batch, oracles_batch, generator_));
-	    
-	    if (! score_1best_)
-	      score_1best_ = scores.first;
+	    if (merge_oracle_mode)
+	      kbests_batch.back().insert(kbests_batch.back().end(), kbests.begin(), kbests.end());
 	    else
-	      *score_1best_ += *(scores.first);
-	  
-	    if (! score_oracle_)
-	      score_oracle_ = scores.second;
-	    else
-	      *score_oracle_ += *(scores.second);
-	    
-	    if (debug >= 2)
-	      std::cerr << "batch 1best:  " << *scores.first << std::endl
-			<< "batch oracle: " << *scores.second << std::endl
-			<< "accumulated 1best:  " << *score_1best_ << std::endl
-			<< "accumulated oracle: " << *score_oracle_ << std::endl;
-	    
-	    // encode into learner...
-	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
-	      learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
-	    
-	    // perform learning...
-	    learner_.learn(weights_, updates);
-	    
-	    // here, we will bcast the updated amount to others...
-	    if (! updates.empty())
-	      queue_bcast_.push(encoder_(updates.begin(), updates.end()));
+	      kbests_oracle_batch.push_back(kbests);
 	  }
+	}
 	  
-	  // signal finished!
-	  if (siter == siter_end) {
-	    learn_finished = true;
-	    queue_bcast_.push(update_encoded_type());
-	  }
+	// if we have segments!
+	if (! segments_batch.empty()) {
+	  // oracle computation
+	  std::pair<score_ptr_type, score_ptr_type> scores = (kbests_oracle_batch.empty()
+							      ? oracle_generator_(kbests_batch, scorers_batch, oracles_batch, generator_)
+							      : oracle_generator_(kbests_batch, kbests_oracle_batch, scorers_batch, oracles_batch, generator_));
+	    
+	  if (! score_1best_)
+	    score_1best_ = scores.first;
+	  else
+	    *score_1best_ += *(scores.first);
+	  
+	  if (! score_oracle_)
+	    score_oracle_ = scores.second;
+	  else
+	    *score_oracle_ += *(scores.second);
+	    
+	  if (debug >= 2)
+	    std::cerr << "batch 1best:  " << *scores.first << std::endl
+		      << "batch oracle: " << *scores.second << std::endl
+		      << "accumulated 1best:  " << *score_1best_ << std::endl
+		      << "accumulated oracle: " << *score_oracle_ << std::endl;
+	    
+	  // encode into learner...
+	  for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	    learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
+	    
+	  // perform learning...
+	  learner_.learn(weights_, updates);
+	    
+	  // here, we will bcast the updated amount to others...
+	  if (! updates.empty())
+	    queue_bcast_.push(encoder_(updates.begin(), updates.end()));
+	}
+	  
+	// signal finished!
+	if (siter == siter_end) {
+	  learn_finished = true;
+	  queue_bcast_.push(update_encoded_type());
 	}
       }
     }
@@ -837,6 +835,9 @@ void cicada_learn(operation_set_type& operations,
   size_t instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
 
+  if (debug && mpi_rank == 0)
+    std::cerr << "# of trainint instances: " << instances << std::endl;
+  
   typename task_type::queue_type queue_merge;
   typename task_type::queue_type queue_bcast;
 
