@@ -600,7 +600,7 @@ struct Task
       is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
       
       size_type feature_size = 0;
-      double value;
+      feature_set_type::data_type value;
       
       while (is) {
 	if (! is.read((char*) &feature_size, sizeof(size_type))) break;

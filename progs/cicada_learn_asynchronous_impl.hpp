@@ -28,6 +28,7 @@
 #include "cicada/feature/scorer.hpp"
 #include "cicada/prune_beam.hpp"
 #include "cicada/apply_exact.hpp"
+#include "cicada/apply_cube_prune.hpp"
 #include "cicada/viterbi.hpp"
 #include "cicada/expected_ngram.hpp"
 #include "cicada/symbol_vector.hpp"
@@ -1476,7 +1477,10 @@ struct ViterbiDependency
 template <typename Viterbi>
 struct OracleForest
 {
+  OracleForest(const int cube_size) : cube_size_(cube_size) {}
+  
   Viterbi __viterbi;
+  const int cube_size_;
 
   template <typename Generator>
   std::pair<score_ptr_type, score_ptr_type>
@@ -1572,7 +1576,10 @@ struct OracleForest
 	
 	model_type model(functions[id]);
 	
-	cicada::apply_exact(model, forests[id], oracles_next[id]);
+	if (cube_size_ <= 0)
+	  cicada::apply_exact(model, forests[id], oracles_next[id]);
+	else
+	  cicada::apply_cube_prune(model, forests[id], oracles_next[id], cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), cube_size_);
 	
 	// compute pruning...
 	cicada::prune_beam(oracles_next[id],

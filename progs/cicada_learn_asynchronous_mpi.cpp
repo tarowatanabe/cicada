@@ -87,6 +87,7 @@ path_type weights_file;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
+int    scorer_size = 200;
 double scorer_beam = 1e-5;
 bool yield_sentence   = false;
 bool yield_alignment  = false;
@@ -520,7 +521,7 @@ struct Task
       is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
       
       size_type feature_size = 0;
-      double value;
+      feature_set_type::data_type value;
       
       while (is) {
 	if (! is.read((char*) &feature_size, sizeof(size_type))) break;
@@ -558,6 +559,7 @@ struct Task
       segments_(segments),
       weights_(weights),
       learner_(num_instance),
+      oracle_generator_(scorer_size),
       num_instance_(num_instance),
       generator_(generator)
   {}
@@ -1205,6 +1207,7 @@ void options(int argc, char** argv)
     ("weights", po::value<path_type>(&weights_file), "initial model (or weights)")
     
     ("scorer",           po::value<std::string>(&scorer_name)->default_value(scorer_name), "evaluation scorer")
+    ("scorer-size",      po::value<int>(&scorer_size)->default_value(scorer_size),         "scorer's cube size")
     ("scorer-beam",      po::value<double>(&scorer_beam)->default_value(scorer_beam),      "beam threshold for scorer")
     ("yield-sentence",   po::bool_switch(&yield_sentence),                                 "sentence yield")
     ("yield-alignment",  po::bool_switch(&yield_alignment),                                "alignment yield")

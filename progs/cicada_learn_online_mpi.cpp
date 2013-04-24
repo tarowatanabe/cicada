@@ -90,6 +90,7 @@ path_type weights_file;
 
 // scorers
 std::string scorer_name = "bleu:order=4,exact=true";
+int    scorer_size = 200;
 double scorer_beam = 1e-5;
 bool yield_sentence   = false;
 bool yield_alignment  = false;
@@ -587,7 +588,7 @@ void cicada_learn(operation_set_type& operations,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   Learner         learner(events.size());
-  OracleGenerator oracle_generator;
+  OracleGenerator oracle_generator(scorer_size);
   YieldGenerator  yield_generator;
   
   segment_set_type segments(events.size());
@@ -1280,6 +1281,7 @@ void options(int argc, char** argv)
     ("weights", po::value<path_type>(&weights_file), "initial model (or weights)")
     
     ("scorer",           po::value<std::string>(&scorer_name)->default_value(scorer_name), "evaluation scorer")
+    ("scorer-size",      po::value<int>(&scorer_size)->default_value(scorer_size),         "scorer's cube size")
     ("scorer-beam",      po::value<double>(&scorer_beam)->default_value(scorer_beam),      "beam threshold for scorer")
     ("yield-sentence",   po::bool_switch(&yield_sentence),                                 "sentence yield")
     ("yield-alignment",  po::bool_switch(&yield_alignment),                                "alignment yield")
