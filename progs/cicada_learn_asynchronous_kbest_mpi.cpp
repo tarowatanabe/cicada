@@ -128,6 +128,8 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
+bool weights_average_mode = false;
+bool weights_select_mode = false;
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
 int debug = 0;
@@ -149,6 +151,9 @@ void synchronize();
 void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle);
+
+void send_weights(const int rank, const weight_set_type& weights);
+void recv_weights(const int rank, weight_set_type& weights);
 
 int main(int argc, char ** argv)
 {
@@ -233,6 +238,9 @@ int main(int argc, char ** argv)
     
     if (order <= 0)
       throw std::runtime_error("ngram order for xBLEU must be positive");
+
+    if (weights_average_mode && weights_select_mode)
+      throw std::runtime_error("you cannot specify both of weights-average and weights-select");
     
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
@@ -665,6 +673,7 @@ struct Task
 
   score_ptr_type score_1best_;
   score_ptr_type score_oracle_;
+  size_type      num_update_;
   
   void operator()()
   {
@@ -680,6 +689,7 @@ struct Task
     
     score_1best_.reset();
     score_oracle_.reset();
+    num_update_ = 0;
     
     segment_set_type::const_iterator siter     = segments_.begin();
     segment_set_type::const_iterator siter_end = segments_.end();
@@ -714,6 +724,7 @@ struct Task
 	  std::cerr << "rank: " << rank_ << " updated weights: " << num_updated << std::endl;
 
 	found |= num_updated;
+	num_update_ += num_updated;
       }
       
       if (! learn_finished) {
@@ -781,11 +792,16 @@ struct Task
 	    learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
 	    
 	  // perform learning...
-	  learner_.learn(weights_, updates);
+	  const double objective = learner_.learn(weights_, updates);
+	  
+	  if (debug >= 2)
+	    std::cerr << "rank: " << rank_ << " objective: " << objective << std::endl;
 	    
 	  // here, we will bcast the updated amount to others...
 	  if (! updates.empty())
 	    queue_bcast_.push(encoder_(updates.begin(), updates.end()));
+
+	  ++ num_update_;
 	}
 	  
 	// signal finished!
@@ -804,7 +820,13 @@ struct Task
   }
 };
 
-
+struct abs_sum
+{
+  double operator()(const double& x, const double& y) const
+  {
+    return x + std::fabs(y);
+  }
+};
 
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>
 void cicada_learn(operation_set_type& operations,
@@ -876,7 +898,9 @@ void cicada_learn(operation_set_type& operations,
 
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
-  std::auto_ptr<boost::thread> dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
+  std::auto_ptr<boost::thread> dumper(dump_weights_mode && (mpi_rank == 0 || weights_select_mode)
+				      ? new boost::thread(dumper_type(queue_dumper))
+				      : 0);
   
   // first, bcast weights...
   bcast_weights(weights);
@@ -987,17 +1011,95 @@ void cicada_learn(operation_set_type& operations,
 	std::cerr << "total 1best:  " << (score_1best ? score_1best->description() : std::string("?")) << std::endl
 		  << "total oracle: " << (score_oracle ? score_oracle->description() : std::string("?")) << std::endl;
     }
-    
-    // dump...
-    if (dump_weights_mode && mpi_rank == 0)
-      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
+
+    if (dump_weights_mode) {
+      if (weights_average_mode) {
+	// +1 to avid zero...
+	const size_t updated = learner.num_update_ + 1;
+	
+	weight_set_type weights_average(weights);
+	weights_average *= updated;
+	
+	reduce_weights(weights_average);
+	
+	size_t updated_total = 0;
+	MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+	
+	if (mpi_rank == 0) {
+	  weights_average *= 1.0 / updated_total;
+	  
+	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights_average));
+	}
+      } else if (weights_select_mode) {	
+	typedef std::vector<double, std::allocator<double> > buffer_type;
+	
+	const double l1 = std::accumulate(weights.begin(), weights.end(), double(0.0), abs_sum());
+	
+	buffer_type buffer_send(mpi_size, 0.0);
+	buffer_type buffer_recv(mpi_size, 0.0);
+
+	buffer_send[mpi_rank] = l1;
+	buffer_recv[mpi_rank] = l1;
+	
+	MPI::COMM_WORLD.Reduce(&(*buffer_send.begin()), &(*buffer_recv.begin()), mpi_size, utils::mpi_traits<double>::data_type(), MPI::MAX, 0);
+	
+	int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
+	
+	MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
+	
+	if (mpi_rank == rank_min)
+	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
+      } else {
+	if (mpi_rank == 0)
+	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
+      }
+    }
   }
-  
-  // termination...!
-  if (mpi_rank == 0) {
+
+  // finish dumper...
+  if (dumper.get()) {
     queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
     dumper->join();
   }
+  
+  // select the final weights!
+  if (weights_average_mode) {
+    const size_t updated = learner.num_update_ + 1;
+    
+    weights *= updated;
+    
+    reduce_weights(weights);
+    
+    size_t updated_total = 0;
+    MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+    
+    weights *= 1.0 / updated_total;
+  } else if (weights_select_mode) {
+    typedef std::vector<double, std::allocator<double> > buffer_type;
+	
+    const double l1 = std::accumulate(weights.begin(), weights.end(), double(0.0), abs_sum());
+	
+    buffer_type buffer_send(mpi_size, 0.0);
+    buffer_type buffer_recv(mpi_size, 0.0);
+
+    buffer_send[mpi_rank] = l1;
+    buffer_recv[mpi_rank] = l1;
+	
+    MPI::COMM_WORLD.Reduce(&(*buffer_send.begin()), &(*buffer_recv.begin()), mpi_size, utils::mpi_traits<double>::data_type(), MPI::MAX, 0);
+	
+    int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
+	
+    MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
+    
+    if (rank_min != 0) {
+      // send weights to root-rank!
+      
+      if (mpi_rank == 0)
+	recv_weights(rank_min, weights);
+      else if (mpi_rank == rank_min)
+	send_weights(0, weights);
+    }
+  }  
 }
 
 void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle)
@@ -1039,11 +1141,24 @@ void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle
   }
 }
 
+void recv_weights(const int rank, weight_set_type& weights)
+{
+  weights.clear();
+  weights.allocate();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(codec::lz4_decompressor());
+  is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
+  
+  std::string feature;
+  std::string value;
+  
+  while ((is >> feature) && (is >> value))
+    weights[feature] = utils::decode_base64<double>(value);
+}
+
 void send_weights(const int rank, const weight_set_type& weights)
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
   boost::iostreams::filtering_ostream os;
   os.push(codec::lz4_compressor());
   os.push(utils::mpi_device_sink(rank, weights_tag, 1024 * 1024));
@@ -1314,12 +1429,14 @@ void options(int argc, char** argv)
     ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
     
-    ("adagrad",             po::bool_switch(&adagrad_mode),       "AdaGrad for adaptive gradient")
-    ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
-    ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
-    ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
-    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle kbests")
-    ("dump-weights",        po::bool_switch(&dump_weights_mode),  "dump mode (or weights) during iterations")
+    ("adagrad",             po::bool_switch(&adagrad_mode),         "AdaGrad for adaptive gradient")
+    ("loss-rank",           po::bool_switch(&loss_rank),            "rank loss")
+    ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
+    ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
+    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
+    ("weights-average",     po::bool_switch(&weights_average_mode), "average weights")
+    ("weights-select",      po::bool_switch(&weights_select_mode),  "select weights by L1")
+    ("dump-weights",        po::bool_switch(&dump_weights_mode),    "dump mode (or weights) during iterations")
     ;
     
 

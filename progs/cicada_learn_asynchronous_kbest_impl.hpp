@@ -938,7 +938,7 @@ struct LearnExpectedLossL1 : public LearnBase
   typedef cicada::WeightVector<double> penalty_set_type;
   
   LearnExpectedLossL1(const size_type __instances)
-    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0), feat_k_norm(":feature-k-norm:") {}
+    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   void clear()
   {
@@ -981,23 +981,22 @@ struct LearnExpectedLossL1 : public LearnBase
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * updates[feat_k_norm];
+    penalty += eta * lambda;
 
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
-    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) 
-      if (eiter->first != feat_k_norm) {
-	double& x = weights[eiter->first];
-	
-	// update weight ... we will update "minus" value
-	x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta);
-	
-	if (adagrad_mode)
-	  adagrad.update(eiter->first, eiter->second);
-	
-	// apply penalty
-	apply(x, penalties[eiter->first], penalty);
-      }
+    for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
+      double& x = weights[eiter->first];
+      
+      // update weight ... we will update "minus" value
+      x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta);
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
+      
+      // apply penalty
+      apply(x, penalties[eiter->first], penalty);
+    }
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1059,7 +1058,7 @@ struct LearnExpectedLossL1 : public LearnBase
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
 
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
@@ -1077,8 +1076,6 @@ struct LearnExpectedLossL1 : public LearnBase
 
       updates[eiter->first] = eiter->second * k_norm;
     }
-
-    updates[feat_k_norm] = k_norm;
     
     features.clear();
     losses.clear();
@@ -1112,8 +1109,6 @@ struct LearnExpectedLossL1 : public LearnBase
   double penalty;
 
   RegularizeAdaGrad adagrad;
-
-  const feature_type feat_k_norm;
 };
 
 struct LearnOExpectedLoss : public LearnBase
@@ -2411,7 +2406,7 @@ struct LearnSGDL1 : public LearnLR
   // 
   
   LearnSGDL1(const size_type __instances)
-    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0), feat_k_norm(":feature-k-norm:") {}
+    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -2447,23 +2442,22 @@ struct LearnSGDL1 : public LearnLR
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * updates[feat_k_norm];;
+    penalty += eta * lambda;
     
     // update by expectations...
     feature_set_type::const_iterator eiter_end = updates.end();
-    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter) 
-      if (eiter->first != feat_k_norm) {
-	double& x = weights[eiter->first];
-	
-	// update weight ... we will update "minus" value
-	x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta);
-	
-	if (adagrad_mode)
-	  adagrad.update(eiter->first, eiter->second);
-	
-	// apply penalty
-	apply(x, penalties[eiter->first], penalty);
-      }
+    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter) {
+      double& x = weights[eiter->first];
+      
+      // update weight ... we will update "minus" value
+      x += - static_cast<double>(eiter->second) * (adagrad_mode ? adagrad(eiter->first, eta) : eta);
+      
+      if (adagrad_mode)
+	adagrad.update(eiter->first, eiter->second);
+      
+      // apply penalty
+      apply(x, penalties[eiter->first], penalty);
+    }
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -2485,7 +2479,7 @@ struct LearnSGDL1 : public LearnLR
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
     
     expectation_type expectations;
     
@@ -2511,9 +2505,6 @@ struct LearnSGDL1 : public LearnLR
       
       updates[eiter->first] = eiter->second * k_norm;
     }
-    
-    // propagate k_norm...
-    updates[feat_k_norm] = k_norm;
     
     samples.clear();
     
@@ -2541,8 +2532,6 @@ struct LearnSGDL1 : public LearnLR
   double penalty;
 
   RegularizeAdaGrad adagrad;
-
-  const feature_type feat_k_norm;
 };
 
 // SGDL2 learner

@@ -1184,7 +1184,7 @@ struct LearnSGDL1 : public LearnLR
   // 
   
   LearnSGDL1(const size_type __instances)
-    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0), feat_k_norm(":feature-k-norm:") {}
+    : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -1204,22 +1204,21 @@ struct LearnSGDL1 : public LearnLR
     ++ epoch;
     
     // the :feature-k-norm: feature will be copied into updates!
-    penalty += eta * lambda * updates[feat_k_norm];
+    penalty += eta * lambda;
     
     feature_set_type::const_iterator giter_end = updates.end();
-    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      if (giter->first != feat_k_norm) {
-	double& x = weights[giter->first];
-	
-	// update weight ... we will update "minus" value
-	x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
-	
-	if (adagrad_mode)
-	  adagrad.update(giter->first, giter->second);
-	
-	// apply penalty
-	apply(x, penalties[giter->first], penalty);
-      }
+    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter) {
+      double& x = weights[giter->first];
+      
+      // update weight ... we will update "minus" value
+      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      
+      if (adagrad_mode)
+	adagrad.update(giter->first, giter->second);
+      
+      // apply penalty
+      apply(x, penalties[giter->first], penalty);
+    }
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1238,7 +1237,7 @@ struct LearnSGDL1 : public LearnLR
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
     
     const double objective_normalized = objective * k_norm;
     
@@ -1258,9 +1257,6 @@ struct LearnSGDL1 : public LearnLR
       // updates!
       updates[giter->first] = giter->second * k_norm;
     }
-
-    // propagate k_norm...
-    updates[feat_k_norm] = k_norm;
     
     clear();
     
@@ -1286,8 +1282,6 @@ struct LearnSGDL1 : public LearnLR
   double penalty;
   
   RegularizeAdaGrad adagrad;
-
-  const feature_type feat_k_norm;
 };
 
 

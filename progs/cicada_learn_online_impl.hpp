@@ -1095,7 +1095,7 @@ struct LearnSGDL1 : public LearnLR
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
 
     const double objective_normalized = objective * k_norm;
     

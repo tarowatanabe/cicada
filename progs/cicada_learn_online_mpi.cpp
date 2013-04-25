@@ -726,7 +726,10 @@ void cicada_learn(operation_set_type& operations,
 	learner.encode(segments_batch[i], weights, forests_batch[i], oracles_batch[i], scorers_batch[i]);
       
       // perform learning...
-      learner.learn(weights);
+      const double objective = learner.learn(weights);
+
+      if (debug >= 2)
+	std::cerr << "rank: " << mpi_rank << " objective: " << objective << std::endl;
       
       // keep totals...
       ++ updated;

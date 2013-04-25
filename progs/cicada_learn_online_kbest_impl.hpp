@@ -914,7 +914,7 @@ struct LearnExpectedLossL1 : public LearnBase
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
 
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
@@ -2136,7 +2136,7 @@ struct LearnSGDL1 : public LearnLR
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    penalty += eta * lambda * k_norm;
+    penalty += eta * lambda;
     
     expectation_type expectations;
     
