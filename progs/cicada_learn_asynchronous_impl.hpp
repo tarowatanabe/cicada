@@ -586,7 +586,7 @@ struct LearnXBLEU : public LearnBase
       gradients_entropy[riter->first] -= riter->second / Z;
   }
   
-  double encode(expectation_type& g)
+  std::pair<double, bool> encode(expectation_type& g)
   {
     g.clear();
     
@@ -604,6 +604,9 @@ struct LearnXBLEU : public LearnBase
     for (int n = 1; n <= order; ++ n)
       if (counts_hypo[n] > weight_type())
 	P += (1.0 / order) * (cicada::semiring::log(counts_matched[n]) - cicada::semiring::log(counts_hypo[n]));
+    
+    if (! std::isfinite(P))
+      return std::make_pair(0.0, false);
     
     // compute C and B
     const weight_type C      = counts_reference / counts_hypo[1];
@@ -649,7 +652,7 @@ struct LearnXBLEU : public LearnBase
 	g[hiter->first] += factor_hypo * hiter->second;
     }
     
-    return - objective_bleu - temperature * entropy;
+    return std::make_pair(- objective_bleu - temperature * entropy, true);
   }
   
   // required for learn()
@@ -745,16 +748,19 @@ struct LearnXBLEUL2 : public LearnXBLEU
       return 0.0;
     }
     
+    // compute gradient...
+    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
+    
+    if (! objective.second)
+      return objective.first;
+
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
-    
-    // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
-    
+        
     double a_norm = 0.0;
     double pred = 0.0;
     expectation_type::const_iterator giter_end = g.end();
@@ -788,7 +794,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     
     clear();
     
-    return objective;
+    return objective.first;
   }
   
   void rescale(weight_set_type& weights, const double scaling)
@@ -868,6 +874,12 @@ struct LearnXBLEUL1 : public LearnXBLEU
       clear();
       return 0.0;
     }
+
+    // compute gradient...
+    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
+
+    if (! objective.second)
+      return objective.first;
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
@@ -875,9 +887,6 @@ struct LearnXBLEUL1 : public LearnXBLEU
     ++ epoch;
     
     penalty += eta * lambda;
-    
-    // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
     
     expectation_type::const_iterator giter_end = g.end();
     for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
@@ -898,7 +907,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
     clear();
     
-    return objective;
+    return objective.first;
   }
 
   void apply(double& x, double& penalty, const double& cummulative)

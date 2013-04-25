@@ -485,6 +485,9 @@ struct LearnXBLEUL2 : public LearnXBLEU
     // collect gradient
     for (size_type k = 0; k != features.size(); ++ k)
       LearnXBLEU::encode(features[k], bleus[k], weights, weight_scale);
+
+    // compute gradient...
+    const double objective = LearnXBLEU::encode(g);
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
@@ -492,10 +495,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
-    
-    // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
-    
+        
     double a_norm = 0.0;
     double pred = 0.0;
     expectation_type::const_iterator giter_end = g.end();
@@ -580,16 +580,16 @@ struct LearnXBLEUL1 : public LearnXBLEU
     for (size_type k = 0; k != features.size(); ++ k)
       LearnXBLEU::encode(features[k], bleus[k], weights, 1.0);
 
+    // compute gradient...
+    const double objective = LearnXBLEU::encode(g);
+    
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
 
     penalty += eta * lambda;
-    
-    // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
-    
+        
     expectation_type::const_iterator giter_end = g.end();
     for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
