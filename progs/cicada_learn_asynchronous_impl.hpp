@@ -132,9 +132,8 @@ struct LearnXBLEU : public LearnBase
   }
   
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-  typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
+  typedef std::vector<gradient_type, std::allocator<gradient_type> >       gradients_type;
   
-  typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   
@@ -586,7 +585,7 @@ struct LearnXBLEU : public LearnBase
       gradients_entropy[riter->first] -= riter->second / Z;
   }
   
-  std::pair<double, bool> encode(expectation_type& g)
+  std::pair<double, bool> encode(gradient_type& g)
   {
     g.clear();
     
@@ -622,15 +621,17 @@ struct LearnXBLEU : public LearnBase
     const weight_type C_dC  = C * derivative_brevity_penalty(minusC);
     
     const weight_type objective_bleu = exp_P * B;
-    const double      factor_entropy = 1.0 / norm_entropy;
+    const weight_type factor_entropy = 1.0 / norm_entropy;
     const weight_type entropy = counts_entropy * factor_entropy;
     const weight_type factor_order = 1.0 / order;
     
     // entropy...
     if (temperature != 0.0) {
+      const weight_type factor_temp(- temperature);
+      
       gradient_type::const_iterator eiter_end = gradients_entropy.end();
       for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
-	g[eiter->first] = - temperature * factor_entropy * eiter->second;
+	g[eiter->first] = factor_temp * factor_entropy * eiter->second;
     }
     
     // we will collect minus gradient for minimizing negative-xBLEU
@@ -764,15 +765,16 @@ struct LearnXBLEUL2 : public LearnXBLEU
         
     double a_norm = 0.0;
     double pred = 0.0;
-    expectation_type::const_iterator giter_end = g.end();
-    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_type::const_iterator giter_end = g.end();
+    for (gradient_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double grad = giter->second;
+      const double alpha = - grad * (adagrad_mode ? adagrad(giter->first, eta) : eta);
 
       if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
+	adagrad.update(giter->first, grad);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -781,7 +783,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
       x += alpha / weight_scale;
 
       // updates!
-      updates[giter->first] = giter->second;
+      updates[giter->first] = grad;
     }
     
     // avoid numerical instability...
@@ -809,7 +811,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     }
   }
 
-  expectation_type g;
+  gradient_type g;
   
   size_type instances;
   
@@ -886,21 +888,22 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
     penalty += eta * lambda;
     
-    expectation_type::const_iterator giter_end = g.end();
-    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_type::const_iterator giter_end = g.end();
+    for (gradient_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double grad = giter->second;
+      x += - grad * (adagrad_mode ? adagrad(giter->first, eta) : eta);
 
       if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
+	adagrad.update(giter->first, grad);
       
       // apply penalty
       apply(x, penalties[giter->first], penalty);
 
       // updates!
-      updates[giter->first] = giter->second;
+      updates[giter->first] = grad;
     }
     
     clear();
@@ -918,7 +921,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
     penalty += x - x_half;
   }
   
-  expectation_type g;
+  gradient_type g;
   
   size_type instances;
   
