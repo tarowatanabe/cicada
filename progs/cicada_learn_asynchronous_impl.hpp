@@ -738,9 +738,11 @@ struct LearnXBLEUL2 : public LearnXBLEU
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
+
+    const double abs_weight_scale = std::fabs(weight_scale);
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
+    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
       finalize(weights);
   }
   
@@ -790,9 +792,11 @@ struct LearnXBLEUL2 : public LearnXBLEU
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
+    const double abs_weight_scale = std::fabs(weight_scale);
+    
+    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
       finalize(weights);
     
     clear();
@@ -1140,9 +1144,11 @@ struct LearnSGDL2 : public LearnLR
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
+
+    const double abs_weight_scale = std::fabs(weight_scale);
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
+    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
       finalize(weights);
   }
 
@@ -1193,9 +1199,11 @@ struct LearnSGDL2 : public LearnLR
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
+
+    const double abs_weight_scale = std::fabs(weight_scale);
     
-    if (weight_scale < 0.001 || 1000 < weight_scale)
+    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
       finalize(weights);
     
     clear();
