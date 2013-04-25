@@ -132,9 +132,9 @@ struct LearnXBLEU : public LearnBase
   }
   
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
-  typedef std::vector<gradient_type, std::allocator<gradient_type> >                gradients_type;
-  
-  typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
+  typedef std::vector<gradient_type, std::allocator<gradient_type> >       gradients_type;
+
+  typedef cicada::FeatureVector<double, std::allocator<double> > gradient_xbleu_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   
@@ -586,9 +586,13 @@ struct LearnXBLEU : public LearnBase
       gradients_entropy[riter->first] -= riter->second / Z;
   }
   
-  double encode(expectation_type& g)
+  std::pair<double, bool> encode(gradient_xbleu_type& g)
   {
     g.clear();
+    
+    // check if we have any matching...
+    if (counts_reference <= weight_type() || counts_hypo[1] <= weight_type() || counts_matched[1] <= weight_type())
+      return std::make_pair(0.0, false);
     
     // smoothing...
     double smoothing = 1e-40;
@@ -605,6 +609,9 @@ struct LearnXBLEU : public LearnBase
       if (counts_hypo[n] > weight_type())
 	P += (1.0 / order) * (cicada::semiring::log(counts_matched[n]) - cicada::semiring::log(counts_hypo[n]));
     
+    if (! std::isfinite(P))
+      return std::make_pair(0.0, false);
+    
     // compute C and B
     const weight_type C      = counts_reference / counts_hypo[1];
     const double      minusC = 1.0 - C;
@@ -615,15 +622,24 @@ struct LearnXBLEU : public LearnBase
     const weight_type C_dC  = C * derivative_brevity_penalty(minusC);
     
     const weight_type objective_bleu = exp_P * B;
-    const double      factor_entropy = 1.0 / norm_entropy;
+    const weight_type factor_entropy = 1.0 / norm_entropy;
     const weight_type entropy = counts_entropy * factor_entropy;
     const weight_type factor_order = 1.0 / order;
+
+    const double objective = - objective_bleu - temperature * entropy;
     
     // entropy...
     if (temperature != 0.0) {
+      const weight_type factor_temp(- temperature);
+      
       gradient_type::const_iterator eiter_end = gradients_entropy.end();
-      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
-	g[eiter->first] = - temperature * factor_entropy * eiter->second;
+      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter) {
+	double& grad = g[eiter->first];
+	grad = factor_temp * factor_entropy * eiter->second;
+
+	if (! std::isfinite(grad))
+	  return std::make_pair(objective, false);
+      }
     }
     
     // we will collect minus gradient for minimizing negative-xBLEU
@@ -633,23 +649,38 @@ struct LearnXBLEU : public LearnBase
 	const weight_type factor_hypo    = - (exp_P * B * factor_order) / counts_hypo[n];
 	
 	gradient_type::const_iterator miter_end = gradients_matched[n].end();
-	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter)
-	  g[miter->first] += factor_matched * miter->second;
+	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter) {
+	  double& grad = g[miter->first];
+	  grad += factor_matched * miter->second;
+	  
+	  if (! std::isfinite(grad))
+	    return std::make_pair(objective, false);
+	}
 	
 	gradient_type::const_iterator hiter_end = gradients_hypo[n].end();
-	for (gradient_type::const_iterator hiter = gradients_hypo[n].begin(); hiter != hiter_end; ++ hiter)
-	  g[hiter->first] -= factor_hypo * hiter->second;
+	for (gradient_type::const_iterator hiter = gradients_hypo[n].begin(); hiter != hiter_end; ++ hiter) {
+	  double& grad = g[hiter->first];
+	  grad -= factor_hypo * hiter->second;
+
+	  if (! std::isfinite(grad))
+	    return std::make_pair(objective, false);
+	}
       }
     
     if (counts_hypo[1] > weight_type()) {
       const weight_type factor_hypo = - (exp_P * C_dC) / counts_hypo[1];
       
       gradient_type::const_iterator hiter_end = gradients_hypo[1].end();
-      for (gradient_type::const_iterator hiter = gradients_hypo[1].begin(); hiter != hiter_end; ++ hiter)
-	g[hiter->first] += factor_hypo * hiter->second;
+      for (gradient_type::const_iterator hiter = gradients_hypo[1].begin(); hiter != hiter_end; ++ hiter) {
+	double& grad = g[hiter->first];
+	grad += factor_hypo * hiter->second;
+	
+	if (! std::isfinite(grad))
+	  return std::make_pair(objective, false);
+      }
     }
     
-    return - objective_bleu - temperature * entropy;
+    return std::make_pair(objective, ! g.empty());
   }
   
   // required for learn()
@@ -700,13 +731,13 @@ struct LearnXBLEUL2 : public LearnXBLEU
   
   double learn(weight_set_type& weights)
   {
-    if (counts_reference <= weight_type()) {
-      clear();
-      return 0.0;
-    }
-
     // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
+    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
+
+    if (! objective.second) {
+      clear();
+      return objective.first;
+    }
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
@@ -717,8 +748,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
         
     double a_norm = 0.0;
     double pred = 0.0;
-    expectation_type::const_iterator giter_end = g.end();
-    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_xbleu_type::const_iterator giter_end = g.end();
+    for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
@@ -738,14 +769,14 @@ struct LearnXBLEUL2 : public LearnXBLEU
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
-    
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
+
     if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     clear();
     
-    return objective;
+    return objective.first;
   }
   
   void rescale(weight_set_type& weights, const double scaling)
@@ -759,7 +790,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     }
   }
 
-  expectation_type g;
+  gradient_xbleu_type g;
   
   size_type instances;
   
@@ -794,13 +825,13 @@ struct LearnXBLEUL1 : public LearnXBLEU
   }
   double learn(weight_set_type& weights)
   {
-    if (counts_reference <= weight_type()) {
-      clear();
-      return 0.0;
-    }
-
     // compute gradient...
-    const double objective = LearnXBLEU::encode(g);
+    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
+
+    if (! objective.second) {
+      clear();
+      return objective.first;
+    }
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
@@ -809,8 +840,8 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
     penalty += eta * lambda;
         
-    expectation_type::const_iterator giter_end = g.end();
-    for (expectation_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_xbleu_type::const_iterator giter_end = g.end();
+    for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
@@ -825,7 +856,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
     clear();
     
-    return objective;
+    return objective.first;
   }
 
   void apply(double& x, double& penalty, const double& cummulative)
@@ -838,7 +869,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
     penalty += x - x_half;
   }
   
-  expectation_type g;
+  gradient_xbleu_type g;
   
   size_type instances;
   
@@ -1067,7 +1098,7 @@ struct LearnSGDL2 : public LearnLR
     weight_norm += a_norm + pred * weight_scale;
     
     if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
+      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
     
     if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);

@@ -745,7 +745,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double alpha = - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
       
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);
@@ -763,9 +763,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
 
-    const double abs_weight_scale = std::fabs(weight_scale);
-    
-    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
   }
   
@@ -816,9 +814,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
     
-    const double abs_weight_scale = std::fabs(weight_scale);
-    
-    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     clear();
@@ -885,7 +881,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      x += - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
       
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);
@@ -1149,7 +1145,7 @@ struct LearnSGDL2 : public LearnLR
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double alpha = - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
       
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);
@@ -1167,9 +1163,7 @@ struct LearnSGDL2 : public LearnLR
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
 
-    const double abs_weight_scale = std::fabs(weight_scale);
-    
-    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
   }
 
@@ -1222,9 +1216,7 @@ struct LearnSGDL2 : public LearnLR
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
 
-    const double abs_weight_scale = std::fabs(weight_scale);
-    
-    if (abs_weight_scale < 0.001 || 1000 < abs_weight_scale)
+    if (weight_scale < 0.001 || 1000 < weight_scale)
       finalize(weights);
     
     clear();
@@ -1297,7 +1289,7 @@ struct LearnSGDL1 : public LearnLR
       double& x = weights[giter->first];
       
       // update weight ... we will update "minus" value
-      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      x += - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
       
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);

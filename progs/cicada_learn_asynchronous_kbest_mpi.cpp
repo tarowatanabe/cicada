@@ -798,10 +798,11 @@ struct Task
 	    std::cerr << "rank: " << rank_ << " objective: " << objective << " batch: " << kbests_batch.size() << std::endl;
 	    
 	  // here, we will bcast the updated amount to others...
-	  if (! updates.empty())
+	  if (! updates.empty()) {
 	    queue_bcast_.push(encoder_(updates.begin(), updates.end()));
-
-	  ++ num_update_;
+	    
+	    ++ num_update_;
+	  }
 	}
 	  
 	// signal finished!
