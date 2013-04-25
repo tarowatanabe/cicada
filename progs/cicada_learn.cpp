@@ -1176,7 +1176,7 @@ struct ObjectiveXBLEU
       double smoothing = 1e-40;
       for (int n = 1; n <= order; ++ n) {
 	if (c_hypo[n] > 0.0 && c_matched[n] <= 0.0)
-	  c_matched[n] = smoothing;
+	  c_matched[n] = std::min(smoothing, c_hypo[n]);
 	smoothing *= 0.1;
       }
     }

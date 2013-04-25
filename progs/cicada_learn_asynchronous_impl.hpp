@@ -594,7 +594,8 @@ struct LearnXBLEU : public LearnBase
     double smoothing = 1e-40;
     for (int n = 1; n <= order; ++ n) {
       if (counts_hypo[n] > weight_type() && counts_matched[n] <= weight_type())
-	counts_matched[n] = smoothing;
+	counts_matched[n] = std::min(weight_type(smoothing), counts_hypo[n]);
+      
       smoothing *= 0.1;
     }
     
@@ -614,7 +615,7 @@ struct LearnXBLEU : public LearnBase
     const weight_type C_dC  = C * derivative_brevity_penalty(minusC);
     
     const weight_type objective_bleu = exp_P * B;
-    const weight_type factor_entropy = 1.0 / norm_entropy;
+    const double      factor_entropy = 1.0 / norm_entropy;
     const weight_type entropy = counts_entropy * factor_entropy;
     const weight_type factor_order = 1.0 / order;
     

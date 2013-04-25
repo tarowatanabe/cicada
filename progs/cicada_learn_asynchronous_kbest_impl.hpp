@@ -135,7 +135,6 @@ struct LearnBase
   typedef SampleSet sample_set_type;
 };
 
-
 struct LearnXBLEU : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
@@ -372,7 +371,8 @@ struct LearnXBLEU : public LearnBase
       double smoothing = 1e-40;
       for (int n = 1; n <= order; ++ n) {
 	if (counts_hypo[n] > weight_type() && counts_matched[n] <= weight_type())
-	  counts_matched[n] = smoothing;
+	  counts_matched[n] = std::min(weight_type(smoothing), counts_hypo[n]);
+	
 	smoothing *= 0.1;
       }
     }
@@ -384,28 +384,32 @@ struct LearnXBLEU : public LearnBase
 	P += (1.0 / order) * (cicada::semiring::log(counts_matched[n]) - cicada::semiring::log(counts_hypo[n]));
     
     // compute C and B
-    const double C = counts_reference / counts_hypo[1];
-    const double B = brevity_penalty(1.0 - C);
+    const weight_type C      = counts_reference / counts_hypo[1];
+    const double      minusC = 1.0 - C;
+    const weight_type B      = brevity_penalty(minusC);
     
     // for computing g...
-    const double exp_P = utils::mathop::exp(P);
-    const double C_dC  = C * derivative_brevity_penalty(1.0 - C);
+    const weight_type exp_P = cicada::semiring::traits<weight_type>::exp(P);
+    const weight_type C_dC  = C * derivative_brevity_penalty(minusC);
     
     // xBLEU...
-    const double objective_bleu = exp_P * B;
-    const double factor_instance = 1.0 / features.size();
-    const double entropy = counts_entropy * factor_instance;
+    const weight_type objective_bleu = exp_P * B;
+    const double      factor_instance = 1.0 / features.size();
+    const weight_type entropy = counts_entropy * factor_instance;
+    const weight_type factor_order = 1.0 / order;
     
     // entropy...
-    gradient_type::const_iterator eiter_end = gradients_entropy.end();
-    for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
-      g[eiter->first] = - temperature * factor_instance * eiter->second;
+    if (temperature != 0.0) {
+      gradient_type::const_iterator eiter_end = gradients_entropy.end();
+      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
+	g[eiter->first] = - temperature * factor_instance * eiter->second;
+    }
     
     // we will collect minus gradient for minimizing negative-xBLEU
     for (int n = 1; n <= order; ++ n) 
       if (counts_hypo[n] > weight_type()) {
-	const double factor_matched = - (exp_P * B / order) / counts_matched[n];
-	const double factor_hypo    = - (exp_P * B / order) / counts_hypo[n];
+	const weight_type factor_matched = - (exp_P * B * factor_order) / counts_matched[n];
+	const weight_type factor_hypo    = - (exp_P * B * factor_order) / counts_hypo[n];
 	
 	gradient_type::const_iterator miter_end = gradients_matched[n].end();
 	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter)
@@ -417,8 +421,8 @@ struct LearnXBLEU : public LearnBase
       }
     
     if (counts_hypo[1] > weight_type()) {
-      const double factor_ref  = - (exp_P * C_dC) / counts_reference;
-      const double factor_hypo = - (exp_P * C_dC) / counts_hypo[1];
+      const weight_type factor_ref  = - (exp_P * C_dC) / counts_reference;
+      const weight_type factor_hypo = - (exp_P * C_dC) / counts_hypo[1];
       
       gradient_type::const_iterator riter_end = gradients_reference.end();
       for (gradient_type::const_iterator riter = gradients_reference.begin(); riter != riter_end; ++ riter)
