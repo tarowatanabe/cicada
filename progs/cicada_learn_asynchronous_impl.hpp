@@ -591,7 +591,7 @@ struct LearnXBLEU : public LearnBase
     g.clear();
     
     // check if we have any matching...
-    if (counts_hypo[1] > weight_type() && counts_matched[1] <= weight_type())
+    if (counts_reference <= weight_type() || counts_hypo[1] <= weight_type() || counts_matched[1] <= weight_type())
       return std::make_pair(0.0, false);
     
     // smoothing...
@@ -747,11 +747,6 @@ struct LearnXBLEUL2 : public LearnXBLEU
   {
     updates.clear();
     
-    if (counts_reference <= weight_type()) {
-      clear();
-      return 0.0;
-    }
-    
     // compute gradient...
     const std::pair<double, bool> objective = LearnXBLEU::encode(g);
     
@@ -875,11 +870,6 @@ struct LearnXBLEUL1 : public LearnXBLEU
   double learn(weight_set_type& weights, feature_set_type& updates)
   {
     updates.clear();
-    
-    if (counts_reference <= weight_type()) {
-      clear();
-      return 0.0;
-    }
     
     // compute gradient...
     const std::pair<double, bool> objective = LearnXBLEU::encode(g);
