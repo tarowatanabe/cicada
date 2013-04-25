@@ -795,7 +795,7 @@ struct Task
 	  const double objective = learner_.learn(weights_, updates);
 	  
 	  if (debug >= 2)
-	    std::cerr << "rank: " << rank_ << " objective: " << objective << std::endl;
+	    std::cerr << "rank: " << rank_ << " objective: " << objective << " batch: " << kbests_batch.size() << std::endl;
 	    
 	  // here, we will bcast the updated amount to others...
 	  if (! updates.empty())

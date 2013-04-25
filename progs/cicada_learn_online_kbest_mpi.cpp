@@ -792,7 +792,7 @@ void cicada_learn(operation_set_type& operations,
       const double objective = learner.learn(weights);
       
       if (debug >= 2)
-	std::cerr << "rank: " << mpi_rank << " objective: " << objective << std::endl;
+	std::cerr << "rank: " << mpi_rank << " objective: " << objective << " batch: " << kbests_batch.size() << std::endl;
       
       // keep totals...
       ++ updated;
