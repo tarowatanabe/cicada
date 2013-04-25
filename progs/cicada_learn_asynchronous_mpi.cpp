@@ -982,6 +982,9 @@ void cicada_learn(operation_set_type& operations,
 	int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
 	
 	MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
+
+	if (debug >= 2 && mpi_rank == 0)
+	  std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
 	
 	if (mpi_rank == rank_min)
 	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
@@ -1026,6 +1029,9 @@ void cicada_learn(operation_set_type& operations,
     int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
 	
     MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
+
+    if (debug >= 2 && mpi_rank == 0)
+      std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
     
     if (rank_min != 0) {
       // send weights to root-rank!

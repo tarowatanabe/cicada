@@ -196,12 +196,6 @@ Rearrange learning code by splitting L2 and/or L1 projection
   - Especially for online-learning, they can be set up as additional
     "unified" code
 
-Add asynchronous online learning inspired by the David Chiang's parallel method
-   - We will not distribute support vectors, but simply send "diffs"
-     and receive "result"
-   - How to handle adaptive learning rate scaling?
-   - Add cicada_learn_asynchronous_mpi and cicada_learn_asynchronous_kbest_mpi
-
 Non-linear features
    - The decoder uses non-linear combination with hidden layers... How
      to implement on cicada?
