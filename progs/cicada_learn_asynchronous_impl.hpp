@@ -209,10 +209,11 @@ struct LearnXBLEU : public LearnBase
     bleu_function(const ngram_set_type& __ngrams,
 		  const count_set_type& __counts,
 		  const id_map_type& __ids,
-		  const weight_set_type& __weights)
+		  const weight_set_type& __weights,
+		  const double& __scale)
       : ngrams(__ngrams), counts(__counts), ids(__ids),
-	weights(__weights) {}
-      
+	weights(__weights), scale(__scale) {}
+    
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
@@ -237,6 +238,7 @@ struct LearnXBLEU : public LearnBase
     const count_set_type&  counts;
     const id_map_type&     ids;
     const weight_set_type& weights;
+    const double           scale;
   };
     
   struct bleu_gradient_function
@@ -274,8 +276,8 @@ struct LearnXBLEU : public LearnBase
     {
       value_type& operator+=(const bleu_gradient_function::value_type& x)
       {
-	const double margin = cicada::dot_product(x.edge.features, impl.weights);
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * scale);
+	const double margin = cicada::dot_product(x.edge.features, impl.weights) * impl.scale_var;
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(margin * impl.scale_const);
 	
 	bleu_weight_type bleu(weight, ngram_weight_type(order * 2, weight_type()));
 	  
@@ -300,7 +302,7 @@ struct LearnXBLEU : public LearnBase
 	    feature_set_type::const_iterator fiter_end = x.edge.features.end();
 	    for (feature_set_type::const_iterator fiter = x.edge.features.begin(); fiter != fiter_end; ++ fiter)
 	      if (fiter->second != 0.0) {
-		const weight_type value(fiter->second * scale);
+		const weight_type value(fiter->second * impl.scale_const);
 		  
 		impl.dM[n][fiter->first] += value * scale_matched;
 		impl.dH[n][fiter->first] += value * scale_hypo;
@@ -322,10 +324,12 @@ struct LearnXBLEU : public LearnBase
 		       const id_map_type& __ids,
 		       const weights_type& __matched,
 		       const weights_type& __hypo,
-		       const weight_set_type& __weights) 
+		       const weight_set_type& __weights,
+		       const double& __scale_var,
+		       const double& __scale_const) 
       : ngrams(__ngrams), counts(__counts), ids(__ids),
 	matched(__matched), hypo(__hypo),
-	weights(__weights), 
+	weights(__weights), scale_var(__scale_var), scale_const(__scale_const),
 	dM(order + 1),
 	dH(order + 1) {}
     
@@ -337,6 +341,8 @@ struct LearnXBLEU : public LearnBase
     const weights_type&    hypo;
       
     const weight_set_type& weights;
+    const double           scale_var;
+    const double           scale_const;
       
     accumulated_set_type dM;
     accumulated_set_type dH;
@@ -348,7 +354,7 @@ struct LearnXBLEU : public LearnBase
   {
     typedef entropy_weight_type value_type;
       
-    entropy_function(const weight_set_type& __weights) : weights(__weights) {}
+    entropy_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
       
     template <typename Edge>
     value_type operator()(const Edge& edge) const
@@ -360,14 +366,15 @@ struct LearnXBLEU : public LearnBase
     }
       
     const weight_set_type& weights;
+    const double scale;
   };
 
   struct entropy_gradient_function
   {
     struct value_type
     {
-      value_type(const feature_set_type& __features, const weight_set_type& __weights)
-	: features(__features), weights(__weights) {}
+      value_type(const feature_set_type& __features, const weight_set_type& __weights, const double& __scale_var, const double& __scale_const)
+	: features(__features), weights(__weights), scale_var(__scale_var), scale_const(__scale_const) {}
       
       friend
       value_type operator*(value_type x, const entropy_weight_type& weight)
@@ -380,18 +387,22 @@ struct LearnXBLEU : public LearnBase
 	
       const feature_set_type& features;
       const weight_set_type& weights;
+      const double scale_var;
+      const double scale_const;
     };
       
-    entropy_gradient_function(const weight_set_type& __weights)
-      : weights(__weights) {}
+    entropy_gradient_function(const weight_set_type& __weights, const double& __scale_var, const double& __scale_const)
+      : weights(__weights), scale_var(__scale_var), scale_const(__scale_const) {}
       
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
-      return value_type(edge.features, weights);
+      return value_type(edge.features, weights, scale_var, scale_const);
     }
     
     const weight_set_type& weights;
+    const double scale_var;
+    const double scale_const;
   };
 
   struct entropy_gradient_type
@@ -404,18 +415,17 @@ struct LearnXBLEU : public LearnBase
 	
       proxy_type& operator+=(const entropy_gradient_function::value_type& x) 
       {
-	const double value = cicada::dot_product(x.features, x.weights);
-	const double log_p_e = value * scale;
+	const double value = cicada::dot_product(x.features, x.weights) * x.scale_var;
+	const double log_p_e = value * x.scale_const;
 	const weight_type p_e = cicada::semiring::traits<weight_type>::exp(log_p_e);
-	const weight_type value_scale(value);
-	  
+	
 	// dZ += \lnabla p_e * x.inside_outside.p;
 	// dR += (1 + \log p_e) * \nalba p_e * x.inside_outside.p + \lnabla p_e * x.inside_outside.r;
 	  
 	feature_set_type::const_iterator fiter_end = x.features.end();
 	for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter) 
 	  if (fiter->second != 0.0) {
-	    const weight_type value(fiter->second * scale);
+	    const weight_type value(fiter->second * x.scale_const);
 	      
 	    dZ[fiter->first] += value * p_e * x.inside_outside.p;
 	    dR[fiter->first] += (weight_type(1.0 + log_p_e) * value * p_e * x.inside_outside.p + value * p_e * x.inside_outside.r);
@@ -467,7 +477,7 @@ struct LearnXBLEU : public LearnBase
     }
   }
   
-  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer, const double& scale_var, const double& scale_const)
   {
     if (! forest.is_valid()) return;
     
@@ -483,7 +493,7 @@ struct LearnXBLEU : public LearnBase
     ids.resize(forest.edges.size());
     
     cicada::expected_ngram(forest,
-			   cicada::operation::weight_scaled_function<weight_type>(weights, scale),
+			   cicada::operation::weight_scaled_function<weight_type>(weights, scale_var * scale_const),
 			   CollectCounts(index, ngrams, counts, ids),
 			   index,
 			   order);
@@ -519,12 +529,12 @@ struct LearnXBLEU : public LearnBase
     
     bleu_gradient_type bleu_gradient(ngrams, counts, ids,
 				     matched, hypo,
-				     weights);
+				     weights, scale_var, scale_const);
     
     cicada::inside_outside(forest,
 			   bleu_inside,
 			   bleu_gradient,
-			   bleu_function(ngrams, counts, ids, weights),
+			   bleu_function(ngrams, counts, ids, weights, scale_var * scale_const),
 			   bleu_gradient_function());
     
     for (int n = 1; n <= order; ++ n) {
@@ -550,8 +560,8 @@ struct LearnXBLEU : public LearnBase
     cicada::inside_outside(forest,
 			   entropy_inside,
 			   entropy_gradient,
-			   entropy_function(weights),
-			   entropy_gradient_function(weights));
+			   entropy_function(weights, scale_var * scale_const),
+			   entropy_gradient_function(weights, scale_var, scale_const));
     
     const weight_type& Z = entropy_inside.back().p;
     const weight_type& R = entropy_inside.back().r;
@@ -678,6 +688,11 @@ struct LearnXBLEUL2 : public LearnXBLEU
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
 
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    LearnXBLEU::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
+  }
+
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
@@ -712,8 +727,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    //if (weight_scale < 0.001 || 1000 < weight_scale)
-    finalize(weights);
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
   }
   
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -763,8 +778,8 @@ struct LearnXBLEUL2 : public LearnXBLEU
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    //if (weight_scale < 0.001 || 1000 < weight_scale)
-    finalize(weights);
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
     
     clear();
     
@@ -811,6 +826,11 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
   }
 
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    LearnXBLEU::encode(id, weights, forest, oracle, scorer, 1.0, scale);
+  }
+  
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
