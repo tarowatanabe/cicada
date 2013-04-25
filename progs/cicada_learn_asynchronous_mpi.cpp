@@ -751,6 +751,9 @@ struct Task
     }
 
     learner_.finalize(weights_);
+    
+    // finish!
+    learner_.clear();
   }
 };
 

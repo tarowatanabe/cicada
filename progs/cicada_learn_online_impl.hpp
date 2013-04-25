@@ -617,9 +617,11 @@ struct LearnXBLEU : public LearnBase
     const double entropy = counts_entropy * factor_entropy;
     
     // entropy...
-    gradient_type::const_iterator eiter_end = gradients_entropy.end();
-    for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
-      g[eiter->first] = - temperature * factor_entropy * eiter->second;
+    if (temperature != 0.0) {
+      gradient_type::const_iterator eiter_end = gradients_entropy.end();
+      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
+	g[eiter->first] = - temperature * factor_entropy * eiter->second;
+    }
     
     // we will collect minus gradient for minimizing negative-xBLEU
     for (int n = 1; n <= order; ++ n) 

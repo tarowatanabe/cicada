@@ -817,6 +817,8 @@ struct Task
     }
 
     learner_.finalize(weights_);
+    
+    learner_.clear();
   }
 };
 
