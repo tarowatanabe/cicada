@@ -133,7 +133,8 @@ struct LearnXBLEU : public LearnBase
   
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef std::vector<gradient_type, std::allocator<gradient_type> >       gradients_type;
-  
+
+  typedef cicada::FeatureVector<double, std::allocator<double> > gradient_xbleu_type;
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   
@@ -585,7 +586,7 @@ struct LearnXBLEU : public LearnBase
       gradients_entropy[riter->first] -= riter->second / Z;
   }
   
-  std::pair<double, bool> encode(gradient_type& g)
+  std::pair<double, bool> encode(gradient_xbleu_type& g)
   {
     g.clear();
     
@@ -624,14 +625,21 @@ struct LearnXBLEU : public LearnBase
     const weight_type factor_entropy = 1.0 / norm_entropy;
     const weight_type entropy = counts_entropy * factor_entropy;
     const weight_type factor_order = 1.0 / order;
+
+    const double objective = - objective_bleu - temperature * entropy;
     
     // entropy...
     if (temperature != 0.0) {
       const weight_type factor_temp(- temperature);
       
       gradient_type::const_iterator eiter_end = gradients_entropy.end();
-      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter)
-	g[eiter->first] = factor_temp * factor_entropy * eiter->second;
+      for (gradient_type::const_iterator eiter = gradients_entropy.begin(); eiter != eiter_end; ++ eiter) {
+	double& grad = g[eiter->first];
+	grad = factor_temp * factor_entropy * eiter->second;
+
+	if (! std::isfinite(grad))
+	  return std::make_pair(objective, false);
+      }
     }
     
     // we will collect minus gradient for minimizing negative-xBLEU
@@ -641,23 +649,38 @@ struct LearnXBLEU : public LearnBase
 	const weight_type factor_hypo    = - (exp_P * B * factor_order) / counts_hypo[n];
 	
 	gradient_type::const_iterator miter_end = gradients_matched[n].end();
-	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter)
-	  g[miter->first] += factor_matched * miter->second;
+	for (gradient_type::const_iterator miter = gradients_matched[n].begin(); miter != miter_end; ++ miter) {
+	  double& grad = g[miter->first];
+	  grad += factor_matched * miter->second;
+	  
+	  if (! std::isfinite(grad))
+	    return std::make_pair(objective, false);
+	}
 	
 	gradient_type::const_iterator hiter_end = gradients_hypo[n].end();
-	for (gradient_type::const_iterator hiter = gradients_hypo[n].begin(); hiter != hiter_end; ++ hiter)
-	  g[hiter->first] -= factor_hypo * hiter->second;
+	for (gradient_type::const_iterator hiter = gradients_hypo[n].begin(); hiter != hiter_end; ++ hiter) {
+	  double& grad = g[hiter->first];
+	  grad -= factor_hypo * hiter->second;
+
+	  if (! std::isfinite(grad))
+	    return std::make_pair(objective, false);
+	}
       }
     
     if (counts_hypo[1] > weight_type()) {
       const weight_type factor_hypo = - (exp_P * C_dC) / counts_hypo[1];
       
       gradient_type::const_iterator hiter_end = gradients_hypo[1].end();
-      for (gradient_type::const_iterator hiter = gradients_hypo[1].begin(); hiter != hiter_end; ++ hiter)
-	g[hiter->first] += factor_hypo * hiter->second;
+      for (gradient_type::const_iterator hiter = gradients_hypo[1].begin(); hiter != hiter_end; ++ hiter) {
+	double& grad = g[hiter->first];
+	grad += factor_hypo * hiter->second;
+	
+	if (! std::isfinite(grad))
+	  return std::make_pair(objective, false);
+      }
     }
     
-    return std::make_pair(- objective_bleu - temperature * entropy, true);
+    return std::make_pair(objective, ! g.empty());
   }
   
   // required for learn()
@@ -767,16 +790,15 @@ struct LearnXBLEUL2 : public LearnXBLEU
         
     double a_norm = 0.0;
     double pred = 0.0;
-    gradient_type::const_iterator giter_end = g.end();
-    for (gradient_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_xbleu_type::const_iterator giter_end = g.end();
+    for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double grad = giter->second;
-      const double alpha = - grad * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double alpha = - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
 
       if (adagrad_mode)
-	adagrad.update(giter->first, grad);
+	adagrad.update(giter->first, giter->second);
       
       a_norm += alpha * alpha;
       pred += 2.0 * x * alpha;
@@ -785,7 +807,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
       x += alpha / weight_scale;
 
       // updates!
-      updates[giter->first] = grad;
+      updates[giter->first] = giter->second;
     }
     
     // avoid numerical instability...
@@ -815,7 +837,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
     }
   }
 
-  gradient_type g;
+  gradient_xbleu_type g;
   
   size_type instances;
   
@@ -892,22 +914,21 @@ struct LearnXBLEUL1 : public LearnXBLEU
     
     penalty += eta * lambda;
     
-    gradient_type::const_iterator giter_end = g.end();
-    for (gradient_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
+    gradient_xbleu_type::const_iterator giter_end = g.end();
+    for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
       
       double& x = weights[giter->first];
-      const double grad = giter->second;
-      x += - grad * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      x += - giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta);
 
       if (adagrad_mode)
-	adagrad.update(giter->first, grad);
+	adagrad.update(giter->first, giter->second);
       
       // apply penalty
       apply(x, penalties[giter->first], penalty);
 
       // updates!
-      updates[giter->first] = grad;
+      updates[giter->first] = giter->second;
     }
     
     clear();
@@ -925,7 +946,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
     penalty += x - x_half;
   }
   
-  gradient_type g;
+  gradient_xbleu_type g;
   
   size_type instances;
   
