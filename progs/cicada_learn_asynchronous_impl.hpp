@@ -934,16 +934,17 @@ struct LearnLR : public LearnBase
   {
     typedef weight_type value_type;
 
-    weight_function(const weight_set_type& __weights) : weights(__weights) {}
+    weight_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
       
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
       // p_e
-      return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
+      return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights) * scale);
     }
       
     const weight_set_type& weights;
+    const double scale;
   };
     
   struct feature_function
@@ -951,8 +952,10 @@ struct LearnLR : public LearnBase
     struct value_type
     {
       value_type(const feature_set_type& __features,
-		 const weight_set_type& __weights)
-	: features(__features), weights(__weights) {}
+		 const weight_set_type& __weights,
+		 const double& __scale_var,
+		 const double& __scale_const)
+	: features(__features), weights(__weights), scale_var(__scale_var), scale_const(__scale_const) {}
 	
       friend
       value_type operator*(value_type x, const weight_type& weight)
@@ -964,17 +967,22 @@ struct LearnLR : public LearnBase
       weight_type inside_outside;
       const feature_set_type& features;
       const weight_set_type&  weights;
+      const double            scale_var;
+      const double            scale_const;
     };
       
-    feature_function(const weight_set_type& __weights) : weights(__weights) {}
+    feature_function(const weight_set_type& __weights, const double& __scale_var, const double& __scale_const)
+      : weights(__weights), scale_var(__scale_var), scale_const(__scale_const) {}
       
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
-      return value_type(edge.features, weights);
+      return value_type(edge.features, weights, scale_var, scale_const);
     }
       
     const weight_set_type& weights;
+    const double           scale_var;
+    const double           scale_const;
   };
     
   struct gradients_type
@@ -985,11 +993,11 @@ struct LearnLR : public LearnBase
 	
       value_type& operator+=(const feature_function::value_type& x)
       {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(x.features, x.weights)) * x.inside_outside;
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(x.features, x.weights) * x.scale_var * x.scale_const) * x.inside_outside;
 	  
 	feature_set_type::const_iterator fiter_end = x.features.end();
 	for (feature_set_type::const_iterator fiter = x.features.begin(); fiter != fiter_end; ++ fiter)
-	  gradient[fiter->first] += weight_type(fiter->second) * weight;
+	  gradient[fiter->first] += weight_type(fiter->second * x.scale_const) * weight;
 	  
 	return *this;
       }
@@ -1007,7 +1015,7 @@ struct LearnLR : public LearnBase
     gradient_type gradient;
   };
   
-  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer, const double& scale_var, const double& scale_const)
   {
     gradients_forest.clear();
     gradients_oracle.clear();
@@ -1018,8 +1026,12 @@ struct LearnLR : public LearnBase
     inside_forest.resize(forest.nodes.size());
     inside_oracle.resize(oracle.nodes.size());
     
-    cicada::inside_outside(forest, inside_forest, gradients_forest, weight_function(weights), feature_function(weights));
-    cicada::inside_outside(oracle, inside_oracle, gradients_oracle, weight_function(weights), feature_function(weights));
+    cicada::inside_outside(forest, inside_forest, gradients_forest,
+			   weight_function(weights, scale_var * scale_const),
+			   feature_function(weights, scale_var, scale_const));
+    cicada::inside_outside(oracle, inside_oracle, gradients_oracle,
+			   weight_function(weights, scale_var * scale_const),
+			   feature_function(weights, scale_var, scale_const));
     
     const gradient_type& gradient_forest = gradients_oracle.gradient;
     const gradient_type& gradient_oracle = gradients_oracle.gradient;
@@ -1075,7 +1087,12 @@ struct LearnSGDL2 : public LearnLR
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
-
+  
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    LearnLR::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
+  }
+  
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
@@ -1110,8 +1127,8 @@ struct LearnSGDL2 : public LearnLR
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    //if (weight_scale < 0.001 || 1000 < weight_scale)
-    finalize(weights);
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1163,8 +1180,8 @@ struct LearnSGDL2 : public LearnLR
     if (weight_norm > 1.0 / lambda || project_weight)
       rescale(weights, std::sqrt(1.0 / (lambda * weight_norm)));
     
-    //if (weight_scale < 0.001 || 1000 < weight_scale)
-    finalize(weights);
+    if (weight_scale < 0.001 || 1000 < weight_scale)
+      finalize(weights);
     
     clear();
     
@@ -1216,6 +1233,11 @@ struct LearnSGDL1 : public LearnLR
     
   }
   
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    LearnLR::encode(id, weights, forest, oracle, scorer, 1.0, scale);
+  }
+
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
