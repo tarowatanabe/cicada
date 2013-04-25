@@ -590,6 +590,10 @@ struct LearnXBLEU : public LearnBase
   {
     g.clear();
     
+    // check if we have any matching...
+    if (counts_hypo[1] > weight_type() && counts_matched[1] <= weight_type())
+      return std::make_pair(0.0, false);
+    
     // smoothing...
     double smoothing = 1e-40;
     for (int n = 1; n <= order; ++ n) {
@@ -751,8 +755,10 @@ struct LearnXBLEUL2 : public LearnXBLEU
     // compute gradient...
     const std::pair<double, bool> objective = LearnXBLEU::encode(g);
     
-    if (! objective.second)
+    if (! objective.second) {
+      clear();
       return objective.first;
+    }
 
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
@@ -874,12 +880,14 @@ struct LearnXBLEUL1 : public LearnXBLEU
       clear();
       return 0.0;
     }
-
+    
     // compute gradient...
     const std::pair<double, bool> objective = LearnXBLEU::encode(g);
-
-    if (! objective.second)
+    
+    if (! objective.second) {
+      clear();
       return objective.first;
+    }
     
     //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
     const size_type num_samples = (instances + batch_size - 1) / batch_size;
