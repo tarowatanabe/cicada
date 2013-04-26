@@ -128,9 +128,9 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
-bool weights_average_mode = false;
-bool weights_select_mode = false;
+bool mix_none_mode = false;
 bool mix_average_mode = false;
+bool mix_select_mode = false;
 int  mix_kbest_features = 0;
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
@@ -241,8 +241,11 @@ int main(int argc, char ** argv)
     if (order <= 0)
       throw std::runtime_error("ngram order for xBLEU must be positive");
 
-    if (weights_average_mode && weights_select_mode)
-      throw std::runtime_error("you cannot specify both of weights-average and weights-select");
+    if (int(mix_none_mode) + mix_average_mode + mix_select_mode + (mix_kbest_features > 0) > 1)
+      throw std::runtime_error("you can specify only one of mix-{none,average,select,kbest-feautures}");
+    
+    if (int(mix_none_mode) + mix_average_mode + mix_select_mode + (mix_kbest_features > 0) == 0)
+      mix_none_mode = true;
     
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
@@ -903,7 +906,7 @@ void cicada_learn(operation_set_type& operations,
 
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
-  std::auto_ptr<boost::thread> dumper(dump_weights_mode && (mpi_rank == 0 || weights_select_mode)
+  std::auto_ptr<boost::thread> dumper(dump_weights_mode && mpi_rank == 0
 				      ? new boost::thread(dumper_type(queue_dumper))
 				      : 0);
   
@@ -1016,52 +1019,126 @@ void cicada_learn(operation_set_type& operations,
 	std::cerr << "total 1best:  " << (score_1best ? score_1best->description() : std::string("?")) << std::endl
 		  << "total oracle: " << (score_oracle ? score_oracle->description() : std::string("?")) << std::endl;
     }
+    
+    if (mix_average_mode) {
+      // +1 to avid zero...
+      const size_t updated = learner.num_update_ + 1;
+      weights *= updated;
+      
+      reduce_weights(weights);
+      
+      bcast_weights(weights);
+      
+      size_t updated_total = 0;
+      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+      
+      weights *= 1.0 / updated_total;
+    } else if (mix_select_mode) {
+      typedef std::vector<double, std::allocator<double> > buffer_type;
+      
+      const double l1 = std::accumulate(weights.begin(), weights.end(), double(0.0), abs_sum());
+      
+      buffer_type buffer_send(mpi_size, 0.0);
+      buffer_type buffer_recv(mpi_size, 0.0);
 
-    if (dump_weights_mode) {
-      if (weights_average_mode) {
-	// +1 to avid zero...
-	const size_t updated = learner.num_update_ + 1;
+      buffer_send[mpi_rank] = l1;
+      buffer_recv[mpi_rank] = l1;
 	
-	weight_set_type weights_average(weights);
-	weights_average *= updated;
+      MPI::COMM_WORLD.Reduce(&(*buffer_send.begin()), &(*buffer_recv.begin()), mpi_size, utils::mpi_traits<double>::data_type(), MPI::MAX, 0);
 	
-	reduce_weights(weights_average);
+      int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
 	
-	size_t updated_total = 0;
-	MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
-	
-	if (mpi_rank == 0) {
-	  weights_average *= 1.0 / updated_total;
-	  
-	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights_average));
-	}
-      } else if (weights_select_mode) {	
-	typedef std::vector<double, std::allocator<double> > buffer_type;
-	
-	const double l1 = std::accumulate(weights.begin(), weights.end(), double(0.0), abs_sum());
-	
-	buffer_type buffer_send(mpi_size, 0.0);
-	buffer_type buffer_recv(mpi_size, 0.0);
+      MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
 
-	buffer_send[mpi_rank] = l1;
-	buffer_recv[mpi_rank] = l1;
-	
-	MPI::COMM_WORLD.Reduce(&(*buffer_send.begin()), &(*buffer_recv.begin()), mpi_size, utils::mpi_traits<double>::data_type(), MPI::MAX, 0);
-	
-	int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
-	
-	MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
-	
-	if (debug >= 2 && mpi_rank == 0)
-	  std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
-
-	if (mpi_rank == rank_min)
-	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
-      } else {
+      if (debug >= 2 && mpi_rank == 0)
+	std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
+    
+      if (rank_min != 0) {
+	// send weights to root-rank!
 	if (mpi_rank == 0)
-	  queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
+	  recv_weights(rank_min, weights);
+	else if (mpi_rank == rank_min)
+	  send_weights(0, weights);
       }
+      
+      bcast_weights(weights);
+    } else if (mix_kbest_features > 0) {
+      // reduce column-L2 weights
+      weight_set_type weights_l2(weights);
+      
+      std::transform(weights_l2.begin(), weights_l2.end(), weights_l2.begin(), weights_l2.begin(), std::multiplies<weight_set_type::value_type>());
+      
+      reduce_weights(weights_l2);
+      
+      // reduce averaged weights
+      const size_t updated = learner.num_update_ + 1;
+      size_t updated_total = 0;
+      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+      
+      weights *= updated;
+      
+      reduce_weights(weights);
+      
+      weights *= 1.0 / updated_total;
+      
+      if (mpi_rank == 0) {
+	typedef std::pair<double, feature_type::id_type> value_type;
+	typedef std::vector<value_type, std::allocator<value_type> > heap_type;
+	
+	// compute k-best wrt column-L2
+	
+	heap_type heap;
+	
+	heap.reserve(weights_l2.size());
+	
+	for (feature_type::id_type id = 0; id != weights_l2.size(); ++ id)
+	  if (! feature_type(id).empty() && weights_l2[id] != 0.0) {
+	    heap.push_back(value_type(weights_l2[id], id));
+	    std::push_heap(heap.begin(), heap.end(), std::less<value_type>());
+	  }
+	
+	if (static_cast<int>(heap.size()) > mix_kbest_features) {
+	  typedef std::vector<bool, std::allocator<bool> > survived_type;
+	  
+	  survived_type survived(utils::bithack::max(weights.size(), weights_l2.size()), false);
+	  
+	  heap_type::iterator iter_begin = heap.begin();
+	  heap_type::iterator iter       = heap.end();
+	  
+	  // kbest features
+	  size_t num_survived = 0;
+	  for (int k = 0; k != mix_kbest_features && iter_begin != iter; ++ k, -- iter) {
+	    survived[iter_begin->second] = true;
+	    std::pop_heap(iter_begin, iter, std::less<value_type>());
+	    ++ num_survived;
+	  }
+	  
+	  // also keep the tied features...
+	  if (iter != iter_begin && iter != heap.end()) {
+	    const double threshold = iter->first;
+
+	    for (/**/; iter_begin != iter && iter_begin->first == threshold; -- iter) {
+	      survived[iter_begin->second] = true;
+	      std::pop_heap(iter_begin, iter, std::less<value_type>());
+	      ++ num_survived;
+	    }
+	  }
+
+	  if (debug && mpi_rank == 0)
+	    std::cerr << "survived: " << num_survived << " all: "<< heap.size() << std::endl;
+	  
+	  for (feature_type::id_type id = 0; id != weights.size(); ++ id)
+	    if (! survived[id])
+	      weights[id] = 0.0;
+	}
+      } 
+      
+      // bcast weights!
+      bcast_weights(weights);
     }
+    
+    if (dump_weights_mode && mpi_rank == 0)
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights));
   }
 
   // finish dumper...
@@ -1069,48 +1146,6 @@ void cicada_learn(operation_set_type& operations,
     queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
     dumper->join();
   }
-  
-  // select the final weights!
-  if (weights_average_mode) {
-    const size_t updated = learner.num_update_ + 1;
-    
-    weights *= updated;
-    
-    reduce_weights(weights);
-    
-    size_t updated_total = 0;
-    MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
-    
-    weights *= 1.0 / updated_total;
-  } else if (weights_select_mode) {
-    typedef std::vector<double, std::allocator<double> > buffer_type;
-	
-    const double l1 = std::accumulate(weights.begin(), weights.end(), double(0.0), abs_sum());
-	
-    buffer_type buffer_send(mpi_size, 0.0);
-    buffer_type buffer_recv(mpi_size, 0.0);
-
-    buffer_send[mpi_rank] = l1;
-    buffer_recv[mpi_rank] = l1;
-	
-    MPI::COMM_WORLD.Reduce(&(*buffer_send.begin()), &(*buffer_recv.begin()), mpi_size, utils::mpi_traits<double>::data_type(), MPI::MAX, 0);
-	
-    int rank_min = (std::min_element(buffer_recv.begin(), buffer_recv.end()) - buffer_recv.begin());
-	
-    MPI::COMM_WORLD.Bcast(&rank_min, 1, utils::mpi_traits<int>::data_type(), 0);
-
-    if (debug >= 2 && mpi_rank == 0)
-      std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
-    
-    if (rank_min != 0) {
-      // send weights to root-rank!
-      
-      if (mpi_rank == 0)
-	recv_weights(rank_min, weights);
-      else if (mpi_rank == rank_min)
-	send_weights(0, weights);
-    }
-  }  
 }
 
 void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle)
@@ -1445,8 +1480,10 @@ void options(int argc, char** argv)
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
-    ("weights-average",     po::bool_switch(&weights_average_mode), "average weights")
-    ("weights-select",      po::bool_switch(&weights_select_mode),  "select weights by L1")
+    ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
+    ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
+    ("mix-select",          po::bool_switch(&mix_select_mode),      "select weights by L1")
+    ("mix-kbest-features",  po::value<int>(&mix_kbest_features),    "mix k-best features")
     ("dump-weights",        po::bool_switch(&dump_weights_mode),    "dump mode (or weights) during iterations")
     ;
     
