@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 //
@@ -1436,9 +1436,9 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
-    ("scale",         po::value<double>(&scale),                    "scaling for weight")
-    ("eta0",          po::value<double>(&eta0),                     "\\eta_0 for decay")
-    ("order",         po::value<int>(&order)->default_value(order), "ngram order for xBLEU")
+    ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
+    ("eta0",          po::value<double>(&eta0)->default_value(eta0),               "\\eta_0 for decay")
+    ("order",         po::value<int>(&order)->default_value(order),                "ngram order for xBLEU")
     
     ("adagrad",             po::bool_switch(&adagrad_mode),         "AdaGrad for adaptive gradient")
     ("loss-rank",           po::bool_switch(&loss_rank),            "rank loss")
