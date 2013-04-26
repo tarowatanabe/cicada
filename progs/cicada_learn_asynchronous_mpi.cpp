@@ -1007,16 +1007,13 @@ void cicada_learn(operation_set_type& operations,
       
       reduce_weights(weights_l2);
       
-      // reduce averaged weights
-      const size_t updated = learner.num_update_ + 1;
-      size_t updated_total = 0;
-      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+      // synchronize here...
+      MPI::COMM_WORLD.Barrier();
       
-      weights *= updated;
+      // reduced rank-averaged weights
+      weights *= 1.0 / mpi_size;
       
       reduce_weights(weights);
-      
-      weights *= 1.0 / updated_total;
       
       if (mpi_rank == 0) {
 	typedef std::pair<double, feature_type::id_type> value_type;
