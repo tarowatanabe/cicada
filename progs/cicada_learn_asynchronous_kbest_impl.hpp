@@ -228,12 +228,6 @@ struct LearnXBLEU : public LearnBase
     gradients_entropy.clear();
   }
   
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
-  }
-  
   // we need features + bleu stats...
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -765,12 +759,6 @@ struct LearnExpectedLoss : public LearnBase
     losses.clear();
   }
   
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
-  }
-  
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
     if (kbests.empty()) return;
@@ -988,12 +976,6 @@ struct LearnExpectedLossL1 : public LearnBase
   {
     features.clear();
     losses.clear();
-  }
-  
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -1232,13 +1214,6 @@ struct LearnOExpectedLoss : public LearnBase
     features.clear();
     losses.clear();
   }
-  
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
-  }
-  
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
@@ -1492,9 +1467,6 @@ struct LearnOnlineMargin : public LearnBase
   {
     features.clear();
     losses.clear();
-
-    history_features.clear();
-    history_losses.clear();
   }
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -1554,56 +1526,12 @@ struct LearnOnlineMargin : public LearnBase
 	
 	losses.push_back(loss_rank ? 1.0 : loss);
 	features.insert(feats.begin(), feats.end());
-	
-	// for history...
-	history_losses.push_back(loss_rank ? 1.0 : loss);
-	history_features.insert(feats.begin(), feats.end());
       }
-  }
-
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    static const double inf = std::numeric_limits<double>::infinity();
-    
-    double grad_pos = 0.0;
-    double grad_neg = 0.0;
-    for (size_t i = 0; i != history_features.size(); ++ i) {
-      const double margin      = cicada::dot_product(weights,      history_features[i].begin(), history_features[i].end(), 0.0);
-      const double margin_prev = cicada::dot_product(weights_prev, history_features[i].begin(), history_features[i].end(), 0.0);
-      const double loss = history_losses[i];
-      
-      const double bi_pos = margin_prev - margin;
-      const double ci_pos = loss - margin_prev;
-      const double ki_pos = (bi_pos != 0.0 ? - ci_pos / bi_pos : - inf);
-      
-      const double bi_neg = margin_prev + margin;
-      const double ci_neg = loss - margin_prev;
-      const double ki_neg = (bi_neg != 0.0 ? - ci_neg / bi_neg : - inf);
-      
-      if (ki_pos > 0) {
-	*iter = std::make_pair(ki_pos, bi_pos);
-	++ iter;
-      }
-      
-      if (ki_neg > 0) {
-	*iter = std::make_pair(- ki_neg, bi_neg);
-	++ iter;
-      }
-      
-      grad_pos += bi_pos * ((bi_pos < 0.0 && ki_pos > 0.0) || (bi_pos > 0.0 && ki_pos <= 0.0));
-      grad_neg += bi_neg * ((bi_neg < 0.0 && ki_neg > 0.0) || (bi_neg > 0.0 && ki_neg <= 0.0));
-    }
-    
-    return boost::fusion::tuple<double, double, double>(grad_pos, grad_neg, history_losses.size());
   }
 
 
   sample_set_type features;
   loss_set_type   losses;
-  
-  sample_set_type history_features;
-  loss_set_type   history_losses;
   
   sentence_unique_type sentences;
 };
@@ -2471,12 +2399,6 @@ struct LearnSGDL1 : public LearnLR
     
   }
   
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
-  }
-
   void clear() { samples.clear(); }
 
   void update(weight_set_type& weights, const feature_set_type& updates)
@@ -2607,13 +2529,6 @@ struct LearnSGDL2 : public LearnLR
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
-
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
-  }
-
 
   void clear() { samples.clear(); }
 
@@ -2831,12 +2746,6 @@ struct LearnOSGDL2 : public LearnLR
     
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-  }
-
-  template <typename Iterator>
-  boost::fusion::tuple<double, double, double> gradient(const weight_set_type& weights, const weight_set_type& weights_prev, Iterator iter) const
-  {
-    return boost::fusion::tuple<double, double, double>(0.0, 0.0, 0.0);
   }
 
   void clear() { samples.clear(); }

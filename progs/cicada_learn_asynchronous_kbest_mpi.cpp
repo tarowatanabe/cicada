@@ -130,6 +130,8 @@ bool project_weight = false;
 bool merge_oracle_mode = false;
 bool weights_average_mode = false;
 bool weights_select_mode = false;
+bool mix_average_mode = false;
+int  mix_kbest_features = 0;
 bool dump_weights_mode   = false; // dump current weights... for debugging purpose etc.
 
 int debug = 0;
