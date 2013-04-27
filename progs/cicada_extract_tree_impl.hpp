@@ -2047,7 +2047,7 @@ struct Task
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs, dumper);
       
-      if ((iter & iter_mask) == iter_mask)
+      if (rule_pairs.empty() || (iter & iter_mask) == iter_mask)
 	extractor.clear();
     }
     
