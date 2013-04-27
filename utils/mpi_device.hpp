@@ -561,6 +561,11 @@ namespace utils
     if (buffer_offset == recv_size) {
       request_size.Start();
       request_buffer.Start();
+      
+      // test here to avoid strange behavior...
+      request_size.Test();
+      request_buffer.Test();
+      
       buffer_offset = 0;
     }
     
@@ -600,6 +605,10 @@ namespace utils
     
     request_size.Start();
     request_buffer.Start();
+    
+    // test here to avoid strange behavior...
+    request_size.Test();
+    request_buffer.Test();
   }
 
 };
