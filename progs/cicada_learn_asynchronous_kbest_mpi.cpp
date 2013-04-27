@@ -150,6 +150,7 @@ void cicada_learn(operation_set_type& operations,
 		  weight_set_type& weights);
 void synchronize();
 
+void bcast_weights(const int rank, weight_set_type& weights);
 void bcast_weights(weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle);
@@ -1052,16 +1053,8 @@ void cicada_learn(operation_set_type& operations,
 
       if (debug >= 2 && mpi_rank == 0)
 	std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
-    
-      if (rank_min != 0) {
-	// send weights to root-rank!
-	if (mpi_rank == 0)
-	  recv_weights(rank_min, weights);
-	else if (mpi_rank == rank_min)
-	  send_weights(0, weights);
-      }
       
-      bcast_weights(weights);
+      bcast_weights(rank_min, weights);
     } else if (mix_kbest_features > 0) {
       // reduce column-L2 weights
       weight_set_type weights_l2(weights);
