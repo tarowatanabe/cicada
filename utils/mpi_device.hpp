@@ -143,10 +143,16 @@ namespace utils
   private:
     struct impl
     {
-      MPI::Prequest request_buffer;
-      volatile unsigned int recv_size;
-      volatile size_t buffer_offset;
-      std::vector<char_type, utils::mpi_allocator<char_type> > buffer;
+      typedef size_t size_type;
+      typedef unsigned int stream_size_type;
+      typedef std::vector<char_type, utils::mpi_allocator<char_type> > buffer_type;
+      
+      MPI::Prequest             request;
+      volatile stream_size_type recv_size;
+      volatile size_type        buffer_offset;
+      buffer_type buffer;
+
+      bool ready;
       
       impl() {}
       ~impl() { close(); }
@@ -222,11 +228,13 @@ namespace utils
   private:
     struct impl
     {
+      typedef size_t size_type;
+      typedef unsigned int stream_size_type;
       typedef std::vector<char_type, utils::mpi_allocator<char_type> > buffer_type;
       
-      MPI::Prequest request_buffer;
-      volatile unsigned int send_size;
-      volatile size_t buffer_offset;
+      MPI::Prequest             request;
+      volatile stream_size_type send_size;
+      volatile size_type        buffer_offset;
       buffer_type buffer;
       buffer_type buffer_overcommit;
       bool terminate_on_close;
@@ -258,19 +266,20 @@ namespace utils
     if (! is_open())
       return;
     
-    if (! const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test())
-      const_cast<mpi_device_sink::impl&>(*this).request_buffer.Wait();
+    if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
+      const_cast<mpi_device_sink::impl&>(*this).request.Wait();
   }
 
   void mpi_device_source::impl::wait() const
   {
-    if (! is_open())
+    if (! is_open() || ready)
       return;
 
-    if (! const_cast<mpi_device_source::impl&>(*this).request_buffer.Test())
-      const_cast<mpi_device_source::impl&>(*this).request_buffer.Wait();
+    if (! const_cast<mpi_device_source::impl&>(*this).request.Test())
+      const_cast<mpi_device_source::impl&>(*this).request.Wait();
     
-    std::copy(buffer.end() - sizeof(unsigned int), buffer.end(), (char_type*) &recv_size);
+    std::copy(buffer.end() - sizeof(stream_size_type), buffer.end(), (char_type*) &recv_size);
+    const_cast<bool&>(ready) = true;
   }
   
   bool mpi_device_sink::impl::test() const
@@ -278,7 +287,7 @@ namespace utils
     if (! is_open())
       return true;
 
-    if (! const_cast<mpi_device_sink::impl&>(*this).request_buffer.Test())
+    if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
       return false;
     
     return true;
@@ -286,13 +295,14 @@ namespace utils
   
   bool mpi_device_source::impl::test() const
   {
-    if (! is_open()) 
+    if (! is_open() || ready) 
       return true;
     
-    if (! const_cast<mpi_device_source::impl&>(*this).request_buffer.Test())
+    if (! const_cast<mpi_device_source::impl&>(*this).request.Test())
       return false;
     
-    std::copy(buffer.end() - sizeof(unsigned int), buffer.end(), (char_type*) &recv_size);
+    std::copy(buffer.end() - sizeof(stream_size_type), buffer.end(), (char_type*) &recv_size);
+    const_cast<bool&>(ready) = true;
     
     return true;
   }
@@ -322,10 +332,9 @@ namespace utils
       
       return n;
     } else {
-      
       wait();
       
-      const std::streamsize copy_size = std::min(std::streamsize(buffer.size() - sizeof(unsigned int) - buffer_offset), n);
+      const std::streamsize copy_size = std::min(std::streamsize(buffer.size() - sizeof(stream_size_type) - buffer_offset), n);
       std::copy(s, s + copy_size, buffer.begin() + buffer_offset);
       buffer_offset += copy_size;
       
@@ -341,32 +350,35 @@ namespace utils
     if (! test()) return 0;
 
     if (overcommit) {
-      if (if_filled ? buffer_offset >= buffer.size() - sizeof(unsigned int) : buffer_offset > 0) {
-	send_size = std::min(buffer.size() - sizeof(unsigned int), buffer_overcommit.size());
+      if (if_filled ? buffer_offset >= buffer.size() - sizeof(stream_size_type) : buffer_offset > 0) {
+	
+	send_size = std::min(buffer.size() - sizeof(stream_size_type), buffer_overcommit.size());
+	
 	std::copy(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size, buffer.begin());
-	buffer_overcommit.erase(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size);
-
+	
 	// if the capacity is twice as large as the buffer size, shrink...
+	
+	buffer_overcommit.erase(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size);
 	if (buffer_overcommit.capacity() > (buffer_overcommit.size() << 1))
 	  buffer_type(buffer_overcommit).swap(buffer_overcommit);
 	
 	buffer_offset = buffer_overcommit.size();
 	
-	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
+	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
 	
-	request_buffer.Start();
+	request.Start();
 	
 	return send_size;
       } else
 	return 0;
     } else {
-      if (if_filled ? buffer_offset == buffer.size() - sizeof(unsigned int) : buffer_offset > 0) {
+      if (if_filled ? buffer_offset == buffer.size() - sizeof(stream_size_type) : buffer_offset > 0) {
 	send_size = buffer_offset;
 	buffer_offset = 0;
 	
-	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
+	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
 	
-	request_buffer.Start();
+	request.Start();
 	
 	return send_size;
       } else
@@ -397,9 +409,9 @@ namespace utils
     
     send_size = 0;
     
-    std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
+    std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
     
-    request_buffer.Start();
+    request.Start();
   };
   
   void mpi_device_sink::impl::finalize()
@@ -409,7 +421,7 @@ namespace utils
     if (send_size != 0)
       terminate();
 
-    request_buffer.Wait();
+    request.Wait();
     
     buffer.clear();
     buffer_overcommit.clear();
@@ -441,21 +453,19 @@ namespace utils
 
   void mpi_device_sink::impl::open(MPI::Comm& comm, int rank, int tag, size_t buffer_size, bool _terminate_on_close, bool _overcommit)
   {
-    typedef unsigned int send_size_type;
-
     close();
     
     // minimum of 4-bytes...
-    buffer.reserve(std::max(buffer_size, size_t(128) + sizeof(unsigned int)));
-    buffer.resize(std::max(buffer_size, size_t(128) + sizeof(unsigned int)));
+    buffer.reserve(std::max(buffer_size, size_t(128) + sizeof(stream_size_type)));
+    buffer.resize(std::max(buffer_size, size_t(128) + sizeof(stream_size_type)));
     
     buffer_overcommit.clear();
     buffer_type(buffer_overcommit).swap(buffer_overcommit);
     
-    send_size = send_size_type(-1);
+    send_size = stream_size_type(-1);
     buffer_offset = 0;
     
-    request_buffer = comm.Send_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
+    request = comm.Send_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
     
     terminate_on_close = _terminate_on_close;
     overcommit = _overcommit;
@@ -478,7 +488,8 @@ namespace utils
     buffer_offset += copy_size;
     
     if (buffer_offset == recv_size) {
-      request_buffer.Start();
+      request.Start();
+      ready = false;
       
       buffer_offset = 0;
     }
@@ -505,15 +516,16 @@ namespace utils
   {
     close();
     
-    buffer.reserve(std::max(buffer_size, size_t(128) + sizeof(unsigned int)));
-    buffer.resize(std::max(buffer_size, size_t(128) + sizeof(unsigned int)));
+    buffer.reserve(std::max(buffer_size, size_t(128) + sizeof(stream_size_type)));
+    buffer.resize(std::max(buffer_size, size_t(128) + sizeof(stream_size_type)));
     
     recv_size = 0;
     buffer_offset = 0;
     
-    request_buffer = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
+    request = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
     
-    request_buffer.Start();
+    request.Start();
+    ready = false;
   }
 
 };
