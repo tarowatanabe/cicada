@@ -341,7 +341,7 @@ namespace utils
     if (! test()) return 0;
 
     if (overcommit) {
-      if (if_filled ? buffer_offset >= buffer.size() - sizeof(unsigned int): buffer_offset > 0) {
+      if (if_filled ? buffer_offset >= buffer.size() - sizeof(unsigned int) : buffer_offset > 0) {
 	send_size = std::min(buffer.size() - sizeof(unsigned int), buffer_overcommit.size());
 	std::copy(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size, buffer.begin());
 	buffer_overcommit.erase(buffer_overcommit.begin(), buffer_overcommit.begin() + send_size);
@@ -511,7 +511,7 @@ namespace utils
     recv_size = 0;
     buffer_offset = 0;
     
-    request_buffer = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, 8);
+    request_buffer = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
     
     request_buffer.Start();
   }
