@@ -239,6 +239,8 @@ namespace utils
       buffer_type buffer_overcommit;
       bool terminate_on_close;
       bool overcommit;
+
+      bool ready;
       
       impl() {}
       ~impl() { close(); }
@@ -263,11 +265,13 @@ namespace utils
   
   void mpi_device_sink::impl::wait() const
   {
-    if (! is_open())
+    if (! is_open() || ready)
       return;
     
     if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
       const_cast<mpi_device_sink::impl&>(*this).request.Wait();
+
+    const_cast<bool&>(ready) = true;
   }
 
   void mpi_device_source::impl::wait() const
@@ -284,11 +288,13 @@ namespace utils
   
   bool mpi_device_sink::impl::test() const
   {
-    if (! is_open())
+    if (! is_open() || ready)
       return true;
 
     if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
       return false;
+
+    const_cast<bool&>(ready) = true;
     
     return true;
   }
@@ -367,6 +373,7 @@ namespace utils
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
 	
 	request.Start();
+	ready = false;
 	
 	return send_size;
       } else
@@ -379,6 +386,7 @@ namespace utils
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
 	
 	request.Start();
+	ready = false;
 	
 	return send_size;
       } else
@@ -412,6 +420,7 @@ namespace utils
     std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
     
     request.Start();
+    ready = false;
   };
   
   void mpi_device_sink::impl::finalize()
@@ -420,8 +429,8 @@ namespace utils
     
     if (send_size != 0)
       terminate();
-
-    request.Wait();
+    
+    wait();
     
     buffer.clear();
     buffer_overcommit.clear();
@@ -466,6 +475,7 @@ namespace utils
     buffer_offset = 0;
     
     request = comm.Send_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
+    ready = true;
     
     terminate_on_close = _terminate_on_close;
     overcommit = _overcommit;
