@@ -355,7 +355,6 @@ namespace utils
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
 	
 	request_buffer.Start();
-	request_buffer.Test();
 	
 	return send_size;
       } else
@@ -368,7 +367,6 @@ namespace utils
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
 	
 	request_buffer.Start();
-	request_buffer.Test();
 	
 	return send_size;
       } else
@@ -399,8 +397,9 @@ namespace utils
     
     send_size = 0;
     
+    std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(unsigned int), buffer.end() - sizeof(unsigned int));
+    
     request_buffer.Start();
-    request_buffer.Test();
   };
   
   void mpi_device_sink::impl::finalize()
@@ -480,7 +479,6 @@ namespace utils
     
     if (buffer_offset == recv_size) {
       request_buffer.Start();
-      request_buffer.Test();
       
       buffer_offset = 0;
     }
@@ -516,7 +514,6 @@ namespace utils
     request_buffer = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, 8);
     
     request_buffer.Start();
-    request_buffer.Test();
   }
 
 };
