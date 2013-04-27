@@ -47,6 +47,8 @@ opt_parser = OptionParser(
                 help="list of hosts to run job. Identical to --host for mpirun", metavar="HOSTS"),
     make_option("--mpi-host-file", default="", action="store", type="string",
                 help="host list file to run job. Identical to --hostfile for mpirun", metavar="FILE"),
+    make_option("--mpi-options", default="", action="store", type="string",
+                metavar="OPTION", help="additional MPI options"),    
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-name", default="cicada-sh", action="store", type="string",
@@ -216,12 +218,13 @@ class Threads:
 
 class MPI:
     
-    def __init__(self, cicada=None, dir="", hosts="", hosts_file="", number=0):
+    def __init__(self, cicada=None, dir="", hosts="", hosts_file="", number=0, options=""):
         
 	self.dir = dir
 	self.hosts = hosts
         self.hosts_file = hosts_file
         self.number = number
+        self.options = options
 	
         if self.dir:
             if not os.path.exists(self.dir):
@@ -263,6 +266,8 @@ class MPI:
             command += ' -x LD_LIBRARY_PATH'
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             command += ' -x DYLD_LIBRARY_PATH'
+
+        command += ' ' + self.options
 
         command += " %s" %(cicada.mpish)
         command += " --debug"
@@ -338,7 +343,8 @@ if __name__ == '__main__':
                   dir=options.mpi_dir,
                   hosts=options.mpi_host,
                   hosts_file=options.mpi_host_file,
-                  number=options.mpi)
+                  number=options.mpi,
+                  options=options.mpi_options)
     
         for line in sys.stdin:
             line = line.strip()

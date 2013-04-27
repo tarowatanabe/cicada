@@ -57,6 +57,8 @@ opt_parser = OptionParser(
                 help="list of hosts to run job. Identical to --host for mpirun", metavar="HOSTS"),
     make_option("--mpi-host-file", default="", action="store", type="string",
                 help="host list file to run job. Identical to --hostfile for mpirun", metavar="FILE"),
+    make_option("--mpi-options", default="", action="store", type="string",
+                metavar="OPTION", help="additional MPI options"),    
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-name", default="cicada-pipe", action="store", type="string",
@@ -186,6 +188,8 @@ class PBS:
                 prefix += ' -x LD_LIBRARY_PATH'
             if os.environ.has_key('DYLD_LIBRARY_PATH'):
                 prefix += ' -x DYLD_LIBRARY_PATH'
+
+            prefix += ' ' + mpi.options
             prefix += ' '
         
         suffix = ''
@@ -198,12 +202,13 @@ class PBS:
         popen.wait()
 
 class MPI:
-    def __init__(self, dir="", hosts="", hosts_file="", number=0):
+    def __init__(self, dir="", hosts="", hosts_file="", number=0, options=""):
         
 	self.dir = dir
 	self.hosts = hosts
         self.hosts_file = hosts_file
         self.number = number
+        self.options = options
 	
         if self.dir:
             if not os.path.exists(self.dir):
@@ -244,8 +249,9 @@ class MPI:
             mpirun += ' -x LD_LIBRARY_PATH'
         if os.environ.has_key('DYLD_LIBRARY_PATH'):
             mpirun += ' -x DYLD_LIBRARY_PATH'
-
-	mpirun += ' ' + command
+            
+        mpirun += ' ' + self.options
+        mpirun += ' ' + command
 
         if logfile:
             mpirun += " 2> %s" %(logfile)
@@ -326,7 +332,8 @@ if __name__ == '__main__':
         mpi = MPI(dir=options.mpi_dir,
                   hosts=options.mpi_host,
                   hosts_file=options.mpi_host_file,
-                  number=options.mpi)
+                  number=options.mpi,
+                  options=options.mpi_options)
     
     ### PBS
     pbs = None
