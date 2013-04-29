@@ -3,13 +3,9 @@
 //
 
 //
-// asynchronous learning
+// mini-batch forest-based online asynchronous learning
 //
-// In each iteration, we sample a block and decode, and update "support vectors" and learn.
-// For learning, we employ lbfgs or liblinear for faster training (but we will use reranking training)
-// We will parallelize in each block, and perform oracle computation in parallel.
-// The update to the weight vector is performed asynchronously, not synchronously thus named 
-// "asynchronous" not "online"
+
 //
 // This implementation is motivated by (Chiang et al., 2008) and (Chiang et al., 2009)
 // 
@@ -609,7 +605,7 @@ struct Task
   struct history_type
   {
     history_type() {}
-    history_type(const scorer_document_type& __scorers) : scorers(__scorers.parameter()) { }
+    history_type(const std::string& parameter) : scorers(parameter) { }
     
     segment_set_type         segments;
     hypergraph_document_type forests;
@@ -678,7 +674,7 @@ struct Task
 	  if (static_cast<int>(history.size()) >= merge_history)
 	    history.erase(history.begin());
 	  
-	  history.push_back(history_type(scorers_));
+	  history.push_back(history_type(scorers_.parameter()));
 	  
 	  history.back().segments.swap(segments_batch);
 	  history.back().forests.swap(forests_batch);

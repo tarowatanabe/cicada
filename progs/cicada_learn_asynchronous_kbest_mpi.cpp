@@ -3,19 +3,13 @@
 //
 
 //
-// New: blocked learning
+// mini-batch kbest-based online asynchronous learning
 //
-// In each iteration, we sample a block and decode, and update "support vectors" and learn.
-// For learning, we employ lbfgs or liblinear for faster training (but we will use reranking training)
-// We will parallelize in each block, and perform oracle computation in parallel.
 
 //
-// The idea is taken from the cicada-learn*.sh scripts, but adapted so that:
-// we will discard or keep old support vectors
-// we will compute error metric wrt "block"
-// run in online fashion for faster convergence on larger data
-// we will keep only support vectors, not actual translations
-//
+// This implementation is motivated by (Chiang et al., 2008) and (Chiang et al., 2009)
+// 
+
 
 #include <iostream>
 #include <vector>
@@ -128,7 +122,7 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
-bool merge_previous_mode = false;
+int merge_history = 0;
 bool mix_none_mode = false;
 bool mix_average_mode = false;
 bool mix_select_mode = false;
@@ -681,6 +675,18 @@ struct Task
   score_ptr_type score_1best_;
   score_ptr_type score_oracle_;
   size_type      num_update_;
+
+  struct history_type
+  {
+    history_type() {}
+    history_type(const std::string& parameter) { }
+    
+    segment_set_type    segments;
+    hypothesis_map_type kbests;
+    hypothesis_map_type oracles;
+  };
+  typedef std::deque<history_type, std::allocator<history_type> > history_set_type;
+
   
   void operator()()
   {
@@ -692,9 +698,7 @@ struct Task
     hypothesis_map_type  oracles_batch;
     scorer_document_type scorers_batch(scorers_);
 
-    segment_set_type     segments_prev;
-    hypothesis_map_type  kbests_prev;
-    hypothesis_map_type  oracles_prev;
+    history_set_type history;
     
     learner_.initialize(weights_);
     
@@ -739,10 +743,16 @@ struct Task
       }
       
       if (! learn_finished) {
-	if (merge_previous_mode) {
-	  segments_batch.swap(segments_prev);
-	  kbests_batch.swap(kbests_prev);
-	  oracles_batch.swap(oracles_prev);
+	if (merge_history > 0) {
+	  
+	  if (static_cast<int>(history.size()) >= merge_history)
+	    history.erase(history.begin());
+	  
+	  history.push_back(history_type(scorers_.parameter()));
+	  
+	  history.back().segments.swap(segments_batch);
+	  history.back().kbests.swap(kbests_batch);
+	  history.back().oracles.swap(oracles_batch);
 	}
 	
 	segments_batch.clear();
@@ -805,9 +815,10 @@ struct Task
 		      << "rank: " << rank_ << " accumulated oracle: " << *score_oracle_ << std::endl;
 	    
 	  // encode into learner...
-	  if (! segments_prev.empty())
-	    for (size_t i = 0; i != kbests_prev.size(); ++ i)
-	      learner_.encode(segments_prev[i], kbests_prev[i], oracles_prev[i]);
+	  if (! history.empty())
+	    for (size_t j = 0; j != history.size(); ++ j)
+	      for (size_t i = 0; i != history[j].segments.size(); ++ i)
+		learner_.encode(history[j].segments[i], history[j].kbests[i], history[j].oracles[i]);
 
 	  for (size_t i = 0; i != kbests_batch.size(); ++ i)
 	    learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
@@ -1485,7 +1496,7 @@ void options(int argc, char** argv)
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
-    ("merge-previous",      po::bool_switch(&merge_previous_mode),  "merge previous decoded results")
+    ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
     ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
     ("mix-select",          po::bool_switch(&mix_select_mode),      "select weights by L1")
