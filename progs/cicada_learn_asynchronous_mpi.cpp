@@ -114,7 +114,7 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
-bool merge_previous_mode = false;
+int merge_history = 0;
 bool weights_average_mode = false;
 bool mix_none_mode = false;
 bool mix_average_mode = false;
@@ -604,6 +604,19 @@ struct Task
   score_ptr_type score_1best_;
   score_ptr_type score_oracle_;
   size_type      num_update_;
+
+
+  struct history_type
+  {
+    history_type() {}
+    history_type(const scorer_document_type& __scorers) : scorers(__scorers.parameter()) { }
+    
+    segment_set_type         segments;
+    hypergraph_document_type forests;
+    hypergraph_document_type oracles;
+    scorer_document_type     scorers;
+  };
+  typedef std::deque<history_type, std::allocator<history_type> > history_set_type;
   
   void operator()()
   {
@@ -614,10 +627,7 @@ struct Task
     scorer_document_type     scorers_batch(scorers_);
     function_document_type   functions_batch;
 
-    segment_set_type         segments_prev;
-    hypergraph_document_type forests_prev;
-    hypergraph_document_type oracles_prev;
-    scorer_document_type     scorers_prev(scorers_);
+    history_set_type history;
     
     learner_.initialize(weights_);
     
@@ -663,11 +673,17 @@ struct Task
       
       if (! learn_finished) {
 	
-	if (merge_previous_mode) {
-	  segments_batch.swap(segments_prev);
-	  forests_batch.swap(forests_prev);
-	  oracles_batch.swap(oracles_prev);
-	  scorers_batch.swap(scorers_prev);
+	if (merge_history > 0) {
+	  
+	  if (static_cast<int>(history.size()) >= merge_history)
+	    history.erase(history.begin());
+	  
+	  history.push_back(history_type(scorers_));
+	  
+	  history.back().segments.swap(segments_batch);
+	  history.back().forests.swap(forests_batch);
+	  history.back().oracles.swap(oracles_batch);
+	  history.back().scorers.swap(scorers_batch);
 	}
 
 	segments_batch.clear();
@@ -742,9 +758,10 @@ struct Task
 		      << "rank: " << rank_ << " accumulated oracle: " << *score_oracle_ << std::endl;
 	  
 	  // encode into learner...
-	  if (! segments_prev.empty())
-	    for (size_t i = 0; i != forests_prev.size(); ++ i)
-	      learner_.encode(segments_prev[i], weights_, forests_prev[i], oracles_prev[i], scorers_prev[i]);
+	  if (! history.empty())
+	    for (size_t j = 0; j != history.size(); ++ j)
+	      for (size_t i = 0; i != history[j].segments.size(); ++ i)
+		learner_.encode(history[j].segments[i], weights_, history[j].forests[i], history[j].oracles[i], history[j].scorers[i]);
 	  
 	  for (size_t i = 0; i != forests_batch.size(); ++ i)
 	    learner_.encode(segments_batch[i], weights_, forests_batch[i], oracles_batch[i], scorers_batch[i]);
@@ -1415,7 +1432,7 @@ void options(int argc, char** argv)
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle forests")
-    ("merge-previous",      po::bool_switch(&merge_previous_mode),  "merge previous decoded results")
+    ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
     ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
     ("mix-select",          po::bool_switch(&mix_select_mode),      "select weights by L1")
