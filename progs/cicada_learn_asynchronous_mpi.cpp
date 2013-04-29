@@ -114,6 +114,7 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
+bool merge_previous_mode = false;
 bool weights_average_mode = false;
 bool mix_none_mode = false;
 bool mix_average_mode = false;
@@ -612,6 +613,11 @@ struct Task
     hypergraph_document_type oracles_batch;
     scorer_document_type     scorers_batch(scorers_);
     function_document_type   functions_batch;
+
+    segment_set_type         segments_prev;
+    hypergraph_document_type forests_prev;
+    hypergraph_document_type oracles_prev;
+    scorer_document_type     scorers_prev(scorers_);
     
     learner_.initialize(weights_);
     
@@ -656,6 +662,14 @@ struct Task
       }
       
       if (! learn_finished) {
+	
+	if (merge_previous_mode) {
+	  segments_batch.swap(segments_prev);
+	  forests_batch.swap(forests_prev);
+	  oracles_batch.swap(oracles_prev);
+	  scorers_batch.swap(scorers_prev);
+	}
+
 	segments_batch.clear();
 	forests_batch.clear();
 	forests_oracle_batch.clear();
@@ -728,6 +742,10 @@ struct Task
 		      << "rank: " << rank_ << " accumulated oracle: " << *score_oracle_ << std::endl;
 	  
 	  // encode into learner...
+	  if (! segments_prev.empty())
+	    for (size_t i = 0; i != forests_prev.size(); ++ i)
+	      learner_.encode(segments_prev[i], weights_, forests_prev[i], oracles_prev[i], scorers_prev[i]);
+	  
 	  for (size_t i = 0; i != forests_batch.size(); ++ i)
 	    learner_.encode(segments_batch[i], weights_, forests_batch[i], oracles_batch[i], scorers_batch[i]);
 	  
@@ -1397,6 +1415,7 @@ void options(int argc, char** argv)
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle forests")
+    ("merge-previous",      po::bool_switch(&merge_previous_mode),  "merge previous decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
     ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
     ("mix-select",          po::bool_switch(&mix_select_mode),      "select weights by L1")

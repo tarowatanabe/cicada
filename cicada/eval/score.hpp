@@ -237,6 +237,16 @@ namespace cicada
       
       inline const_iterator end() const { return m_scorers.end(); }
       inline       iterator end()       { return m_scorers.end(); }
+
+      void erase(iterator first, iterator last)
+      {
+	m_scorers.erase(first, last);
+      }
+
+      void erase(iterator iter)
+      {
+	m_scorers.erase(iter);
+      }
       
       void push_back(const scorer_ptr_type& x) { m_scorers.push_back(x); }
       

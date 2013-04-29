@@ -128,6 +128,7 @@ bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
 bool merge_oracle_mode = false;
+bool merge_previous_mode = false;
 bool mix_none_mode = false;
 bool mix_average_mode = false;
 bool mix_select_mode = false;
@@ -690,6 +691,10 @@ struct Task
     hypothesis_map_type  kbests_oracle_batch;
     hypothesis_map_type  oracles_batch;
     scorer_document_type scorers_batch(scorers_);
+
+    segment_set_type     segments_prev;
+    hypothesis_map_type  kbests_prev;
+    hypothesis_map_type  oracles_prev;
     
     learner_.initialize(weights_);
     
@@ -734,6 +739,12 @@ struct Task
       }
       
       if (! learn_finished) {
+	if (merge_previous_mode) {
+	  segments_batch.swap(segments_prev);
+	  kbests_batch.swap(kbests_prev);
+	  oracles_batch.swap(oracles_prev);
+	}
+	
 	segments_batch.clear();
 	kbests_batch.clear();
 	kbests_oracle_batch.clear();
@@ -794,6 +805,10 @@ struct Task
 		      << "rank: " << rank_ << " accumulated oracle: " << *score_oracle_ << std::endl;
 	    
 	  // encode into learner...
+	  if (! segments_prev.empty())
+	    for (size_t i = 0; i != kbests_prev.size(); ++ i)
+	      learner_.encode(segments_prev[i], kbests_prev[i], oracles_prev[i]);
+
 	  for (size_t i = 0; i != kbests_batch.size(); ++ i)
 	    learner_.encode(segments_batch[i], kbests_batch[i], oracles_batch[i]);
 	    
@@ -1470,6 +1485,7 @@ void options(int argc, char** argv)
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
+    ("merge-previous",      po::bool_switch(&merge_previous_mode),  "merge previous decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
     ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
     ("mix-select",          po::bool_switch(&mix_select_mode),      "select weights by L1")
