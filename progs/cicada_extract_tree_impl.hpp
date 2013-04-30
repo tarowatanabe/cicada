@@ -1606,9 +1606,6 @@ struct ExtractTree
 
     range_tails.clear();
     
-    // try dump when we have spurious allocation...
-    dumper(rule_pairs);
-
     for (size_t id = 0; id != graph_target.derivations.size(); ++ id) {
       derivation_node_type& node = graph_target.derivations[id];
       
@@ -1632,9 +1629,6 @@ struct ExtractTree
 	range_tails[range_tail].push_back(std::make_pair(id, id_edge));
       }
     }
-
-    // try dump when we have spurious allocation...
-    dumper(rule_pairs);
     
     for (size_t id = 0; id != graph_source.derivations.size(); ++ id) {
       derivation_node_type& node_source = graph_source.derivations[id];

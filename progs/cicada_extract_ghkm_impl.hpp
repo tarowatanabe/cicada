@@ -752,9 +752,6 @@ struct ExtractGHKM
     rules_target.clear();
     rules_alignment.clear();
 
-    // try dump when we have spurious allocation...
-    dumper(rule_pairs);
-    
     candidate_set_type    candidates;
     candidate_heap_type   cand;
     
