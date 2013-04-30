@@ -916,8 +916,11 @@ struct ExtractGHKM
 
     uniques_pair.clear();
     
+    const int iter_rules_mask = (1 << 12) - 1;
+    int iter_rules = 0;
+
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ iter_rules) {
       // uncover phrasal representation!
       const bool unique_source = ! riter->source->second;
       const bool unique_target = ! riter->target->second;
@@ -940,6 +943,9 @@ struct ExtractGHKM
       rule_pair.freqs[2] += unique_target;
       
       rule_pairs_local.erase(riter ++);
+      
+      if ((iter_rules & iter_rules_mask) == iter_rules_mask)
+	dumper(rule_pairs);
     }
     
     rule_pairs_local.clear();
