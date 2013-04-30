@@ -289,7 +289,6 @@ namespace utils
       } else
 	boost::thread::yield();
     }
-
   }
   
   bool mpi_device_sink::impl::test() const

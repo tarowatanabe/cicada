@@ -1605,6 +1605,9 @@ struct ExtractTree
     rules_alignment.clear();
 
     range_tails.clear();
+    
+    // try dump when we have spurious allocation...
+    dumper(rule_pairs);
 
     for (size_t id = 0; id != graph_target.derivations.size(); ++ id) {
       derivation_node_type& node = graph_target.derivations[id];
@@ -1622,16 +1625,17 @@ struct ExtractTree
 	  
 	  range_tail.second.push_back(graph_target.ranges[node_tail.node]);
 	}
-
+	
 	// sort!
 	std::sort(range_tail.second.begin(), range_tail.second.end());
 	
 	range_tails[range_tail].push_back(std::make_pair(id, id_edge));
       }
     }
-    
-    const size_t id_mask = 512 - 1;
 
+    // try dump when we have spurious allocation...
+    dumper(rule_pairs);
+    
     for (size_t id = 0; id != graph_source.derivations.size(); ++ id) {
       derivation_node_type& node_source = graph_source.derivations[id];
       
@@ -1715,18 +1719,15 @@ struct ExtractTree
 	  }
 	}
       }
-      
-      if ((id & id_mask) == id_mask)
-	dumper(rule_pairs);
     }
 
+    // try dump when we have spurious allocation...
+    dumper(rule_pairs);
+    
     uniques_pair.clear();
-
-    const int iter_rules_mask = (1 << 12) - 1;
-    int iter_rules = 0;
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ iter_rules) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
       // uncover phrasal representation!
       const bool unique_source = ! riter->source->second;
       const bool unique_target = ! riter->target->second;
@@ -1749,9 +1750,6 @@ struct ExtractTree
       rule_pair.freqs[2] += unique_target;
       
       rule_pairs_local.erase(riter ++);
-      
-      if ((iter_rules & iter_rules_mask) == iter_rules_mask)
-	dumper(rule_pairs);
     }
     
     rule_pairs_local.clear();

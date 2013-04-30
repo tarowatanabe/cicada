@@ -751,6 +751,9 @@ struct ExtractGHKM
     rules_source.clear();
     rules_target.clear();
     rules_alignment.clear();
+
+    // try dump when we have spurious allocation...
+    dumper(rule_pairs);
     
     candidate_set_type    candidates;
     candidate_heap_type   cand;
@@ -775,8 +778,6 @@ struct ExtractGHKM
     node_set_type tails_new;
 
     //std::cerr << "derivations size: " << derivations.size() << std::endl;
-
-    const size_t id_mask = 512 - 1;
 
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
@@ -921,18 +922,15 @@ struct ExtractGHKM
       }
       
       rule_pairs_span.clear();
-      
-      if ((id & id_mask) == id_mask)
-	dumper(rule_pairs);
     }
-
-    uniques_pair.clear();
     
-    const int iter_rules_mask = (1 << 12) - 1;
-    int iter_rules = 0;
+    // try dump when we have spurious allocation...
+    dumper(rule_pairs);
+    
+    uniques_pair.clear();
 
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ iter_rules) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
       // uncover phrasal representation!
       const bool unique_source = ! riter->source->second;
       const bool unique_target = ! riter->target->second;
@@ -955,9 +953,6 @@ struct ExtractGHKM
       rule_pair.freqs[2] += unique_target;
       
       rule_pairs_local.erase(riter ++);
-      
-      if ((iter_rules & iter_rules_mask) == iter_rules_mask)
-	dumper(rule_pairs);
     }
     
     rule_pairs_local.clear();
