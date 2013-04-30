@@ -1622,6 +1622,8 @@ struct ExtractTree
       }
     }
     
+    const size_t id_mask = 512 - 1;
+
     for (size_t id = 0; id != graph_source.derivations.size(); ++ id) {
       derivation_node_type& node_source = graph_source.derivations[id];
       
@@ -1703,6 +1705,9 @@ struct ExtractTree
 	  }
 	}
       }
+      
+      if ((id & id_mask) == id_mask)
+	dumper(rule_pairs);
     }
 
     uniques_pair.clear();

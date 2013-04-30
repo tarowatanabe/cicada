@@ -532,7 +532,6 @@ struct ExtractGHKM
   typedef std::vector<bool, std::allocator<bool> > covered_type;
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
-  typedef std::vector<rule_pair_compact_type, std::allocator<rule_pair_compact_type> > rule_pair_compact_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
 
   typedef std::vector<symbol_type, std::allocator<symbol_type> > frontier_symbol_set_type;
@@ -541,6 +540,8 @@ struct ExtractGHKM
   typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
 
   typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_local_type;
+
+  typedef std::vector<rule_pair_compact_type, std::allocator<rule_pair_compact_type> > rule_pair_compact_list_type;
 
   struct node_set_hash : public utils::hashmurmur3<size_t>
   {
@@ -769,6 +770,8 @@ struct ExtractGHKM
 
     //std::cerr << "derivations size: " << derivations.size() << std::endl;
 
+    const size_t id_mask = 512 - 1;
+
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
       
@@ -912,6 +915,9 @@ struct ExtractGHKM
       }
       
       rule_pairs_span.clear();
+      
+      if ((id & id_mask) == id_mask)
+	dumper(rule_pairs);
     }
 
     uniques_pair.clear();
