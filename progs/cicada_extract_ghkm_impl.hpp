@@ -323,13 +323,18 @@ struct ExtractGHKM
 			       std::equal_to<phrase_type>,
 			       std::allocator<std::pair<const phrase_type, bool> > >::type rule_compact_set_type;
   
+  typedef utils::unordered_set<rule_pair_type::alignment_type,
+			       boost::hash<rule_pair_type::alignment_type>,
+			       std::equal_to<rule_pair_type::alignment_type>,
+			       std::allocator<rule_pair_type::alignment_type> >::type alignment_set_type;
+  
   struct RulePairCompact
   {
-    typedef rule_pair_type::alignment_type alignment_type;
+    typedef rule_pair_type::alignment_type alignment_type;    
     
     const rule_compact_type* source;
     const rule_compact_type* target;
-    alignment_type           alignment;
+    const alignment_type*    alignment;
     count_type               count;
     
     RulePairCompact() : source(), target(), alignment(), count(0) {}
@@ -339,7 +344,7 @@ struct ExtractGHKM
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
       
-      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
+      return hasher_type()(x.target, hasher_type()(x.alignment, (uintptr_t) x.source));
     }
     
     friend
@@ -745,6 +750,7 @@ struct ExtractGHKM
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
     
     candidate_set_type    candidates;
     candidate_heap_type   cand;
@@ -936,7 +942,7 @@ struct ExtractGHKM
       
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
 											      riter->target->first,
-											      riter->alignment,
+											      *(riter->alignment),
 											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -957,6 +963,7 @@ struct ExtractGHKM
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
@@ -965,6 +972,7 @@ struct ExtractGHKM
       rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
+      alignment_set_type(rules_alignment).swap(rules_alignment);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -1096,6 +1104,7 @@ struct ExtractGHKM
 
   rule_compact_set_type rules_source;
   rule_compact_set_type rules_target;
+  alignment_set_type    rules_alignment;
   unique_pair_set_type  uniques_pair;
   
   bool construct_rule_pair(const hypergraph_type& graph,
@@ -1195,7 +1204,8 @@ struct ExtractGHKM
 
     //std::cerr << "construct alignment" << std::endl;
     
-    rule_pair.alignment.clear();
+    //rule_pair.alignment.clear();
+    alignment_type alignment;
     int pos_src = 0;
     
     if (! positions_source.empty()) {
@@ -1205,21 +1215,21 @@ struct ExtractGHKM
 	  point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
 	  
 	  for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	    rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
+	    alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
 	  
 	  ++ pos_src;
 	}
     }
 
-    //std::cerr << "alignment: " << rule_pair.alignment << std::endl;
+    //std::cerr << "alignment: " << alignment << std::endl;
 
     
     if (swap_source_target) {
       //std::cerr << "swapping" << std::endl;
       
       // inverse alignment
-      rule_pair.alignment.inverse();
-      std::sort(rule_pair.alignment.begin(), rule_pair.alignment.end());
+      alignment.inverse();
+      std::sort(alignment.begin(), alignment.end());
 
       rule_source.swap(rule_target);
       
@@ -1229,7 +1239,7 @@ struct ExtractGHKM
 #if 0
       std::cerr << "swapped source: " << rule_source << std::endl
 		<< "swapped target: " << rule_target << std::endl
-		<< "swapped alignment: " << rule_pair.alignment << std::endl;
+		<< "swapped alignment: " << alignment << std::endl;
 #endif
     }
 
@@ -1281,6 +1291,8 @@ struct ExtractGHKM
 							     false)).first);
     rule_pair.target = &(*rules_target.insert(std::make_pair(phrase_type(buffer_target.begin(), buffer_target.end()),
 							     false)).first);
+    
+    rule_pair.alignment = &(*rules_alignment.insert(alignment).first);
     
     return true;
   }
