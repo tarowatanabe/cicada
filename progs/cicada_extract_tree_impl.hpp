@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_TREE_IMPL__HPP__
@@ -319,14 +319,19 @@ struct ExtractTree
 			       std::equal_to<phrase_type>,
 			       std::allocator<std::pair<const phrase_type, bool> > >::type rule_compact_set_type;
   
+  typedef utils::unordered_set<rule_pair_type::alignment_type,
+			       boost::hash<rule_pair_type::alignment_type>,
+			       std::equal_to<rule_pair_type::alignment_type>,
+			       std::allocator<rule_pair_type::alignment_type> >::type alignment_set_type;
+  
   struct RulePairCompact
   {
     typedef rule_pair_type::alignment_type alignment_type;
 
     const rule_compact_type* source;
     const rule_compact_type* target;
-    alignment_type                       alignment;
-    count_type                           count;
+    const alignment_type*    alignment;
+    count_type               count;
     
     RulePairCompact() : source(), target(), alignment(), count(0) {}
 
@@ -335,7 +340,7 @@ struct ExtractTree
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
       
-      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
+      return hasher_type()(x.target, hasher_type()(x.alignment, (uintptr_t) x.source));
     }
     
     friend
@@ -1577,6 +1582,7 @@ struct ExtractTree
   rule_pair_compact_set_type rule_pairs_local;
   rule_compact_set_type      rules_source;
   rule_compact_set_type      rules_target;
+  alignment_set_type         rules_alignment;
   unique_pair_set_type       uniques_pair;
   
   template <typename Dumper>
@@ -1590,11 +1596,13 @@ struct ExtractTree
     // first, compute span-mapping from target-side...
 
     rule_pair_compact_type rule_pair;
+    rule_pair_type::alignment_type alignment;
     range_tail_type range_tail;
     
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
 
     range_tails.clear();
 
@@ -1681,7 +1689,7 @@ struct ExtractTree
 	  rule_pair.target = edge_target.rule;
 	  
 	  // construct alignment... HOW?
-	  rule_pair.alignment.clear();
+	  alignment.clear();
 
 	  for (size_t src = 0; src != edge_source.positions.size(); ++ src)
 	    if (edge_source.positions[src] >= 0) {
@@ -1692,9 +1700,11 @@ struct ExtractTree
 		if (edge_target.positions[*aiter] < 0)
 		  throw std::runtime_error("inlvalid alignment...?");
 		
-		rule_pair.alignment.push_back(std::make_pair(edge_source.positions[src], edge_target.positions[*aiter]));
+		alignment.push_back(std::make_pair(edge_source.positions[src], edge_target.positions[*aiter]));
 	      }
 	    }
+
+	  rule_pair.alignment = &(*rules_alignment.insert(alignment).first);
 	  
 	  rule_pair.count = edge_source.count * edge_target.count;
 	  
@@ -1726,7 +1736,7 @@ struct ExtractTree
       
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
 											      riter->target->first,
-											      riter->alignment,
+											      *(riter->alignment),
 											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -1747,6 +1757,7 @@ struct ExtractTree
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
@@ -1755,6 +1766,7 @@ struct ExtractTree
       rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
+      alignment_set_type(rules_alignment).swap(rules_alignment);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }

@@ -265,25 +265,31 @@ namespace utils
   
   void mpi_device_sink::impl::wait() const
   {
-    if (! is_open() || ready)
-      return;
-    
-    if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
-      const_cast<mpi_device_sink::impl&>(*this).request.Wait();
-
-    const_cast<bool&>(ready) = true;
+    const size_t mask = (1 << 6) - 1;
+    for (size_t iter = 0; ! test(); ++ iter) {
+      if ((iter & mask) == mask) {
+	struct timespec tm;
+	tm.tv_sec = 0;
+	tm.tv_nsec = 2000001;
+	nanosleep(&tm, NULL);
+      } else
+	boost::thread::yield();
+    }    
   }
 
   void mpi_device_source::impl::wait() const
   {
-    if (! is_open() || ready)
-      return;
+    const size_t mask = (1 << 6) - 1;
+    for (size_t iter = 0; ! test(); ++ iter) {
+      if ((iter & mask) == mask) {
+	struct timespec tm;
+	tm.tv_sec = 0;
+	tm.tv_nsec = 2000001;
+	nanosleep(&tm, NULL);
+      } else
+	boost::thread::yield();
+    }
 
-    if (! const_cast<mpi_device_source::impl&>(*this).request.Test())
-      const_cast<mpi_device_source::impl&>(*this).request.Wait();
-    
-    std::copy(buffer.end() - sizeof(stream_size_type), buffer.end(), (char_type*) &recv_size);
-    const_cast<bool&>(ready) = true;
   }
   
   bool mpi_device_sink::impl::test() const
