@@ -36,7 +36,6 @@
 #include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 #include "utils/getline.hpp"
-#include "utils/map_file_allocator.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -374,7 +373,7 @@ struct ExtractTree
   typedef utils::compact_set<rule_pair_compact_type,
 			     rule_pair_compact_unassigned, rule_pair_compact_unassigned,
 			     boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
-			     utils::map_file_allocator<rule_pair_compact_type> > rule_pair_compact_set_type;
+			     std::allocator<rule_pair_compact_type> > rule_pair_compact_set_type;
 
   
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
@@ -390,7 +389,7 @@ struct ExtractTree
   typedef utils::compact_set<unique_pair_type,
 			     unique_pair_unassigned, unique_pair_unassigned,
 			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
-			     utils::map_file_allocator<unique_pair_type> > unique_pair_set_type;
+			     std::allocator<unique_pair_type> > unique_pair_set_type;
 
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
