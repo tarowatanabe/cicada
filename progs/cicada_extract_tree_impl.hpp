@@ -709,9 +709,11 @@ struct ExtractTree
 	  
 	  const derivation_edge_type& edge = *(item->edge);
 	  
-	  candidate_type query(item->j);
-	  index_set_type& j = query.j;
-	  query.edge = item->edge;
+	  //candidate_type query(item->j);
+	  //index_set_type& j = query.j;
+	  //query.edge = item->edge;
+
+	  index_set_type j(item->j);
 	  
 	  for (size_t i = 0; i != j.size(); ++ i) 
 	    if (! derivations[edge.tails[i]].edges.empty()) {
