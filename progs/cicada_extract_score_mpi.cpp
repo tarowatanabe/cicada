@@ -69,6 +69,8 @@ bool score_ghkm   = false;
 
 double max_malloc = 8; // 8 GB
 path_type prog_name;
+std::string host;
+std::string hostfile;
 
 int debug = 0;
 
@@ -225,9 +227,21 @@ int main(int argc, char** argv)
       synchronize_reducer(comm_parent);
     } else {
       std::vector<int, std::allocator<int> > error_codes(mpi_size, MPI_SUCCESS);
-      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
-      utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0, &(*error_codes.begin())));
+
       
+      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
+      
+      MPI::Info info = MPI::Info::Create();
+
+      if (! host.empty())
+	info.Set("host", host.c_str());
+      if (! hostfile.empty())
+	info.Set("hostfile", hostfile.c_str());
+      
+      utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, info, 0, &(*error_codes.begin())));
+
+      info.Free();
+
       for (size_t i = 0; i != error_codes.size(); ++ i)
 	if (error_codes[i] != MPI_SUCCESS)
 	  throw std::runtime_error("one of children failed to launch!");
@@ -1601,8 +1615,11 @@ void options(int argc, char** argv)
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
     ("score-ghkm",   po::bool_switch(&score_ghkm),   "score ghkm fragment counts")
     
-    ("max-malloc", po::value<double>(&max_malloc),   "maximum malloc in GB")
-    ("prog",       po::value<path_type>(&prog_name), "this binary");
+    ("max-malloc", po::value<double>(&max_malloc),    "maximum malloc in GB")
+    ("prog",       po::value<path_type>(&prog_name),  "this binary")
+    ("host",       po::value<std::string>(&host),     "host name")
+    ("hostfile",   po::value<std::string>(&hostfile), "hostfile name")
+    ;
   
   po::options_description opts_command("command line options");
   opts_command.add_options()

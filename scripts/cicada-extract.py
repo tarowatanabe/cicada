@@ -896,6 +896,12 @@ class ExtractScore(Extract):
         
         if mpi:
             command += " --prog \"%s\"" %(prog_name)
+            
+            if mpi.hosts:
+                command += "  --host \"%s\"" %(mpi.hosts)
+            elif mpi.hosts_file:
+                command += "  --hostfile \"%s\"" %(mpi.hosts_file)
+            
         else:
             command += " --threads %d" %(self.threads)
             
