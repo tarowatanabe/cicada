@@ -394,7 +394,7 @@ struct ExtractGHKM
   typedef utils::compact_set<unique_pair_type,
 			     unique_pair_unassigned, unique_pair_unassigned,
 			     utils::hashmurmur3<size_t>, std::equal_to<unique_pair_type>,
-			     std::allocator<unique_pair_type> > unique_pair_set_type;
+			     utils::map_file_allocator<unique_pair_type> > unique_pair_set_type;
   
   typedef cicada::HyperGraph hypergraph_type;
   typedef cicada::Symbol     word_type;
