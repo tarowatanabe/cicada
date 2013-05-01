@@ -37,6 +37,7 @@
 #include "utils/simple_vector.hpp"
 #include "utils/small_vector.hpp"
 #include "utils/array_power2.hpp"
+#include "utils/indexed_set.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -306,45 +307,105 @@ struct ExtractGHKM
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
 
-  struct string_hash : public utils::hashmurmur3<size_t>
+
+  struct rule_compact_set_type
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    size_t operator()(const std::string& x) const
+    struct string_hash : public utils::hashmurmur3<size_t>
     {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      size_t operator()(const std::string& x) const
+      {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+    
+    typedef utils::indexed_set<phrase_type, string_hash, std::equal_to<phrase_type>, 
+			       std::allocator<phrase_type> > phrase_set_type;
+    
+    typedef phrase_set_type::index_type      index_type;
+    typedef phrase_set_type::size_type       size_type;
+    typedef phrase_set_type::difference_type difference_type;
+
+    void clear()
+    {
+      phrases.clear();
     }
+
+    void swap(rule_compact_set_type& x)
+    {
+      phrases.swap(x.phrases);
+    }
+    
+    index_type insert(const phrase_type& x)
+    {
+      phrase_set_type::iterator iter = phrases.insert(x).first;
+      return iter - phrases.begin();
+    }
+    
+    const phrase_type& operator[](index_type x) const { return phrases[x]; }
+    
+    size_type size() const { return phrases.size(); }
+    bool empty() const { return phrases.empty(); }
+    
+    phrase_set_type phrases;
   };
 
-  typedef std::pair<const phrase_type, bool> rule_compact_type;
+  struct alignment_set_type
+  {
+    typedef rule_pair_type::alignment_type alignment_type;
 
-  typedef utils::unordered_map<phrase_type,
-			       bool,
-			       string_hash,
-			       std::equal_to<phrase_type>,
-			       std::allocator<std::pair<const phrase_type, bool> > >::type rule_compact_set_type;
-  
-  typedef utils::unordered_set<rule_pair_type::alignment_type,
-			       boost::hash<rule_pair_type::alignment_type>,
-			       std::equal_to<rule_pair_type::alignment_type>,
-			       std::allocator<rule_pair_type::alignment_type> >::type alignment_set_type;
+    typedef utils::indexed_set<alignment_type,
+			       boost::hash<alignment_type>,
+			       std::equal_to<alignment_type>,
+			       std::allocator<alignment_type> > align_set_type;
+    
+    typedef align_set_type::index_type      index_type;
+    typedef align_set_type::size_type       size_type;
+    typedef align_set_type::difference_type difference_type;
+
+    void clear()
+    {
+      aligns.clear();
+    }
+    
+    void swap(alignment_set_type& x)
+    {
+      aligns.swap(x.aligns);
+    }
+    
+    index_type insert(const alignment_type& x)
+    {
+      align_set_type::iterator iter = aligns.insert(x).first;
+      return iter - aligns.begin();
+    }
+    
+    const alignment_type& operator[](index_type x) const { return aligns[x]; }
+    
+    size_type size() const { return aligns.size(); }
+    bool empty() const { return aligns.empty(); }
+    
+    align_set_type aligns;
+  };
   
   struct RulePairCompact
   {
-    typedef rule_pair_type::alignment_type alignment_type;    
+    rule_compact_set_type::index_type source;
+    rule_compact_set_type::index_type target;
+    alignment_set_type::index_type    alignment;
+    count_type                        count;
     
-    const rule_compact_type* source;
-    const rule_compact_type* target;
-    const alignment_type*    alignment;
-    count_type               count;
-    
-    RulePairCompact() : source(0), target(0), alignment(0), count(0) {}
+    RulePairCompact()
+      : source(rule_compact_set_type::index_type(-1)),
+	target(rule_compact_set_type::index_type(-1)),
+	alignment(alignment_set_type::index_type(-1)),
+	count(0) {}
 
     friend
     size_t hash_value(RulePairCompact const& x)
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
       
-      return hasher_type()(x.target, hasher_type()(x.alignment, (uintptr_t) x.source));
+      return hasher_type()(x.target, hasher_type()(x.alignment, x.source));
     }
     
     friend
@@ -383,11 +444,17 @@ struct ExtractGHKM
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
-  typedef std::pair<const rule_compact_type*, const rule_compact_type*> unique_pair_type;
+  typedef std::vector<bool, std::allocator<bool> > unique_set_type;
+  
+  typedef std::pair<rule_compact_set_type::index_type, rule_compact_set_type::index_type> unique_pair_type;
   
   struct unique_pair_unassigned
   {
-    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+    unique_pair_type operator()() const
+    {
+      return unique_pair_type(rule_compact_set_type::index_type(-1),
+			      rule_compact_set_type::index_type(-1));
+    }
   };
   
   typedef utils::compact_set<unique_pair_type,
@@ -940,20 +1007,25 @@ struct ExtractGHKM
     // try dump when we have spurious allocation...
     dumper(rule_pairs);
     
+    uniques_source.clear();
+    uniques_target.clear();
+    uniques_source.resize(rules_source.size(), true);
+    uniques_target.resize(rules_target.size(), true);
+    
     uniques_pair.clear();
-
+    
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
       // uncover phrasal representation!
-      const bool unique_source = ! riter->source->second;
-      const bool unique_target = ! riter->target->second;
+      const bool unique_source = uniques_source[riter->source];
+      const bool unique_target = uniques_target[riter->target];
+
+      uniques_source[riter->source] = false;
+      uniques_target[riter->target] = false;
       
-      const_cast<bool&>(riter->source->second) = true;
-      const_cast<bool&>(riter->target->second) = true;
-      
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
-											      riter->target->first,
-											      *(riter->alignment),
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(rules_source[riter->source],
+											      rules_target[riter->target],
+											      rules_alignment[riter->alignment],
 											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -972,6 +1044,9 @@ struct ExtractGHKM
     rules_source.clear();
     rules_target.clear();
     rules_alignment.clear();
+    
+    uniques_source.clear();
+    uniques_target.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
@@ -981,6 +1056,9 @@ struct ExtractGHKM
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
       alignment_set_type(rules_alignment).swap(rules_alignment);
+      
+      unique_set_type(uniques_source).swap(uniques_source);
+      unique_set_type(uniques_target).swap(uniques_target);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -1109,10 +1187,12 @@ struct ExtractGHKM
   
   buffer_type buffer_source;
   buffer_type buffer_target;
-
+  
   rule_compact_set_type rules_source;
   rule_compact_set_type rules_target;
   alignment_set_type    rules_alignment;
+  unique_set_type       uniques_source;
+  unique_set_type       uniques_target;
   unique_pair_set_type  uniques_pair;
   
   bool construct_rule_pair(const hypergraph_type& graph,
@@ -1295,12 +1375,9 @@ struct ExtractGHKM
     os_source.reset();
     os_target.reset();
     
-    rule_pair.source = &(*rules_source.insert(std::make_pair(phrase_type(buffer_source.begin(), buffer_source.end()),
-							     false)).first);
-    rule_pair.target = &(*rules_target.insert(std::make_pair(phrase_type(buffer_target.begin(), buffer_target.end()),
-							     false)).first);
-    
-    rule_pair.alignment = &(*rules_alignment.insert(alignment).first);
+    rule_pair.source = rules_source.insert(phrase_type(buffer_source.begin(), buffer_source.end()));
+    rule_pair.target = rules_target.insert(phrase_type(buffer_target.begin(), buffer_target.end()));
+    rule_pair.alignment = rules_alignment.insert(alignment);
     
     return true;
   }
