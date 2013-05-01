@@ -36,6 +36,7 @@
 #include "utils/unordered_set.hpp"
 #include "utils/chart.hpp"
 #include "utils/getline.hpp"
+#include "utils/map_file_allocator.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -333,7 +334,7 @@ struct ExtractTree
     const alignment_type*    alignment;
     count_type               count;
     
-    RulePairCompact() : source(), target(), alignment(), count(0) {}
+    RulePairCompact() : source(0), target(0), alignment(0), count(0) {}
 
     friend
     size_t hash_value(RulePairCompact const& x)
@@ -357,9 +358,24 @@ struct ExtractTree
   };
   
   typedef RulePairCompact rule_pair_compact_type;
-  
+
+  struct rule_pair_compact_unassigned
+  {
+    rule_pair_compact_type operator()() const
+    {
+      return rule_pair_compact_type();
+    }
+  };
+
+#if 0  
   typedef utils::unordered_set<rule_pair_compact_type, boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
 			       std::allocator<rule_pair_compact_type> >::type rule_pair_compact_set_type;
+#endif
+  typedef utils::compact_set<rule_pair_compact_type,
+			     rule_pair_compact_unassigned, rule_pair_compact_unassigned,
+			     boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
+			     utils::map_file_allocator<rule_pair_compact_type> > rule_pair_compact_set_type;
+
   
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
@@ -1721,7 +1737,7 @@ struct ExtractTree
     uniques_pair.clear();
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
       // uncover phrasal representation!
       const bool unique_source = ! riter->source->second;
       const bool unique_target = ! riter->target->second;
@@ -1743,7 +1759,7 @@ struct ExtractTree
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
       
-      rule_pairs_local.erase(riter ++);
+      //rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
