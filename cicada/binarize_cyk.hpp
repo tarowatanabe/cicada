@@ -15,8 +15,9 @@ namespace cicada
 {
   struct BinarizeCYK : public BinarizeBase
   {
-    BinarizeCYK(const int __order=0)
-      : order(__order) {}
+    BinarizeCYK(const int __order_vertical=0, const int __order_horizontal=0)
+      : order_vertical(__order_vertical),
+	order_horizontal(__order_horizontal) {}
     
     typedef std::vector<bool, std::allocator<bool> > visited_type;
     
@@ -120,7 +121,7 @@ namespace cicada
       }
       
       // collect ancestors...
-      if (order <= 0) {
+      if (order_vertical <= 0) {
 	for (size_t i = 0; i != target.nodes.size(); ++ i) {
 	  hypergraph_type::id_type parent = parents[i];
 	  
@@ -133,7 +134,7 @@ namespace cicada
 	for (size_t i = 0; i != target.nodes.size(); ++ i) {
 	  hypergraph_type::id_type parent = parents[i];
 
-	  for (int j = 0; j != order && parent != hypergraph_type::invalid; ++ j) {
+	  for (int j = 0; j != order_vertical && parent != hypergraph_type::invalid; ++ j) {
 	    ancestors[i].push_back(parent);
 	    parent = parents[parent];
 	  }
@@ -197,7 +198,7 @@ namespace cicada
 	  if (nodes(first, last).empty()) continue;
 	  
 	  const hypergraph_type::id_type parent = nodes(first, last).front();
-	  
+	  	  
 	  const symbol_type lhs = category(parent);
 	  
 	  middle_set_type::const_iterator miter_end = middles[parent].end();
@@ -208,6 +209,11 @@ namespace cicada
 	    
 	    const hypergraph_type::id_type left   = nodes(first, middle).back();
 	    const hypergraph_type::id_type right  = nodes(middle, last).back();
+	    
+	    // check horizontal order: either one must be less than a particular horizontal threshold for disambiguation...
+	    if (order_horizontal > 0
+		&& static_cast<int>(labels[left].size()) > order_horizontal
+		&& static_cast<int>(labels[right].size()) > order_horizontal) continue;
 	    
 	    tails.front() = left;
 	    tails.back()  = right;
@@ -268,23 +274,24 @@ namespace cicada
 
     node_chart_type     nodes;
     
-    const int order;
+    const int order_vertical;
+    const int order_horizontal;
   };
   
   inline
-  void binarize_cyk(const HyperGraph& source, HyperGraph& target, const int order=0)
+  void binarize_cyk(const HyperGraph& source, HyperGraph& target, const int order_vertical=0, const int order_horizontal=0)
   {
-    BinarizeCYK binarizer(order);
+    BinarizeCYK binarizer(order_vertical, order_horizontal);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_cyk(HyperGraph& source, const int order=0)
+  void binarize_cyk(HyperGraph& source, const int order_vertical=0, const int order_horizontal=0)
   {
     HyperGraph target;
 
-    BinarizeCYK binarizer(order);
+    BinarizeCYK binarizer(order_vertical, order_horizontal);
     
     binarizer(source, target);
     

@@ -19,7 +19,7 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : order(-1), head(false), label(false),
+      : order(-1), horizontal(-1), head(false), label(false),
 	left(false), right(false), all(false), cyk(false), dependency(false),
 	debug(__debug)
     {
@@ -30,8 +30,10 @@ namespace cicada
 	throw std::runtime_error("this is not a binarizer");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "order")
+	if (utils::ipiece(piter->first) == "order" || utils::ipiece(piter->first) == "vertical" || utils::ipiece(piter->first) == "order-vertical")
 	  order = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "horizontal" || utils::ipiece(piter->first) == "order-horizontal")
+	  horizontal = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "head")
 	  head = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "label")
@@ -97,7 +99,7 @@ namespace cicada
       else if (all)
 	cicada::binarize_all(data.hypergraph, binarized);
       else if (cyk)
-	cicada::binarize_cyk(data.hypergraph, binarized, order);
+	cicada::binarize_cyk(data.hypergraph, binarized, order, horizontal);
       else if (dependency)
 	cicada::binarize_dependency(data.hypergraph, binarized, head, label);
       else

@@ -75,7 +75,8 @@ apply: feature application\n\
 \tfeature=feature function\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|cyk|cky|dep|dependency] binarization direction\n\
-\torder=binarization order (default: -1 == all context)\n\
+\torder=binarization order (default: -1 == all context. sinonym: order-vertical)\n\
+\thorizontal=horizontal binarization order (default: -1 == all horizontal order. synonym: order-horizontal)\n\
 \thead=[true|false] head non-terminal for dependency binarization\n\
 \tlabel=[true|false] dependency direction label for dependency binarization\n\
 clear: clear data structure\n\

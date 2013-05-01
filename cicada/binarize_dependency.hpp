@@ -91,7 +91,7 @@ namespace cicada
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  
 	  // for head_mode mode, even single non-terminal should be checked!
-	  if (edge_source.tails.size() < 2 - head_mode) continue;
+	  if (static_cast<int>(edge_source.tails.size()) < 2 - head_mode) continue;
 	  
 	  rhs.clear();
 	  tails.clear();
