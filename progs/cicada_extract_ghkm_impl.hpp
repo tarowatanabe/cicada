@@ -977,7 +977,7 @@ struct ExtractGHKM
     dumper(rule_pairs);
     
     if (rule_pairs.empty()) {
-      //rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
+      rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
       alignment_set_type(rules_alignment).swap(rules_alignment);
