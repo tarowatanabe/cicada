@@ -2089,7 +2089,7 @@ struct Task
 	  || allocated <= malloc_threshold) return;
       
       if (! min_counts_size)
-	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 5;
+	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 6;
       
       dump(rule_pairs);
       
