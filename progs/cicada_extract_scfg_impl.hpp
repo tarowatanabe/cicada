@@ -30,6 +30,7 @@
 #include "utils/unordered_set.hpp"
 #include "utils/compact_set.hpp"
 #include "utils/chart.hpp"
+#include "utils/indexed_set.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -316,40 +317,104 @@ struct ExtractSCFG
   typedef rule_pair_type::phrase_type phrase_type;
   typedef rule_pair_type::count_type  count_type;
 
-  struct string_hash : public utils::hashmurmur3<size_t>
+  struct rule_compact_set_type
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    size_t operator()(const std::string& x) const
+    struct string_hash : public utils::hashmurmur3<size_t>
     {
-      return hasher_type::operator()(x.begin(), x.end(), 0);
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      size_t operator()(const std::string& x) const
+      {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+    
+    typedef utils::indexed_set<phrase_type, string_hash, std::equal_to<phrase_type>, 
+			       std::allocator<phrase_type> > phrase_set_type;
+    
+    typedef phrase_set_type::index_type      index_type;
+    typedef phrase_set_type::size_type       size_type;
+    typedef phrase_set_type::difference_type difference_type;
+
+    void clear()
+    {
+      phrases.clear();
     }
+
+    void swap(rule_compact_set_type& x)
+    {
+      phrases.swap(x.phrases);
+    }
+    
+    index_type insert(const phrase_type& x)
+    {
+      phrase_set_type::iterator iter = phrases.insert(x).first;
+      return iter - phrases.begin();
+    }
+    
+    const phrase_type& operator[](index_type x) const { return phrases[x]; }
+    
+    size_type size() const { return phrases.size(); }
+    bool empty() const { return phrases.empty(); }
+    
+    phrase_set_type phrases;
   };
 
-  typedef std::pair<const phrase_type, bool> rule_compact_type;
-  
-  typedef utils::unordered_map<phrase_type,
-			       bool,
-			       string_hash,
-			       std::equal_to<phrase_type>,
-			       std::allocator<std::pair<const phrase_type, bool> > >::type rule_compact_set_type;
+  struct alignment_set_type
+  {
+    typedef rule_pair_type::alignment_type alignment_type;
+
+    typedef utils::indexed_set<alignment_type,
+			       boost::hash<alignment_type>,
+			       std::equal_to<alignment_type>,
+			       std::allocator<alignment_type> > align_set_type;
+    
+    typedef align_set_type::index_type      index_type;
+    typedef align_set_type::size_type       size_type;
+    typedef align_set_type::difference_type difference_type;
+
+    void clear()
+    {
+      aligns.clear();
+    }
+    
+    void swap(alignment_set_type& x)
+    {
+      aligns.swap(x.aligns);
+    }
+    
+    index_type insert(const alignment_type& x)
+    {
+      align_set_type::iterator iter = aligns.insert(x).first;
+      return iter - aligns.begin();
+    }
+    
+    const alignment_type& operator[](index_type x) const { return aligns[x]; }
+    
+    size_type size() const { return aligns.size(); }
+    bool empty() const { return aligns.empty(); }
+    
+    align_set_type aligns;
+  };
 
   struct RulePairCompact
   {
-    typedef rule_pair_type::alignment_type alignment_type;
+    rule_compact_set_type::index_type source;
+    rule_compact_set_type::index_type target;
+    alignment_set_type::index_type    alignment;
+    count_type                        count;
     
-    const rule_compact_type* source;
-    const rule_compact_type* target;
-    alignment_type           alignment;
-    count_type               count;
-    
-    RulePairCompact() : source(), target(), alignment(), count(0) {}
+    RulePairCompact()
+      : source(rule_compact_set_type::index_type(-1)),
+	target(rule_compact_set_type::index_type(-1)),
+	alignment(alignment_set_type::index_type(-1)),
+	count(0) {}
 
     friend
     size_t hash_value(RulePairCompact const& x)
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
       
-      return hasher_type()(x.target, hasher_type()(x.alignment.begin(), x.alignment.end(), (uintptr_t) x.source));
+      return hasher_type()(x.target, hasher_type()(x.alignment, x.source));
     }
     
     friend
@@ -366,18 +431,34 @@ struct ExtractSCFG
   };
   
   typedef RulePairCompact rule_pair_compact_type;
+
+  struct rule_pair_compact_unassigned
+  {
+    rule_pair_compact_type operator()() const
+    {
+      return rule_pair_compact_type();
+    }
+  };
   
-  typedef utils::unordered_set<rule_pair_compact_type, boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
-			       std::allocator<rule_pair_compact_type> >::type rule_pair_compact_set_type;
+  typedef utils::compact_set<rule_pair_compact_type,
+			     rule_pair_compact_unassigned, rule_pair_compact_unassigned,
+			     boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
+			     std::allocator<rule_pair_compact_type> > rule_pair_compact_set_type;
   
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
-  typedef std::pair<const rule_compact_type*, const rule_compact_type*> unique_pair_type;
+  typedef std::vector<bool, std::allocator<bool> > unique_set_type;
+  
+  typedef std::pair<rule_compact_set_type::index_type, rule_compact_set_type::index_type> unique_pair_type;
   
   struct unique_pair_unassigned
   {
-    unique_pair_type operator()() const { return unique_pair_type(0, 0); }
+    unique_pair_type operator()() const
+    {
+      return unique_pair_type(rule_compact_set_type::index_type(-1),
+			      rule_compact_set_type::index_type(-1));
+    }
   };
   
   typedef utils::compact_set<unique_pair_type,
@@ -614,6 +695,10 @@ struct ExtractSCFG
   rule_pair_compact_set_type rule_pairs_local;
   rule_compact_set_type      rules_source;
   rule_compact_set_type      rules_target;
+  alignment_set_type         rules_alignment;
+  
+  unique_set_type            uniques_source;
+  unique_set_type            uniques_target;
   unique_pair_set_type       uniques_pair;
   
   template <typename Dumper>
@@ -665,15 +750,16 @@ struct ExtractSCFG
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
     
     if (! exclude) // phrasal rule
       if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  extract_rule(source, target, span, category, rule_pair, true);
 	  
-	  rule_pair_type& rule_pair_new = const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair_type(rule_pair.source->first,
-													 rule_pair.target->first,
-													 rule_pair.alignment,
+	  rule_pair_type& rule_pair_new = const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair_type(rules_source[rule_pair.source],
+													 rules_target[rule_pair.target],
+													 rules_alignment[rule_pair.alignment],
 													 rule_pair.count)).first));
 	  
 	  rule_pair_new.count += 1;
@@ -807,19 +893,25 @@ struct ExtractSCFG
 	const_cast<rule_pair_compact_type&>(*(rule_pairs_local.insert(*riter).first)).count += count;
     }
     
+    uniques_source.clear();
+    uniques_target.clear();
+    uniques_source.resize(rules_source.size(), true);
+    uniques_target.resize(rules_target.size(), true);
+
     uniques_pair.clear();
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-      const bool unique_source = ! riter->source->second;
-      const bool unique_target = ! riter->target->second;
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+      // uncover phrasal representation!
+      const bool unique_source = uniques_source[riter->source];
+      const bool unique_target = uniques_target[riter->target];
 
-      const_cast<bool&>(riter->source->second) = true;
-      const_cast<bool&>(riter->target->second) = true;
+      uniques_source[riter->source] = false;
+      uniques_target[riter->target] = false;
       
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
-											      riter->target->first,
-											      riter->alignment,
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(rules_source[riter->source],
+											      rules_target[riter->target],
+											      rules_alignment[riter->alignment],
 											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -831,12 +923,16 @@ struct ExtractSCFG
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
       
-      rule_pairs_local.erase(riter ++);
+      //rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
+
+    uniques_source.clear();
+    uniques_target.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
@@ -845,6 +941,10 @@ struct ExtractSCFG
       rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
+      alignment_set_type(rules_alignment).swap(rules_alignment);
+      
+      unique_set_type(uniques_source).swap(uniques_source);
+      unique_set_type(uniques_target).swap(uniques_target);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -865,6 +965,7 @@ struct ExtractSCFG
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
     
     if (! exclude) { // phrase extraction
       span_pair_set_type::const_iterator iter_end = spans.end();
@@ -1021,19 +1122,25 @@ struct ExtractSCFG
       }
     }
     
+    uniques_source.clear();
+    uniques_target.clear();
+    uniques_source.resize(rules_source.size(), true);
+    uniques_target.resize(rules_target.size(), true);
+
     uniques_pair.clear();
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; /**/) {
-      const bool unique_source = ! riter->source->second;
-      const bool unique_target = ! riter->target->second;
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+      // uncover phrasal representation!
+      const bool unique_source = uniques_source[riter->source];
+      const bool unique_target = uniques_target[riter->target];
 
-      const_cast<bool&>(riter->source->second) = true;
-      const_cast<bool&>(riter->target->second) = true;
+      uniques_source[riter->source] = false;
+      uniques_target[riter->target] = false;
       
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(riter->source->first,
-											      riter->target->first,
-											      riter->alignment,
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(rules_source[riter->source],
+											      rules_target[riter->target],
+											      rules_alignment[riter->alignment],
 											      riter->count));
       
       rule_pair_type& rule_pair = const_cast<rule_pair_type&>(*result.first);
@@ -1045,12 +1152,16 @@ struct ExtractSCFG
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
       
-      rule_pairs_local.erase(riter ++);
+      //rule_pairs_local.erase(riter ++);
     }
     
     rule_pairs_local.clear();
     rules_source.clear();
     rules_target.clear();
+    rules_alignment.clear();
+    
+    uniques_source.clear();
+    uniques_target.clear();
     uniques_pair.clear();
     
     dumper(rule_pairs);
@@ -1059,6 +1170,10 @@ struct ExtractSCFG
       rule_pair_compact_set_type(rule_pairs_local).swap(rule_pairs_local);
       rule_compact_set_type(rules_source).swap(rules_source);
       rule_compact_set_type(rules_target).swap(rules_target);
+      alignment_set_type(rules_alignment).swap(rules_alignment);
+      
+      unique_set_type(uniques_source).swap(uniques_source);
+      unique_set_type(uniques_target).swap(uniques_target);
       unique_pair_set_type(uniques_pair).swap(uniques_pair);
     }
   }
@@ -1137,22 +1252,24 @@ struct ExtractSCFG
     builder << lhs;
     for (int src = spans.source.first; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
+    rule_pair.source = rules_source.insert(builder);
 
     builder.clear();
     builder << lhs;
     for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
+    rule_pair.target = rules_target.insert(builder);
     
-    rule_pair.alignment.clear();
+    rule_pair_type::alignment_type alignment;
     for (int src = spans.source.first; src != spans.source.second; ++ src) {
       point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
       point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
       
       for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	rule_pair.alignment.push_back(std::make_pair(src - spans.source.first, *aiter - spans.target.first));
+	alignment.push_back(std::make_pair(src - spans.source.first, *aiter - spans.target.first));
     }
+
+    rule_pair.alignment = rules_alignment.insert(alignment);
   }
 
   template <typename Category>
@@ -1174,7 +1291,7 @@ struct ExtractSCFG
     builder << ' ' << nt1;
     for (int src = spans_nt1.source.second; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
+    rule_pair.source = rules_source.insert(builder);
     
     builder.clear();
     builder << lhs;
@@ -1183,12 +1300,12 @@ struct ExtractSCFG
     builder << ' ' << nt1;
     for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
+    rule_pair.target = rules_target.insert(builder);
 
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
     
-    rule_pair.alignment.clear();
+    rule_pair_type::alignment_type alignment;
     for (int src = spans.source.first; src != spans.source.second; ++ src) 
       if (is_out_of_span(spans_nt1.source, src)) {
 	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
@@ -1206,9 +1323,11 @@ struct ExtractSCFG
 	    //const int shift_source = (src >= spans_nt1.source.second ? spans_nt1.source.second - spans_nt1.source.first - 1 : 0) + ...;
 	    //const int shift_target = (trg >= spans_nt1.target.second ? spans_nt1.target.second - spans_nt1.target.first - 1 : 0) + ...;
 	    
-	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	    alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
+
+    rule_pair.alignment = rules_alignment.insert(alignment);
   }
   
   template <typename Category>
@@ -1240,7 +1359,7 @@ struct ExtractSCFG
     builder << ' ' << nt2;
     for (int src = spans_nt2.source.second; src != spans.source.second; ++ src)
       builder << ' ' << source[src];
-    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
+    rule_pair.source = rules_source.insert(builder);
     
     builder.clear();
     builder << lhs;
@@ -1263,14 +1382,14 @@ struct ExtractSCFG
       for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
 	builder << ' ' << target[trg];
     }
-    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
+    rule_pair.target = rules_target.insert(builder);
     
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
     const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
     const int nt2_target_size = spans_nt2.target.second - spans_nt2.target.first;
 
-    rule_pair.alignment.clear();
+    rule_pair_type::alignment_type alignment;
     for (int src = spans.source.first; src != spans.source.second; ++ src) 
       if (is_out_of_span(spans_nt1.source, src) && is_out_of_span(spans_nt2.source, src)) {
 	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
@@ -1292,9 +1411,11 @@ struct ExtractSCFG
 				      + (mask_target1 & (nt1_target_size - 1))
 				      + (mask_target2 & (nt2_target_size - 1)));
 	    
-	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	    alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
+
+    rule_pair.alignment = rules_alignment.insert(alignment);
   }
 
   struct less_source
@@ -1357,7 +1478,7 @@ struct ExtractSCFG
     builder << ' ' << cat[2];
     for (int src = spans_nt[2].source.second; src != spans.source.second; ++ src)
       builder << ' '  << source[src];
-    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
+    rule_pair.source = rules_source.insert(builder);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 3> spans_cat;
@@ -1380,7 +1501,7 @@ struct ExtractSCFG
     builder << ' ' << spans_cat[2].second;
     for (int trg = spans_cat[2].first.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
+    rule_pair.target = rules_target.insert(builder);
     
     const int nt1_source_size = spans_nt[0].source.second - spans_nt[0].source.first;
     const int nt2_source_size = spans_nt[1].source.second - spans_nt[1].source.first;
@@ -1390,7 +1511,7 @@ struct ExtractSCFG
     const int nt2_target_size = spans_nt[1].target.second - spans_nt[1].target.first;
     const int nt3_target_size = spans_nt[2].target.second - spans_nt[2].target.first;
     
-    rule_pair.alignment.clear();
+    rule_pair_type::alignment_type alignment;
     for (int src = spans.source.first; src != spans.source.second; ++ src)
       if (is_out_of_span(spans_nt[0].source, src)
 	  && is_out_of_span(spans_nt[1].source, src)
@@ -1421,9 +1542,11 @@ struct ExtractSCFG
 				      + (mask_target2 & (nt2_target_size - 1))
 				      + (mask_target3 & (nt3_target_size - 1)));
 	    
-	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	    alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
+    
+    rule_pair.alignment = rules_alignment.insert(alignment);
   }
   
   template <typename Category>
@@ -1474,7 +1597,7 @@ struct ExtractSCFG
     builder << ' ' << cat[3];
     for (int src = spans_nt[3].source.second; src != spans.source.second; ++ src)
       builder << ' '  << source[src];
-    rule_pair.source = &(*rules_source.insert(rule_compact_type(builder, false)).first);
+    rule_pair.source = rules_source.insert(builder);
     
     // sort by target-side span with category,...
     boost::array<span_category_type, 4> spans_cat;
@@ -1501,7 +1624,7 @@ struct ExtractSCFG
     builder << ' ' << spans_cat[3].second;
     for (int trg = spans_cat[3].first.second; trg != spans.target.second; ++ trg)
       builder << ' ' << target[trg];
-    rule_pair.target = &(*rules_target.insert(rule_compact_type(builder, false)).first);
+    rule_pair.target = rules_target.insert(builder);
     
     const int nt1_source_size = spans_nt[0].source.second - spans_nt[0].source.first;
     const int nt2_source_size = spans_nt[1].source.second - spans_nt[1].source.first;
@@ -1513,7 +1636,7 @@ struct ExtractSCFG
     const int nt3_target_size = spans_nt[2].target.second - spans_nt[2].target.first;
     const int nt4_target_size = spans_nt[3].target.second - spans_nt[3].target.first;
     
-    rule_pair.alignment.clear();
+    rule_pair_type::alignment_type alignment;
     for (int src = spans.source.first; src != spans.source.second; ++ src)
       if (is_out_of_span(spans_nt[0].source, src)
 	  && is_out_of_span(spans_nt[1].source, src)
@@ -1549,9 +1672,11 @@ struct ExtractSCFG
 				      + (mask_target3 & (nt3_target_size - 1))
 				      + (mask_target4 & (nt4_target_size - 1)));
 	    
-	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	    alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
+    
+    rule_pair.alignment = rules_alignment.insert(alignment);
   }
   
 

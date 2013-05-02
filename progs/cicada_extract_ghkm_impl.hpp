@@ -431,10 +431,6 @@ struct ExtractGHKM
     }
   };
   
-#if 0
-  typedef utils::unordered_set<rule_pair_compact_type, boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
-			       std::allocator<rule_pair_compact_type> >::type rule_pair_compact_set_type;
-#endif
   typedef utils::compact_set<rule_pair_compact_type,
 			     rule_pair_compact_unassigned, rule_pair_compact_unassigned,
 			     boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
@@ -2061,7 +2057,7 @@ struct Task
 	  || utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*) <= malloc_threshold) return;
 
       if (! min_counts_size)
-	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 3;
+	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 5;
       
       dump(rule_pairs);
       

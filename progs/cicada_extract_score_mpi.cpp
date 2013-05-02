@@ -227,7 +227,6 @@ int main(int argc, char** argv)
       synchronize_reducer(comm_parent);
     } else {
       std::vector<int, std::allocator<int> > error_codes(mpi_size, MPI_SUCCESS);
-
       
       const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
       

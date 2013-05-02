@@ -5,10 +5,8 @@ expgram: ngram language model training/indexing
 Others:
 Boost library     (http://www.boost.org/)
 MPI (Open MPI)    (http://www.open-mpi.org/)
-    REMARK: Under Linux, it is recommended not to use memory managers in open-mpi, which may conflict with your
-    	    favorite memory managers, such as jemalloc/tcmalloc. To disable this, for instance, you
-	    can edit "openmpi-mca-params.conf" and add(or disable) mca by, "memory = ^ptmalloc2"
-	    For details, consult open-mpi documentation.
+   We strongly recommend open-mpi since it is regularly tested.
+
 
 ICU               (http://site.icu-project.org/)
 
