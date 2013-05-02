@@ -2085,7 +2085,7 @@ struct Task
 
       const size_t allocated = utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*);
       
-      if ((min_counts_size && rule_pairs.size() < min_counts_size && allocated <= (malloc_threshold << 1))
+      if ((min_counts_size && rule_pairs.size() < min_counts_size && allocated <= (malloc_threshold + (malloc_threshold >> 1)))
 	  || allocated <= malloc_threshold) return;
       
       if (! min_counts_size)
