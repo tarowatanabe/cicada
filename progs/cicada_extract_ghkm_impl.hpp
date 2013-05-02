@@ -2052,10 +2052,13 @@ struct Task
   {
     void operator()(rule_pair_set_type& rule_pairs) const
     {
-      if (rule_pairs.size() < 1024 * 4
-	  || (min_counts_size && rule_pairs.size() < min_counts_size)
-	  || utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*) <= malloc_threshold) return;
-
+      if (rule_pairs.size() < 1024 * 4) return;
+      
+      const size_t allocated = utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*);
+      
+      if ((min_counts_size && rule_pairs.size() < min_counts_size && allocated <= (malloc_threshold << 1))
+	  || allocated <= malloc_threshold) return;
+      
       if (! min_counts_size)
 	const_cast<size_t&>(min_counts_size) = rule_pairs.size() >> 5;
       
