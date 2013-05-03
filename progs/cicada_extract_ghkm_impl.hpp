@@ -54,8 +54,6 @@
 #include <utils/hashmurmur3.hpp>
 #include <utils/getline.hpp>
 
-#include "succinct_db/succinct_hash.hpp"
-
 struct Bitext
 {
   typedef cicada::HyperGraph hypergraph_type;
@@ -313,38 +311,6 @@ struct ExtractGHKM
 
   struct rule_compact_set_type : public utils::hashmurmur3<size_t>
   {
-    typedef uint32_t index_type;
-    
-    typedef succinctdb::succinct_hash<char, utils::map_file_allocator<char> > phrase_set_type;
-
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    
-    rule_compact_set_type() : phrases(1024 * 1024) {}
-    rule_compact_set_type(size_t size) : phrases(size) {}
-    
-    void clear()
-    {
-      phrases.clear();
-    }
-
-    void swap(rule_compact_set_type& x)
-    {
-      phrases.swap(x.phrases);
-    }
-    
-    index_type insert(const phrase_type& x)
-    {
-      return phrases.insert(x.c_str(), x.size(), hasher_type()(x.begin(), x.end(), 0));
-    }
-    
-    phrase_type operator[](index_type x) const { return phrase_type(phrases[x].begin(), phrases[x].end()); }
-    
-    size_type size() const { return phrases.size(); }
-    bool empty() const { return phrases.empty(); }
-    
-    phrase_set_type phrases;
-
-#if 0
     struct string_hash : public utils::hashmurmur3<size_t>
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
@@ -383,7 +349,6 @@ struct ExtractGHKM
     bool empty() const { return phrases.empty(); }
     
     phrase_set_type phrases;
-#endif
   };
 
   struct alignment_set_type
@@ -476,7 +441,7 @@ struct ExtractGHKM
   typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
 			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
 
-  typedef std::vector<phrase_type, std::allocator<phrase_type> > unique_set_type;
+  typedef std::vector<bool, std::allocator<bool> > unique_set_type;
   
   typedef std::pair<rule_compact_set_type::index_type, rule_compact_set_type::index_type> unique_pair_type;
   
@@ -1041,24 +1006,22 @@ struct ExtractGHKM
     
     uniques_source.clear();
     uniques_target.clear();
-    uniques_source.resize(rules_source.size(), phrase_type());
-    uniques_target.resize(rules_target.size(), phrase_type());
+    uniques_source.resize(rules_source.size(), true);
+    uniques_target.resize(rules_target.size(), true);
     
     uniques_pair.clear();
     
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
       // uncover phrasal representation!
-      const bool unique_source = uniques_source[riter->source].empty();
-      const bool unique_target = uniques_target[riter->target].empty();
+      const bool unique_source = uniques_source[riter->source];
+      const bool unique_target = uniques_target[riter->target];
+
+      uniques_source[riter->source] = false;
+      uniques_target[riter->target] = false;
       
-      if (unique_source)
-	uniques_source[riter->source] = rules_source[riter->source];
-      if (unique_target)
-	uniques_target[riter->target] = rules_target[riter->target];
-      
-      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(uniques_source[riter->source],
-											      uniques_target[riter->target],
+      std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair_type(rules_source[riter->source],
+											      rules_target[riter->target],
 											      rules_alignment[riter->alignment],
 											      riter->count));
       
