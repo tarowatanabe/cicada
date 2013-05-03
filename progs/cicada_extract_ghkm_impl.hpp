@@ -329,7 +329,7 @@ struct ExtractGHKM
 
     void swap(rule_compact_set_type& x)
     {
-      
+      phrases.swap(x.phrases);
     }
     
     index_type insert(const phrase_type& x)
