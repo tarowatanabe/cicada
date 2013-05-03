@@ -319,6 +319,8 @@ struct ExtractGHKM
 
     typedef utils::hashmurmur3<size_t> hasher_type;
     
+    rule_compact_set_type() : phrases(1024 * 256) {}
+    rule_compact_set_type(size_t size) : phrases(size) {}
     
     void clear()
     {
