@@ -775,6 +775,7 @@ struct Task
       extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);
       
       if (((iter & iteration_mask) == iteration_mask)
+	  && (phrase_pairs.size() > 1024 * 64)
 	  && (! min_counts_size || phrase_pairs.size() > min_counts_size)
 	  && (utils::malloc_stats::used() + phrase_pairs.size() * sizeof(void*) > malloc_threshold)) {
 	
