@@ -285,6 +285,14 @@ namespace succinctdb
       offs.populate();
     }
   
+    void swap(succinct_hash_mapped& x)
+    {
+      bins.swap(x.bins);
+      nexts.swap(x.nexts);
+      keys.swap(x.keys);
+      offs.swap(x.offs);
+    }
+
   private:
     bool equal_to(pos_type pos, const key_type* buf, size_type size) const
     {
@@ -641,6 +649,14 @@ namespace succinctdb
       dump_file(rep.path("keys"), keys, false);
       offs.write(rep.path("offs"));
     }
+
+    void swap(succinct_hash& x)
+    {
+      bins.swap(x.bins);
+      nexts.swap(x.nexts);
+      keys.swap(x.keys);
+      offs.swap(x.offs);
+    }
     
   private:
     
@@ -686,6 +702,24 @@ namespace succinctdb
     off_set_type  offs;
   };
   
+};
+
+namespace std
+{
+  template <typename K, typename A>
+  inline
+  void swap(succinctdb::succinct_hash_mapped<K,A>& x, succinctdb::succinct_hash_mapped<K,A>& y)
+  {
+    x.swap(y);
+  }
+
+  template <typename K, typename A>
+  inline
+  void swap(succinctdb::succinct_hash<K,A>& x, succinctdb::succinct_hash<K,A>& y)
+  {
+    x.swap(y);
+  }
+
 };
 
 #endif
