@@ -38,6 +38,7 @@
 #include "utils/small_vector.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/indexed_set.hpp"
+#include "utils/map_file_allocator.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -52,6 +53,8 @@
 #include <utils/compact_set.hpp>
 #include <utils/hashmurmur3.hpp>
 #include <utils/getline.hpp>
+
+#include "succinct_db/succinct_hash.hpp"
 
 struct Bitext
 {
@@ -308,8 +311,38 @@ struct ExtractGHKM
   typedef rule_pair_type::count_type  count_type;
 
 
-  struct rule_compact_set_type
+  struct rule_compact_set_type : public utils::hashmurmur3<size_t>
   {
+    typedef uint32_t index_type;
+    
+    typedef succinctdb::succinct_hash<char, utils::map_file_allocator<char> > phrase_set_type;
+
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    
+    
+    void clear()
+    {
+      phrases.clear();
+    }
+
+    void swap(rule_compact_set_type& x)
+    {
+      
+    }
+    
+    index_type insert(const phrase_type& x)
+    {
+      return phrases.insert(x.c_str(), x.size(), hasher_type()(x.begin(), x.end(), 0));
+    }
+    
+    phrase_type operator[](index_type x) const { return phrase_type(phrases[x].begin(), phrases[x].end()); }
+    
+    size_type size() const { return phrases.size(); }
+    bool empty() const { return phrases.empty(); }
+    
+    phrase_set_type phrases;
+
+#if 0
     struct string_hash : public utils::hashmurmur3<size_t>
     {
       typedef utils::hashmurmur3<size_t> hasher_type;
@@ -348,6 +381,7 @@ struct ExtractGHKM
     bool empty() const { return phrases.empty(); }
     
     phrase_set_type phrases;
+#endif
   };
 
   struct alignment_set_type
