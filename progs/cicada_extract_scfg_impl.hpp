@@ -900,8 +900,11 @@ struct ExtractSCFG
 
     uniques_pair.clear();
     
+    size_t iter = 0;
+    size_t iter_mask = (1024 * 1024) - 1;
+
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter, ++ iter) {
       // uncover phrasal representation!
       const bool unique_source = uniques_source[riter->source];
       const bool unique_target = uniques_target[riter->target];
@@ -922,6 +925,10 @@ struct ExtractSCFG
       rule_pair.freqs[0] += uniques_pair.insert(std::make_pair(riter->source, riter->target)).second;;
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
+
+      // dumping...
+      if ((iter & iter_mask) == iter_mask)
+	dumper(rule_pairs);
       
       //rule_pairs_local.erase(riter ++);
     }
@@ -1128,9 +1135,12 @@ struct ExtractSCFG
     uniques_target.resize(rules_target.size(), true);
 
     uniques_pair.clear();
-    
+
+    size_t iter = 0;
+    size_t iter_mask = (1024 * 1024) - 1;
+
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+    for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter, ++ iter) {
       // uncover phrasal representation!
       const bool unique_source = uniques_source[riter->source];
       const bool unique_target = uniques_target[riter->target];
@@ -1152,6 +1162,10 @@ struct ExtractSCFG
       rule_pair.freqs[1] += unique_source;
       rule_pair.freqs[2] += unique_target;
       
+      // dumping...
+      if ((iter & iter_mask) == iter_mask)
+	dumper(rule_pairs);
+
       //rule_pairs_local.erase(riter ++);
     }
     

@@ -7,6 +7,25 @@ Boost library     (http://www.boost.org/)
 MPI (Open MPI)    (http://www.open-mpi.org/)
    We strongly recommend open-mpi since it is regularly tested.
 
+   If you encounter a problem like, "mca_btl_tcp_frag_recv: readv
+   failed: Connection timed out" then, try this patch:
+
+*** ompi/mca/btl/tcp/btl_tcp_frag.c.org	2012-04-03 23:30:11.000000000 +0900
+--- ompi/mca/btl/tcp/btl_tcp_frag.c	2013-05-02 10:43:21.571867286 +0900
+***************
+*** 201,206 ****
+--- 201,207 ----
+  	switch(opal_socket_errno) {
+  	case EINTR:
+  	    continue;
++ 	case ETIMEDOUT:
+  	case EWOULDBLOCK:
+  	    return false;
+  	case EFAULT:
+
+   This will force open-mpi to re-reading buffer again, even after
+   timeout.
+
 
 ICU               (http://site.icu-project.org/)
 
