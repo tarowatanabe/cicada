@@ -221,42 +221,40 @@ namespace cicada
 	
 	if (add_next && D.size() > 0)
 	  lazy_next(*D.back(), state);
-
+	
+	if (cand.empty()) break;
+	
+	const derivation_type* derivation = cand.top();
+	cand.pop();
+	
+	// perform traversal here...
+	yields.clear();
+	for (size_t i = 0; i != derivation->edge->tails.size(); ++ i) {
+	  const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
+	  
+	  if (! antecedent)
+	    throw std::runtime_error("no antecedent???");
+	  
+	  yields.push_back(&(antecedent->yield));
+	}
+	
+	traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yield_iterator(yields.begin()), yield_iterator(yields.end()));
+	
+	// perform filtering here...!
+	// if we have duplicates, do not insert...
+	
 	add_next = false;
 	
-	if (! cand.empty()) {
-	  const derivation_type* derivation = cand.top();
-	  cand.pop();
+	if (! filter(graph.nodes[v], derivation->yield)) {
+	  D.push_back(derivation);
 	  
-	  // perform traversal here...
+	  add_next = true;
+	} else {
+	  // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
+	  lazy_next(*derivation, state);
 	  
-	  yields.clear();
-	  for (size_t i = 0; i != derivation->edge->tails.size(); ++ i) {
-	    const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
-
-	    if (! antecedent)
-	      throw std::runtime_error("no antecedent???");
-	    
-	    yields.push_back(&(antecedent->yield));
-	  }
-	  
-	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yield_iterator(yields.begin()), yield_iterator(yields.end()));
-	  
-	  // perform filtering here...!
-	  // if we have duplicates, do not insert...
-	  
-	  if (! filter(graph.nodes[v], derivation->yield)) {
-	    D.push_back(derivation);
-	    
-	    add_next = true;
-	  } else {
-	    // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
-	    lazy_next(*derivation, state);
-	    
-	    add_next = false;
-	  }
-	} else
-	  break;
+	  add_next = false;
+	}
       }
       
       return (k < static_cast<int>(D.size()) ? D[k] : 0);
