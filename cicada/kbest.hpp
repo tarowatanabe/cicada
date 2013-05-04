@@ -243,13 +243,14 @@ namespace cicada
 	  
 	  // perform filtering here...!
 	  // if we have duplicates of "yield", do not insert into D
-	  
 	  if (! filter(graph.nodes[v], derivation->yield)) {
 	    D.push_back(derivation);
 	    incremented = true;
 	    break;
-	  } else // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
-	    lazy_next(*derivation, state);
+	  }
+	  
+	  // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
+	  lazy_next(*derivation, state);
 	}
 	
 	// if D was not incremented, no new item was found!
