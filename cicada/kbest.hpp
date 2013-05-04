@@ -219,7 +219,7 @@ namespace cicada
       
       while (static_cast<int>(D.size()) <= k) {
 	
-	if (add_next && D.size() > 0)
+	if (add_next && ! D.empty())
 	  lazy_next(*D.back(), state);
 	
 	if (cand.empty()) break;
@@ -242,8 +242,6 @@ namespace cicada
 	
 	// perform filtering here...!
 	// if we have duplicates, do not insert...
-	
-	add_next = false;
 	
 	if (! filter(graph.nodes[v], derivation->yield)) {
 	  D.push_back(derivation);
