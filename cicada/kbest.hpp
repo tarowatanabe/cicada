@@ -212,47 +212,48 @@ namespace cicada
       state_type & state = get_candidate(v);
       derivation_heap_type& cand = state.cand;
       derivation_list_type& D = state.D;
-
+      
       yield_set_type yields;
-
-      bool add_next = true;
       
       while (static_cast<int>(D.size()) <= k) {
 	
-	if (add_next && ! D.empty())
+	// lazy-next for the last of the derivation, D
+	if (! D.empty())
 	  lazy_next(*D.back(), state);
 	
-	if (cand.empty()) break;
+	// We will add an item from cand into D.
 	
-	const derivation_type* derivation = cand.top();
-	cand.pop();
-	
-	// perform traversal here...
-	yields.clear();
-	for (size_t i = 0; i != derivation->edge->tails.size(); ++ i) {
-	  const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
+	bool incremented = false;
+	while (! cand.empty()) {
+	  const derivation_type* derivation = cand.top();
+	  cand.pop();
 	  
-	  if (! antecedent)
-	    throw std::runtime_error("no antecedent???");
+	  // perform traversal here...
+	  yields.clear();
+	  for (size_t i = 0; i != derivation->edge->tails.size(); ++ i) {
+	    const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
+	    
+	    if (! antecedent)
+	      throw std::runtime_error("no antecedent???");
+	    
+	    yields.push_back(&(antecedent->yield));
+	  }
 	  
-	  yields.push_back(&(antecedent->yield));
+	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yield_iterator(yields.begin()), yield_iterator(yields.end()));
+	  
+	  // perform filtering here...!
+	  // if we have duplicates of "yield", do not insert into D
+	  
+	  if (! filter(graph.nodes[v], derivation->yield)) {
+	    D.push_back(derivation);
+	    incremented = true;
+	    break;
+	  } else // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
+	    lazy_next(*derivation, state);
 	}
 	
-	traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yield_iterator(yields.begin()), yield_iterator(yields.end()));
-	
-	// perform filtering here...!
-	// if we have duplicates, do not insert...
-	
-	if (! filter(graph.nodes[v], derivation->yield)) {
-	  D.push_back(derivation);
-	  
-	  add_next = true;
-	} else {
-	  // lazy-next for this derivation, otherwise, we may have computed wrong k-best...
-	  lazy_next(*derivation, state);
-	  
-	  add_next = false;
-	}
+	// if D was not incremented, no new item was found!
+	if (! incremented) break;
       }
       
       return (k < static_cast<int>(D.size()) ? D[k] : 0);
