@@ -2060,7 +2060,7 @@ struct Task
   {
     void operator()(rule_pair_set_type& rule_pairs) const
     {
-      if (rule_pairs.size() < 1024 * 16) return;
+      if (rule_pairs.size() < 1024 * 1024) return;
       
       const size_t allocated = utils::malloc_stats::used() + rule_pairs.size() * sizeof(void*);
       
