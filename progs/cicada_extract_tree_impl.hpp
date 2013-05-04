@@ -1818,7 +1818,7 @@ struct ExtractTree
     uniques_pair.clear();
     
     size_t iter = 0;
-    size_t iter_mask = (1024 * 1024) - 1;
+    size_t iter_mask = (1024 * 1024 * 4) - 1;
 
     rule_pair_compact_set_type::const_iterator riter_end = rule_pairs_local.end();
     for (rule_pair_compact_set_type::const_iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter, ++ iter) {
