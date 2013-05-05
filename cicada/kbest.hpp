@@ -110,7 +110,12 @@ namespace cicada
     {
       bool operator()(const derivation_type* x, const derivation_type* y) const
       {
-	return x->score < y->score;
+	return (x->score < y->score) || (!(y->score < x->score) && (cardinality(x->j) > cardinality(y->y)));
+      }
+
+      size_t cardinality(const index_set_type& x) const
+      {
+	return std::accumulate(x.begin(), x.end(), 0);
       }
     };
     
