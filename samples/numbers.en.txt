@@ -2,8 +2,8 @@
 0: =%spellout-cardinal=;
 
 %spellout-cardinal:
--x: - >>;
-x.x: << . >>;
+-x: ->>;
+x.x: <<.>>;
 0: =##0=;
 1,000:                     <0<[.>%%digits3>] thousand;
 1,000,000:                 <0<[.>%%digits6>] million;
