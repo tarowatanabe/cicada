@@ -95,7 +95,7 @@ int batch_size = 8;
 
 // solver parameters
 bool learn_xbleu = false;
-bool learn_sgd    = false;
+bool learn_softmax    = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
@@ -198,9 +198,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_xbleu) + learn_sgd  > 1)
-      throw std::runtime_error("you can specify either --learn-{xbleu,sgd}");
-    if (int(learn_xbleu) + learn_sgd == 0)
+    if (int(learn_xbleu) + learn_softmax  > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,softmax}");
+    if (int(learn_xbleu) + learn_softmax == 0)
       learn_xbleu = true;
 
     
@@ -312,28 +312,28 @@ int main(int argc, char ** argv)
     
     // perform learning...
     if (yield_sentence) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
+      if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
 	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
     } else if (yield_alignment) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
+      if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
 	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
     } else if (yield_dependency) {
-      if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
+      if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
@@ -1413,7 +1413,7 @@ void options(int argc, char** argv)
     ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
     ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
     
-    ("learn-sgd",     po::bool_switch(&learn_sgd),      "online SGD algorithm")
+    ("learn-softmax", po::bool_switch(&learn_softmax),  "online softmax algorithm")
     ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")

@@ -884,14 +884,14 @@ struct LearnXBLEUL1 : public LearnXBLEU
 
 
 // logistic regression base...
-struct LearnLR : public LearnBase
+struct LearnSoftmax : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
-  LearnLR() { clear(); }
+  LearnSoftmax() { clear(); }
   
   struct weight_function
   {
@@ -1031,10 +1031,10 @@ struct LearnLR : public LearnBase
   int samples;
 };
 
-// SGDL2 learner
-struct LearnSGDL2 : public LearnLR
+// SoftmaxL2 learner
+struct LearnSoftmaxL2 : public LearnSoftmax
 {
-  LearnSGDL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnSoftmaxL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   
   void initialize(weight_set_type& weights)
@@ -1053,7 +1053,7 @@ struct LearnSGDL2 : public LearnLR
 
   void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
   {
-    LearnLR::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
+    LearnSoftmax::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
   }
   
   double learn(weight_set_type& weights)
@@ -1131,8 +1131,8 @@ struct LearnSGDL2 : public LearnLR
 };
 
 
-// SGDL1 learner
-struct LearnSGDL1 : public LearnLR
+// SoftmaxL1 learner
+struct LearnSoftmaxL1 : public LearnSoftmax
 {
   typedef cicada::WeightVector<double> penalty_set_type;
   
@@ -1140,7 +1140,7 @@ struct LearnSGDL1 : public LearnLR
   // L_w =  \sum \log p(y | x) - C |w|
   // 
   
-  LearnSGDL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
+  LearnSoftmaxL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   
   void initialize(weight_set_type& weights)
@@ -1155,7 +1155,7 @@ struct LearnSGDL1 : public LearnLR
 
   void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
   {
-    LearnLR::encode(id, weights, forest, oracle, scorer, 1.0, scale);
+    LearnSoftmax::encode(id, weights, forest, oracle, scorer, 1.0, scale);
   }
   
   double learn(weight_set_type& weights)

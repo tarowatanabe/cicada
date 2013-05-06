@@ -104,8 +104,8 @@ bool learn_cw = false;
 bool learn_arow = false;
 bool learn_nherd = false;
 bool learn_mira   = false;
-bool learn_sgd    = false;
-bool learn_osgd   = false;
+bool learn_softmax    = false;
+bool learn_osoftmax   = false;
 bool learn_el     = false;
 bool learn_oel     = false;
 bool regularize_l1 = false;
@@ -208,10 +208,10 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
-      throw std::runtime_error("you can specify either --learn-{xbleu,mira,sgd,osgd,el,oel,pegasos,opegasos,pa,cw,arow}");
-    if (int(learn_xbleu) + learn_mira + learn_sgd + learn_osgd + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
-      learn_sgd = true;
+    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,mira,softmax,osoftmax,el,oel,pegasos,opegasos,pa,cw,arow}");
+    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+      learn_softmax = true;
 
     
     if (int(regularize_l1) + regularize_l2 > 1)
@@ -219,8 +219,8 @@ int main(int argc, char ** argv)
     if (int(regularize_l1) + regularize_l2 == 0)
       regularize_l2 = true;
 
-    if (learn_osgd && regularize_l1)
-      throw std::runtime_error("no optimized-SGD with L1");
+    if (learn_osoftmax && regularize_l1)
+      throw std::runtime_error("no optimized-softmax with L1");
     if (learn_oel && regularize_l1)
       throw std::runtime_error("no optimized-ExpectedLoss with L1");
 
@@ -335,12 +335,12 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnNHERD, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmaxL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
@@ -366,12 +366,12 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnNHERD, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmaxL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
@@ -397,12 +397,12 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnNHERD, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_mira)
 	cicada_learn<LearnMIRA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l1)
-	cicada_learn<LearnSGDL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_sgd && regularize_l2)
-	cicada_learn<LearnSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osgd && regularize_l2)
-	cicada_learn<LearnOSGDL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_softmax && regularize_l1)
+	cicada_learn<LearnSoftmaxL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_l2)
+	cicada_learn<LearnSoftmaxL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmaxL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEUL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
@@ -1478,8 +1478,8 @@ void options(int argc, char** argv)
     ("learn-cw",       po::bool_switch(&learn_cw),       "online CW algorithm")
     ("learn-arow",     po::bool_switch(&learn_arow),     "online AROW algorithm")
     ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
-    ("learn-sgd",      po::bool_switch(&learn_sgd),      "online SGD algorithm")
-    ("learn-osgd",     po::bool_switch(&learn_osgd),     "online optimized-SGD algorithm")
+    ("learn-softmax",  po::bool_switch(&learn_softmax),  "online softmax algorithm")
+    ("learn-osoftmax", po::bool_switch(&learn_osoftmax), "online optimized-softmax algorithm")
     ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
     ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
     ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected-loss")

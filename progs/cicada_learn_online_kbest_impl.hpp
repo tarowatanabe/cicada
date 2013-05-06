@@ -2039,7 +2039,7 @@ struct LearnMIRA : public LearnOnlineMargin
 };
 
 // logistic regression base...
-struct LearnLR : public LearnBase
+struct LearnSoftmax : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
 
@@ -2123,8 +2123,8 @@ struct LearnLR : public LearnBase
   };
 };
 
-// SGDL1 learner
-struct LearnSGDL1 : public LearnLR
+// SoftmaxL1 learner
+struct LearnSoftmaxL1 : public LearnSoftmax
 {
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
   
@@ -2134,7 +2134,7 @@ struct LearnSGDL1 : public LearnLR
   // L_w =  \sum \log p(y | x) - C |w|
   // 
   
-  LearnSGDL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
+  LearnSoftmaxL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
   
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -2233,12 +2233,12 @@ struct LearnSGDL1 : public LearnLR
   RegularizeAdaGrad adagrad;
 };
 
-// SGDL2 learner
-struct LearnSGDL2 : public LearnLR
+// SoftmaxL2 learner
+struct LearnSoftmaxL2 : public LearnSoftmax
 {
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnSGDL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnSoftmaxL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -2356,8 +2356,8 @@ struct LearnSGDL2 : public LearnLR
   RegularizeAdaGrad adagrad;
 };
 
-// SGDL2 learner
-struct LearnOSGDL2 : public LearnLR
+// SoftmaxL2 learner
+struct LearnOSoftmaxL2 : public LearnSoftmax
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
@@ -2418,7 +2418,7 @@ struct LearnOSGDL2 : public LearnLR
 
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnOSGDL2(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnOSoftmaxL2(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)

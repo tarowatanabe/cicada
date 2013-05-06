@@ -471,6 +471,7 @@ if __name__ == '__main__':
                         options.learn_options,
                         Option('--C', options.C),
                         Option(regularizer),
+                        Option('--dump-weights'),
                         Option('--debug')),
                 name="learn-online",
                 memory=options.max_malloc,
