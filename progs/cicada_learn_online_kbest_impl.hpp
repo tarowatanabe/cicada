@@ -53,7 +53,7 @@ struct RegularizeAdaGrad
   {
     const double grad2 = grads2[feat];
     
-    return (grad2 == 0.0 ? eta : eta / utils::mathop::sqrt(grad2));
+    return (grad2 == 0.0 ? eta0 : eta0 / utils::mathop::sqrt(grad2));
   }
   
   void update(const feature_type& feat, const double& grad)

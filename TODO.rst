@@ -195,6 +195,8 @@ msgpack for succinct storage
 Rearrange learning code by splitting L2 and/or L1 projection
   - Especially for online-learning, they can be set up as additional
     "unified" code
+  - Split learning rate scheduling from the code so that we can choose
+    from exponential decay, adagrad etc.
 
 Non-linear features
    - The decoder uses non-linear combination with hidden layers... How
