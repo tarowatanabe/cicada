@@ -9,6 +9,7 @@ dist_bin_SCRIPTS = \
 	cicada-index.py \
 	cicada-learn.py \
 	cicada-learn-moses.py \
+	cicada-learn-online.py \
 	cicada-maxent.py \
 	cicada-mert.py \
 	cicada-mert-moses.py \
