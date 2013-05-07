@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
 ###
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     print "# feature-function = non-latin-penalty"
     print "# feature-function = rule-shape"
     print
-
+    
     ### inputs
     print "#"
     print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency,directory}"

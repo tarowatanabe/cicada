@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
 import threading

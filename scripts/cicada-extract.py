@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 ### a wrapper script (similar to phrase-extract in moses)
 ### we support "lexicon construction" and "phrase/rule extraction" meaning only step 4 through 6
