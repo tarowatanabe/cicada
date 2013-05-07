@@ -67,26 +67,25 @@ struct LearnBase
   
 };
 
-struct DecayEpoch
+struct DecaySimple
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
   double eta0_;
   double eta_;
-  size_type samples_;
   size_type epoch_;
   
-  DecayEpoch(const double& eta0, const size_type& samples) : eta0_(eta0), samples_(samples), epoch_(0) {}
+  DecaySimple(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
-  double operator()(const size_type& epoch)
+  double operator()() const
   {
-    eta_ = eta0 / (epoch_ + 2);
-    ++ epoch_;
+    const_cast<double&>(eta_) = eta0_ / (epoch_ + 1);
+    ++ const_cast<size_type&>(epoch_);
     return eta_;
   }
   
-  double operator()(const feature_type& feat, const double& grad)
+  double operator()(const feature_type& feat, const double& grad) const
   {
     return eta_ * grad;
   }  
@@ -97,21 +96,22 @@ struct DecayExponential
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
+  double alpha0_;
   double eta0_;
   double eta_;
   size_type samples_;
   size_type epoch_;
   
-  DecayExponential(const double& eta0, const size_type& samples) : eta0_(eta0), samples_(samples), epoch_(0) {}
+  DecayExponential(const double& alpha0, const double& eta0, const size_type& samples) : alpha0_(alpha0), eta0_(eta0), samples_(samples), epoch_(0) {}
   
-  double operator()(const size_type& epoch)
+  double operator()() const
   {
-    eta_ = eta0 * std::pow(0.85, double(epoch_) / samples_);
-    ++ epoch_;
+    const_cast<double&>(eta_) = eta0_ * std::pow(alpha0_, double(epoch_) / samples_);
+    ++ const_cast<size_type&>(epoch_);
     return eta_;
   }
   
-  double operator()(const feature_type& feat, const double& grad)
+  double operator()(const feature_type& feat, const double& grad) const
   {
     return eta_ * grad;
   }
@@ -124,21 +124,20 @@ struct DecayAdaGrad
   
   weight_set_type grads2_;
   double eta0_;
-  size_type samples_;
   size_type epoch_;
   
-  DecayAdaGrad(const double& eta0, const size_type& samples) : eta0_(eta0), samples_(samples), epoch_(0) {}
+  DecayAdaGrad(const double& eta0, const size_type& samples) : eta0_(eta0), epoch_(0) {}
   
-  double operator()()
+  double operator()() const
   {
-    const double eta = eta0_ / (epoch_ + 2);
-    ++ epoch_;
+    const double eta = eta0_ / (epoch_ + 1);
+    ++ const_cast<size_type&>(epoch_);
     return eta;
   }
   
-  double operator()(const feature_type& feat, const double& grad)
+  double operator()(const feature_type& feat, const double& grad) const
   {
-    double& grad2 = grads2_[feat];
+    double& grad2 = const_cast<weight_set_type&>(grads2_).operator[](feat);
     const double eta = (grad2 == 0.0 ? eta0_ : eta0_ / utils::mathop::sqrt(grad2));
     
     grad2 += grad * grad;
