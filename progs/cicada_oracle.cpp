@@ -104,11 +104,11 @@ bool forest_mode = false;
 bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
+int scorer_cube = 200;
+double scorer_beam = 1e-5;
 int max_iteration = 10;
 int min_iteration = 5;
 bool apply_exact = false;
-int cube_size = 200;
-double beam_size = 1e-5;
 
 int threads = 2;
 
@@ -269,7 +269,7 @@ struct TaskSingle
       if (apply_exact)
 	cicada::apply_exact(model, graphs[id], graph_oracle);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), cube_size);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube);
       
       // compute viterbi...
       weight_type weight;
@@ -367,7 +367,7 @@ struct TaskOracle
       if (apply_exact)
 	cicada::apply_exact(model, graphs[id], graph_oracle);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), cube_size);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube);
       
       // compute viterbi...
       weight_type weight;
@@ -376,7 +376,7 @@ struct TaskOracle
       
       // compute pruned forest
       hypergraph_type forest;
-      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_scorer, score_factor), beam_size);
+      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_scorer, score_factor), scorer_beam);
       
       // compute scores...
       score_ptr_type score_sample = scorers[id]->score(sentence);
@@ -705,14 +705,14 @@ void options(int argc, char** argv)
     ("forest",    po::bool_switch(&forest_mode),    "output by forest")
     ("directory", po::bool_switch(&directory_mode), "output in directory")
         
-    ("scorer",    po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-cube", po::value<int>(&scorer_cube)->default_value(scorer_cube),         "cube pruning size")
+    ("scorer-beam", po::value<double>(&scorer_beam)->default_value(scorer_beam),      "beam pruning size")
     
     ("max-iteration", po::value<int>(&max_iteration), "# of hill-climbing iteration")
     ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact application")
-    ("cube-size", po::value<int>(&cube_size)->default_value(cube_size),    "cube pruning size")
-    ("beam-size", po::value<double>(&beam_size)->default_value(beam_size), "beam pruning size")
     
     ("threads", po::value<int>(&threads), "# of threads")
     ;

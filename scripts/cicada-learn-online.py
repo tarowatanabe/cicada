@@ -44,10 +44,10 @@ opt_parser = OptionParser(
                 metavar="REGULARIZER", help="L1 regularization"),
     make_option("--regularize-l2", action="store_true",
                 metavar="REGULARIZER", help="L2 regularization"),
-    make_option("--cube-size", default=400, action="store", type="int",
-                metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: %default)"),
+    make_option("--scorer-cube", default=30, action="store", type="int",
+                metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--learn", default="xbleu", action="store", type="string",
                 metavar="LEARN", help="learning algorithms from [softmax, svm, linear, pegasos, mira, cw, arow, nherd, cp, mcp, xbleu] (default: %default)"),
     make_option("--learn-options", default="", action="store", type="string",
@@ -451,6 +451,10 @@ if __name__ == '__main__':
                 raise ValueError, "%s is not supported by forest learner" %(options.learn)
 
             cicada_learn     = cicada.cicada_learn_online_kbest_mpi
+
+    oracle_scorer_cube = ''
+    if options.forest:
+        oracle_scorer_cube = Option('--scorer-cube', options.scorer_cube)
     
     learn_output = Option('--output', Quoted(os.path.join(options.root_dir, options.prefix + '.weights')))
     
@@ -465,6 +469,7 @@ if __name__ == '__main__':
                         Option('--refset', Quoted(options.refset)),
                         Option('--scorer', options.scorer),
                         Option('--config', Quoted(options.config)),
+                        oracle_scorer_cube,
                         learn_output,
                         learn_weights,
                         learn_algorithm,

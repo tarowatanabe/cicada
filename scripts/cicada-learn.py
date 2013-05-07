@@ -47,10 +47,10 @@ opt_parser = OptionParser(
                 metavar="REGULARIZER", help="L1 regularization"),
     make_option("--regularize-l2", action="store_true",
                 metavar="REGULARIZER", help="L2 regularization"),
-    make_option("--cube-size", default=400, action="store", type="int",
-                metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: %default)"),
+    make_option("--scorer-cube", default=400, action="store", type="int",
+                metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--learn", default="xbleu", action="store", type="string",
                 metavar="LEARN", help="learning algorithms from [softmax, svm, linear, pegasos, mira, cw, arow, nherd, cp, mcp, xbleu] (default: %default)"),
     make_option("--learn-options", default="", action="store", type="string",
@@ -621,10 +621,10 @@ if __name__ == '__main__':
         if options.merge:
             oracle_tstset = Option('--tstset', ' '.join(map(lambda x: str(Quoted(x)), tstset)))
 
-        oracle_cube_size = ''
+        oracle_scorer_cube = ''
         oracle_forest = ''
         if options.forest:
-            oracle_cube_size = Option('--cube-size', options.cube_size)
+            oracle_scorer_cube = Option('--scorer-cube', options.scorer_cube)
             oracle_forest = Option('--forest')
                     
         if mpi:
@@ -633,7 +633,7 @@ if __name__ == '__main__':
                                 oracle_tstset,
                                 Option('--output', Quoted(oracle)),
                                 Option('--scorer', options.scorer),
-                                oracle_cube_size,
+                                oracle_scorer_cube,
                                 oracle_forest,
                                 Option('--directory'),
                                 Option('--debug')),
