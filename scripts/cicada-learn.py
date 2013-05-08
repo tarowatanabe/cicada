@@ -442,16 +442,14 @@ if __name__ == '__main__':
         cicada_oracle     = cicada.cicada_oracle_kbest
         cicada_oracle_mpi = cicada.cicada_oracle_kbest_mpi
 
-    learn_forest     = learn_algorithms(cicada.cicada_learn)
-    learn_kbest      = learn_algorithms(cicada.cicada_learn_kbest)
-    learn_forest_mpi = learn_algorithms(cicada.cicada_learn_mpi)
-    learn_kbest_mpi  = learn_algorithms(cicada.cicada_learn_kbest_mpi)
-
     learn_mpi        = None
     cicada_learn     = None
     cicada_learn_mpi = None
     
     if options.forest:
+        learn_forest     = learn_algorithms(cicada.cicada_learn)
+        learn_forest_mpi = learn_algorithms(cicada.cicada_learn_mpi)
+        
         if options.learn not in learn_forest or options.learn not in learn_forest_mpi:
             raise ValueError, "%s is not supported by forest learner" %(options.learn)
 
@@ -465,6 +463,9 @@ if __name__ == '__main__':
             learn_mpi = 1
 
     else:
+        learn_kbest     = learn_algorithms(cicada.cicada_learn_kbest)
+        learn_kbest_mpi = learn_algorithms(cicada.cicada_learn_kbest_mpi)
+
         if options.learn not in learn_kbest or options.learn not in learn_kbest_mpi:
             raise ValueError, "learner %s is not supported by kbest learner" %(options.learn)
         

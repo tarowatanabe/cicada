@@ -449,9 +449,9 @@ if __name__ == '__main__':
     if options.kbest <= 0:
         raise ValueError, "invalid kbest"
 
-    learn_kbest      = learn_algorithms(cicada.cicada_learn_kbest)
-    learn_kbest_mpi  = learn_algorithms(cicada.cicada_learn_kbest_mpi)
-    learn_mpi        = None
+    learn_kbest     = learn_algorithms(cicada.cicada_learn_kbest)
+    learn_kbest_mpi = learn_algorithms(cicada.cicada_learn_kbest_mpi)
+    learn_mpi       = None
     
     if options.learn not in learn_kbest or options.learn not in learn_kbest_mpi:
         raise ValueError, "learner %s is not supported by kbest learner" %(options.learn)

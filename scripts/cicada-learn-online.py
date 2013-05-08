@@ -422,35 +422,30 @@ if __name__ == '__main__':
     if options.forest and options.kbest > 0:
         raise ValueError, "forest-mode or kbest-mode?"
 
-    online_forest       = learn_algorithms(cicada.cicada_learn_online_mpi)
-    online_kbest        = learn_algorithms(cicada.cicada_learn_online_kbest_mpi)
-    asynchronous_forest = learn_algorithms(cicada.cicada_learn_asynchronous_mpi)
-    asynchronous_kbest  = learn_algorithms(cicada.cicada_learn_asynchronous_kbest_mpi)
-
     cicada_learn = None
     
     if options.forest:
         if options.asynchronous:
-            if options.learn not in asynchronous_forest:
+            cicada_learn = cicada.cicada_learn_asynchronous_mpi
+            
+            if options.learn not in learn_algorithms(cicada_learn):
                 raise ValueError, "%s is not supported by forest learner" %(options.learn)
-
-            cicada_learn     = cicada.cicada_learn_asynchronous_mpi
         else:
-            if options.learn not in online_forest:
+            cicada_learn = cicada.cicada_learn_online_mpi
+            
+            if options.learn not in learn_algorithms(cicada_learn)
                 raise ValueError, "%s is not supported by forest learner" %(options.learn)
-
-            cicada_learn     = cicada.cicada_learn_online_mpi
     else:
         if options.asynchronous:
-            if options.learn not in asynchronous_kbest:
-                raise ValueError, "%s is not supported by forest learner" %(options.learn)
+            cicada_learn = cicada.cicada_learn_asynchronous_kbest_mpi
 
-            cicada_learn     = cicada.cicada_learn_asynchronous_kbest_mpi
+            if options.learn not in learn_algorithms(cicada_learn):
+                raise ValueError, "%s is not supported by forest learner" %(options.learn)
         else:
-            if options.learn not in online_kbest:
+            cicada_learn = cicada.cicada_learn_online_kbest_mpi
+            
+            if options.learn not in learn_algorithms(cicada_learn):
                 raise ValueError, "%s is not supported by forest learner" %(options.learn)
-
-            cicada_learn     = cicada.cicada_learn_online_kbest_mpi
 
     oracle_scorer_cube = ''
     if options.forest:

@@ -10,7 +10,6 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/device/array.hpp>
 
