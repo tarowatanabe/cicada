@@ -130,7 +130,6 @@ namespace std
   }
 };
 
-
 struct RulePair
 {
   typedef std::string phrase_type;
@@ -139,27 +138,25 @@ struct RulePair
   typedef int64_t frequency_type;
   typedef boost::array<frequency_type, 3> freqs_type;
   
-  phrase_type    source;
-  phrase_type    target;
-  alignment_type alignment;
+  const phrase_type*    source;
+  const phrase_type*    target;
+  const alignment_type* alignment;
   count_type     count;
   freqs_type     freqs;
 
-  RulePair() : source(), target(), alignment(), count(0), freqs() {}
+  RulePair() : source(0), target(0), alignment(0), count(0), freqs() {}
   RulePair(const phrase_type& __source,
 	   const phrase_type& __target,
 	   const alignment_type& __alignment,
 	   const count_type& __count)
-    : source(__source), target(__target), alignment(__alignment), count(__count), freqs() {}
+    : source(&__source), target(&__target), alignment(&__alignment), count(__count), freqs() {}
 
   friend
   size_t hash_value(RulePair const& x)
   {
     typedef utils::hashmurmur3<size_t> hasher_type;
     
-    return hasher_type()(x.source.begin(), x.source.end(),
-			 hasher_type()(x.target.begin(), x.target.end(),
-				       hasher_type()(x.alignment.begin(), x.alignment.end(), 0)));
+    return hasher_type()(x.source, hasher_type()(x.target, (uintptr_t) x.alignment));
   }
 
   friend
@@ -177,11 +174,11 @@ struct RulePair
   friend
   bool operator<(const RulePair& x, const RulePair& y)
   {
-    return (x.source < y.source
-	    || (!(y.source < x.source)
-		&& (x.target < y.target
-		    || (!(y.target < x.target)
-			&& x.alignment < y.alignment))));
+    return (RulePair::compare(x.source, y.source)
+	    || (!RulePair::compare(y.source, x.source)
+		&& (RulePair::compare(x.target, y.target)
+		    || (!RulePair::compare(y.target, x.target)
+			&& RulePair::compare(x.alignment, y.alignment)))));
   }
   
   friend
@@ -189,19 +186,18 @@ struct RulePair
   {
     return y < x;
   }
+  
+  template <typename Tp>
+  static inline
+  bool compare(const Tp* x, const Tp* y)
+  {
+    return (x && y && *x < *y) || (!x && y);
+  }
 };
 
 BOOST_FUSION_ADAPT_STRUCT(RulePair::alignment_type::point_type,
 			  (RulePair::alignment_type::index_type, source)
 			  (RulePair::alignment_type::index_type, target)
-			  )
-BOOST_FUSION_ADAPT_STRUCT(
-			  RulePair,
-			  (RulePair::phrase_type, source)
-			  (RulePair::phrase_type, target)
-			  (RulePair::alignment_type, alignment)
-			  (RulePair::count_type, count)
-			  (RulePair::freqs_type, freqs)
 			  )
 
 struct RulePairGenerator
@@ -213,53 +209,41 @@ struct RulePairGenerator
   typedef phrase_pair_type::frequency_type frequency_type;
   typedef phrase_pair_type::count_type     count_type;
   
-  RulePairGenerator() : grammar() {}
-  RulePairGenerator(const RulePairGenerator& x) : grammar() {}
-  
-  template <typename Iterator>
-  struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
-  {
-    phrase_pair_generator() : phrase_pair_generator::base_type(phrase_pair)
-    {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      
-      alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
-      phrase_pair %= (standard::string
-		      << " ||| " << standard::string
-		      << " ||| " << alignment
-		      << " ||| " << double20
-		      << ' ' << (frequency % ' '));
-    }
-
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 20;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double20;
-    boost::spirit::karma::int_generator<frequency_type> frequency;
-    
-    boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
-    boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
-  };
-
-  typedef std::ostream_iterator<char> iterator_type;
+  RulePairGenerator() {}
   
   std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair) const
   {
+    typedef std::ostream_iterator<char> iterator_type;
+  
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, grammar, phrase_pair))
+    if (! karma::generate(iter,
+			  standard::string << " ||| " << standard::string
+			  << " ||| " << -((karma::int_ << '-' << karma::int_) % ' ')
+			  << " ||| " << double20 << ' ' << (frequency % ' ') << '\n',
+			  *phrase_pair.source,
+			  *phrase_pair.target,
+			  *phrase_pair.alignment,
+			  phrase_pair.count,
+			  phrase_pair.freqs))
       throw std::runtime_error("failed generation!");
     
     return os;
   }
   
-  phrase_pair_generator<iterator_type> grammar;
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double20;
+  boost::spirit::karma::int_generator<frequency_type> frequency;
 };
 
 //
@@ -438,9 +422,81 @@ struct ExtractTree
 			     boost::hash<rule_pair_compact_type>, std::equal_to<rule_pair_compact_type>,
 			     std::allocator<rule_pair_compact_type> > rule_pair_compact_set_type;
 
-  
-  typedef utils::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-			       std::allocator<rule_pair_type> >::type rule_pair_set_type;
+  struct rule_pair_set_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
+    typedef rule_pair_type::alignment_type alignment_type;
+    
+    struct string_hash : public utils::hashmurmur3<size_t>
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      size_t operator()(const std::string& x) const
+      {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+    
+    typedef utils::indexed_set<phrase_type, string_hash, std::equal_to<phrase_type>, 
+			       std::allocator<phrase_type> > phrase_set_type;
+
+    typedef utils::indexed_set<alignment_type,
+			       boost::hash<alignment_type>,
+			       std::equal_to<alignment_type>,
+			       std::allocator<alignment_type> > alignment_set_type;
+
+    struct rule_pair_unassigned
+    {
+      rule_pair_type operator()() const
+      {
+	return rule_pair_type();
+      }
+    };
+    
+    typedef utils::compact_set<rule_pair_type,
+			       rule_pair_unassigned, rule_pair_unassigned,
+			       boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			       std::allocator<rule_pair_type> > phrase_pair_set_type;
+
+    typedef phrase_pair_set_type::const_iterator const_iterator;
+    typedef phrase_pair_set_type::iterator       iterator;
+    
+    bool empty() const { return rules.empty(); }
+    size_type size() const { return rules.size(); }
+
+    const_iterator begin() const { return rules.begin(); }
+    const_iterator end() const { return rules.end(); }
+
+    std::pair<iterator, bool> insert(const rule_pair_type& x)
+    {
+      return rules.insert(rule_pair_type(*sources.insert(*x.source).first,
+					 *targets.insert(*x.target).first,
+					 *alignments.insert(*x.alignment).first,
+					 x.count));
+    }
+    
+    void clear()
+    {
+      rules.clear();
+      sources.clear();
+      targets.clear();
+      alignments.clear();
+    }
+
+    void swap(rule_pair_set_type& x)
+    {
+      rules.swap(x.rules);
+      sources.swap(x.sources);
+      targets.swap(x.targets);
+      alignments.swap(x.alignments);
+    }
+    
+    phrase_pair_set_type rules;
+    phrase_set_type      sources;
+    phrase_set_type      targets;
+    alignment_set_type   alignments;
+  };
 
   typedef std::vector<bool, std::allocator<bool> > unique_set_type;
   
