@@ -233,7 +233,7 @@ struct RulePairGenerator
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string
 			  << " ||| " << -((karma::int_ << '-' << karma::int_) % ' ')
-			  << " ||| " << double20 << ' ' << (frequency % ' ') << '\n',
+			  << " ||| " << double20 << ' ' << (frequency % ' '),
 			  *phrase_pair.source,
 			  *phrase_pair.target,
 			  *phrase_pair.alignment,
