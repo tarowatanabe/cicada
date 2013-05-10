@@ -321,10 +321,10 @@ struct ExtractPhrase
       alignments.swap(x.alignments);
     }
     
-    pair_set_type        phrases;
-    phrase_set_type      sources;
-    phrase_set_type      targets;
-    alignment_set_type   alignments;
+    pair_set_type      phrases;
+    phrase_set_type    sources;
+    phrase_set_type    targets;
+    alignment_set_type alignments;
   };  
   
   struct string_hash : public utils::hashmurmur3<size_t>

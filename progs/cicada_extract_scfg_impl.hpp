@@ -463,10 +463,10 @@ struct ExtractSCFG
     typedef utils::compact_set<rule_pair_type,
 			       rule_pair_unassigned, rule_pair_unassigned,
 			       boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
-			       std::allocator<rule_pair_type> > phrase_pair_set_type;
-
-    typedef phrase_pair_set_type::const_iterator const_iterator;
-    typedef phrase_pair_set_type::iterator       iterator;
+			       std::allocator<rule_pair_type> > pair_set_type;
+    
+    typedef pair_set_type::const_iterator const_iterator;
+    typedef pair_set_type::iterator       iterator;
     
     bool empty() const { return rules.empty(); }
     size_type size() const { return rules.size(); }
@@ -498,7 +498,7 @@ struct ExtractSCFG
       alignments.swap(x.alignments);
     }
     
-    phrase_pair_set_type rules;
+    pair_set_type        rules;
     phrase_set_type      sources;
     phrase_set_type      targets;
     alignment_set_type   alignments;
