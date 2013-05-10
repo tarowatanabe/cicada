@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_PHRASE_IMPL__HPP__
@@ -27,6 +27,7 @@
 #include "utils/unordered_map.hpp"
 #include "utils/chart.hpp"
 #include "utils/compact_set.hpp"
+#include "utils/indexed_set.hpp"
 
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/bithack.hpp>
@@ -106,30 +107,24 @@ struct PhrasePair
   typedef int64_t count_type;
   typedef boost::array<count_type, 5+3> counts_type;
   
-  phrase_type    source;
-  phrase_type    target;
-  alignment_type alignment;
+  const phrase_type*    source;
+  const phrase_type*    target;
+  const alignment_type* alignment;
   counts_type    counts;
 
-  PhrasePair() : source(), target(), alignment(), counts() {}
-  PhrasePair(const phrase_type& __source,
-	     const phrase_type& __target,
-	     const alignment_type& __alignment)
-    : source(__source), target(__target), alignment(__alignment), counts() {}
+  PhrasePair() : source(0), target(0), alignment(0), counts() {}
   PhrasePair(const phrase_type& __source,
 	     const phrase_type& __target,
 	     const alignment_type& __alignment,
 	     const counts_type& __counts)
-    : source(__source), target(__target), alignment(__alignment), counts(__counts) {}
+    : source(&__source), target(&__target), alignment(&__alignment), counts(__counts) {}
   
   friend
   size_t hash_value(PhrasePair const& x)
   {
     typedef utils::hashmurmur3<size_t> hasher_type;
     
-    return hasher_type()(x.source.begin(), x.source.end(),
-			 hasher_type()(x.target.begin(), x.target.end(),
-				       hasher_type()(x.alignment.begin(), x.alignment.end(), 0)));
+    return hasher_type()(x.source, hasher_type()(x.target, (uintptr_t) x.alignment));
   }
 
   friend
@@ -147,11 +142,11 @@ struct PhrasePair
   friend
   bool operator<(const PhrasePair& x, const PhrasePair& y)
   {
-    return (x.source < y.source
-	    || (!(y.source < x.source)
-		&& (x.target < y.target
-		    || (!(y.target < x.target)
-			&& x.alignment < y.alignment))));
+    return (PhrasePair::compare(x.source, y.source)
+	    || (!PhrasePair::compare(y.source, x.source)
+		&& (PhrasePair::compare(x.target, y.target)
+		    || (!PhrasePair::compare(y.target, x.target)
+			&& PhrasePair::compare(x.alignment, y.alignment)))));
   }
   
   friend
@@ -159,18 +154,18 @@ struct PhrasePair
   {
     return y < x;
   }
+
+  template <typename Tp>
+  static inline
+  bool compare(const Tp* x, const Tp* y)
+  {
+    return (x && y && *x < *y) || (!x && y);
+  }
 };
 
 BOOST_FUSION_ADAPT_STRUCT(PhrasePair::alignment_type::point_type,
 			  (PhrasePair::alignment_type::index_type, source)
 			  (PhrasePair::alignment_type::index_type, target)
-			  )
-BOOST_FUSION_ADAPT_STRUCT(
-			  PhrasePair,
-			  (PhrasePair::phrase_type, source)
-			  (PhrasePair::phrase_type, target)
-			  (PhrasePair::alignment_type, alignment)
-			  (PhrasePair::counts_type, counts)
 			  )
 
 struct PhrasePairGenerator
@@ -182,42 +177,31 @@ struct PhrasePairGenerator
   typedef phrase_pair_type::count_type     count_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
-  PhrasePairGenerator() : grammar() {}
-  PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
+  PhrasePairGenerator() {}
 
-  
-  template <typename Iterator>
-  struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
-  {
-    phrase_pair_generator() : phrase_pair_generator::base_type(phrase_pair)
-    {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      
-      alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
-      counts %= count % ' ';
-      phrase_pair %= standard::string << " ||| " << standard::string << " ||| " << alignment << " ||| " << counts;
-    }
-
-    boost::spirit::karma::int_generator<count_type> count;
-    boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
-    boost::spirit::karma::rule<Iterator, counts_type()> counts;
-    boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
-  };
-
-  typedef std::ostream_iterator<char> iterator_type;
-  
   std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
   {
+    typedef std::ostream_iterator<char> iterator_type;
+  
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, grammar, phrase_pair))
+    if (! karma::generate(iter,
+			  standard::string << " ||| " << standard::string
+			  << " ||| " << -((karma::int_ << '-' << karma::int_) % ' ')
+			  << " ||| " << (count % ' '),
+			  *phrase_pair.source,
+			  *phrase_pair.target,
+			  *phrase_pair.alignment,
+			  phrase_pair.counts))
       throw std::runtime_error("failed generation!");
     
     return os;
   }
   
-  phrase_pair_generator<iterator_type> grammar;
+  boost::spirit::karma::int_generator<count_type> count;
 };
 
 
@@ -267,8 +251,81 @@ struct ExtractPhrase
   
   typedef PhrasePair phrase_pair_type;
 
-  typedef utils::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-			       std::allocator<phrase_pair_type> >::type phrase_pair_set_type;
+  struct phrase_pair_set_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
+    typedef phrase_pair_type::alignment_type alignment_type;
+    
+    struct string_hash : public utils::hashmurmur3<size_t>
+    {
+      typedef utils::hashmurmur3<size_t> hasher_type;
+      size_t operator()(const std::string& x) const
+      {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+    
+    typedef utils::indexed_set<phrase_type, string_hash, std::equal_to<phrase_type>, 
+			       std::allocator<phrase_type> > phrase_set_type;
+
+    typedef utils::indexed_set<alignment_type,
+			       boost::hash<alignment_type>,
+			       std::equal_to<alignment_type>,
+			       std::allocator<alignment_type> > alignment_set_type;
+
+    struct phrase_pair_unassigned
+    {
+      phrase_pair_type operator()() const
+      {
+	return phrase_pair_type();
+      }
+    };
+    
+    typedef utils::compact_set<phrase_pair_type,
+			       phrase_pair_unassigned, phrase_pair_unassigned,
+			       boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
+			       std::allocator<phrase_pair_type> > pair_set_type;
+
+    typedef pair_set_type::const_iterator const_iterator;
+    typedef pair_set_type::iterator       iterator;
+    
+    bool empty() const { return phrases.empty(); }
+    size_type size() const { return phrases.size(); }
+
+    const_iterator begin() const { return phrases.begin(); }
+    const_iterator end() const { return phrases.end(); }
+
+    std::pair<iterator, bool> insert(const phrase_pair_type& x)
+    {
+      return phrases.insert(phrase_pair_type(*sources.insert(*x.source).first,
+					     *targets.insert(*x.target).first,
+					     *alignments.insert(*x.alignment).first,
+					     x.counts));
+    }
+    
+    void clear()
+    {
+      phrases.clear();
+      sources.clear();
+      targets.clear();
+      alignments.clear();
+    }
+
+    void swap(phrase_pair_set_type& x)
+    {
+      phrases.swap(x.phrases);
+      sources.swap(x.sources);
+      targets.swap(x.targets);
+      alignments.swap(x.alignments);
+    }
+    
+    pair_set_type        phrases;
+    phrase_set_type      sources;
+    phrase_set_type      targets;
+    alignment_set_type   alignments;
+  };  
   
   struct string_hash : public utils::hashmurmur3<size_t>
   {
