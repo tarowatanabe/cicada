@@ -819,7 +819,7 @@ struct Task
     bitext_type bitext;
     phrase_pair_set_type phrase_pairs;
     
-    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask = (1 << 5) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     size_t min_counts_size = 0;
     
