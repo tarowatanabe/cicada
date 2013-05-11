@@ -1003,17 +1003,19 @@ struct PhrasePairSourceMapper
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
+    typedef std::vector<buffer_type, std::allocator<buffer_type> > buffer_set_type;
+    
     pqueue_type pqueue;
-
+    
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());
-
+    
     size_t pos = 0;
     path_set_type::const_iterator piter_end = paths.end();
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->string());
-
+      
       istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
       buffer_stream_type* buffer_stream = &buffer_streams[pos];
@@ -1025,8 +1027,12 @@ struct PhrasePairSourceMapper
 	pqueue.push(buffer_stream);
     }
     
-    simple_type counts;
+    simple_type     counts;
+    buffer_set_type buffers(queues.size());
 
+    int shard_prev = -1;
+    int non_found_iter = 0;
+    
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1036,7 +1042,41 @@ struct PhrasePairSourceMapper
       if (counts != curr) {
 	if (! counts.counts.empty()) {
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-	  queues[shard]->push_swap(counts);
+	  
+	  // try consume as much as possible...
+	  while (! buffers[shard].empty()) {
+	    if (queues[shard]->push_swap(buffers[shard].front(), true))
+	      buffers[shard].pop_front();
+	    else
+	      break;
+	  }
+	  
+	  if (buffers[shard].empty()) { // try insert into queue.
+	    if (! queues[shard]->push_swap(counts, true))
+	      buffers[shard].push_back(counts);
+	  } else if (shard == shard_prev)
+	    buffers[shard].push_back(counts); // put into buffer
+	  else {
+	    // otherwise, wait until buffers[shard] becomes empty!
+	    while (! buffers[shard].empty()) {
+	      bool found = false;
+	      
+	      for (size_t i = 0; i != buffers.size(); ++ i)
+		if (! buffers[i].empty())
+		  if (queues[i]->push_swap(buffers[i].front(), true)) {
+		    buffers[i].pop_front();
+		    found = true;
+		  }
+	      
+	      non_found_iter = loop_sleep(found, non_found_iter);
+	    }
+	    
+	    if (! queues[shard]->push_swap(counts, true))
+	      buffers[shard].push_back(counts);
+	  }
+	  
+	  shard_prev = shard;
+	  //queues[shard]->push_swap(counts);
 	}
 	
 	counts.swap(curr);
@@ -1056,25 +1096,43 @@ struct PhrasePairSourceMapper
     
     if (! counts.counts.empty()) {
       const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-      queues[shard]->push_swap(counts);
+      
+      if (buffers[shard].empty()) {
+	if (! queues[shard]->push_swap(counts, true))
+	  buffers[shard].push_back(counts);
+      } else
+	buffers[shard].push_back(counts);
+      
+      shard_prev = shard;
+      //queues[shard]->push_swap(counts);
     }
 
     // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
-    int non_found_iter = 0;
     
     counts.clear();
     
     while (1) {
       bool found = false;
       
-      for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+      for (size_t shard = 0; shard != queues.size(); ++ shard) {
+	// consume as much as possible...
+	while (! buffers[shard].empty()) {
+	  if (queues[shard]->push_swap(buffers[shard].front(), true)) {
+	    buffers[shard].pop_front();
+	    found = true;
+	  } else
+	    break;
+	}
+	
+	// check for termination...
+	if (buffers[shard].empty() && ! terminated[shard] && queues[shard]->push_swap(counts, true)) {
 	  counts.clear();
 	  
 	  terminated[shard] = true;
 	  found = true;
 	}
+      }
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
@@ -2731,6 +2789,8 @@ struct PhrasePairScoreMapper
     typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+
+    typedef std::vector<buffer_type, std::allocator<buffer_type> > buffer_set_type;
     
     pqueue_type            pqueue;
     istream_ptr_set_type   istreams(paths.size());
@@ -2754,6 +2814,10 @@ struct PhrasePairScoreMapper
     }
     
     phrase_pair_type counts;
+    buffer_set_type  buffers(queues.size());
+    
+    int shard_prev = -1;
+    int non_found_iter = 0;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -2767,7 +2831,41 @@ struct PhrasePairScoreMapper
 	    std::cerr << "score count mapper send" << std::endl;
 	  
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-	  queues[shard]->push_swap(counts);
+	  
+	  // try consume as much as possible...
+	  while (! buffers[shard].empty()) {
+	    if (queues[shard]->push_swap(buffers[shard].front(), true))
+	      buffers[shard].pop_front();
+	    else
+	      break;
+	  }
+	  
+	  if (buffers[shard].empty()) { // try insert into queue.
+	    if (! queues[shard]->push_swap(counts, true))
+	      buffers[shard].push_back(counts);
+	  } else if (shard == shard_prev)
+	    buffers[shard].push_back(counts); // put into buffer
+	  else {
+	    // otherwise, wait until buffers[shard] becomes empty!
+	    while (! buffers[shard].empty()) {
+	      bool found = false;
+	      
+	      for (size_t i = 0; i != buffers.size(); ++ i)
+		if (! buffers[i].empty())
+		  if (queues[i]->push_swap(buffers[i].front(), true)) {
+		    buffers[i].pop_front();
+		    found = true;
+		  }
+	      
+	      non_found_iter = loop_sleep(found, non_found_iter);
+	    }
+	    
+	    if (! queues[shard]->push_swap(counts, true))
+	      buffers[shard].push_back(counts);
+	  }
+	  
+	  shard_prev = shard;
+	  //queues[shard]->push_swap(counts);
 	}
 	
 	counts.swap(curr);
@@ -2790,26 +2888,44 @@ struct PhrasePairScoreMapper
 	std::cerr << "score count mapper send" << std::endl;
 
       const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-      queues[shard]->push_swap(counts);
+
+      if (buffers[shard].empty()) {
+	if (! queues[shard]->push_swap(counts, true))
+	  buffers[shard].push_back(counts);
+      } else
+	buffers[shard].push_back(counts);
+      
+      shard_prev = shard;
+      //queues[shard]->push_swap(counts);
     }
     
     // termination...
     // we will terminate asynchronously...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
-    int non_found_iter = 0;
     
     counts.clear();
     
     while (1) {
       bool found = false;
       
-      for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+      for (size_t shard = 0; shard != queues.size(); ++ shard)  {
+	// consume as much as possible...
+	while (! buffers[shard].empty()) {
+	  if (queues[shard]->push_swap(buffers[shard].front(), true)) {
+	    buffers[shard].pop_front();
+	    found = true;
+	  } else
+	    break;
+	}
+	
+	// check for termination...
+	if (buffers[shard].empty() && ! terminated[shard] && queues[shard]->push_swap(counts, true)) {
 	  counts.clear();
 	  
 	  terminated[shard] = true;
 	  found = true;
 	}
+      }
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
