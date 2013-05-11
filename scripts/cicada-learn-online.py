@@ -441,7 +441,7 @@ if __name__ == '__main__':
         else:
             cicada_learn = cicada.cicada_learn_online_mpi
             
-            if options.learn not in learn_algorithms(cicada_learn)
+            if options.learn not in learn_algorithms(cicada_learn):
                 raise ValueError, "%s is not supported by forest learner" %(options.learn)
     else:
         if options.asynchronous:
