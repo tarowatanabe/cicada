@@ -417,12 +417,6 @@ if __name__ == '__main__':
     ### QSUB
     qsub = QSub(mpi=mpi, pbs=pbs)
     
-    ### iterations
-    if options.iteration_first <= 0:
-        options.iteration_first = 1
-    if options.iteration_first > options.iteration:
-        raise ValueError, "invalid iterations"
-
     ### defaults to forest...
     if not options.forest and options.kbest <= 0:
         options.forest = 1
