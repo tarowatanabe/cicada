@@ -371,6 +371,14 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
 
+    ### devset
+    if not os.path.exists(options.devset):
+        raise ValueError, "no developtment file: %s" %(options.devset)
+
+    ### refset
+    if not os.path.exists(options.refset):
+        raise ValueError, "no reference translation file: %s" %(options.refset)
+
     ### config
     if not os.path.exists(options.config):
         raise ValueError, "no config file: %s" %(options.config)
