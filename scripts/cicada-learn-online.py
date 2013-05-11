@@ -452,8 +452,10 @@ if __name__ == '__main__':
     oracle_scorer_cube = ''
     if options.forest:
         oracle_scorer_cube = Option('--scorer-cube', options.scorer_cube)
+
+    tuning = os.path.join(options.root_dir, options.prefix + '.weights')
     
-    learn_output = Option('--output', Quoted(os.path.join(options.root_dir, options.prefix + '.weights')))
+    learn_output = Option('--output', Quoted(tuning))
     
     learn_weights = ''
     if options.weights:
