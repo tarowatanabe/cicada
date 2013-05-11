@@ -461,7 +461,7 @@ if __name__ == '__main__':
 
     learn_algorithm = Option('--learn-' + options.learn)
     
-    qsub.mpirun(Program(cicada.cicada_mpi,
+    qsub.mpirun(Program(cicada_learn,
                         Option('--input', Quoted(options.devset)),
                         Option('--refset', Quoted(options.refset)),
                         Option('--scorer', options.scorer),
