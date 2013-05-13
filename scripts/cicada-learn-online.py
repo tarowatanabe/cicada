@@ -35,6 +35,8 @@ opt_parser = OptionParser(
 
     make_option("--iteration", default=10, action="store", type="int",
                 metavar="ITERATION", help="# of iterations (default: %default)"),
+    make_option("--batch", default=10, action="store", type="int",
+                metavar="BATCH", help="mini batch size (default: %default)"),
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
     
@@ -468,6 +470,8 @@ if __name__ == '__main__':
                         Option('--refset', Quoted(options.refset)),
                         Option('--scorer', options.scorer),
                         Option('--config', Quoted(options.config)),
+                        Option('--iteration', options.iteration),
+                        Option('--batch',     options.batch),
                         oracle_scorer_cube,
                         learn_output,
                         learn_weights,
