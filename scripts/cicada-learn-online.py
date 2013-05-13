@@ -35,7 +35,7 @@ opt_parser = OptionParser(
 
     make_option("--iteration", default=10, action="store", type="int",
                 metavar="ITERATION", help="# of iterations (default: %default)"),
-    make_option("--batch", default=10, action="store", type="int",
+    make_option("--batch", default=8, action="store", type="int",
                 metavar="BATCH", help="mini batch size (default: %default)"),
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
