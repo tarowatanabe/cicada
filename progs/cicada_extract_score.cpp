@@ -411,7 +411,7 @@ void merge_counts(path_set_type& counts_files)
   for (int i = 0; i != threads; ++ i)
     workers.add_thread(new boost::thread(task_type(mapped_files[i],
 						   utils::tempfile::tmp_dir(),
-						   utils::bithack::max(max_files / threads, 1))));
+						   utils::bithack::max((max_files + threads - 1) / threads, 1))));
   
   workers.join_all();
   
@@ -533,7 +533,7 @@ void target_counts(const path_map_type& reversed_files,
 						       target_files[shard],
 						       threads,
 						       max_malloc,
-						       utils::bithack::max(max_files / threads, 1),
+						       utils::bithack::max((max_files + threads - 1) / threads, 1),
 						       debug)));
   
   boost::thread_group mappers;
@@ -694,7 +694,7 @@ void reverse_counts(const path_set_type& counts_files,
 						       reversed_files[shard],
 						       threads,
 						       max_malloc,
-						       utils::bithack::max(max_files / threads, 1),
+						       utils::bithack::max((max_files + threads - 1) / threads, 1),
 						       debug)));
 
   boost::thread_group mappers;
