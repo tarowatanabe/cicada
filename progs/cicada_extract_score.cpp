@@ -66,7 +66,7 @@ int number_descriptors()
   struct rlimit rlimits;
   
   getrlimit(RLIMIT_NOFILE, &rlimits);
-
+  
   return rlimits.rlim_cur;
 }
 
@@ -136,7 +136,7 @@ int main(int argc, char** argv)
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
 
-    const int max_files = number_descriptors() >> 2;
+    const size_t max_files = number_descriptors() >> 2;
     
     if (counts_files.size() > max_files) {
       if (debug)
