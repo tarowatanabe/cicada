@@ -136,7 +136,7 @@ int main(int argc, char** argv)
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
 
-    const size_t max_files = number_descriptors() >> 2;
+    const size_t max_files = number_descriptors() >> 1;
     
     if (counts_files.size() > max_files) {
       if (debug)
@@ -405,7 +405,7 @@ void merge_counts(path_set_type& counts_files)
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
 
-  const int max_files = number_descriptors() >> 2;
+  const int max_files = number_descriptors() >> 1;
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
