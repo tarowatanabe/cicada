@@ -105,6 +105,18 @@ namespace utils
 	
 	__pid = ::getpid();
 	
+	// back to default signal handler
+	default_handler(SIGTERM);
+	default_handler(SIGINT);
+	default_handler(SIGHUP);
+	default_handler(SIGPIPE);
+	default_handler(SIGCHLD);
+	
+	// unblock signals
+	sigset_t sigs;
+	sigprocmask(0, 0, &sigs);
+	sigprocmask(SIG_UNBLOCK, &sigs, 0);
+	
 	::execlp("sh", "sh", "-c", sh_command.c_str(), (char*) 0);
 	
 	::_exit(errno);  // not exit(errno)!
@@ -172,6 +184,18 @@ namespace utils
 	
 	__pid = ::getpid();
 
+	// back to default signal handler
+	default_handler(SIGTERM);
+	default_handler(SIGINT);
+	default_handler(SIGHUP);
+	default_handler(SIGPIPE);
+	default_handler(SIGCHLD);
+
+	// unblock signals
+	sigset_t sigs;
+	sigprocmask(0, 0, &sigs);
+	sigprocmask(SIG_UNBLOCK, &sigs, 0);
+
 #if BOOST_FILESYSTEM_VERSION == 2
 	::execlp(command.file_string().c_str(), command.file_string().c_str(), (char*) 0);
 #else
@@ -230,6 +254,17 @@ namespace utils
 	throw std::runtime_error(std::string("fcntl(): ") + strerror(errno));
     }
     
+    static void default_handler(const int sig)
+    {
+      struct sigaction act;
+
+      act.sa_handler = SIG_DFL;
+      act.sa_flags = 0;
+      sigemptyset(&act.sa_mask);
+      
+      sigaction(sig, &act, (struct sigaction *)0);
+    }
+
   public:
     pid_t __pid;
     int   __pread;
