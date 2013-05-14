@@ -12,6 +12,8 @@
 #include <vector>
 #include <utility>
 
+#include <sys/resource.h>
+
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
@@ -73,6 +75,15 @@ std::string host;
 std::string hostfile;
 
 int debug = 0;
+
+int number_descriptors()
+{
+  struct rlimit rlimits;
+  
+  getrlimit(RLIMIT_NOFILE, &rlimits);
+
+  return rlimits.rlim_cur;
+}
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files);
@@ -837,12 +848,11 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(source_file,
-						    target_files,
-						    queues,
-						    os,
-						    debug)));
+  boost::thread reducer(reducer_type(source_file,
+				     target_files,
+				     queues,
+				     os,
+				     debug));
   
   phrase_pair_type phrase_pair;
   parser_type      parser;
@@ -876,7 +886,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  reducer.join_all();
+  reducer.join();
 }
 
 void source_counts_mapper(utils::mpi_intercomm& reducer,
@@ -1279,9 +1289,11 @@ void target_counts_reducer(utils::mpi_intercomm& mapper,
     
     ranks[rank] = rank;
   }
+
+  const int max_files = number_descriptors() >> 2;
   
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, 128, debug));
+  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), target_files, 1, max_malloc, max_files, debug));
   
   simple_type target;
   simple_parser_type parser;
@@ -1531,10 +1543,11 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     ranks[rank] = rank;
   }
   
-  queue_type queue(queue_size);
+
+  const int max_files = number_descriptors() >> 2;
   
-  boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, reversed_files, 1, max_malloc, 128, debug)));
+  queue_type queue(queue_size);
+  boost::thread reducer(reducer_type(queue, output_file, reversed_files, 1, max_malloc, max_files, debug));
   
   simple_type reversed;
   simple_parser_type parser;
@@ -1575,7 +1588,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
   reversed.clear();
   queue.push_swap(reversed);
   
-  reducer.join_all();
+  reducer.join();
   
   {
     // send reversed files to mapper sharing the same rank

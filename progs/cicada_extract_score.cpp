@@ -11,6 +11,8 @@
 #include <vector>
 #include <utility>
 
+#include <sys/resource.h>
+
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
@@ -58,6 +60,15 @@ double max_malloc = 8; // 8 GB
 int    threads = 1;
 
 int debug = 0;
+
+int number_descriptors()
+{
+  struct rlimit rlimits;
+  
+  getrlimit(RLIMIT_NOFILE, &rlimits);
+
+  return rlimits.rlim_cur;
+}
 
 void merge_counts(path_set_type& counts_files);
 
@@ -124,8 +135,10 @@ int main(int argc, char** argv)
     }
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
+
+    const int max_files = number_descriptors() >> 2;
     
-    if (counts_files.size() > 128) {
+    if (counts_files.size() > max_files) {
       if (debug)
 	std::cerr << "merge counts: " << counts_files.size() << std::endl;
       
@@ -391,10 +404,14 @@ void merge_counts(path_set_type& counts_files)
   path_map_type mapped_files(threads);
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
+
+  const int max_files = number_descriptors() >> 2;
   
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(mapped_files[i], utils::tempfile::tmp_dir(), utils::bithack::max(128 / threads, 1))));
+    workers.add_thread(new boost::thread(task_type(mapped_files[i],
+						   utils::tempfile::tmp_dir(),
+						   utils::bithack::max(max_files / threads, 1))));
   
   workers.join_all();
   
@@ -506,6 +523,8 @@ void target_counts(const path_map_type& reversed_files,
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     queues[shard].reset(new queue_type(1024 * threads));
+
+  const int max_files = number_descriptors() >> 2;
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
@@ -514,7 +533,7 @@ void target_counts(const path_map_type& reversed_files,
 						       target_files[shard],
 						       threads,
 						       max_malloc,
-						       utils::bithack::max(128 / threads, 1),
+						       utils::bithack::max(max_files / threads, 1),
 						       debug)));
   
   boost::thread_group mappers;
@@ -665,6 +684,8 @@ void reverse_counts(const path_set_type& counts_files,
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     queues[shard].reset(new queue_type(1024 * threads));
+
+  const int max_files = number_descriptors() >> 2;
   
   boost::thread_group reducers;
   for (size_t shard = 0; shard != queues.size(); ++ shard)
@@ -673,7 +694,7 @@ void reverse_counts(const path_set_type& counts_files,
 						       reversed_files[shard],
 						       threads,
 						       max_malloc,
-						       utils::bithack::max(128 / threads, 1),
+						       utils::bithack::max(max_files / threads, 1),
 						       debug)));
 
   boost::thread_group mappers;
