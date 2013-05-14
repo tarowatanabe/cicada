@@ -1062,11 +1062,13 @@ struct PhrasePairSourceMapper
 	      bool found = false;
 	      
 	      for (size_t i = 0; i != buffers.size(); ++ i)
-		if (! buffers[i].empty())
+		while (! buffers[i].empty()) {
 		  if (queues[i]->push_swap(buffers[i].front(), true)) {
 		    buffers[i].pop_front();
 		    found = true;
-		  }
+		  } else
+		    break;
+		}
 	      
 	      non_found_iter = loop_sleep(found, non_found_iter);
 	    }
@@ -2851,11 +2853,13 @@ struct PhrasePairScoreMapper
 	      bool found = false;
 	      
 	      for (size_t i = 0; i != buffers.size(); ++ i)
-		if (! buffers[i].empty())
+		while (! buffers[i].empty()) {
 		  if (queues[i]->push_swap(buffers[i].front(), true)) {
 		    buffers[i].pop_front();
 		    found = true;
-		  }
+		  } else
+		    break;
+		}
 	      
 	      non_found_iter = loop_sleep(found, non_found_iter);
 	    }
