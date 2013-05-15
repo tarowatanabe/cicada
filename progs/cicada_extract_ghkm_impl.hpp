@@ -1176,7 +1176,7 @@ struct ExtractGHKM
 	
 	// early termination...
 	if (max_height > 0 && height > max_height)
-	  return return std::make_pair(height, num_tails);
+	  return std::make_pair(height, num_tails);
 
       } else if (iter != last) {
 	if (*iter >= 0) {
@@ -1188,7 +1188,7 @@ struct ExtractGHKM
 
 	  // early termination...
 	  if (max_height > 0 && height > max_height)
-	    return return std::make_pair(height, num_tails);
+	    return std::make_pair(height, num_tails);
 	}
 	
 	++ iter;
