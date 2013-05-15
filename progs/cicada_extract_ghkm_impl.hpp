@@ -990,9 +990,14 @@ struct ExtractGHKM
 	    int composed_size_prev = edge_composed.compose;
 	    if (j_i_prev >= 0)
 	      composed_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].compose;
+
+	    int internal_size_prev = edge_composed.internal;
+	    if (j_i_prev >= 0)
+	      internal_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].internal;
 	    
 	    for (/**/; j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()); ++ j[i]) {
 	      const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
+	      const int internal_size = internal_size_prev + derivations[edge.tails[i]].edges[j[i]].internal;
 	      
 	      // early termination!
 	      if (max_compose > 0 && composed_size > max_compose) break;
@@ -1003,6 +1008,9 @@ struct ExtractGHKM
 	      //std::cerr << "compose tails" << std::endl;
 	      
 	      const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+
+	      if (internal_size != composed_stat.first)
+		std::cerr << "internal size differ: " << internal_size << " " << composed_stat.first << std::endl;
 	      
 	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
 		index_set_type::const_iterator jiter_begin = j.begin();
