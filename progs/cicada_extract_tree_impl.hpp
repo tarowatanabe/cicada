@@ -867,39 +867,39 @@ struct ExtractTree
 	      for (/**/; j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()); ++ j[i]) {
 		const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
 		
+		// early termination!
+		if (max_compose > 0 && composed_size > max_compose) break;
+		
 		bool inserted = false;
 		
-		if (max_compose <= 0 || composed_size <= max_compose) {
+		edges_new.clear();
+		tails_new.clear();
+		
+		const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
+		
+		if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
+		  index_set_type::const_iterator jiter_begin = j.begin();
+		  index_set_type::const_iterator jiter_end   = j.end();
+		  node_set_type::const_iterator  titer_begin = edge.tails.begin();
+		  edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
+		  edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 		  
-		  edges_new.clear();
-		  tails_new.clear();
+		  const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 		  
-		  const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
-		  
-		  if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
-		    index_set_type::const_iterator jiter_begin = j.begin();
-		    index_set_type::const_iterator jiter_end   = j.end();
-		    node_set_type::const_iterator  titer_begin = edge.tails.begin();
-		    edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
-		    edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+		  if (max_height <= 0 || rule_stat.first <= max_height) {
+		    candidates.push_back(candidate_type(edge, j));
 		    
-		    const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		    candidate_type& item_next = candidates.back();
 		    
-		    if (max_height <= 0 || rule_stat.first <= max_height) {
-		      candidates.push_back(candidate_type(edge, j));
-		      
-		      candidate_type& item_next = candidates.back();
-		      
-		      item_next.edge_composed.edges = edges_new;
-		      item_next.edge_composed.tails = tails_new;
-		      item_next.edge_composed.height = rule_stat.first;
-		      item_next.edge_composed.internal = rule_stat.second;
-		      item_next.edge_composed.compose = composed_size;
-		      
-		      cand.push(&item_next);
-		      
-		      inserted = true;
-		    }
+		    item_next.edge_composed.edges = edges_new;
+		    item_next.edge_composed.tails = tails_new;
+		    item_next.edge_composed.height = rule_stat.first;
+		    item_next.edge_composed.internal = rule_stat.second;
+		    item_next.edge_composed.compose = composed_size;
+		    
+		    cand.push(&item_next);
+		    
+		    inserted = true;
 		  }
 		}
 		
