@@ -865,14 +865,12 @@ struct ExtractGHKM
   typedef Candidate candidate_type;
   typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
 
-  struct compare_heap_type
+  struct compare_heap_type : public less_derivation_edge_type
   {
-    // we use greater, so that when popped from heap, we will grab "less" in back...
+    // we use inverse less, so that when popped from heap, we will grab "less" in back...
     bool operator()(const candidate_type* x, const candidate_type* y) const
     {
-      return (x->edge_composed.compose > y->edge_composed.compose
-	      || (x->edge_composed.compose == y->edge_composed.compose
-		  && x->edge_composed.internal > y->edge_composed.internal));
+      return less_derivation_edge_type::operator()(y->edge_composed, x->edge_composed);
     }
   };
   
@@ -953,7 +951,7 @@ struct ExtractGHKM
 	// no equality check since, derivation_edges_new are used for "composition"
 	// thus, if internal == max_nodes, this cannnot be composed with others!
 	// similarly, if compose == max_compose, this cannot be composed with others!
-	if ((max_height <= 0 || edge_composed.height <= max_height)
+	if ((max_height <= 0 || edge_composed.height < max_height)
 	    && (max_nodes <= 0 || edge_composed.internal < max_nodes)
 	    && (max_compose <= 0 || edge_composed.compose < max_compose))
 	  derivation_edges_new.push_back(edge_composed);
@@ -971,26 +969,27 @@ struct ExtractGHKM
 	
 	for (size_t i = 0; i != j.size(); ++ i) 
 	  if (! derivations[edge.tails[i]].edges.empty()) {
+	    const int j_i_prev = j[i];
 	    ++ j[i];
 	    
 	    //std::cerr << "i = " << i << " j[i] = " << j[i] << std::endl;
 	    
-	    if (j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size())) {
-	      
+	    for (/**/; j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()); ++ j[i]) {
 	      int composed_size = edge_composed.compose;
 	      if (j[i] - 1 >= 0)
 		composed_size -= derivations[edge.tails[i]].edges[j[i] - 1].compose;
 	      composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
 	      
-	      if (max_compose <= 0 || composed_size <= max_compose) {
+	      bool inserted = false;
 	      
+	      if (max_compose <= 0 || composed_size <= max_compose) {
 		edges_new.clear();
 		tails_new.clear();
-
+		
 		//std::cerr << "compose tails" << std::endl;
-	      
+		
 		const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
-	      
+		
 		if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
 		  index_set_type::const_iterator jiter_begin = j.begin();
 		  index_set_type::const_iterator jiter_end   = j.end();
@@ -1001,7 +1000,7 @@ struct ExtractGHKM
 		  //std::cerr << "compose edges" << std::endl;
 		
 		  const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
-		
+		  
 		  if (max_height <= 0 || rule_stat.first <= max_height) {
 		    candidates.push_back(candidate_type(edge, j));
 		  
@@ -1012,16 +1011,21 @@ struct ExtractGHKM
 		    item_next.edge_composed.height = rule_stat.first;
 		    item_next.edge_composed.internal = rule_stat.second;
 		    item_next.edge_composed.compose = composed_size;
-		  
+		    
 		    cand.push(&item_next);
+		    
+		    inserted = true;
 		  }
 		}
 	      }
+	      
+	      // if successfully inserted, break!
+	      if (inserted) break;
 	    }
 	    
 	    if (item->j[i] != -1) break;
 	    
-	    -- j[i];
+	    j[i] = j_i_prev;
 	  }
       }
             

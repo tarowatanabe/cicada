@@ -737,14 +737,12 @@ struct ExtractTree
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
-    struct compare_heap_type
+    struct compare_heap_type : public less_derivation_edge_type
     {
-      // we use greater, so that when popped from heap, we will grab "less" in back...
+      // we use inverse less, so that when popped from heap, we will grab "less" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return (x->edge_composed.compose > y->edge_composed.compose
-		|| (x->edge_composed.compose == y->edge_composed.compose
-		    && x->edge_composed.internal > y->edge_composed.internal));
+	return less_derivation_edge_type::operator()(y->edge_composed, x->edge_composed);
       }
     };
     
@@ -828,7 +826,7 @@ struct ExtractTree
 	    // no equality check since, derivation_edges_new are used for "composition"
 	    // thus, if internal == max_nodes, this cannnot be composed with others!
 	    // similarly, if compose == max_compose, this cannot be composed with others!
-	    if ((max_height <= 0 || edge_composed.height <= max_height)
+	    if ((max_height <= 0 || edge_composed.height < max_height)
 		&& (max_nodes <= 0 || edge_composed.internal < max_nodes)
 		&& (max_compose <= 0 || edge_composed.compose < max_compose))
 	      derivations_next[id].edges.push_back(edge_composed);
@@ -846,14 +844,17 @@ struct ExtractTree
 	  
 	  for (size_t i = 0; i != j.size(); ++ i) 
 	    if (! derivations[edge.tails[i]].edges.empty()) {
+	      const int j_i_prev = j[i];
 	      ++ j[i];
 	      
-	      if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size())) {
+	      for (/**/; j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()); ++ j[i]) {
 		int composed_size = edge_composed.compose;
 		if (j[i] - 1 >= 0)
 		  composed_size -= derivations[edge.tails[i]].edges[j[i] - 1].compose;
 		composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
-
+		
+		bool inserted = false;
+		
 		if (max_compose <= 0 || composed_size <= max_compose) {
 		  
 		  edges_new.clear();
@@ -882,14 +883,19 @@ struct ExtractTree
 		      item_next.edge_composed.compose = composed_size;
 		      
 		      cand.push(&item_next);
+		      
+		      inserted = true;
 		    }
 		  }
 		}
+		
+		// if successfully inserted, break!
+		if (inserted) break;
 	      }
 	      
 	      if (item->j[i] != -1) break;
 	      
-	      -- j[i];
+	      j[i] = j_i_prev;
 	    }
 	}
 	
