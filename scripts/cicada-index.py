@@ -101,7 +101,7 @@ opt_parser = OptionParser(
     make_option("--threshold", default=0, action="store", type="float",
                 metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
     make_option("--sigtest", default=0, action="store", type="float",
-                metavar="SIGTEST", help="significance testing threshold relative to 1-1-1-N log-p-value (default: %default)"),
+                metavar="SIGTEST", help="significance testing threshold relative to 1-1-1-N log-p-value (or \epsilon in \"discarding most of the phrasetable\") (default: %default)"),
 
     
 
