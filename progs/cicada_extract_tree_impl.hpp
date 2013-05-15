@@ -692,7 +692,7 @@ struct ExtractTree
   
   typedef utils::chunk_vector<derivation_node_type, 4096 / sizeof(derivation_node_type), std::allocator<derivation_node_type> > derivation_set_type;
 
-  typedef std::vector<int, std::allocator<int> > index_set_type;
+  typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
   
   
   typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
@@ -875,7 +875,12 @@ struct ExtractTree
 		// early termination!
 		if (max_compose > 0 && composed_size > max_compose) break;
 		// early checking...
-		if (max_nodes > 0 && internal_size > max_nodes) continue;
+		if (max_nodes > 0 && internal_size > max_nodes) {
+		  if (max_compose > 0 && composed_size == max_compose)
+		    break;
+		  else
+		    continue;
+		}
 		
 		index_set_type::const_iterator jiter_begin = j.begin();
 		index_set_type::const_iterator jiter_end   = j.end();
@@ -887,8 +892,27 @@ struct ExtractTree
 		tails_new.clear();
 		
 		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_new);
-
-		if (max_height > 0 && rule_stat.first > max_height) continue;
+		
+		// early checking...
+		if (max_height > 0 && rule_stat.first > max_height) {
+		  if (max_compose > 0 && max_nodes > 0) {
+		    if (composed_size == max_compose && internal_size == max_nodes)
+		      break;
+		    else
+		      continue;
+		  } else if (max_compose > 0) {
+		    if (composed_size == max_compose)
+		      break;
+		    else
+		      continue;
+		  } else if (max_nodes > 0) {
+		    if (internal_size == max_nodes)
+		      break;
+		    else
+		      continue;
+		  } else
+		    continue;
+		}
 		
 		candidates.push_back(candidate_type(edge, j));
 		
