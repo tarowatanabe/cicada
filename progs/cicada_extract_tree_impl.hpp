@@ -842,6 +842,19 @@ struct ExtractTree
 
 	  index_set_type j(item->j);
 	  
+	  // proceed to the next until we find better candidate...
+	  // @InProceedings{iglesias-EtAl:2009:EACL,
+	  //  author    = {Iglesias, Gonzalo  and  de Gispert, Adri\`{a}  and  Banga, Eduardo R.  and  Byrne, William},
+	  //  title     = {Rule Filtering by Pattern for Efficient Hierarchical Translation},
+	  //  booktitle = {Proceedings of the 12th Conference of the European Chapter of the ACL (EACL 2009)},
+	  //  month     = {March},
+	  //  year      = {2009},
+	  //  address   = {Athens, Greece},
+	  //  publisher = {Association for Computational Linguistics},
+	  //  pages     = {380--388},
+	  //  url       = {http://www.aclweb.org/anthology/E09-1044}
+	  // }
+	  
 	  for (size_t i = 0; i != j.size(); ++ i) 
 	    if (! derivations[edge.tails[i]].edges.empty()) {
 	      const int j_i_prev = j[i];
@@ -849,8 +862,8 @@ struct ExtractTree
 	      
 	      for (/**/; j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()); ++ j[i]) {
 		int composed_size = edge_composed.compose;
-		if (j[i] - 1 >= 0)
-		  composed_size -= derivations[edge.tails[i]].edges[j[i] - 1].compose;
+		if (j_i_prev >= 0)
+		  composed_size -= derivations[edge.tails[i]].edges[j_i_prev].compose;
 		composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
 		
 		bool inserted = false;
