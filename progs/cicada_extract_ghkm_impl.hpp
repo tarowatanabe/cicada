@@ -1012,19 +1012,12 @@ struct ExtractGHKM
 	      
 	      //std::cerr << "compose edges" << std::endl;
 
-	      node_set_type tails_latest;
-	      
 	      edges_new.clear();
-	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_latest);
+	      tails_new.clear();
+	      
+	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_new);
 	      
 	      if (max_height > 0 && rule_stat.first > max_height) continue;
-	      
-	      //std::cerr << "compose tails" << std::endl;
-	      tails_new.clear();
-	      compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
-
-	      if (tails_new != tails_latest)
-		std::cerr << "tails differ?" << std::endl;
 	      
 	      candidates.push_back(candidate_type(edge, j));
 	      
@@ -1185,15 +1178,16 @@ struct ExtractGHKM
       } else if (iter != last) {
 	if (*iter >= 0) {
 	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
-	  edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
-	  tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
 	  
 	  height = utils::bithack::max(height, edge.height + 1);
 	  num_tails += edge.internal;
-
+	  
 	  // early termination...
 	  if (max_height > 0 && height > max_height)
 	    return std::make_pair(height, num_tails);
+	  
+	  edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
+	  tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
 	} else
 	  tails_new.push_back(*tail_iter);
 	
@@ -1204,29 +1198,7 @@ struct ExtractGHKM
     }
     
     return std::make_pair(height, num_tails);
-  }
-  
-  template <typename IndexIterator, typename TailIterator, typename Tails>
-  std::pair<int, bool> compose_tails(IndexIterator first, IndexIterator last,
-				     TailIterator tail_iter,
-				     int internal,
-				     Tails& tails_new)
-  {
-    bool composed_rule = false;
-    for (/**/; first != last; ++ first, ++ tail_iter) {
-      if (*first < 0) {
-	tails_new.push_back(*tail_iter);
-      } else {
-	const derivation_edge_type& edge = derivations[*tail_iter].edges[*first];
-	tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
-	
-	internal += edge.internal;
-	composed_rule = true;
-      }
-    }
-    
-    return std::make_pair(internal, composed_rule);
-  }
+  }  
   
   // construct rule-pair related data
   frontier_symbol_set_type frontier_symbols;

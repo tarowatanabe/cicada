@@ -884,12 +884,11 @@ struct ExtractTree
 		edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 		
 		edges_new.clear();
-		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		tails_new.clear();
+		
+		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_new);
 
 		if (max_height > 0 && rule_stat.first > max_height) continue;
-		
-		tails_new.clear();
-		compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
 		
 		candidates.push_back(candidate_type(edge, j));
 		
@@ -919,13 +918,14 @@ struct ExtractTree
       derivations.swap(derivations_new);
     }
 
-    template <typename Derivations, typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges>
+    template <typename Derivations, typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges, typename Tails>
     std::pair<int, int> compose_edges(const Derivations& derivations,
 				      const hypergraph_type& graph,
 				      IndexIterator& iter, IndexIterator last,
 				      TailIterator& tail_iter,
 				      EdgeIterator& edge_iter, EdgeIterator edge_last,
-				      Edges& edges_new)
+				      Edges& edges_new,
+				      Tails& tails_new)
     {
       // this should not happen...
       if (edge_iter == edge_last) return std::make_pair(0, 0);
@@ -941,18 +941,21 @@ struct ExtractTree
       hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
       for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
 	if (edge_iter != edge_last && graph.edges[*edge_iter].head == *titer) {
-	  const std::pair<int, int> result = compose_edges(derivations, graph, iter, last, tail_iter, edge_iter, edge_last, edges_new);
+	  const std::pair<int, int> result = compose_edges(derivations, graph, iter, last, tail_iter, edge_iter, edge_last, edges_new, tails_new);
 	  
 	  height = utils::bithack::max(height, result.first + 1);
 	  num_tails += result.second;
 	} else if (iter != last) {
 	  if (*iter >= 0) {
 	    const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
-	    edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
 	    
 	    height = utils::bithack::max(height, edge.height + 1);
 	    num_tails += edge.internal;
-	  }
+
+	    edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
+	    tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
+	  } else
+	    tails_new.push_back(*tail_iter);
 	
 	  ++ iter;
 	  ++ tail_iter;
@@ -962,31 +965,6 @@ struct ExtractTree
     
       return std::make_pair(height, num_tails);
     }
-
-
-    template <typename Derivations, typename IndexIterator, typename TailIterator, typename Tails>
-    std::pair<int, bool> compose_tails(const Derivations& derivations,
-				       IndexIterator first, IndexIterator last,
-				       TailIterator tail_iter,
-				       int internal,
-				       Tails& tails_new)
-    {
-      bool composed_rule = false;
-      for (/**/; first != last; ++ first, ++ tail_iter) {
-	if (*first < 0)
-	  tails_new.push_back(*tail_iter);
-	else {
-	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*first];
-	  tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
-	  
-	  internal += edge.internal;
-	  composed_rule = true;
-	}
-      }
-	    
-    return std::make_pair(internal, composed_rule);
-  }
-
     
     enum color_type {
       white,
