@@ -951,7 +951,7 @@ struct ExtractGHKM
 	// no equality check since, derivation_edges_new are used for "composition"
 	// thus, if internal == max_nodes, this cannnot be composed with others!
 	// similarly, if compose == max_compose, this cannot be composed with others!
-	if ((max_height <= 0 || edge_composed.height < max_height)
+	if ((max_height <= 0 || edge_composed.height <= max_height)
 	    && (max_nodes <= 0 || edge_composed.internal < max_nodes)
 	    && (max_compose <= 0 || edge_composed.compose < max_compose))
 	  derivation_edges_new.push_back(edge_composed);
@@ -986,12 +986,13 @@ struct ExtractGHKM
 	    ++ j[i];
 	    
 	    //std::cerr << "i = " << i << " j[i] = " << j[i] << std::endl;
+
+	    int composed_size_prev = edge_composed.compose;
+	    if (j_i_prev >= 0)
+	      composed_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].compose;
 	    
 	    for (/**/; j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()); ++ j[i]) {
-	      int composed_size = edge_composed.compose;
-	      if (j_i_prev >= 0)
-		composed_size -= derivations[edge.tails[i]].edges[j_i_prev].compose;
-	      composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
+	      const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
 	      
 	      bool inserted = false;
 	      

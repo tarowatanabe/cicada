@@ -859,12 +859,13 @@ struct ExtractTree
 	    if (! derivations[edge.tails[i]].edges.empty()) {
 	      const int j_i_prev = j[i];
 	      ++ j[i];
+
+	      int composed_size_prev = edge_composed.compose;
+	      if (j_i_prev >= 0)
+		composed_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].compose;
 	      
 	      for (/**/; j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()); ++ j[i]) {
-		int composed_size = edge_composed.compose;
-		if (j_i_prev >= 0)
-		  composed_size -= derivations[edge.tails[i]].edges[j_i_prev].compose;
-		composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
+		const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
 		
 		bool inserted = false;
 		
