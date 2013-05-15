@@ -1008,9 +1008,6 @@ struct ExtractGHKM
 	      //std::cerr << "compose tails" << std::endl;
 	      
 	      const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
-
-	      if (internal_size != composed_stat.first)
-		std::cerr << "internal size differ: " << internal_size << " " << composed_stat.first << std::endl;
 	      
 	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
 		index_set_type::const_iterator jiter_begin = j.begin();
@@ -1023,6 +1020,9 @@ struct ExtractGHKM
 		
 		const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 		
+		if (internal_size != composed_stat.first)
+		  std::cerr << "internal size differ: " << internal_size << " " << composed_stat.first << std::endl;
+
 		if (max_height <= 0 || rule_stat.first <= max_height) {
 		  candidates.push_back(candidate_type(edge, j));
 		  
