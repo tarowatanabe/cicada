@@ -1011,15 +1011,20 @@ struct ExtractGHKM
 	      edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 	      
 	      //std::cerr << "compose edges" << std::endl;
+
+	      node_set_type tails_latest;
 	      
 	      edges_new.clear();
-	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_latest);
 	      
 	      if (max_height > 0 && rule_stat.first > max_height) continue;
 	      
 	      //std::cerr << "compose tails" << std::endl;
 	      tails_new.clear();
 	      compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+
+	      if (tails_new != tails_latest)
+		std::cerr << "tails differ?" << std::endl;
 	      
 	      candidates.push_back(candidate_type(edge, j));
 	      
@@ -1146,12 +1151,13 @@ struct ExtractGHKM
     }
   }
 
-  template <typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges>
+  template <typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges, typename Tails>
   std::pair<int, int> compose_edges(const hypergraph_type& graph,
 				    IndexIterator& iter, IndexIterator last,
 				    TailIterator& tail_iter,
 				    EdgeIterator& edge_iter, EdgeIterator edge_last,
-				    Edges& edges_new)
+				    Edges& edges_new,
+				    Tails& tails_new)
   {
     // this should not happen...
     if (edge_iter == edge_last) return std::make_pair(0, 0);
@@ -1167,7 +1173,7 @@ struct ExtractGHKM
     hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
     for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
       if (edge_iter != edge_last && graph.edges[*edge_iter].head == *titer) {
-	const std::pair<int, int> result = compose_edges(graph, iter, last, tail_iter, edge_iter, edge_last, edges_new);
+	const std::pair<int, int> result = compose_edges(graph, iter, last, tail_iter, edge_iter, edge_last, edges_new, tails_new);
 	
 	height = utils::bithack::max(height, result.first + 1);
 	num_tails += result.second;
@@ -1180,6 +1186,7 @@ struct ExtractGHKM
 	if (*iter >= 0) {
 	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
 	  edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
+	  tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
 	  
 	  height = utils::bithack::max(height, edge.height + 1);
 	  num_tails += edge.internal;
@@ -1187,7 +1194,8 @@ struct ExtractGHKM
 	  // early termination...
 	  if (max_height > 0 && height > max_height)
 	    return std::make_pair(height, num_tails);
-	}
+	} else
+	  tails_new.push_back(*tail_iter);
 	
 	++ iter;
 	++ tail_iter;
