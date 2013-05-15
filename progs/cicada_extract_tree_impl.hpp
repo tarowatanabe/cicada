@@ -874,7 +874,8 @@ struct ExtractTree
 		
 		// early termination!
 		if (max_compose > 0 && composed_size > max_compose) break;
-		if (max_nodes > 0 && internal_size > max_nodes) break;
+		// early checking...
+		if (max_nodes > 0 && internal_size > max_nodes) continue;
 		
 		edges_new.clear();
 		tails_new.clear();
