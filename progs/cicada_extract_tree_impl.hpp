@@ -870,8 +870,6 @@ struct ExtractTree
 		// early termination!
 		if (max_compose > 0 && composed_size > max_compose) break;
 		
-		bool inserted = false;
-		
 		edges_new.clear();
 		tails_new.clear();
 		
@@ -899,12 +897,9 @@ struct ExtractTree
 		    
 		    cand.push(&item_next);
 		    
-		    inserted = true;
+		    break;
 		  }
 		}
-		
-		// if successfully inserted, break!
-		if (inserted) break;
 	      }
 	      
 	      if (item->j[i] != -1) break;
