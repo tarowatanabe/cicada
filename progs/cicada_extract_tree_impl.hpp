@@ -943,14 +943,14 @@ struct ExtractTree
       for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
 	if (edge_iter != edge_last && graph.edges[*edge_iter].head == *titer) {
 	  const std::pair<int, int> result = compose_edges(derivations, graph, iter, last, tail_iter, edge_iter, edge_last, edges_new);
-
+	  
 	  height = utils::bithack::max(height, result.first + 1);
 	  num_tails += result.second;
 	} else if (iter != last) {
 	  if (*iter >= 0) {
 	    const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
 	    edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
-	  
+	    
 	    height = utils::bithack::max(height, edge.height + 1);
 	    num_tails += edge.internal;
 	  }
