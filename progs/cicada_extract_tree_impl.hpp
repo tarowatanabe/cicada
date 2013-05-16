@@ -682,11 +682,11 @@ struct ExtractTree
   {
     bool operator()(const derivation_edge_type& x, const derivation_edge_type& y) const
     {
-      return (x.compose < y.compose
-	      || (!(y.compose < x.compose)
+      return (x.height < y.height
+	      || (!(y.height < x.height)
 		  && (x.internal < y.internal
 		      || (!(y.internal < x.internal)
-			  && x.height < y.height))));
+			  && x.compose < y.compose))));
     }
   };
   
@@ -872,15 +872,9 @@ struct ExtractTree
 		const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
 		const int internal_size = internal_size_prev + derivations[edge.tails[i]].edges[j[i]].internal;
 		
-		// early termination!
-		if (max_compose > 0 && composed_size > max_compose) break;
-		// early checking...
-		if (max_nodes > 0 && internal_size > max_nodes) {
-		  if (max_compose > 0 && composed_size == max_compose)
-		    break;
-		  else
-		    continue;
-		}
+		// early checking!
+		if (max_compose > 0 && composed_size > max_compose) continue;
+		if (max_nodes > 0 && internal_size > max_nodes) continue;
 		
 		index_set_type::const_iterator jiter_begin = j.begin();
 		index_set_type::const_iterator jiter_end   = j.end();
@@ -893,26 +887,8 @@ struct ExtractTree
 		
 		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new, tails_new);
 		
-		// early checking...
-		if (max_height > 0 && rule_stat.first > max_height) {
-		  if (max_compose > 0 && max_nodes > 0) {
-		    if (composed_size == max_compose && internal_size == max_nodes)
-		      break;
-		    else
-		      continue;
-		  } else if (max_compose > 0) {
-		    if (composed_size == max_compose)
-		      break;
-		    else
-		      continue;
-		  } else if (max_nodes > 0) {
-		    if (internal_size == max_nodes)
-		      break;
-		    else
-		      continue;
-		  } else
-		    continue;
-		}
+		// early termination...
+		if (max_height > 0 && rule_stat.first > max_height) break;
 		
 		candidates.push_back(candidate_type(edge, j));
 		
