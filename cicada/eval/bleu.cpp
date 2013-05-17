@@ -43,10 +43,18 @@ namespace cicada
       score += penalty;
       
       std::ostringstream stream;
-      stream << "bleu: " << std::exp(score) << ' ';
+      stream << "bleu: " << std::exp(score);
       if (! precisions.empty()) {
+	stream << ' ';
 	std::copy(precisions.begin(), precisions.end() - 1, std::ostream_iterator<double>(stream, "|"));
 	stream << precisions.back();
+      }
+      if (! ngrams_hypothesis.empty()) {
+	char delim = ' ';
+	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
+	  stream << delim << ngrams_hypothesis[n] << '-' << ngrams_reference[n];
+	  delim = '|';
+	}
       }
       stream << " penalty: " << std::exp(penalty);
       
