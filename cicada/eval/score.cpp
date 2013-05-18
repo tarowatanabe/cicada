@@ -115,6 +115,7 @@ bleus:\n\
 ribes: RIBES\n\
 \talpha=[weight for precision] (default 0.25)\n\
 \tbeta=[weight for brevity penalty] (default 0.1)\n\
+\torder=[ngram order] maximum ngram matching (defualt: 0 for infinity)\n\
 \tspearman=[true|false] use Spearman's correlation\n\
 \tkendall=[true|false] use Kendall's correlation (default)\n\
 per: position indenendent error rate\n\
@@ -309,14 +310,17 @@ depeval: dependency parse evaluation\n\
 	
 	double alpha = 0.25;
 	double beta = 0.1;
+	int order = 0;
 	bool spearman = false;
 	bool kendall = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "alpha")
 	    alpha = utils::lexical_cast<double>(piter->second);
-	  if (utils::ipiece(piter->first) == "beta")
+	  else if (utils::ipiece(piter->first) == "beta")
 	    beta = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "order")
+	    order = utils::lexical_cast<int>(piter->second);
 	  else if (utils::ipiece(piter->first) == "spearman")
 	    spearman = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "kendall")
@@ -332,7 +336,7 @@ depeval: dependency parse evaluation\n\
 	if (spearman && kendall)
 	  throw std::runtime_error("either Kendall or Spearman");
 	
-	scorer = scorer_ptr_type(new RibesScorer(alpha, beta, spearman));
+	scorer = scorer_ptr_type(new RibesScorer(alpha, beta, order, spearman));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
 	

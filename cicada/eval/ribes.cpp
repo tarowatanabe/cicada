@@ -112,7 +112,6 @@ namespace cicada
       typedef cicada::Sentence                sentence_type;
       typedef cicada::Symbol                  word_type;
       typedef word_type                       unigram_type;
-      typedef std::pair<word_type, word_type> bigram_type;
       
       struct Score
       {
@@ -138,23 +137,7 @@ namespace cicada
       
       typedef utils::unordered_map<unigram_type, matched_set_type, boost::hash<unigram_type>, std::equal_to<unigram_type>,
 				   std::allocator<std::pair<const unigram_type, matched_set_type> > >::type unigram_count_type;
-      typedef utils::unordered_map<bigram_type, matched_set_type, utils::hashmurmur3<size_t>, std::equal_to<bigram_type>,
-				   std::allocator<std::pair<const bigram_type, matched_set_type> > >::type bigram_count_type;
       
-      void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams, bigram_count_type& bigrams) const
-      {
-	unigrams.clear();
-	bigrams.clear();
-	
-	sentence_type::const_iterator siter_begin = sentence.begin();
-	sentence_type::const_iterator siter_end  = sentence.end();
-	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	  unigrams[*siter].push_back(siter - siter_begin);
-	
-	for (sentence_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter)
-	  bigrams[bigram_type(*(siter - 1), *siter)].push_back(siter - siter_begin);
-      }
- 
       void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams) const
       {
 	unigrams.clear();
@@ -165,7 +148,7 @@ namespace cicada
 	  unigrams[*siter].push_back(siter - siter_begin);
       }
       
-      value_type operator()(const sentence_type& hyp, const bool spearman) const
+      value_type operator()(const sentence_type& hyp, const int order_max, const bool spearman) const
       {
 	// no score
 	if (hyp.empty())
@@ -175,7 +158,6 @@ namespace cicada
 	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
 	
 	unigram_count_type& hyp_unigrams = const_cast<unigram_count_type&>(hyp_unigrams_impl);
-	//bigram_count_type&  hyp_bigrams  = const_cast<bigram_count_type&>(hyp_bigrams_impl);
 
 	collect_stats(hyp, hyp_unigrams);
 	
@@ -214,8 +196,12 @@ namespace cicada
 	    ref_matched_right = ref_matched;
 	    hyp_matched_left  = hyp_matched;
 	    hyp_matched_right = hyp_matched;
+
+	    size_type order_last = utils::bithack::max(i, hyp_size - i);
+	    if (order_max > 0)
+	      order_last = utils::bithack::min(order_last, static_cast<size_type>(order_max));
 	    
-	    for (size_type order = 1; order <= utils::bithack::max(i, hyp_size - i); ++ order) {
+	    for (size_type order = 1; order <= order_last; ++ order) {
 	      // try matching with the ngram to the left
 	      if (i >= order && ! ref_matched_left.empty() && ! hyp_matched_left.empty()) {
 		ref_matched_next.clear();
@@ -277,40 +263,6 @@ namespace cicada
 	  }
 	}
 	
-#if 0
-	// this is an old RIBES which can match upto bigrams
-	for (size_type i = 0; i != hyp_size; ++ i)
-	  for (size_type j = 0; j != ref_size; ++ j)
-	    if (hyp[i] == ref[j]) {
-	      
-	      // check unique unigram
-	      if (ref_unigrams.find(ref[j])->second.size() == 1
-		  && hyp_unigrams.find(hyp[i])->second.size() == 1) {
-		aligned.set(j, true);
-		align.push_back(j);
-		continue;
-	      }
-	      
-	      // bigram with the next word
-	      if (i + 1 != hyp_size && j + 1 != ref_size && hyp[i + 1] == ref[j + 1]
-		  && ref_bigrams.find(bigram_type(ref[j], ref[j + 1]))->second.size() == 1
-		  && hyp_bigrams.find(bigram_type(hyp[i], hyp[i + 1]))->second.size() == 1) {
-		aligned.set(j, true);
-		align.push_back(j);
-		continue;
-	      }
-	      
-	      // bigram with the previos word
-	      if (i != 0 && j != 0 && hyp[i - 1] == ref[j - 1]
-		  && ref_bigrams.find(bigram_type(ref[j - 1], ref[j]))->second.size() == 1
-		  && hyp_bigrams.find(bigram_type(hyp[i - 1], hyp[i]))->second.size() == 1) {
-		aligned.set(j, true);
-		align.push_back(j);
-		continue;
-	      }
-	    }
-#endif
-	
 	if (align.size() == 1 && ref_size == 1)
 	  return value_type(1.0, 1.0 / hyp.size(), bp);
 	else if (align.size() <= 1)
@@ -356,10 +308,7 @@ namespace cicada
     private:
       sentence_type ref;
       unigram_count_type ref_unigrams;
-      //bigram_count_type  ref_bigrams;
-
       unigram_count_type hyp_unigrams_impl;
-      //bigram_count_type  hyp_bigrams_impl;
       
       alignment_type align_impl;
       aligned_type   aligned_impl;
@@ -369,6 +318,7 @@ namespace cicada
       : Scorer(static_cast<const Scorer&>(*this)),
 	alpha(x.alpha),
 	beta(x.beta),
+	order_max(x.order_max),
 	spearman(x.spearman)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
@@ -389,9 +339,10 @@ namespace cicada
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
       
-      alpha = x.alpha;
-      beta = x.beta;
-      spearman = x.spearman;
+      alpha     = x.alpha;
+      beta      = x.beta;
+      order_max = x.order_max;
+      spearman  = x.spearman;
       
       return *this;
     }
@@ -425,7 +376,7 @@ namespace cicada
 	for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	  const impl_type& evaluator = *(*iter);
 	  
-	  const impl_type::value_type value = evaluator(sentence, spearman);
+	  const impl_type::value_type value = evaluator(sentence, order_max, spearman);
 	  
 	  ribes->distance = std::max(ribes->distance, (value.distance
 						       * utils::mathop::pow(value.precision, alpha)

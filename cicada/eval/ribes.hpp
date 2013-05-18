@@ -123,10 +123,8 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RibesScorer() : impl(), alpha(), beta(), spearman(false) { }
-      RibesScorer(const weight_type& __alpha, const weight_type& __beta) : impl(), alpha(__alpha), beta(__beta), spearman(false) {}
-      RibesScorer(const weight_type& __alpha, const weight_type& __beta, const bool __spearman)
-	: impl(), alpha(__alpha), beta(__beta), spearman(__spearman) {}
+      RibesScorer(const weight_type& __alpha, const weight_type& __beta, const int __order_max=0, const bool __spearman=false)
+	: impl(), alpha(__alpha), beta(__beta), order_max(__order_max), spearman(__spearman) {}
       
       RibesScorer(const RibesScorer& x);
       ~RibesScorer();
@@ -145,6 +143,7 @@ namespace cicada
       impl_set_type impl;
       weight_type  alpha;
       weight_type  beta;
+      int  order_max;
       bool spearman;
     };
   };
