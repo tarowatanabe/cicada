@@ -25,11 +25,11 @@ namespace cicada
       typedef double count_type;
       
     public:
-      Ribes() : distance(0), penalty(0) {}
+      Ribes() : distance(0), norm(0) {}
       
       double score() const
       {
-	return (penalty != 0.0 ? distance / penalty : 0.0);
+	return (norm != 0.0 ? distance / norm : 0.0);
       }
 
       double loss() const { return score(); }
@@ -44,7 +44,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid Ribes score");
 	
-	return (distance == rhs->distance && penalty == rhs->penalty);
+	return (distance == rhs->distance && norm == rhs->norm);
       }
       
       void assign(const score_type& score)
@@ -54,7 +54,7 @@ namespace cicada
 	  throw std::runtime_error("invalid Ribes score");
 	
 	distance = rhs->distance;
-	penalty  = rhs->penalty;
+	norm     = rhs->norm;
       }
 
       void plus_equal(const score_type& score)
@@ -64,7 +64,7 @@ namespace cicada
 	  throw std::runtime_error("invalid Ribes score");
 
 	distance += rhs->distance;
-	penalty  += rhs->penalty;
+	norm     += rhs->norm;
       }
       
       void minus_equal(const score_type& score)
@@ -74,19 +74,19 @@ namespace cicada
 	  throw std::runtime_error("invalid Ribes score");
 
 	distance -= rhs->distance;
-	penalty  -= rhs->penalty;
+	norm     -= rhs->norm;
       }
 
       void multiplies_equal(const double& scale)
       {
 	distance *= scale;
-	penalty  *= scale;
+	norm     *= scale;
       }
       
       void divides_equal(const double& scale)
       {
 	distance /= scale;
-	penalty  /= scale;
+	norm     /= scale;
       }
       
       score_ptr_type zero() const
@@ -107,7 +107,7 @@ namespace cicada
       
     public:
       count_type distance;
-      count_type penalty;
+      count_type norm;
     };
 
     class RibesScorerImpl;

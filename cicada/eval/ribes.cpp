@@ -26,7 +26,7 @@ namespace cicada
     std::string Ribes::description() const
     {
       std::ostringstream stream;
-      stream << "ribes: " << score() << ' ' << distance << " penalty: " << penalty;
+      stream << "ribes: " << score() << ' ' << distance << " norm: " << norm;
       return stream.str();
     }
     
@@ -37,8 +37,8 @@ namespace cicada
       stream << "\"distance\":";
       stream << escaper(distance);
       stream << ',';
-      stream << "\"penalty\":";
-      stream << escaper(penalty);
+      stream << "\"norm\":";
+      stream << escaper(norm);
       stream << '}';
       return stream.str();
     }
@@ -56,7 +56,7 @@ namespace cicada
 	ribes_parsed %= (qi::lit('{')
 			 >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"ribes\"") >> qi::lit(',')
 			 >> qi::lit("\"distance\"") >> qi::lit(':') >> double_value >> ','
-			 >> qi::lit("\"penalty\"") >> qi::lit(':') >> double_value
+			 >> qi::lit("\"norm\"") >> qi::lit(':') >> double_value
 			 >> qi::lit('}'));
       }
       
@@ -82,7 +82,7 @@ namespace cicada
       
       std::auto_ptr<Ribes> ribes(new Ribes());
       ribes->distance = boost::fusion::get<0>(parsed);
-      ribes->penalty  = boost::fusion::get<1>(parsed);
+      ribes->norm     = boost::fusion::get<1>(parsed);
       
       return score_ptr_type(ribes.release());
     }
@@ -323,7 +323,7 @@ namespace cicada
 						       * utils::mathop::pow(value.penalty, beta)));
 	}
 	
-	ribes->penalty = 1;
+	ribes->norm = 1;
       }
       
       return score_ptr_type(ribes.release());
