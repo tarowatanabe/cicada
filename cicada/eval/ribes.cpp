@@ -101,6 +101,9 @@ namespace cicada
       friend class RibesScorer;
       
     public:
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
+
       typedef RibesScorer ribes_scorer_type;
       
       typedef ribes_scorer_type::count_type count_type;
@@ -130,23 +133,26 @@ namespace cicada
       
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
+
+      typedef std::vector<size_type, std::allocator<size_type> > matched_set_type;
       
-      typedef utils::unordered_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
-				   std::allocator<std::pair<const unigram_type, int> > >::type unigram_count_type;
-      typedef utils::unordered_map<bigram_type, int, utils::hashmurmur3<size_t>, std::equal_to<bigram_type>,
-				   std::allocator<std::pair<const bigram_type, int> > >::type bigram_count_type;
+      typedef utils::unordered_map<unigram_type, matched_set_type, boost::hash<unigram_type>, std::equal_to<unigram_type>,
+				   std::allocator<std::pair<const unigram_type, matched_set_type> > >::type unigram_count_type;
+      typedef utils::unordered_map<bigram_type, matched_set_type, utils::hashmurmur3<size_t>, std::equal_to<bigram_type>,
+				   std::allocator<std::pair<const bigram_type, matched_set_type> > >::type bigram_count_type;
       
       void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams, bigram_count_type& bigrams) const
       {
 	unigrams.clear();
 	bigrams.clear();
 	
-	sentence_type::const_iterator siter_end = sentence.end();
-	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
-	  ++ unigrams[*siter];
+	sentence_type::const_iterator siter_begin = sentence.begin();
+	sentence_type::const_iterator siter_end  = sentence.end();
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  unigrams[*siter].push_back(siter - siter_begin);
 	
-	for (sentence_type::const_iterator siter = sentence.begin() + 1; siter != siter_end; ++ siter)
-	  ++ bigrams[bigram_type(*(siter - 1), *siter)];
+	for (sentence_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter)
+	  bigrams[bigram_type(*(siter - 1), *siter)].push_back(siter - siter_begin);
       }
     
       value_type operator()(const sentence_type& hyp, const bool spearman) const
@@ -166,18 +172,106 @@ namespace cicada
 	align.clear();
 	aligned.clear();
 	
-	const size_t hyp_size = hyp.size();
-	const size_t ref_size = ref.size();
+	const size_type hyp_size = hyp.size();
+	const size_type ref_size = ref.size();
 	
 	const double bp = std::min(1.0, std::exp(1.0 - double(ref_size) / hyp_size));
+
+	matched_set_type ref_matched_left;
+	matched_set_type hyp_matched_left;
+	matched_set_type ref_matched_right;
+	matched_set_type hyp_matched_right;
+	matched_set_type ref_matched_next;
+	matched_set_type hyp_matched_next;
 	
-	for (size_t i = 0; i != hyp_size; ++ i)
-	  for (size_t j = 0; j != ref_size; ++ j)
+	for (size_type i = 0; i != hyp_size; ++ i) {
+	  unigram_count_type::const_iterator riter = ref_unigrams.find(hyp[i]);
+
+	  if (riter == ref_unigrams.end()) continue;
+	  
+	  const matched_set_type& ref_matched = riter->second;
+	  const matched_set_type& hyp_matched = hyp_unigrams.find(hyp[i])->second;
+	  
+	  if (ref_matched.size() == 1 && hyp_matched.size() == 1) {
+	    aligned.set(ref_matched.front(), true);
+	    align.push_back(ref_matched.front());
+
+	    //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << std::endl;
+	  } else {
+	    // we will try matching ngrams from lower order
+	    
+	    ref_matched_left  = ref_matched;
+	    ref_matched_right = ref_matched;
+	    hyp_matched_left  = hyp_matched;
+	    hyp_matched_right = hyp_matched;
+	    
+	    for (size_type order = 1; order <= utils::bithack::max(i, hyp_size - i); ++ order) {
+	      // try matching with the ngram to the left
+	      if (i >= order && ! ref_matched_left.empty() && ! hyp_matched_left.empty()) {
+		ref_matched_next.clear();
+		hyp_matched_next.clear();
+		
+		matched_set_type::const_iterator riter_end = ref_matched_left.end();
+		for (matched_set_type::const_iterator riter = ref_matched_left.begin(); riter != riter_end; ++ riter)
+		  if (*riter >= order && ref[*riter - order] == hyp[i - order])
+		    ref_matched_next.push_back(*riter);
+		
+		matched_set_type::const_iterator hiter_end = hyp_matched_left.end();
+		for (matched_set_type::const_iterator hiter = hyp_matched_left.begin(); hiter != hiter_end; ++ hiter)
+		  if (*hiter >= order && hyp[*hiter - order] == hyp[i - order])
+		    hyp_matched_next.push_back(*hiter);
+
+		if (ref_matched_next.size() == 1 && hyp_matched_next.size() == 1) {
+		  aligned.set(ref_matched_next.front(), true);
+		  align.push_back(ref_matched_next.front());
+
+		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " left-order = " << order << std::endl;
+		  break;
+		}
+		
+		ref_matched_left.swap(ref_matched_next);
+		hyp_matched_left.swap(hyp_matched_next);
+	      }
+	      
+	      // try matching with the ngram to the right
+	      if (i + order < hyp.size() && ! ref_matched_right.empty() && ! hyp_matched_right.empty()) {
+		ref_matched_next.clear();
+		hyp_matched_next.clear();
+		
+		matched_set_type::const_iterator riter_end = ref_matched_right.end();
+		for (matched_set_type::const_iterator riter = ref_matched_right.begin(); riter != riter_end; ++ riter)
+		  if (*riter + order < ref.size() && ref[*riter + order] == hyp[i + order])
+		    ref_matched_next.push_back(*riter);
+		
+		matched_set_type::const_iterator hiter_end = hyp_matched_right.end();
+		for (matched_set_type::const_iterator hiter = hyp_matched_right.begin(); hiter != hiter_end; ++ hiter)
+		  if (*hiter + order < hyp.size() && hyp[*hiter + order] == hyp[i + order])
+		    hyp_matched_next.push_back(*hiter);
+		
+		if (ref_matched_next.size() == 1 && hyp_matched_next.size() == 1) {
+		  aligned.set(ref_matched_next.front(), true);
+		  align.push_back(ref_matched_next.front());
+		  
+		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " right-order = " << order << std::endl;
+		  break;
+		}
+		
+		ref_matched_right.swap(ref_matched_next);
+		hyp_matched_right.swap(hyp_matched_next);
+	      }
+	    }
+	  }
+	}
+	
+#if 0
+	// this is an old RIBES which can match upto bigrams
+	for (size_type i = 0; i != hyp_size; ++ i)
+	  for (size_type j = 0; j != ref_size; ++ j)
 	    if (hyp[i] == ref[j]) {
 	      
 	      // check unique unigram
-	      if (ref_unigrams.find(ref[j])->second == 1
-		  && hyp_unigrams.find(hyp[i])->second == 1) {
+	      if (ref_unigrams.find(ref[j])->second.size() == 1
+		  && hyp_unigrams.find(hyp[i])->second.size() == 1) {
 		aligned.set(j, true);
 		align.push_back(j);
 		continue;
@@ -185,8 +279,8 @@ namespace cicada
 	      
 	      // bigram with the next word
 	      if (i + 1 != hyp_size && j + 1 != ref_size && hyp[i + 1] == ref[j + 1]
-		  && ref_bigrams.find(bigram_type(ref[j], ref[j + 1]))->second == 1
-		  && hyp_bigrams.find(bigram_type(hyp[i], hyp[i + 1]))->second == 1) {
+		  && ref_bigrams.find(bigram_type(ref[j], ref[j + 1]))->second.size() == 1
+		  && hyp_bigrams.find(bigram_type(hyp[i], hyp[i + 1]))->second.size() == 1) {
 		aligned.set(j, true);
 		align.push_back(j);
 		continue;
@@ -194,13 +288,14 @@ namespace cicada
 	      
 	      // bigram with the previos word
 	      if (i != 0 && j != 0 && hyp[i - 1] == ref[j - 1]
-		  && ref_bigrams.find(bigram_type(ref[j - 1], ref[j]))->second == 1
-		  && hyp_bigrams.find(bigram_type(hyp[i - 1], hyp[i]))->second == 1) {
+		  && ref_bigrams.find(bigram_type(ref[j - 1], ref[j]))->second.size() == 1
+		  && hyp_bigrams.find(bigram_type(hyp[i - 1], hyp[i]))->second.size() == 1) {
 		aligned.set(j, true);
 		align.push_back(j);
 		continue;
 	      }
 	    }
+#endif
 	
 	if (align.size() == 1 && ref_size == 1)
 	  return value_type(1.0, 1.0 / hyp.size(), bp);
@@ -223,7 +318,7 @@ namespace cicada
 
 	  // Spearman
 	  double distance = 0.0;
-	  for (size_t i = 0; i != align.size(); ++ i)
+	  for (size_type i = 0; i != align.size(); ++ i)
 	    distance += (align[i] - i) * (align[i] - i);
 	  
 	  const double rho = 1.0 - distance / boost::math::binomial_coefficient<double>(align.size() + 1, 3);
@@ -231,9 +326,9 @@ namespace cicada
 	  value.distance = (rho + 1.0) * 0.5;
 	} else {
 	  // Kendall
-	  size_t num_increasing = 0;
-	  for (size_t i = 0; i != align.size() - 1; ++ i)
-	    for (size_t j = i + 1; j != align.size(); ++ j)
+	  size_type num_increasing = 0;
+	  for (size_type i = 0; i != align.size() - 1; ++ i)
+	    for (size_type j = i + 1; j != align.size(); ++ j)
 	      num_increasing += (align[j] > align[i]);
 	  
 	  const double tau = 2.0 * num_increasing / boost::math::binomial_coefficient<double>(align.size(), 2) - 1.0;
