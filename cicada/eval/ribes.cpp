@@ -129,7 +129,7 @@ namespace cicada
       
       typedef Score value_type;
       
-      RibesScorerImpl(const sentence_type& __ref) : ref(__ref) { collect_stats(ref, ref_unigrams, ref_bigrams); }
+      RibesScorerImpl(const sentence_type& __ref) : ref(__ref) { collect_stats(ref, ref_unigrams); }
       
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
@@ -154,7 +154,17 @@ namespace cicada
 	for (sentence_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter)
 	  bigrams[bigram_type(*(siter - 1), *siter)].push_back(siter - siter_begin);
       }
-    
+ 
+      void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams) const
+      {
+	unigrams.clear();
+	
+	sentence_type::const_iterator siter_begin = sentence.begin();
+	sentence_type::const_iterator siter_end  = sentence.end();
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  unigrams[*siter].push_back(siter - siter_begin);
+      }
+      
       value_type operator()(const sentence_type& hyp, const bool spearman) const
       {
 	// no score
@@ -165,9 +175,9 @@ namespace cicada
 	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
 	
 	unigram_count_type& hyp_unigrams = const_cast<unigram_count_type&>(hyp_unigrams_impl);
-	bigram_count_type&  hyp_bigrams  = const_cast<bigram_count_type&>(hyp_bigrams_impl);
+	//bigram_count_type&  hyp_bigrams  = const_cast<bigram_count_type&>(hyp_bigrams_impl);
 
-	collect_stats(hyp, hyp_unigrams, hyp_bigrams);
+	collect_stats(hyp, hyp_unigrams);
 	
 	align.clear();
 	aligned.clear();
@@ -342,10 +352,10 @@ namespace cicada
     private:
       sentence_type ref;
       unigram_count_type ref_unigrams;
-      bigram_count_type  ref_bigrams;
+      //bigram_count_type  ref_bigrams;
 
       unigram_count_type hyp_unigrams_impl;
-      bigram_count_type  hyp_bigrams_impl;
+      //bigram_count_type  hyp_bigrams_impl;
       
       alignment_type align_impl;
       aligned_type   aligned_impl;
