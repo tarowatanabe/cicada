@@ -216,6 +216,8 @@ namespace cicada
 	    hyp_matched_right = hyp_matched;
 	    
 	    for (size_type order = 1; order <= utils::bithack::max(i, hyp_size - i); ++ order) {
+	      bool proceed_next = false;
+
 	      // try matching with the ngram to the left
 	      if (i >= order && ! ref_matched_left.empty() && ! hyp_matched_left.empty()) {
 		ref_matched_next.clear();
@@ -234,13 +236,15 @@ namespace cicada
 		if (ref_matched_next.size() == 1 && hyp_matched_next.size() == 1) {
 		  aligned.set(ref_matched_next.front(), true);
 		  align.push_back(ref_matched_next.front());
-
+		  
 		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " left-order = " << order << std::endl;
 		  break;
 		}
 		
 		ref_matched_left.swap(ref_matched_next);
 		hyp_matched_left.swap(hyp_matched_next);
+		
+		proceed_next |= (! ref_matched_left.empty()) && (! hyp_matched_left.empty());
 	      }
 	      
 	      // try matching with the ngram to the right
@@ -268,7 +272,12 @@ namespace cicada
 		
 		ref_matched_right.swap(ref_matched_next);
 		hyp_matched_right.swap(hyp_matched_next);
+		
+		proceed_next |= (! ref_matched_right.empty()) && (! hyp_matched_right.empty());
 	      }
+	      
+	      // quit here!
+	      if (! proceed_next) break;
 	    }
 	  }
 	}
