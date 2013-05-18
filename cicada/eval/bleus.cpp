@@ -23,7 +23,7 @@ namespace cicada
     {
       std::ostringstream stream;
       
-      stream << "bleus: " << score() << " bleu: " << bleu << " penalty: " << penalty;
+      stream << "bleus: " << score() << " bleu: " << bleu << " norm: " << norm;
       
       return stream.str();
     }
@@ -35,7 +35,7 @@ namespace cicada
       stream << '{' << "\"eval\":\"bleus\",";
       stream << "\"bleu\":" << escaper(bleu) 
 	     << ','
-	     << "\"penalty\":" << escaper(penalty)
+	     << "\"norm\":" << escaper(norm)
 	     << '}';
       
       return stream.str();
@@ -54,7 +54,7 @@ namespace cicada
 	bleus_parsed %= (qi::lit('{')
 			 >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"bleus\"") >> qi::lit(',')
 			 >> qi::lit("\"bleu\"") >> qi::lit(':') >> double_value >> qi::lit(',')
-			 >> qi::lit("\"penalty\"") >> qi::lit(':') >> double_value
+			 >> qi::lit("\"norm\"") >> qi::lit(':') >> double_value
 			 >> qi::lit('}'));
 	
       }
@@ -82,7 +82,7 @@ namespace cicada
       std::auto_ptr<BleuS> bleus(new BleuS());
       
       bleus->bleu = bleus_parsed.first;
-      bleus->penalty = bleus_parsed.second;
+      bleus->norm = bleus_parsed.second;
       
       return score_ptr_type(bleus.release());
     }
@@ -188,7 +188,7 @@ namespace cicada
 	  ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
       }
       
-      bleus->penalty = 1;
+      bleus->norm = 1;
       if (ngrams_hypothesis[0] == 0.0)
 	bleus->bleu = 0.0;
       else {

@@ -49,6 +49,8 @@ namespace cicada
 	std::copy(precisions.begin(), precisions.end() - 1, std::ostream_iterator<double>(stream, "|"));
 	stream << precisions.back();
       }
+      
+      // stats for precision
       if (! ngrams_hypothesis.empty()) {
 	char delim = ' ';
 	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
@@ -56,6 +58,10 @@ namespace cicada
 	  delim = '|';
 	}
       }
+      
+      // stats for BP
+      stream << ' ' << length_hypothesis << ':' << length_reference;
+
       stream << " penalty: " << std::exp(penalty);
       
       return stream.str();

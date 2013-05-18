@@ -33,11 +33,11 @@ namespace cicada
       typedef double count_type;
 
     public:
-      BleuS() : bleu(0), penalty(0) {}
+      BleuS() : bleu(0), norm(0) {}
       
       double score() const
       {
-	return (penalty == 0.0 ? 0.0 : bleu / penalty);
+	return (norm == 0.0 ? 0.0 : bleu / norm);
       }
 
       double loss() const { return 1.0 - score(); }
@@ -52,7 +52,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 	
-	return (bleu == rhs->bleu && penalty == rhs->penalty);
+	return (bleu == rhs->bleu && norm == rhs->norm);
       }
 
       void assign(const score_type& score)
@@ -61,8 +61,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 	
-	bleu    = rhs->bleu;
-	penalty = rhs->penalty;
+	bleu = rhs->bleu;
+	norm = rhs->norm;
       }
       
       void plus_equal(const score_type& score)
@@ -71,8 +71,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 
-	bleu    += rhs->bleu;
-	penalty += rhs->penalty;
+	bleu += rhs->bleu;
+	norm += rhs->norm;
       }
       
       void minus_equal(const score_type& score)
@@ -81,20 +81,20 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEUS score");
 
-	bleu    -= rhs->bleu;
-	penalty -= rhs->penalty;
+	bleu -= rhs->bleu;
+	norm -= rhs->norm;
       }
       
       void multiplies_equal(const double& scale)
       {
-	bleu    *= scale;
-	penalty *= scale;
+	bleu *= scale;
+	norm *= scale;
       }
       
       void divides_equal(const double& scale)
       {
-	bleu    /= scale;
-	penalty /= scale;
+	bleu /= scale;
+	norm /= scale;
       }
       
       score_ptr_type zero() const
@@ -114,7 +114,7 @@ namespace cicada
       static score_ptr_type decode(const utils::piece& encoded);
 
       count_type bleu;
-      count_type penalty;
+      count_type norm;
     };
     
 
