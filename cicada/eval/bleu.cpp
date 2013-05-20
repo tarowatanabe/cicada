@@ -54,7 +54,7 @@ namespace cicada
       if (! ngrams_hypothesis.empty()) {
 	char delim = ' ';
 	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	  stream << delim << ngrams_hypothesis[n] << '-' << ngrams_reference[n];
+	  stream << delim << ngrams_hypothesis[n] << ':' << ngrams_reference[n];
 	  delim = '|';
 	}
       }
