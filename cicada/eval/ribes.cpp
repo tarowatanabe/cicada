@@ -192,8 +192,11 @@ namespace cicada
 	  } else {
 	    // we will try matching ngrams from lower order
 	    
+	    // ref_matched_{left,right} can be empty...
 	    ref_matched_left  = ref_matched;
 	    ref_matched_right = ref_matched;
+	    
+	    // hyp_matched_{left,right} will be always non-empty...
 	    hyp_matched_left  = hyp_matched;
 	    hyp_matched_right = hyp_matched;
 
@@ -201,9 +204,9 @@ namespace cicada
 	    if (order_max > 0)
 	      order_last = utils::bithack::min(order_last, static_cast<size_type>(order_max));
 	    
-	    for (size_type order = 1; order <= order_last; ++ order) {
+	    for (size_type order = 1; order <= order_last && ! ref_matched_left.empty() && ! ref_matched_right.empty(); ++ order) {
 	      // try matching with the ngram to the left
-	      if (i >= order && ! ref_matched_left.empty() && ! hyp_matched_left.empty()) {
+	      if (i >= order && ! ref_matched_left.empty()) {
 		ref_matched_next.clear();
 		hyp_matched_next.clear();
 		
@@ -230,7 +233,7 @@ namespace cicada
 	      }
 	      
 	      // try matching with the ngram to the right
-	      if (i + order < hyp.size() && ! ref_matched_right.empty() && ! hyp_matched_right.empty()) {
+	      if (i + order < hyp.size() && ! ref_matched_right.empty()) {
 		ref_matched_next.clear();
 		hyp_matched_next.clear();
 		
@@ -255,10 +258,6 @@ namespace cicada
 		ref_matched_right.swap(ref_matched_next);
 		hyp_matched_right.swap(hyp_matched_next);
 	      }
-	      
-	      // early termination...
-	      if ((ref_matched_left.empty() || hyp_matched_left.empty())
-		  && (ref_matched_right.empty() || hyp_matched_right.empty())) break;
 	    }
 	  }
 	}
