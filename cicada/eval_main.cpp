@@ -48,5 +48,6 @@ int main(int argc, char** argv)
   process("parseval", refset, tstset);
   process("ribes", refset, tstset);
   process("ribes:spearman=true", refset, tstset);
+  process("ribes:order=1", refset, tstset);
   process("combined:metric=bleu,weight=0.5,metric=ter,weight=-0.5", refset, tstset);
 }

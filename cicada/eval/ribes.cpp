@@ -189,7 +189,7 @@ namespace cicada
 	    align.push_back(ref_matched.front());
 
 	    //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << std::endl;
-	  } else {
+	  } else if (order_max <= 0 || order_max > 1) {
 	    // we will try matching ngrams from lower order
 	    
 	    // ref_matched_{left,right} can be empty...
@@ -202,7 +202,7 @@ namespace cicada
 
 	    size_type order_last = utils::bithack::max(i, hyp_size - i);
 	    if (order_max > 0)
-	      order_last = utils::bithack::min(order_last, static_cast<size_type>(order_max));
+	      order_last = utils::bithack::min(order_last, static_cast<size_type>(order_max - 1));
 	    
 	    for (size_type order = 1; order <= order_last && ! ref_matched_left.empty() && ! ref_matched_right.empty(); ++ order) {
 	      // try matching with the ngram to the left
