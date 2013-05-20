@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "decode.hpp"
@@ -200,31 +200,31 @@ namespace cicada
 	    hyp_matched_left  = hyp_matched;
 	    hyp_matched_right = hyp_matched;
 
-	    size_type order_last = utils::bithack::max(i, hyp_size - i);
+	    size_type offset_last = utils::bithack::max(i, hyp_size - i);
 	    if (order_max > 0)
-	      order_last = utils::bithack::min(order_last, static_cast<size_type>(order_max - 1));
+	      offset_last = utils::bithack::min(offset_last, static_cast<size_type>(order_max - 1));
 	    
-	    for (size_type order = 1; order <= order_last && ! ref_matched_left.empty() && ! ref_matched_right.empty(); ++ order) {
+	    for (size_type offset = 1; offset <= offset_last && ! ref_matched_left.empty() && ! ref_matched_right.empty(); ++ offset) {
 	      // try matching with the ngram to the left
-	      if (i >= order && ! ref_matched_left.empty()) {
+	      if (i >= offset && ! ref_matched_left.empty()) {
 		ref_matched_next.clear();
 		hyp_matched_next.clear();
 		
 		matched_set_type::const_iterator riter_end = ref_matched_left.end();
 		for (matched_set_type::const_iterator riter = ref_matched_left.begin(); riter != riter_end; ++ riter)
-		  if (*riter >= order && ref[*riter - order] == hyp[i - order])
+		  if (*riter >= offset && ref[*riter - offset] == hyp[i - offset])
 		    ref_matched_next.push_back(*riter);
 		
 		matched_set_type::const_iterator hiter_end = hyp_matched_left.end();
 		for (matched_set_type::const_iterator hiter = hyp_matched_left.begin(); hiter != hiter_end; ++ hiter)
-		  if (*hiter >= order && hyp[*hiter - order] == hyp[i - order])
+		  if (*hiter >= offset && hyp[*hiter - offset] == hyp[i - offset])
 		    hyp_matched_next.push_back(*hiter);
 
 		if (ref_matched_next.size() == 1 && hyp_matched_next.size() == 1) {
 		  aligned.set(ref_matched_next.front(), true);
 		  align.push_back(ref_matched_next.front());
 		  
-		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " left-order = " << order << std::endl;
+		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " left-offset = " << offset << std::endl;
 		  break;
 		}
 		
@@ -233,25 +233,25 @@ namespace cicada
 	      }
 	      
 	      // try matching with the ngram to the right
-	      if (i + order < hyp.size() && ! ref_matched_right.empty()) {
+	      if (i + offset < hyp.size() && ! ref_matched_right.empty()) {
 		ref_matched_next.clear();
 		hyp_matched_next.clear();
 		
 		matched_set_type::const_iterator riter_end = ref_matched_right.end();
 		for (matched_set_type::const_iterator riter = ref_matched_right.begin(); riter != riter_end; ++ riter)
-		  if (*riter + order < ref.size() && ref[*riter + order] == hyp[i + order])
+		  if (*riter + offset < ref.size() && ref[*riter + offset] == hyp[i + offset])
 		    ref_matched_next.push_back(*riter);
 		
 		matched_set_type::const_iterator hiter_end = hyp_matched_right.end();
 		for (matched_set_type::const_iterator hiter = hyp_matched_right.begin(); hiter != hiter_end; ++ hiter)
-		  if (*hiter + order < hyp.size() && hyp[*hiter + order] == hyp[i + order])
+		  if (*hiter + offset < hyp.size() && hyp[*hiter + offset] == hyp[i + offset])
 		    hyp_matched_next.push_back(*hiter);
 		
 		if (ref_matched_next.size() == 1 && hyp_matched_next.size() == 1) {
 		  aligned.set(ref_matched_next.front(), true);
 		  align.push_back(ref_matched_next.front());
 		  
-		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " right-order = " << order << std::endl;
+		  //std::cerr << "matched: " << hyp[i] << " i = " << i << " j = " << align.back() << " right-offset = " << offset << std::endl;
 		  break;
 		}
 		
