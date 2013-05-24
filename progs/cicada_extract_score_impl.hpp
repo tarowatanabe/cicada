@@ -1044,21 +1044,14 @@ struct PhrasePairSourceMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  
 	  // try consume as much as possible...
-	  while (! buffers[shard].empty()) {
-	    bool found = false;
-	    
+	  if (! buffers[shard].empty())
 	    for (size_t i = 0; i != buffers.size(); ++ i)
 	      while (! buffers[i].empty()) {
-		if (queues[i]->push_swap(buffers[i].front(), true)) {
+		if (queues[i]->push_swap(buffers[i].front(), true))
 		  buffers[i].pop_front();
-		  if (i == static_cast<size_t>(shard))
-		    found = true;
-		} else
+		else
 		  break;
 	      }
-	    
-	    if (! found) break;
-	  }
 	  
 	  if (buffers[shard].empty()) { // try insert into queue.
 	    if (! queues[shard]->push_swap(counts, true))
@@ -2844,21 +2837,14 @@ struct PhrasePairScoreMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  
 	  // try consume as much as possible...
-	  while (! buffers[shard].empty()) {
-	    bool found = false;
-	    
+	  if (! buffers[shard].empty())
 	    for (size_t i = 0; i != buffers.size(); ++ i)
 	      while (! buffers[i].empty()) {
-		if (queues[i]->push_swap(buffers[i].front(), true)) {
+		if (queues[i]->push_swap(buffers[i].front(), true))
 		  buffers[i].pop_front();
-		  if (i == static_cast<size_t>(shard))
-		    found = true;
-		} else
+		else
 		  break;
 	      }
-	    
-	    if (! found) break;
-	  }
 	  
 	  if (buffers[shard].empty()) { // try insert into queue.
 	    if (! queues[shard]->push_swap(counts, true))
