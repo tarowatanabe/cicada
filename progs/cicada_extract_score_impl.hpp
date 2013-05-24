@@ -1045,10 +1045,19 @@ struct PhrasePairSourceMapper
 	  
 	  // try consume as much as possible...
 	  while (! buffers[shard].empty()) {
-	    if (queues[shard]->push_swap(buffers[shard].front(), true))
-	      buffers[shard].pop_front();
-	    else
-	      break;
+	    bool found = false;
+	    
+	    for (size_t i = 0; i != buffers.size(); ++ i)
+	      while (! buffers[i].empty()) {
+		if (queues[i]->push_swap(buffers[i].front(), true)) {
+		  buffers[i].pop_front();
+		  if (i == static_cast<size_t>(shard))
+		    found = true;
+		} else
+		  break;
+	      }
+	    
+	    if (! found) break;
 	  }
 	  
 	  if (buffers[shard].empty()) { // try insert into queue.
@@ -2836,10 +2845,19 @@ struct PhrasePairScoreMapper
 	  
 	  // try consume as much as possible...
 	  while (! buffers[shard].empty()) {
-	    if (queues[shard]->push_swap(buffers[shard].front(), true))
-	      buffers[shard].pop_front();
-	    else
-	      break;
+	    bool found = false;
+	    
+	    for (size_t i = 0; i != buffers.size(); ++ i)
+	      while (! buffers[i].empty()) {
+		if (queues[i]->push_swap(buffers[i].front(), true)) {
+		  buffers[i].pop_front();
+		  if (i == static_cast<size_t>(shard))
+		    found = true;
+		} else
+		  break;
+	      }
+	    
+	    if (! found) break;
 	  }
 	  
 	  if (buffers[shard].empty()) { // try insert into queue.
