@@ -313,6 +313,7 @@ struct LearnModel4 : public LearnBase
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
     
     typedef std::vector<char, std::allocator<char> > modified_type;
+    typedef utils::vector2_aligned<char, std::allocator<char> > computed_swap_type;
 
     void assign(const sentence_type& source,
 		const sentence_type& target,
@@ -538,15 +539,24 @@ struct LearnModel4 : public LearnBase
 	  for (index_type i = 0; i != static_cast<index_type>(aligns.mapped.size()); ++ i)
 	    if (! modified[i])
 	      moves(j, i) = (aligns.aligns[j] != i ? score_move(j, i) : 1.0);
+
+      computed_swap.clear();
+      computed_swap.resize(aligns.aligns.size(), aligns.aligns.size(), false);
       
       // update swaps...
       for (index_type j = 1; j != static_cast<index_type>(aligns.aligns.size()); ++ j)
 	if (modified[aligns.aligns[j]]) {
 	  for (index_type j2 = j + 1; j2 < static_cast<index_type>(aligns.aligns.size()); ++ j2)
-	    swaps(j, j2) = (aligns.aligns[j] != aligns.aligns[j2] ? score_swap(j, j2) : 1.0);
+	    if (! computed_swap(j, j2)) {
+	      swaps(j, j2) = (aligns.aligns[j] != aligns.aligns[j2] ? score_swap(j, j2) : 1.0);
+	      computed_swap(j, j2) = true;
+	    }
 	  
 	  for (index_type j1 = 1; j1 < j; ++ j1)
-	    swaps(j1, j) = (aligns.aligns[j1] != aligns.aligns[j] ? score_swap(j1, j) : 1.0);
+	    if (! computed_swap(j1, j)) {
+	      swaps(j1, j) = (aligns.aligns[j1] != aligns.aligns[j] ? score_swap(j1, j) : 1.0);
+	      computed_swap(j1, j) = true;
+	    }
 	}
     }
 
@@ -1121,6 +1131,7 @@ struct LearnModel4 : public LearnBase
     swap_score_type swaps;
     distortion_cache_type distortions;
     modified_type         modified;
+    computed_swap_type    computed_swap;
 
     // posteriors...
     double total;
