@@ -33,18 +33,25 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
+      typedef feature_function_type::feature_set_type   feature_set_type;
       typedef feature_function_type::attribute_set_type attribute_set_type;
       
+      typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
 
       DistortionImpl()
 	: lattice(0),
 	  attr_phrase_span_first("phrase-span-first"),
-	  attr_phrase_span_last("phrase-span-last") {}
+	  attr_phrase_span_last("phrase-span-last"),
+	  feature("distortion"),
+	  feature_final("distortion:final") {}
       DistortionImpl(const DistortionImpl& x)
 	: lattice(0),
 	  attr_phrase_span_first("phrase-span-first"),
-	  attr_phrase_span_last("phrase-span-last") {}
+	  attr_phrase_span_last("phrase-span-last"),
+	  feature("distortion"),
+	  feature_final("distortion:final") {}
+      
       DistortionImpl& operator=(const DistortionImpl& x)
       {
 	return *this;
@@ -124,6 +131,9 @@ namespace cicada
       
       const attribute_type attr_phrase_span_first;
       const attribute_type attr_phrase_span_last;
+      
+      const feature_type feature;
+      const feature_type feature_final;
     };
 
     
@@ -140,15 +150,14 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
 	std::cerr << "WARNING: unsupported parameter for distortion: " << piter->first << "=" << piter->second << std::endl;
       
+      pimpl = new impl_type();
+      
       // distotion context: span = [first, last)
       base_type::__state_size = sizeof(int) * 2;
-      base_type::__feature_name = std::string("distortion");
-      
-      pimpl = new impl_type();
+      base_type::__feature_name = pimpl->feature;
     }
     
     Distortion::~Distortion() { std::auto_ptr<impl_type> tmp(pimpl); }
-
     
     Distortion::Distortion(const Distortion& x)
       : base_type(static_cast<const base_type&>(x)),
@@ -170,15 +179,21 @@ namespace cicada
 			   feature_set_type& features,
 			   const bool final) const
     {
-      double score = pimpl->distortion_score(state, states, edge);
-      
-      if (final)
-	score += pimpl->distortion_final_score(state);
+      const double score = pimpl->distortion_score(state, states, edge);
       
       if (score != 0.0)
-	features[base_type::feature_name()] = score;
+	features[pimpl->feature] = score;
       else
-	features.erase(base_type::feature_name());
+	features.erase(pimpl->feature);
+      
+      if (final) {
+	const double score = pimpl->distortion_final_score(state);
+	
+	if (score != 0.0)
+	  features[pimpl->feature_final] = score;
+	else
+	  features.erase(pimpl->feature_final);
+      }
     }
     
     void Distortion::apply_coarse(state_ptr_type& state,
