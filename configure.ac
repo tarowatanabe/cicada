@@ -51,6 +51,80 @@ AC_PATH_PROG(RST2MAN, rst2man.py, no)
 AM_CONDITIONAL(WITH_RST2MAN, test "$RST2MAN" != no)
 
 # Checks for libraries.
+AC_ARG_WITH(zlib,
+	[AC_HELP_STRING([--with-zlib=DIR], [zlib in DIR])],
+	[zlib_dir="${withval}"], [zlib_dir=''])
+
+if test "x$zlib_dir" != "x"; then
+  ZLIB_CPPFLAGS="-DHAVA_ZLIB -I${zlib_dir}/include"
+  ZLIB_LDFLAGS="-L${zlib_dir}/lib -lz"
+else
+  ZLIB_CPPFLAGS="-DHAVE_ZLIB"
+  ZLIB_LDFLAGS="-lz"
+fi
+
+AC_MSG_CHECKING(for zlib)
+   
+save_CXXFLAGS="$CXXFLAGS"
+save_LDFLAGS="$LDFLAGS"
+CXXFLAGS="$CXXFLAGS $ZLIB_CPPFLAGS"
+LDFLAGS="$LDFLAGS $ZLIB_LDFLAGS"
+
+AC_TRY_LINK([], [], [ac_have_zlib=yes], [ac_have_zlib=no])
+AC_MSG_RESULT($ac_have_zlib)
+AC_CHECK_HEADERS([zlib.h])
+
+if test "x$ac_have_zlib" = "xno" -o "x$ac_cv_header_zlib_h" = "xno"; then
+  ZLIB_CPPFLAGS=""
+  ZLIB_LDFLAGS=""
+else
+  AC_DEFINE(HAVE_ZLIB, 1, [Define if you have zlib])
+fi
+
+CXXFLAGS="$save_CXXFLAGS"
+LDFLAGS="$save_LDFLAGS"
+
+AC_SUBST(ZLIB_CPPFLAGS)
+AC_SUBST(ZLIB_LDFLAGS)
+AM_CONDITIONAL([WITH_ZLIB], [test "x$ac_have_zlib" = "xyes" -a "x$ac_cv_header_zlib_h" = "xyes"])
+
+AC_ARG_WITH(bzlib,
+	[AC_HELP_STRING([--with-bzlib=DIR], [bzlib in DIR])],
+	[bzlib_dir="${withval}"], [bzlib_dir=''])
+
+if test "x$bzlib_dir" != "x"; then
+  BZLIB_CPPFLAGS="-DHAVA_BZLIB -I${bzlib_dir}/include"
+  BZLIB_LDFLAGS="-L${bzlib_dir}/lib -lbz2"
+else
+  BZLIB_CPPFLAGS="-DHAVE_BZLIB"
+  BZLIB_LDFLAGS="-lbz2"
+fi
+
+AC_MSG_CHECKING(for bzlib)
+   
+save_CXXFLAGS="$CXXFLAGS"
+save_LDFLAGS="$LDFLAGS"
+CXXFLAGS="$CXXFLAGS $BZLIB_CPPFLAGS"
+LDFLAGS="$LDFLAGS $BZLIB_LDFLAGS"
+
+AC_TRY_LINK([], [], [ac_have_bzlib=yes], [ac_have_bzlib=no])
+AC_MSG_RESULT($ac_have_bzlib)
+AC_CHECK_HEADERS([bzlib.h])
+
+if test "x$ac_have_bzlib" = "xno" -o "x$ac_cv_header_bzlib_h" = "xno"; then
+  BZLIB_CPPFLAGS=""
+  BZLIB_LDFLAGS=""
+else
+  AC_DEFINE(HAVE_BZLIB, 1, [Define if you have bzlib])
+fi
+
+CXXFLAGS="$save_CXXFLAGS"
+LDFLAGS="$save_LDFLAGS"
+
+AC_SUBST(BZLIB_CPPFLAGS)
+AC_SUBST(BZLIB_LDFLAGS)
+AM_CONDITIONAL([WITH_BZLIB], [test "x$ac_have_bzlib" = "xyes" -a "x$ac_cv_header_bzlib_h" = "xyes"])
+
 
 AC_ARG_WITH(blas,
 	[AC_HELP_STRING([--with-blas=DIR], [blas in DIR])],
