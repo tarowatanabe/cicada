@@ -36,6 +36,16 @@ AC_LANG_CPLUSPLUS
 
 AC_SYS_LARGEFILE
 
+
+# Constants...
+# KENLM_MAX_ORDER
+AC_ARG_WITH(kenlm-order,
+        [AC_HELP_STRING([--with-kenlm-order=ORDER], [kenlm's max order [default=6]])],
+        [kenlm_order="${withval}"], [kenlm_order=6])
+AC_DEFINE_UNQUOTED(KENLM_MAX_ORDER, [${kenlm_order}], [kenlm's max order])
+KENLM_CPPFLAGS="-DKENLM_MAX_ORDER=${kenlm_order}"
+AC_SUBST(KENLM_CPPFLAGS)
+
 # Check for binaries...
 AC_PATH_PROG(RST2MAN, rst2man.py, no)
 AM_CONDITIONAL(WITH_RST2MAN, test "$RST2MAN" != no)
@@ -541,6 +551,9 @@ AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
 		 doc/Makefile
 		 eigen/Makefile
+		 kenlm/Makefile
+		 kenlm/util/Makefile
+		 kenlm/lm/Makefile
 		 codec/Makefile
 		 libstemmer_c/Makefile
 		 liblinear/Makefile

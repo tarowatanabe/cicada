@@ -1,6 +1,7 @@
-AM_CPPFLAGS = -I.. -I../eigen $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(MSGPACK_CPPFLAGS)
+AM_CPPFLAGS = -I.. -I../eigen -I../kenlm $(KEMLM_CPPFLAGS) $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(MSGPACK_CPPFLAGS)
 
 LIBUTILS=$(top_builddir)/utils/libutils.la
+LIBKENLM=$(top_builddir)/kenlm/lm/libkenlm.la
 
 lib_LTLIBRARIES = libcicada.la
 
@@ -630,6 +631,7 @@ libcicada_la_LIBADD = \
 	libcicada-signature.la \
 	libcicada-stemmer.la \
 	\
+	$(LIBKENLM) \
 	$(LIBUTILS) \
 	$(BOOST_THREAD_LIBS) \
 	$(BOOST_FILESYSTEM_LIBS) \
