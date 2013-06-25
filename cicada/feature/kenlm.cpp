@@ -569,17 +569,17 @@ namespace cicada
       
       switch (m) { 
       case lm::ngram::PROBING:
-	return feature_function_ptr_type(new KenLM<lm::ngram::ProbingModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::ProbingModel>(parameter));
       case lm::ngram::REST_PROBING:
-	return feature_function_ptr_type(new KenLM<lm::ngram::RestProbingModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::RestProbingModel>(parameter));
       case lm::ngram::TRIE:
-	return feature_function_ptr_type(new KenLM<lm::ngram::TrieModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::TrieModel>(parameter));
       case lm::ngram::ARRAY_TRIE:
-	return feature_function_ptr_type(new KenLM<lm::ngram::ArrayTrieModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::ArrayTrieModel>(parameter));
       case lm::ngram::QUANT_TRIE:
-	return feature_function_ptr_type(new KenLM<lm::ngram::QuantTrieModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::QuantTrieModel>(parameter));
       case lm::ngram::QUANT_ARRAY_TRIE:
-	return feature_function_ptr_type(new KenLM<lm::ngram::QuantArrayTrieModel>(param));
+	return feature_function_ptr_type(new KenLM<lm::ngram::QuantArrayTrieModel>(parameter));
       default:
 	throw std::runtime_error("Unrecognized kenlm binary file type:" + boost::lexical_cast<std::string>(m));
       }
