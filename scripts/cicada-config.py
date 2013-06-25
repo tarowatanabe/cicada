@@ -44,6 +44,7 @@ opt_parser = OptionParser(
     
     ### feature functions
     make_option("--feature-ngram", default=[], action="append", type="string", help="ngram feature"),
+    make_option("--feature-kenlm", default=[], action="append", type="string", help="kenlm feature"),
     make_option("--feature-lexicon", default="", action="store", type="string", help="lexicon feature"),
     
     ## operations...
@@ -221,8 +222,16 @@ if __name__ == '__main__':
         print "# ngram feature. If you have multiple ngrams, you should modify name"
         print "# no-boe-eos=true implies that the forest is explicitly annotated with <s> and </s>."
         for ngram in options.feature_ngram:
-            print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
+            print "feature-function = ngram: name=ngram, no-bos-eos=true, file=%s" %(ngram)
         print
+
+    if options.feature_kenlm:
+        print "# kenlm feature. If you have multiple ngrams, you should modify name"
+        print "# no-boe-eos=true implies that the forest is explicitly annotated with <s> and </s>."
+        for ngram in options.feature_kenlm:
+            print "feature-function = kenlm: name=kenlm, no-bos-eos=true, file=%s" %(ngram)
+        print
+    
     
     if options.feature_lexicon:
         print "# lexicon feature computes P(target-sentence | source-sentence) based on model1/viterbi/noisy-or"
