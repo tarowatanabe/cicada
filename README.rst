@@ -46,7 +46,7 @@ shell's newline):
       --grammar samples/sample.grammar.gz \
       --grammar "glue:straight=true,inverted=false,non-terminal=[x],goal=[s]" \
       --grammar "insertion:non-terminal=[x]" \
-      --feature-function "ngram:file=samples/sample.ngram.gz,order=5" \
+      --feature-function "ngram:file=samples/sample.ngram.bin" \
       --feature-function word-penalty \
       --feature-function rule-penalty \
       --operation compose-cky \

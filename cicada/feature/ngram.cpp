@@ -112,8 +112,12 @@ namespace cicada
       {
 	if (populate)
 	  ngram->populate();
-
-	order = utils::bithack::min(order, ngram->index.order());
+	
+	// set up correct ordering...
+	if (__order <= 0)
+	  order = ngram->index.order();
+	else
+	  order = utils::bithack::min(__order, ngram->index.order());
 	
 	initialize_cache();
 	
@@ -777,7 +781,7 @@ namespace cicada
 
       path_type   path;
       bool        populate = false;
-      int         order = 3;
+      int         order = 0;
       path_type   cluster_path;
       bool        approximate = false;
       bool        skip_sgml_tag = false;
@@ -825,16 +829,14 @@ namespace cicada
       if (path.empty())
 	throw std::runtime_error("no ngram file? " + path.string());
       
-      if (order <= 0)
-	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(order));
-
-      if (coarse_order > order)
-	throw std::runtime_error("invalid coarse order: coarse-order <= order");
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
 
+      if (ngram_impl->order <= 0)
+	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
+            
       ngram_impl->approximate = approximate;
       ngram_impl->no_bos_eos = no_bos_eos;
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
@@ -858,11 +860,11 @@ namespace cicada
       // ...
       if (coarse_order > 0 || ! coarse_path.empty()) {
 	
-	if (coarse_order <= 0)
-	  throw std::runtime_error("coarse order must be non-zero!");
-	
 	if (! coarse_path.empty()) {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order, coarse_populate));
+	  
+	  if (ngram_impl->order <= 0)
+	    throw std::runtime_error("invalid coarse ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
 
 	  ngram_impl->approximate = coarse_approximate;
 	  ngram_impl->no_bos_eos = no_bos_eos;
@@ -877,6 +879,9 @@ namespace cicada
 	  
 	  pimpl_coarse = ngram_impl.release();
 	} else {
+	  if (coarse_order > pimpl->order)
+	    throw std::runtime_error("invalid coarse order: coarse-order <= order");
+	  
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
 	  ngram_impl->order = coarse_order;
 	  ngram_impl->coarse = true;
