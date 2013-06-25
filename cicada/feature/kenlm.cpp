@@ -145,7 +145,8 @@ namespace cicada
     public:
       KenLMImpl(const path_type& __path)
 	: ngram(&ngram_type::create(__path)),
-	  cluster(0), no_bos_eos(false), skip_sgml_tag(false)
+	  cluster(0), no_bos_eos(false), skip_sgml_tag(false),
+	  log10(std::log(10))
       {
 	id_oov = 0;
 	id_bos = ngram->vocabulary(vocab_type::BOS);
@@ -161,8 +162,8 @@ namespace cicada
 	  feature_name_oov(x.feature_name_oov),
 	  id_oov(x.id_oov),
 	  id_bos(x.id_bos),
-	  id_eos(x.id_eos)
-	  
+	  id_eos(x.id_eos),
+	  log10(std::log(10))
       { }
       
       KenLMImpl& operator=(const KenLMImpl& x)
@@ -177,6 +178,7 @@ namespace cicada
 	id_oov           = x.id_oov;
 	id_bos           = x.id_bos;
 	id_eos           = x.id_eos;
+	
 	return *this;
       }
             
@@ -285,7 +287,7 @@ namespace cicada
 	
 	reinterpret_cast<ngram_state_type*>(state)->ZeroRemaining();
 	
-	return ret;
+	return ret * log10;
       }
       
       double ngram_final_score(const state_ptr_type& state)
@@ -302,8 +304,8 @@ namespace cicada
 	  ruleScore.BeginSentence();
 	  ruleScore.NonTerminal(ngram_state);
 	  ruleScore.Terminal(id_eos);
-
-	  return ruleScore.Finish();
+	  
+	  return ruleScore.Finish() * log10;
 	}
       }
 
@@ -327,6 +329,8 @@ namespace cicada
       lm::WordIndex id_oov;
       lm::WordIndex id_bos;
       lm::WordIndex id_eos;
+      
+      double log10;
     };
     
     template <typename Model>
