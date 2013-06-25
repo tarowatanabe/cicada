@@ -42,9 +42,11 @@ AC_SYS_LARGEFILE
 AC_ARG_WITH(kenlm-order,
         [AC_HELP_STRING([--with-kenlm-order=ORDER], [kenlm's max order [default=6]])],
         [kenlm_order="${withval}"], [kenlm_order=6])
+AC_MSG_CHECKING([for kenlm's max order])
 AC_DEFINE_UNQUOTED(KENLM_MAX_ORDER, [${kenlm_order}], [kenlm's max order])
 KENLM_CPPFLAGS="-DKENLM_MAX_ORDER=${kenlm_order}"
 AC_SUBST(KENLM_CPPFLAGS)
+AC_MSG_RESULT([${kenlm_order}])
 
 # Check for binaries...
 AC_PATH_PROG(RST2MAN, rst2man.py, no)
