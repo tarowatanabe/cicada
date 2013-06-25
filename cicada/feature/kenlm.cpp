@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <memory>
+#include <cmath>
 
 #include "cicada/feature/kenlm.hpp"
 #include "cicada/parameter.hpp"
@@ -152,7 +153,7 @@ namespace cicada
       KenLMImpl(const path_type& __path, const bool populate)
 	: ngram(&ngram_type::create(__path, populate)),
 	  cluster(0), no_bos_eos(false), skip_sgml_tag(false),
-	  log10(std::log(10))
+	  log10(M_LN10)
       {
 	id_oov = 0;
 	id_bos = ngram->vocabulary(vocab_type::BOS);
@@ -169,7 +170,7 @@ namespace cicada
 	  id_oov(x.id_oov),
 	  id_bos(x.id_bos),
 	  id_eos(x.id_eos),
-	  log10(std::log(10))
+	  log10(M_LN10)
       { }
       
       KenLMImpl& operator=(const KenLMImpl& x)
