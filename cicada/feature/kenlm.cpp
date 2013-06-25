@@ -81,10 +81,11 @@ namespace cicada
 	return lm::WordIndex(__id);
       }
       
-      KenLMNGram(const path_type& file) : caches_(), model_(file.string().c_str()) {}
+      KenLMNGram(const path_type& file,
+		 const lm::ngram::Config& config) : caches_(), model_(file.string().c_str(), config) {}
 
       static
-      KenLMNGram<Model>& create(const path_type& path)
+      KenLMNGram<Model>& create(const path_type& path, const bool populate)
       {
 	typedef boost::mutex            mutex_type;
 	typedef mutex_type::scoped_lock lock_type;
@@ -99,8 +100,13 @@ namespace cicada
 	lock_type lock(ngram_mutex);
 	
 	typename ngram_map_type::iterator iter = ngram_map.find(path.string());
-	if (iter == ngram_map.end())
-	  iter = ngram_map.insert(std::make_pair(path.string(), ngram_ptr_type(new KenLMNGram<Model>(path)))).first;
+	if (iter == ngram_map.end()) {
+	  lm::ngram::Config config;
+	  
+	  config.load_method = populate ? util::POPULATE_OR_READ : util::LAZY;
+	  
+	  iter = ngram_map.insert(std::make_pair(path.string(), ngram_ptr_type(new KenLMNGram<Model>(path, config)))).first;
+	}
 	
 	return *(iter->second);
       }
@@ -143,8 +149,8 @@ namespace cicada
       typedef lm::ngram::ChartState ngram_state_type;
       
     public:
-      KenLMImpl(const path_type& __path)
-	: ngram(&ngram_type::create(__path)),
+      KenLMImpl(const path_type& __path, const bool populate)
+	: ngram(&ngram_type::create(__path, populate)),
 	  cluster(0), no_bos_eos(false), skip_sgml_tag(false),
 	  log10(std::log(10))
       {
@@ -345,11 +351,13 @@ namespace cicada
 	throw std::runtime_error("is this really kenlm feature function? " + parameter);
 
       path_type   path;
+      bool        populate = false;
       path_type   cluster_path;
       bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
       
       path_type   coarse_path;
+      bool        coarse_populate = false;
       path_type   coarse_cluster_path;
       
       std::string name;
@@ -357,6 +365,8 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
+	else if (utils::ipiece(piter->first) == "populate")
+	  populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "cluster")
 	  cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
@@ -365,6 +375,8 @@ namespace cicada
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
+	else if (utils::ipiece(piter->first) == "coarse-populate")
+	  coarse_populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "name")
@@ -379,7 +391,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path));
+      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, populate));
 
       ngram_impl->no_bos_eos = no_bos_eos;
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
@@ -403,7 +415,7 @@ namespace cicada
 
       // coarse ngram
       if (! coarse_path.empty()) {
-	std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path));
+	std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
 	
 	ngram_impl->no_bos_eos = no_bos_eos;
 	ngram_impl->skip_sgml_tag = skip_sgml_tag;

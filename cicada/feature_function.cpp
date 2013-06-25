@@ -128,11 +128,13 @@ insertion: insertion feature\n\
 \tthreshold=threshold (default: 0.5)\n\
 kenlm: ngram LM from kenlm\n\
 \tfile=<file>\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
 \tcluster=<word class>\n\
 \tname=feature-name(default: ngram)\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
+\tcoarse-populate=[true|false] \"populate\" by pre-fetching\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
 lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
