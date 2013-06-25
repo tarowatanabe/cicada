@@ -110,6 +110,7 @@ namespace cicada
       model_type     model_;
     };
 
+
     template <typename Model>
     class KenLMImpl : public utils::hashmurmur3<size_t>
     {
@@ -139,13 +140,15 @@ namespace cicada
       typedef boost::filesystem::path path_type;
 
       typedef KenLMNGram<Model> ngram_type;
+
+      typedef lm::ngram::ChartState ngram_state_type;
       
     public:
       KenLMImpl(const path_type& __path)
 	: ngram(&ngram_type::create(__path)),
 	  cluster(0), no_bos_eos(false), skip_sgml_tag(false)
       {
-	id_oov = ngram->vocabulary(vocab_type::UNK);
+	id_oov = 0;
 	id_bos = ngram->vocabulary(vocab_type::BOS);
 	id_eos = ngram->vocabulary(vocab_type::EOS);
       }
@@ -241,17 +244,74 @@ namespace cicada
 			 Extract extract,
 			 Skipper skipper)
       {
-	return 0.0;
+	const rule_type& rule = *(edge.rule);
+        const phrase_type& target = rule.rhs;
+	
+	lm::ngram::RuleScore<Model> ruleScore(ngram->model_, *reinterpret_cast<ngram_state_type*>(state));
+
+	phrase_type::const_iterator titer_begin = target.begin();
+        phrase_type::const_iterator titer_end   = target.end();
+	
+	int non_terminal_pos = 0;
+	bool initial = true;
+	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	  if (titer->is_non_terminal()) {
+	    const int __non_terminal_index = titer->non_terminal_index();
+            const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+            ++ non_terminal_pos;
+	    
+	    if (initial) // special case for left-edge NT
+	      ruleScore.BeginNonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
+	    else
+	      ruleScore.NonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
+	    
+	    initial = false;
+	  } else if (! skipper(*titer)) {
+	    
+	    if (initial && *titer == vocab_type::BOS)
+	      ruleScore.BeginSentence();
+	    else {
+	      const lm::WordIndex id = ngram->vocabulary(extract(*titer));
+	      
+	      if (id == id_oov)
+		++ oov;
+	      
+	      ruleScore.Terminal(id);
+	    }
+	    
+	    initial = false;
+	  }
+	}
+	
+	const double ret = ruleScore.Finish();
+	
+	reinterpret_cast<ngram_state_type*>(state)->ZeroRemaining();
+	
+	return ret;
       }
-            
+      
       double ngram_final_score(const state_ptr_type& state)
       {
-	return 0.0;
+	if (no_bos_eos) {
+	  // we do not need scoring by bos and eos...
+	  return 0.0;
+	} else {
+	  const ngram_state_type& ngram_state = *reinterpret_cast<const ngram_state_type*>(state);
+	  
+	  ngram_state_type ngram_state_next;
+	  lm::ngram::RuleScore<Model> ruleScore(ngram->model_, ngram_state_next);
+	  
+	  ruleScore.BeginSentence();
+	  ruleScore.NonTerminal(ngram_state, 0.0);
+	  ruleScore.Terminal(id_eos);
+
+	  return ruleScore.Finish();
+	}
       }
 
       size_type reserve_state_size() const
       {
-	return sizeof(lm::ngram::ChartState);
+	return sizeof(ngram_state_type);
       }      
       
       ngram_type*     ngram;
@@ -266,9 +326,9 @@ namespace cicada
       feature_type feature_name;
       feature_type feature_name_oov;
       
-      symbol_type::id_type id_oov;
-      symbol_type::id_type id_bos;
-      symbol_type::id_type id_eos;
+      lm::WordIndex id_oov;
+      lm::WordIndex id_bos;
+      lm::WordIndex id_eos;
     };
     
     template <typename Model>
