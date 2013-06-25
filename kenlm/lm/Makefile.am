@@ -91,3 +91,14 @@ $(BOOST_THREAD_LDFLAGS) \
 $(BOOST_THREAD_LIBS) \
 $(BOOST_PROGRAM_OPTIONS_LDFLAGS) \
 $(BOOST_PROGRAM_OPTIONS_LIBS)
+
+noinst_DATA = .gitignore
+
+.gitignore: Makefile.am
+	cat $(top_builddir)/.gitignore > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
