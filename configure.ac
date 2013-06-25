@@ -630,6 +630,7 @@ AC_CONFIG_FILES([Makefile
 		 kenlm/Makefile
 		 kenlm/util/Makefile
 		 kenlm/lm/Makefile
+		 kenlm/search/Makefile
 		 codec/Makefile
 		 libstemmer_c/Makefile
 		 liblinear/Makefile

@@ -1,1 +1,1 @@
-SUBDIRS = util lm
+SUBDIRS = util lm search

@@ -25,8 +25,6 @@ vocab.cc
 libkenlm_la_LDFLAGS = -version-info $(CICADA_LTVERSION)
 
 libkenlm_la_LIBADD = \
-	$(JEMALLOC_LDFLAGS) \
-	$(TCMALLOC_LDFLAGS) \
 	$(LIBKENUTIL)
 
 noinst_HEADERS = \

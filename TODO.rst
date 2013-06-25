@@ -227,8 +227,6 @@ Do we add "training" module?
 
 Implement LBFGS/CG by templates since this may conflict with float/double based implementation of liblbfgs
 
-Implement kenlm like probing data structure
-
 Unify the liblbfgs and cg_descent code...?
 
 Documentation:
