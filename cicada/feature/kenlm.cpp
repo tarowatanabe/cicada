@@ -301,7 +301,7 @@ namespace cicada
 	  lm::ngram::RuleScore<Model> ruleScore(ngram->model_, ngram_state_next);
 	  
 	  ruleScore.BeginSentence();
-	  ruleScore.NonTerminal(ngram_state, 0.0);
+	  ruleScore.NonTerminal(ngram_state);
 	  ruleScore.Terminal(id_eos);
 
 	  return ruleScore.Finish();
@@ -338,8 +338,8 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (utils::ipiece(param.name()) != "ngram")
-	throw std::runtime_error("is this really ngram feature function? " + parameter);
+      if (utils::ipiece(param.name()) != "kenlm")
+	throw std::runtime_error("is this really kenlm feature function? " + parameter);
 
       path_type   path;
       path_type   cluster_path;
@@ -391,7 +391,7 @@ namespace cicada
       // two contexts (order - 1) for each edge, with two separator..
       // state_size..
       base_type::__state_size   = ngram_impl->reserve_state_size();
-      base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
+      base_type::__feature_name = (name.empty() ? std::string("kenlm") : name);
       
       ngram_impl->feature_name     = base_type::__feature_name;
       ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov-penalty";
