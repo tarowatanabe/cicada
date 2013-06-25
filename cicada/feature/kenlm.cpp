@@ -272,8 +272,7 @@ namespace cicada
 	    else {
 	      const lm::WordIndex id = ngram->vocabulary(extract(*titer));
 	      
-	      if (id == id_oov)
-		++ oov;
+	      oov += (id == id_oov);
 	      
 	      ruleScore.Terminal(id);
 	    }
