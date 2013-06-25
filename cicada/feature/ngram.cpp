@@ -106,18 +106,15 @@ namespace cicada
     public:
       
       
-      NGramImpl(const path_type& __path, const int __order, const bool populate)
+      NGramImpl(const path_type& __path, const bool populate)
 	: ngram(&ngram_type::create(__path)),
-	  order(__order), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
+	  order(0), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
       {
 	if (populate)
 	  ngram->populate();
 	
 	// set up correct ordering...
-	if (__order <= 0)
-	  order = ngram->index.order();
-	else
-	  order = utils::bithack::min(__order, ngram->index.order());
+	order = ngram->index.order();
 	
 	initialize_cache();
 	
@@ -781,7 +778,6 @@ namespace cicada
 
       path_type   path;
       bool        populate = false;
-      int         order = 0;
       path_type   cluster_path;
       bool        approximate = false;
       bool        skip_sgml_tag = false;
@@ -789,7 +785,6 @@ namespace cicada
       
       path_type   coarse_path;
       bool        coarse_populate = false;
-      int         coarse_order = 0;
       path_type   coarse_cluster_path;
       bool        coarse_approximate = false;
       
@@ -802,8 +797,6 @@ namespace cicada
 	  populate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "cluster")
 	  cluster_path = piter->second;
-	else if (utils::ipiece(piter->first) == "order")
-	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "approximate")
 	  approximate = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
@@ -814,8 +807,6 @@ namespace cicada
 	  coarse_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-populate")
 	  coarse_populate = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "coarse-order")
-	  coarse_order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-approximate")
@@ -832,7 +823,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
+      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, populate));
 
       if (ngram_impl->order <= 0)
 	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
@@ -858,36 +849,24 @@ namespace cicada
       pimpl = ngram_impl.release();
 
       // ...
-      if (coarse_order > 0 || ! coarse_path.empty()) {
+      if (! coarse_path.empty()) {
+	std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
 	
-	if (! coarse_path.empty()) {
-	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order, coarse_populate));
+	if (ngram_impl->order <= 0)
+	  throw std::runtime_error("invalid coarse ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
+	
+	ngram_impl->approximate = coarse_approximate;
+	ngram_impl->no_bos_eos = no_bos_eos;
+	ngram_impl->skip_sgml_tag = skip_sgml_tag;
+	
+	if (! coarse_cluster_path.empty()) {
+	  if (! boost::filesystem::exists(coarse_cluster_path))
+	    throw std::runtime_error("no cluster file: " + coarse_cluster_path.string());
 	  
-	  if (ngram_impl->order <= 0)
-	    throw std::runtime_error("invalid coarse ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
-
-	  ngram_impl->approximate = coarse_approximate;
-	  ngram_impl->no_bos_eos = no_bos_eos;
-	  ngram_impl->skip_sgml_tag = skip_sgml_tag;
-	  
-	  if (! coarse_cluster_path.empty()) {
-	    if (! boost::filesystem::exists(coarse_cluster_path))
-	      throw std::runtime_error("no cluster file: " + coarse_cluster_path.string());
-	    
-	    ngram_impl->cluster = &cicada::Cluster::create(coarse_cluster_path);
-	  }
-	  
-	  pimpl_coarse = ngram_impl.release();
-	} else {
-	  if (coarse_order > pimpl->order)
-	    throw std::runtime_error("invalid coarse order: coarse-order <= order");
-	  
-	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
-	  ngram_impl->order = coarse_order;
-	  ngram_impl->coarse = true;
-	  
-	  pimpl_coarse = ngram_impl.release();
+	  ngram_impl->cluster = &cicada::Cluster::create(coarse_cluster_path);
 	}
+	
+	pimpl_coarse = ngram_impl.release();
       }
     }
     

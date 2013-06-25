@@ -12,7 +12,6 @@
 
 #include "kenlm/lm/model.hh"
 #include "kenlm/lm/left.hh"
-#include "kenlm/lm/enumerate_vocab.hh"
 
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"

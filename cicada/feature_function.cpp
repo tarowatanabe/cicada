@@ -153,13 +153,11 @@ neighbours: neighbour words feature\n\
 ngram: ngram language model\n\
 \tfile=<file>\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
-\torder=<order>\n\
 \tcluster=<word class>\n\
 \tname=feature-name(default: ngram)\n\
 \tapproximate=[true|false] approximated upper-bound estimates\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
-\tcoarse-order=<order> ngram order for coarse heuristic\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-populate=[true|false] \"populate\" by pre-fetching\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
