@@ -108,7 +108,7 @@ namespace cicada
       
       NGramImpl(const path_type& __path, const bool populate)
 	: ngram(&ngram_type::create(__path)),
-	  order(0), cluster(0), coarse(false), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
+	  order(0), cluster(0), approximate(false), no_bos_eos(false), skip_sgml_tag(false)
       {
 	if (populate)
 	  ngram->populate();
@@ -127,7 +127,6 @@ namespace cicada
 	: ngram(&ngram_type::create(x.ngram->path())),
 	  order(x.order),
 	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
-	  coarse(x.coarse),
 	  approximate(x.approximate),
 	  no_bos_eos(x.no_bos_eos),
 	  skip_sgml_tag(x.skip_sgml_tag),
@@ -146,7 +145,6 @@ namespace cicada
 	ngram = &ngram_type::create(x.ngram->path());
 	order = x.order;
 	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
-	coarse = x.coarse;
 	approximate = x.approximate;
 	no_bos_eos = x.no_bos_eos;
 	skip_sgml_tag = x.skip_sgml_tag;
@@ -212,10 +210,7 @@ namespace cicada
       {
 	typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
-	if (coarse)
-	  return ngram_score(state, first, last, __ngram_score_logbound(*ngram), value_type());
-	else
-	  return ngram_score(state, first, last, __ngram_score_logprob(*ngram), value_type());
+	return ngram_score(state, first, last, __ngram_score_logprob(*ngram), value_type());
       }
       
       template <typename Iterator, typename Scorer>
@@ -749,7 +744,6 @@ namespace cicada
       // cluster...
       cluster_type* cluster;
       
-      bool coarse;
       bool approximate;
       bool no_bos_eos;
       bool skip_sgml_tag;
