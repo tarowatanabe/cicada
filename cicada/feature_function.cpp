@@ -23,6 +23,7 @@
 #include "feature/frontier_shape.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/insertion.hpp"
+#include "feature/kenlm.hpp"
 #include "feature/lexicalized_reordering.hpp"
 #include "feature/lexicon.hpp"
 #include "feature/neighbours.hpp"
@@ -125,6 +126,14 @@ insertion: insertion feature\n\
 \tunique-source=[true|source] unique source labels\n\
 \tname=feature-name (default: insertion)\n\
 \tthreshold=threshold (default: 0.5)\n\
+kenlm: ngram LM from kenlm\n\
+\tfile=<file>\n\
+\tcluster=<word class>\n\
+\tname=feature-name(default: ngram)\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tcoarse-file=<file>   ngram for coarrse heuristic\n\
+\tcoarse-cluster=<word class> word class for coarse heuristics\n\
 lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
@@ -252,6 +261,8 @@ word-pair: word pair feature\n\
     
     if (param_name == "ngram")
       return feature_function_ptr_type(new feature::NGram(parameter));
+    else if (param_name == "kenlm")
+      return feature::KenLMFactory().create(parameter);
     else if (param_name == "ngram-pyp")
       return feature_function_ptr_type(new feature::NGramPYP(parameter));
     else if (param_name == "neighbours" || param_name == "neighbors")

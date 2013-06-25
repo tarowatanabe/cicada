@@ -146,6 +146,7 @@ feature/frontier_pair.hpp \
 feature/frontier_shape.hpp \
 feature/global_lexicon.hpp \
 feature/insertion.hpp \
+feature/kenlm.hpp \
 feature/lexicalized_reordering.hpp \
 feature/lexicon.hpp \
 feature/neighbours.hpp \
@@ -182,6 +183,7 @@ feature/frontier_pair.cpp \
 feature/frontier_shape.cpp \
 feature/global_lexicon.cpp \
 feature/insertion.cpp \
+feature/kenlm.cpp \
 feature/lexicalized_reordering.cpp \
 feature/lexicon.cpp \
 feature/neighbours.cpp \

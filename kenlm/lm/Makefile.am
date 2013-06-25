@@ -59,3 +59,35 @@ vocab.hh \
 weights.hh \
 word_index.hh
 
+bin_PROGRAMS = \
+cicada_kenlm_build_binary \
+cicada_kenlm_fragment \
+cicada_kenlm_query \
+cicada_kenlm_lmplz
+
+cicada_kenlm_build_binary_SOURCES = build_binary_main.cc
+cicada_kenlm_build_binary_LDADD   = $(LIBKENLM)
+
+cicada_kenlm_fragment_SOURCES = fragment_main.cc
+cicada_kenlm_fragment_LDADD   = $(LIBKENLM)
+
+cicada_kenlm_query_SOURCES = query_main.cc
+cicada_kenlm_query_LDADD   = $(LIBKENLM)
+
+cicada_kenlm_lmplz_SOURCES = \
+builder/adjust_counts.cc \
+builder/corpus_count.cc \
+builder/initial_probabilities.cc \
+builder/interpolate.cc \
+builder/pipeline.cc \
+builder/print.cc \
+builder/lmplz_main.cc
+
+cicada_kenlm_lmplz_CPPFLAGS = $(AM_CPPFLAGS)
+
+cicada_kenlm_lmplz_LDADD = \
+$(LIBKENLM) \
+$(BOOST_THREAD_LDFLAGS) \
+$(BOOST_THREAD_LIBS) \
+$(BOOST_PROGRAM_OPTIONS_LDFLAGS) \
+$(BOOST_PROGRAM_OPTIONS_LIBS)
