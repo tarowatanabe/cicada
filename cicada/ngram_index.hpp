@@ -22,6 +22,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include <utils/array_power2.hpp>
 #include <utils/packed_vector.hpp>
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -132,8 +133,8 @@ namespace cicada
 	cache_suffix_type() : state(), suffix() {}
       };
       
-      typedef std::vector<cache_pos_type,    std::allocator<cache_pos_type> >    cache_pos_set_type;
-      typedef std::vector<cache_suffix_type, std::allocator<cache_suffix_type> > cache_suffix_set_type;
+      typedef utils::array_power2<cache_pos_type,    1024 * 32, std::allocator<cache_pos_type> >    cache_pos_set_type;
+      typedef utils::array_power2<cache_suffix_type, 1024 * 32, std::allocator<cache_suffix_type> > cache_suffix_set_type;
       
     public:
       Shard() {}
@@ -162,7 +163,11 @@ namespace cicada
 	clear_cache();
       };
       
-      void clear_cache();
+      void clear_cache()
+      {
+	caches_pos.clear();
+	caches_suffix.clear();
+      }
 
       void open(const path_type& path);
       
