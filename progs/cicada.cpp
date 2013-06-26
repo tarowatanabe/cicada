@@ -61,7 +61,7 @@ path_type output_feature;
 op_set_type ops;
 bool op_list = false;
 
-bool eval_list = false;
+bool scorer_list = false;
 bool format_list = false;
 bool signature_list = false;
 bool stemmer_list   = false;
@@ -91,9 +91,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
 
-    if (feature_list || op_list || grammar_list || tree_grammar_list || eval_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
+    if (feature_list || op_list || grammar_list || tree_grammar_list || scorer_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
       
-      if (eval_list)
+      if (scorer_list)
 	std::cout << cicada::eval::Scorer::lists();
       
       if (feature_list)
@@ -652,7 +652,7 @@ void options(int argc, char** argv)
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")
     ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)")
     
-    ("eval-list",      po::bool_switch(&eval_list),      "list of available evaluators")
+    ("scorer-list",    po::bool_switch(&scorer_list),    "list of available scorers")
     ("format-list",    po::bool_switch(&format_list),    "list of available formatters")
     ("signature-list", po::bool_switch(&signature_list), "list of available signatures")
     ("stemmer-list",   po::bool_switch(&stemmer_list),   "list of available stemmers")
