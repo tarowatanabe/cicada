@@ -79,7 +79,7 @@ Operation Options
 Other List Options
 ``````````````````
 
-  **--eval-list** list of available evaluators
+  **--scorer-list** list of available scorers
 
   **--format-list** list of available formatters
 
