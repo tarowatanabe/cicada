@@ -94,7 +94,7 @@ namespace cicada
       };
       
       typedef CacheContext cache_context_type;
-      typedef utils::array_power2<cache_context_type,  1024 * 128, std::allocator<cache_context_type> >  cache_context_set_type;
+      typedef utils::array_power2<cache_context_type,  1024 * 64, std::allocator<cache_context_type> >  cache_context_set_type;
       
       typedef boost::filesystem::path path_type;
       
