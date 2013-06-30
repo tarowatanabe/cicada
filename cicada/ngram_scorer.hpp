@@ -105,7 +105,7 @@ namespace cicada
     void initial_bos(const void* buffer)
     {
       // copy suffix state...
-      ngram_state_.suffix_.copy(buffer, ngram_state_.suffix(state_));
+      ngram_state_.suffix_.copy(ngram_state_.suffix(buffer), ngram_state_.suffix(state_));
       complete_ = true;
     }
     
@@ -266,7 +266,7 @@ namespace cicada
     double complete()
     {
       // if the prefix is already reached the ngram order - 1, then, it is also complete
-      ngram_state_.complete(state_) = complete_ || (static_cast<int>(ngram_state_.size_prefix(state_)) == ngram_->index.order() - 1);
+      ngram_state_.complete(state_) = complete_ || (ngram_state_.size_prefix(state_) == ngram_state_.suffix_.order_ - 1);
       
       // fill the state
       ngram_state_.fill(state_);
