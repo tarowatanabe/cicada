@@ -76,6 +76,9 @@ namespace cicada
     if (biter != rep.end())
       __backward = utils::lexical_cast<bool>(biter->second);
 
+    if (! __backward)
+      throw std::runtime_error("this is not an ngram language model with backward structure!");
+
     // vocabulary...
     __vocab.open(rep.path("vocab"));
     
