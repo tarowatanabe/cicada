@@ -120,40 +120,16 @@ namespace cicada
     static ngram_map_type __ngram_map;
   };
 
-#ifdef HAVE_TLS
-  static __thread ngram_map_type* __ngrams_tls = 0;
-  static utils::thread_specific_ptr<ngram_map_type> __ngrams;
-#else
-  static utils::thread_specific_ptr<ngram_map_type> __ngrams;
-#endif
 
   NGram& NGram::create(const path_type& path)
   {
-#ifdef HAVE_TLS
-    if (! __ngrams_tls) {
-      __ngrams.reset(new ngram_map_type());
-      __ngrams_tls = __ngrams.get();
-    }
-    ngram_map_type& ngrams_map = *__ngrams_tls;
-#else
-    if (! __ngrams.get())
-      __ngrams.reset(new ngram_map_type());
-    
-    ngram_map_type& ngrams_map = *__ngrams;
-#endif
-
     const std::string parameter = path.string();
     
-    ngram_map_type::iterator iter = ngrams_map.find(parameter);
-    if (iter == ngrams_map.end()) {
-      impl::lock_type lock(impl::__ngram_mutex);
-      
-      ngram_map_type::iterator iter_global = impl::__ngram_map.find(parameter);
-      if (iter_global == impl::__ngram_map.end())
-	iter_global = impl::__ngram_map.insert(std::make_pair(parameter, NGram(parameter))).first;
-      
-      iter = ngrams_map.insert(*iter_global).first;
-    }
+    impl::lock_type lock(impl::__ngram_mutex);
+    
+    ngram_map_type::iterator iter = impl::__ngram_map.find(parameter);
+    if (iter == impl::__ngram_map.end())
+      iter = impl::__ngram_map.insert(std::make_pair(parameter, NGram(parameter))).first;
     
     return iter->second;
   }

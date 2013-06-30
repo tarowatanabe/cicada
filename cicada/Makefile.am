@@ -490,6 +490,9 @@ model.hpp \
 ngram.hpp \
 ngram_cache.hpp \
 ngram_index.hpp \
+ngram_scorer.hpp \
+ngram_state.hpp \
+ngram_state_chart.hpp \
 ngram_count_set.hpp \
 ngram_pyp.hpp \
 operation.hpp \

@@ -6,19 +6,18 @@
 #include <memory>
 
 #include "cicada/ngram.hpp"
-#include "cicada/ngram_cache.hpp"
+#include "cicada/ngram_scorer.hpp"
+
 #include "cicada/feature/ngram.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 #include "cicada/cluster.hpp"
 
 #include "utils/vector2.hpp"
-#include "utils/array_power2.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
-#include "utils/small_vector.hpp"
 
 // faster ngram state representation inspired by
 //
@@ -51,19 +50,12 @@ namespace cicada
       typedef ptrdiff_t difference_type;
 
       typedef cicada::Symbol symbol_type;
+      typedef cicada::Symbol word_type;
       typedef cicada::Vocab  vocab_type;
       
-      typedef cicada::NGram                           ngram_type;
-
-      typedef ngram_type::state_type ngram_state_type;
-      typedef std::pair<ngram_state_type, double> state_score_type;
-      
-      typedef cicada::NGramCache<symbol_type::id_type, state_score_type> ngram_cache_type;
-      typedef cicada::NGramCache<symbol_type::id_type, int>              prefix_cache_type;
+      typedef cicada::NGram  ngram_type;
       
       typedef cicada::Cluster cluster_type;
-      
-      typedef std::vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > buffer_type;
 
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -80,31 +72,12 @@ namespace cicada
       typedef rule_type::symbol_set_type phrase_type;
       
       typedef utils::hashmurmur3<size_t> hasher_type;
-
-
-      struct CacheContext
-      {
-	typedef utils::small_vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > phrase_type;
-
-	ngram_state_type state;
-	phrase_type      ngram;
-	state_score_type score;
-	
-	CacheContext() : state(), ngram(), score() {}
-      };
       
-      typedef CacheContext cache_context_type;
-      typedef utils::array_power2<cache_context_type,  1024 * 64, std::allocator<cache_context_type> >  cache_context_set_type;
+      typedef std::vector<char, std::allocator<char> > buffer_type;
       
       typedef boost::filesystem::path path_type;
       
     public:
-      // we will use -2, since -1 may be used for OOV
-      //static const symbol_type::id_type id_empty = symbol_type::id_type(-2);
-      static const symbol_type::id_type id_empty;
-
-    public:
-      
       
       NGramImpl(const path_type& __path, const bool populate)
 	: ngram(&ngram_type::create(__path)),
@@ -116,11 +89,19 @@ namespace cicada
 	// set up correct ordering...
 	order = ngram->index.order();
 	
-	initialize_cache();
-	
 	id_oov = ngram->index.vocab()[vocab_type::UNK];
 	id_bos = ngram->index.vocab()[vocab_type::BOS];
 	id_eos = ngram->index.vocab()[vocab_type::EOS];
+	
+	ngram_scorer.assign(*ngram);
+
+	buffer_bos.reserve(ngram_scorer.buffer_size());
+	buffer_tmp.reserve(ngram_scorer.buffer_size());
+	
+	buffer_bos.resize(ngram_scorer.buffer_size());
+	buffer_tmp.resize(ngram_scorer.buffer_size());
+	
+	ngram->lookup_context(&id_bos, (&id_bos) + 1, ngram_scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
       }
 
       NGramImpl(const NGramImpl& x)
@@ -135,9 +116,16 @@ namespace cicada
 	  id_oov(x.id_oov),
 	  id_bos(x.id_bos),
 	  id_eos(x.id_eos)
-	  
       {
-	initialize_cache();
+	ngram_scorer.assign(*ngram);
+
+	buffer_bos.reserve(ngram_scorer.buffer_size());
+	buffer_tmp.reserve(ngram_scorer.buffer_size());
+	
+	buffer_bos.resize(ngram_scorer.buffer_size());
+	buffer_tmp.resize(ngram_scorer.buffer_size());
+	
+	ngram->lookup_context(&id_bos, (&id_bos) + 1, ngram_scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
       }
 
       NGramImpl& operator=(const NGramImpl& x)
@@ -154,186 +142,24 @@ namespace cicada
 	id_oov           = x.id_oov;
 	id_bos           = x.id_bos;
 	id_eos           = x.id_eos;
-		
-	initialize_cache();
+	
+	ngram_scorer.assign(*ngram);
+	
+	buffer_bos.reserve(ngram_scorer.buffer_size());
+	buffer_tmp.reserve(ngram_scorer.buffer_size());
+	
+	buffer_bos.resize(ngram_scorer.buffer_size());
+	buffer_tmp.resize(ngram_scorer.buffer_size());
+	
+	ngram->lookup_context(&id_bos, (&id_bos) + 1, ngram_scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
 	
 	return *this;
       }
-      
-      void initialize_cache()
-      {
-	cache_logprob.clear();
-	cache_estimate = ngram_cache_type(ngram->index.order());
-	//cache_prefix   = prefix_cache_type(ngram->index.order());
-      }
-      
-      template <typename Iterator>
-      inline
-      size_t hash_phrase(Iterator first, Iterator last, size_t seed=0) const
-      {
-	return hasher_type::operator()(first, last, seed);
-      }
-      
-      template <typename Iterator, typename __Phrase>
-      inline
-      bool equal_phrase(Iterator first, Iterator last, const __Phrase& x) const
-      {
-	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
-      }
-      
-      struct __ngram_score_logprob
-      {
-	const ngram_type& ngram;
 
-	__ngram_score_logprob(const ngram_type& __ngram) : ngram(__ngram) {}
-	
-	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
-	{
-	  return ngram.logprob(state, word, backoffed, max_order);
-	}
-      };
-
-      struct __ngram_score_logbound
+      size_type buffer_size() const
       {
-	const ngram_type& ngram;
-
-	__ngram_score_logbound(const ngram_type& __ngram) : ngram(__ngram) {}
-	
-	state_score_type operator()(const ngram_state_type& state, const symbol_type::id_type& word, const bool backoffed, const int max_order) const
-	{
-	  return ngram.logbound(state, word, backoffed, max_order);
-	}
-      };
-
-      template <typename Iterator>
-      state_score_type ngram_score(const ngram_state_type& state, Iterator first, Iterator last) const
-      {
-	typedef typename std::iterator_traits<Iterator>::value_type value_type;
-
-	return ngram_score(state, first, last, __ngram_score_logprob(*ngram), value_type());
+	return ngram_scorer.buffer_size();
       }
-      
-      template <typename Iterator, typename Scorer>
-      state_score_type ngram_score(ngram_state_type state, Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
-      {
-	const size_type length = std::distance(first, last);
-	
-	if (length == 0)
-	  return state_score_type(state, 0.0);
-	else if (length == 1)
-	  return scorer(state, *first, ngram->index.order(state) + 1 < order, order);
-	
-	const size_t cache_pos = hash_phrase(first, last, state.value()) & (cache_logprob.size() - 1);
-	cache_context_type& cache = const_cast<cache_context_type&>(cache_logprob[cache_pos]);
-	
-	if (cache.state != state || ! equal_phrase(first, last, cache.ngram)) {
-	  cache.state = state;
-	  cache.ngram.assign(first, last);
-	  
-	  ngram_type::logprob_type score = 0.0;
-	  for (/**/; first != last; ++ first) {
-	    const state_score_type result = scorer(state, *first, ngram->index.order(state) + 1 < order, order);
-	    
-	    state = result.first;
-	    score += result.second;
-	  }
-	  
-	  cache.score = std::make_pair(state, score);
-	}
-	
-	return cache.score;
-      }
-      
-      template <typename Iterator>
-      state_score_type ngram_estimate(Iterator first, Iterator last) const
-      {
-	typedef typename std::iterator_traits<Iterator>::value_type value_type;
-
-	const size_type length = std::distance(first, last);
-	
-	if (length == 0)
-	  return state_score_type(ngram_state_type(), 0.0);
-	
-	// if *first == bos, then we perform exact scoring...
-	if (approximate || *first == id_bos)
-	  return ngram_estimate(first, last, __ngram_score_logprob(*ngram), value_type());
-	else
-	  return ngram_estimate(first, last, __ngram_score_logbound(*ngram), value_type());
-      }
-      
-      template <typename Iterator, typename Scorer>
-      state_score_type ngram_estimate(Iterator first, Iterator last, Scorer scorer, symbol_type::id_type) const
-      {
-	const size_type length = std::distance(first, last);
-	
-	if (length == 0)
-	  return state_score_type(ngram_state_type(), 0.0);
-	else if (length <= 2) {
-	  int bound_order = 0;
-	  state_score_type state_score(ngram_state_type(), 0.0);
-	  
-	  if (*first == id_bos) {
-	    state_score.first = ngram->index.next(state_score.first, id_bos);
-	    ++ first;
-	    ++ bound_order;
-	  }
-	  
-	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
-	    
-	    state_score.first   = result.first;
-	    state_score.second += result.second;
-	  }
-	  
-	  return state_score;
-	}
-	
-	const size_type cache_pos = cache_estimate(first, last);
-	
-	if (! cache_estimate.equal_to(cache_pos, first, last)) {
-	  ngram_cache_type& cache = const_cast<ngram_cache_type&>(cache_estimate);
-	  cache.assign(cache_pos, first, last);
-	  
-	  int bound_order = 0;
-	  state_score_type state_score(ngram_state_type(), 0.0);
-	  
-	  if (*first == id_bos) {
-	    state_score.first = ngram->index.next(state_score.first, id_bos);
-	    ++ first;
-	    ++ bound_order;
-	  }
-	  
-	  for (/**/; first != last; ++ first, ++ bound_order) {
-	    const state_score_type result = scorer(state_score.first, *first, ngram->index.order(state_score.first) < bound_order, order);
-	    
-	    state_score.first   = result.first;
-	    state_score.second += result.second;
-	  }
-	  
-	  cache[cache_pos] = state_score;
-	}
-	
-	return cache_estimate[cache_pos];
-      }
-
-#if 0
-      template <typename Iterator>
-      std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
-      {
-	const size_type cache_pos = cache_prefix(first, last);
-	
-	if (! cache_prefix.equal_to(cache_pos, first, last)) {
-	  prefix_cache_type& cache = const_cast<prefix_cache_type&>(cache_prefix);
-	  cache.assign(cache_pos, first, last);
-	  
-	  const std::pair<Iterator, Iterator > result = ngram->prefix(first, last);
-	  
-	  cache[cache_pos] = std::distance(result.first, result.second);
-	}
-	
-	return std::make_pair(first, first + cache_prefix[cache_pos]);
-      }
-#endif
 
       struct extract_cluster
       {
@@ -374,7 +200,7 @@ namespace cicada
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
-			 int& oov) const
+			 int& oov)
       {
 	if (cluster) {
 	  if (skip_sgml_tag)
@@ -388,22 +214,6 @@ namespace cicada
 	    return ngram_score(state, states, edge, oov, extract_word(), skipper_epsilon());
 	}
       }
-
-      double ngram_estimate(const edge_type& edge, int& oov) const
-      {
-	if (cluster) {
-	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_sgml());
-	  else
-	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, oov, extract_word(), skipper_sgml());
-	  else
-	    return ngram_estimate(edge, oov, extract_word(), skipper_epsilon());
-	}
-      }
-
       
       template <typename Extract, typename Skipper>
       double ngram_score(state_ptr_type& state,
@@ -411,336 +221,69 @@ namespace cicada
 			 const edge_type& edge,
 			 int& oov,
 			 Extract extract,
-			 Skipper skipper) const
+			 Skipper skipper)
       {
-	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = rule.rhs;
+        const phrase_type& target = rule.rhs;
+	
+	ngram_scorer.assign(state);
 	
 	phrase_type::const_iterator titer_begin = target.begin();
-	phrase_type::const_iterator titer_end   = target.end();
-	
-	// we will reserve enough space so that buffer's memory will not be re-allocated.
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	buffer.clear();
-	
-	static const ngram_state_type state_root    = ngram_state_type();
-	static const ngram_state_type state_invalid = ngram_state_type(size_type(0), size_type(-1));
-
-	ngram_state_type*     ngram_state = reinterpret_cast<ngram_state_type*>(state);
-	symbol_type::id_type* context     = reinterpret_cast<symbol_type::id_type*>(ngram_state + 1);
-	symbol_type::id_type* context_end = context + order;
-	
-	if (states.empty()) {
-	  // we will copy to buffer...
-	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    if (! skipper(*titer)) {
-	      buffer.push_back(ngram->index.vocab()[extract(*titer)]);
-	      oov += (buffer.back() == id_oov);
-	    }
-	  
-	  buffer_type::const_iterator biter_begin = buffer.begin();
-	  buffer_type::const_iterator biter_end   = buffer.end();
-	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
-	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
-	  //std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
-	  
-	  if (prefix.second == biter_end) {
-	    *ngram_state = state_invalid;
-	    std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
-	    
-	    return ngram_estimate(biter_begin, biter_end).second;
-	  } else {
-	    const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
-	    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
-	    
-	    *ngram_state = state_score.first;
-	    std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
-	    
-	    return state_bound.second + state_score.second;
-	  }
-	}
-	
-	ngram_state_type state_rule = state_invalid;
-	double score = 0.0;
+        phrase_type::const_iterator titer_end   = target.end();
 	
 	int non_terminal_pos = 0;
+	bool initial = true;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	  if (titer->is_non_terminal()) {
 	    const int __non_terminal_index = titer->non_terminal_index();
-	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
-	    ++ non_terminal_pos;
-	    
-	    const ngram_state_type*     ngram_state_antecedent = reinterpret_cast<const ngram_state_type*>(states[antecedent_index]);
-	    const symbol_type::id_type* context_antecedent     = reinterpret_cast<const symbol_type::id_type*>(ngram_state_antecedent + 1);
-	    const symbol_type::id_type* context_antecedent_end = std::find(context_antecedent, context_antecedent + order, id_empty);
-	    
-	    // subtract estimated prefix score
-	    score -= ngram_estimate(context_antecedent, context_antecedent_end).second;
-	    
-	    buffer.insert(buffer.end(), context_antecedent, context_antecedent_end);
+            const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+            ++ non_terminal_pos;
 
-	    if (! buffer.empty()) {
-	      if (state_rule != state_invalid) {
-		// state_rule is "valid". we will compute anyway
-		const state_score_type state_score = ngram_score(state_rule, buffer.begin(), buffer.end());
-		
-		state_rule = state_score.first;
-		score     += state_score.second;
-		
-		buffer.clear();
-	      } else if (static_cast<int>(buffer.size()) > context_size || *ngram_state_antecedent != state_invalid) {
-		// state_rule is invalid, but we have enough context or we have 'star' at antecedent
-		
-		buffer_type::const_iterator biter_begin = buffer.begin();
-		buffer_type::const_iterator biter_end   = buffer.end();
-		buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
-		
-		std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
-		//std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
-		
-		if (prefix.second == biter_end) {
-		  // implicitly, invalid state, but we do not have to make an assignment, since state_rule will be assinged from antecedent.
-		  // state_rule = state_invalid;
-		  std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
-		  
-		  score += ngram_estimate(biter_begin, biter_end).second;
-		} else {
-		  const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
-		  const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
-		  
-		  state_rule = state_score.first;
-		  std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
-		  
-		  score += state_bound.second + state_score.second;
-		}
-		
-		buffer.clear();
-	      }
-	    }
+	    if (initial)
+	      ngram_scorer.initial_non_terminal(states[antecedent_index]);
+	    else
+	      ngram_scorer.non_terminal(states[antecedent_index]);
 	    
-	    if (*ngram_state_antecedent != state_invalid)
-	      state_rule = *ngram_state_antecedent;
-	    
+	    initial = false;
 	  } else if (! skipper(*titer)) {
-	    buffer.push_back(ngram->index.vocab()[extract(*titer)]);
-	    oov += (buffer.back() == id_oov);
-	  }
-	}
-	
-	if (buffer.empty()) {
-	  *ngram_state = state_rule;
-	  
-	  if (state_rule == state_invalid)
-	    std::fill(context, context_end, id_empty);
-	} else if (state_rule != state_invalid) {
-	  const state_score_type state_score = ngram_score(state_rule, buffer.begin(), buffer.end());
-	  
-	  *ngram_state = state_score.first;
-	  
-	  score += state_score.second;
-	} else {
-	  buffer_type::const_iterator biter_begin = buffer.begin();
-	  buffer_type::const_iterator biter_end   = buffer.end();
-	  buffer_type::const_iterator biter       = std::min(biter_begin + context_size, biter_end);
-	  
-	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram->prefix(biter_begin, biter);
-	  //std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter);
-	  
-	  if (prefix.second == biter_end) {
-	    *ngram_state = state_invalid;
-	    std::fill(std::copy(biter_begin, biter_end, context), context_end, id_empty);
 	    
-	    score += ngram_estimate(biter_begin, biter_end).second;
-	  } else {
-	    const state_score_type state_bound = ngram_estimate(prefix.first, prefix.second);
-	    const state_score_type state_score = ngram_score(state_bound.first, prefix.second, biter_end);
-	    
-	    *ngram_state = state_score.first;
-	    std::fill(std::copy(prefix.first, prefix.second, context), context_end, id_empty);
-	    
-	    score += state_bound.second + state_score.second;
-	  }
-	}
-
-	return score;
-      }
-      
-      template <typename Extract, typename Skipper>
-      double ngram_estimate(const edge_type& edge, int& oov, Extract extract, Skipper skipper) const
-      {
-	const int context_size = order - 1;
-	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = rule.rhs;
-	
-	phrase_type::const_iterator titer_begin = target.begin();
-	phrase_type::const_iterator titer_end   = target.end();
-	
-	// we will reserve enough space so that buffer's memory will not be re-allocated.
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	buffer.clear();
-	
-	double score = 0.0;
-	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	  if (titer->is_non_terminal()) {
-	    if (! buffer.empty()) {
-	      buffer_type::iterator biter_begin = buffer.begin();
-	      buffer_type::iterator biter_end   = buffer.end();
-	      buffer_type::iterator biter       = std::min(biter_begin + context_size, biter_end);
-
-	      const state_score_type state_bound = ngram_estimate(biter_begin, biter);
-	      const state_score_type state_score = ngram_score(state_bound.first, biter, biter_end);
+	    if (initial && *titer == vocab_type::BOS)
+	      ngram_scorer.initial_bos(&(*buffer_bos.begin()));
+	    else {
+	      const word_type::id_type id = ngram->index.vocab()[extract(*titer)];
 	      
-	      score += state_bound.second + state_score.second;
+	      oov += (id == id_oov);
+	      
+	      ngram_scorer.terminal(id);
 	    }
 	    
-	    buffer.clear();
-	  } else if (! skipper(*titer)) {
-	    buffer.push_back(ngram->index.vocab()[extract(*titer)]);
-	    oov += (buffer.back() == id_oov);
+	    initial = false;
 	  }
 	}
-	
-	if (! buffer.empty()) {
-	  buffer_type::iterator biter_begin = buffer.begin();
-	  buffer_type::iterator biter_end   = buffer.end();
-	  buffer_type::iterator biter       = std::min(biter_begin + context_size, biter_end);
-	  
-	  const state_score_type state_bound = ngram_estimate(biter_begin, biter);
-	  const state_score_type state_score = ngram_score(state_bound.first, biter, biter_end);
-	  
-	  score += state_bound.second + state_score.second;
-	}
 
-	return score;
-      }
-
-      
-      double ngram_final_score(const state_ptr_type& state) const
-      {
-	static const ngram_state_type state_root    = ngram_state_type();
-	static const ngram_state_type state_invalid = ngram_state_type(size_type(0), size_type(-1));
-
-	const ngram_state_type*     ngram_state = reinterpret_cast<const ngram_state_type*>(state);
-	const symbol_type::id_type* context     = reinterpret_cast<const symbol_type::id_type*>(ngram_state + 1);
-	const symbol_type::id_type* context_end = std::find(context, context + order, id_empty);
-	
-	if (no_bos_eos) {
-	  if (context == context_end)
-	    return 0.0;
-	  else {
-	    const state_score_type state_bound = ngram_estimate(context, context_end);
-	    const state_score_type state_score = (*context == id_bos
-						  ? ngram_score(ngram->index.next(ngram_state_type(), *context), context + 1, context_end)
-						  : ngram_score(ngram_state_type(), context, context_end));
-	    
-	    return state_score.second - state_bound.second;
-	  }
-	} else {
-	  const state_score_type state_bound = ngram_estimate(context, context_end);
-	  const state_score_type state_score = ngram_score(ngram->index.next(ngram_state_type(), id_bos), context, context_end);
-	  
-	  return (state_score.second - state_bound.second
-		  + ngram_score(*ngram_state != state_invalid ? *ngram_state : state_score.first, &id_eos, (&id_eos) + 1).second);
-	}
-      }
-            
-      double ngram_predict_score(const state_ptr_type& state)
-      {
-	// for no-bos-eos, we need to keep track of whether P(bos) was scored or not...
-	
-	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
-	
-	*ngram_state = (no_bos_eos ? ngram_state_type() : ngram->index.next(ngram_state_type(), id_bos));
-	
-	return 0.0;
-      }
-
-      double ngram_scan_score(state_ptr_type& state,
-			      const edge_type& edge,
-			      const int dot,
-			      int& oov)
-      {
-	if (cluster) {
-	  if (skip_sgml_tag)
-	    return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_sgml());
-	  else
-	    return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_sgml());
-	  else
-	    return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_epsilon());
-	}
+	return ngram_scorer.complete();
       }
       
-      template <typename Extract, typename Skipper>
-      double ngram_scan_score(state_ptr_type& state,
-			      const edge_type& edge,
-			      const int dot,
-			      int& oov,
-			      Extract extract,
-			      Skipper skipper)
-      {
-	const rule_type& rule = *(edge.rule);
-	const phrase_type& phrase = rule.rhs;
-
-	ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
-	
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	buffer.clear();
-	
-	phrase_type::const_iterator piter_end = phrase.end();
-	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
-	  if (! skipper(*piter)) {
-	    buffer.push_back(ngram->index.vocab()[extract(*piter)]);
-	    oov += (buffer.back() == id_oov);
-	  }
-	
-	if (no_bos_eos && *ngram_state == ngram_state_type() && ! buffer.empty() && buffer.front() == id_bos)  {
-	  const state_score_type state_score = ngram_score(ngram->index.next(ngram_state_type(), id_bos), buffer.begin() + 1, buffer.end());
-	  
-	  *ngram_state = state_score.first;
-	  
-	  return state_score.second;
-	} else {
-	  const state_score_type state_score = ngram_score(*ngram_state, buffer.begin(), buffer.end());
-	  
-	  *ngram_state = state_score.first;
-	  
-	  return state_score.second;
-	}
-      }
       
-      double ngram_complete_score(state_ptr_type& state)
+      double ngram_final_score(const state_ptr_type& state)
       {
 	if (no_bos_eos)
 	  return 0.0;
 	else {
-	  ngram_state_type* ngram_state = reinterpret_cast<ngram_state_type*>(state);
+	  ngram_scorer.assign(&(*buffer_tmp.begin()));
 	  
-	  const state_score_type state_score = ngram_score(*ngram_state, &id_eos, (&id_eos) + 1);
+	  ngram_scorer.initial_bos(&(*buffer_bos.begin()));
+	  ngram_scorer.non_terminal(state);
+	  ngram_scorer.terminal(id_eos);
 	  
-	  *ngram_state = state_score.first;
-	  
-	  return state_score.second;
+	  return ngram_scorer.complete();
 	}
       }
-
-      
-      // caching...
-      cache_context_set_type cache_logprob;
-      ngram_cache_type       cache_estimate;
-      //prefix_cache_type      cache_prefix;
-      
-      // actual buffers...
-      buffer_type    buffer_impl;
       
       // ngrams
-      ngram_type*     ngram;
-      int             order;
-
+      ngram_type* ngram;
+      int         order;
+      
       // cluster...
       cluster_type* cluster;
       
@@ -752,13 +295,17 @@ namespace cicada
       feature_type feature_name;
       feature_type feature_name_oov;
       
+      // bos/eos etc...
       symbol_type::id_type id_oov;
       symbol_type::id_type id_bos;
       symbol_type::id_type id_eos;
+      
+      cicada::NGramScorer ngram_scorer;
+      
+      // bos state
+      buffer_type buffer_bos;
+      buffer_type buffer_tmp;
     };
-
-    const NGramImpl::symbol_type::id_type NGramImpl::id_empty = NGramImpl::symbol_type::id_type(-2);
-    
     
     NGram::NGram(const std::string& parameter)
       : pimpl(0), pimpl_coarse(0)
@@ -834,7 +381,7 @@ namespace cicada
       }
       
       // two contexts (order - 1) for each edge, with two separator..
-      base_type::__state_size = sizeof(impl_type::ngram_state_type) + sizeof(symbol_type::id_type) * ngram_impl->order;
+      base_type::__state_size = ngram_impl->buffer_size();
       base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
       
       ngram_impl->feature_name     = base_type::__feature_name;
@@ -930,6 +477,24 @@ namespace cicada
 	double score = pimpl_coarse->ngram_score(state, states, edge, oov);
 	if (final)
 	  score += pimpl_coarse->ngram_final_score(state);
+	
+	if (score != 0.0)
+	  features[pimpl->feature_name] = score;
+	else
+	  features.erase(pimpl->feature_name);
+	
+	if (oov)
+	  features[pimpl->feature_name_oov] = - oov;
+	else
+	  features.erase(pimpl->feature_name_oov);
+      } else
+	apply(state, states, edge, features, final);
+#if 0
+      if (pimpl_coarse) {
+	int oov = 0;
+	double score = pimpl_coarse->ngram_score(state, states, edge, oov);
+	if (final)
+	  score += pimpl_coarse->ngram_final_score(state);
       
 	if (score != 0.0)
 	  features[pimpl->feature_name] = score;
@@ -955,6 +520,7 @@ namespace cicada
 	else
 	  features.erase(pimpl->feature_name_oov);
       }
+#endif
     }
 
     // temporarily assigned feature function...
@@ -965,9 +531,11 @@ namespace cicada
 			      feature_set_type& features,
 			      const bool final) const
     {
+#if 0
       // add <s>
       if (final)
 	pimpl->ngram_predict_score(state);
+#endif
     }
     
     void NGram::apply_scan(state_ptr_type& state,
@@ -977,6 +545,7 @@ namespace cicada
 			   feature_set_type& features,
 			   const bool final) const
     {
+#if 0
       int oov = 0;
       const double score = pimpl->ngram_scan_score(state, edge, dot, oov);
       
@@ -989,14 +558,17 @@ namespace cicada
 	features[pimpl->feature_name_oov] = - oov;
       else
 	features.erase(pimpl->feature_name_oov);
+#endif
     }
-    
     void NGram::apply_complete(state_ptr_type& state,
 			       const state_ptr_set_type& states,
 			       const edge_type& edge,
 			       feature_set_type& features,
 			       const bool final) const
     {
+      apply(state, states, edge, features, final);
+
+#if 0
       // if final, add scoring for </s>
 
       
@@ -1008,6 +580,7 @@ namespace cicada
 	else
 	  features.erase(pimpl->feature_name);
       }
+#endif
     }
 
 

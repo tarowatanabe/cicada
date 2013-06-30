@@ -71,6 +71,11 @@ namespace cicada
       throw std::runtime_error("no order");
     __order = utils::lexical_cast<int>(oiter->second);
     
+    // backward
+    repository_type::const_iterator biter = rep.find("backward");
+    if (biter != rep.end())
+      __backward = utils::lexical_cast<bool>(biter->second);
+
     // vocabulary...
     __vocab.open(rep.path("vocab"));
     

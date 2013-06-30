@@ -125,16 +125,7 @@ namespace cicada
 	cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
       };
       
-      struct cache_suffix_type
-      {
-	state_type state;
-	state_type suffix;
-	
-	cache_suffix_type() : state(), suffix() {}
-      };
-      
       typedef utils::array_power2<cache_pos_type,    1024 * 32, std::allocator<cache_pos_type> >    cache_pos_set_type;
-      typedef utils::array_power2<cache_suffix_type, 1024 * 32, std::allocator<cache_suffix_type> > cache_suffix_set_type;
       
     public:
       Shard() {}
@@ -166,7 +157,6 @@ namespace cicada
       void clear_cache()
       {
 	caches_pos.clear();
-	caches_suffix.clear();
       }
 
       void open(const path_type& path);
@@ -336,7 +326,6 @@ namespace cicada
       spinlock_type          spinlock_suffix;
       
       cache_pos_set_type     caches_pos;
-      cache_suffix_set_type  caches_suffix;
     };
     
     typedef Shard shard_type;
@@ -412,137 +401,6 @@ namespace cicada
       }
     }
 
-    template <typename Iterator>
-    std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
-    {
-      last = std::min(last, first + order() - 1);
-      
-      if (first == last || first + 1 == last) return std::make_pair(first, last);
-      
-      return std::make_pair(first, next(state_type(), first, last - 1).second + 1);
-    }
-
-    template <typename Iterator>
-    state_type suffix(Iterator first, Iterator last) const 
-    {
-      typedef typename std::iterator_traits<Iterator>::value_type value_type;
-      
-      return __suffix_dispatch(first, last, value_type());
-    }
-    
-    template <typename Iterator, typename __Word>
-    state_type __suffix_dispatch(Iterator first, Iterator last, __Word) const
-    {
-      typedef std::vector<id_type, std::allocator<id_type> > buffer_type;
-      
-      const size_type length = std::distance(first, last);
-      
-      if (length == 0)
-	return state_type();
-      else if (length == 1) {
-	const state_type state = next(state_type(), *first);
-	return (state.is_root_node() ? state_type() : state);
-      }
-      
-      buffer_type buffer(length);
-      for (typename buffer_type::iterator biter = buffer.begin(); first != last; ++ first, ++ biter)
-	*biter = __vocab[*first];
-      
-      return __suffix_dispatch(buffer.begin(), buffer.end(), id_type());
-    }
-
-    template <typename Iterator>
-    state_type __suffix_dispatch(Iterator first, Iterator last, id_type) const
-    {
-      const size_type length = std::distance(first, last);
-      
-      if (length == 0)
-	return state_type();
-      else if (length == 1) {
-	const state_type state = next(state_type(), *first);
-	return (state.is_root_node() ? state_type() : state);
-      }
-      
-      first = std::max(first, last - order());
-      
-      state_type state;
-      
-      while (first != last) {
-	std::pair<state_type, Iterator> result = next(state, first, last);
-	
-	if (result.second == last)
-	  return result.first;
-	else {
-	  state = suffix(result.first);
-	  first = result.second;
-	}
-      }
-      
-      return state_type();
-    }
-    
-    state_type suffix(const state_type& state) const
-    {
-      typedef std::vector<id_type, std::allocator<id_type> > context_type;
-      
-      // root or unigram's suffix is root
-      if (state.is_root() || state.is_root_shard())
-	return state_type();
-      
-      shard_type& shard = const_cast<shard_type&>(__shards[state.shard()]);
-      
-      // if we are bigram, we will simply take root_shard + current id
-      if (state.node() < shard.offsets[2])
-	return state_type(size_type(-1), shard[state.node()]);
-      
-      const size_type cache_pos = hash_value(state) & (shard.caches_suffix.size() - 1);
-      
-      // trylock...
-      {
-	shard_type::trylock_type lock(shard.spinlock_suffix);
-	
-	if (lock && shard.caches_suffix[cache_pos].state == state)
-	  return shard.caches_suffix[cache_pos].suffix;
-      }
-
-      // we will push in reverse order...
-      context_type context(order());
-      context_type::reverse_iterator riter = context.rbegin();
-	
-      {
-	size_type node = state.node();
-	for (/**/; node != size_type(-1); ++ riter) {
-	  *riter = shard[node];
-	  node = shard.parent(node);
-	}
-      }
-      
-      context_type::const_iterator first = riter.base() + 1;
-      context_type::const_iterator last  = context.end();
-
-      state_type state_suffix;
-      for (/**/; first != last - 1; ++ first) {
-	std::pair<state_type, context_type::const_iterator> result = next(state_type(), first, last);
-	
-	if (result.second == last) {
-	  state_suffix = result.first;
-	  break;
-	}
-      }
-
-      // trylock...
-      {
-	shard_type::trylock_type lock(shard.spinlock_suffix);
-	
-	if (lock) {
-	  shard.caches_suffix[cache_pos].state  = state;
-	  shard.caches_suffix[cache_pos].suffix = state_suffix;
-	}
-      }
-      
-      return state_suffix;
-    }
-
     size_type shard_index(const id_type& first, const id_type& second) const
     {
       return __hasher(first, __hasher(second, 0)) % __shards.size();
@@ -602,6 +460,7 @@ namespace cicada
       __vocab.clear();
       __order = 0;
       __path = path_type();
+      __backward = false;
     }
     void close() { clear(); }
     
@@ -620,6 +479,8 @@ namespace cicada
     
     inline const int& order() const { return __order; }
         
+    inline const bool& backward() const { return __backward; }
+
     size_type ngram_size(int order) const
     {
       switch (order) {
@@ -654,6 +515,7 @@ namespace cicada
     
     int            __order;
     path_type      __path;
+    bool           __backward;
   };
   
 };

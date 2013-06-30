@@ -11,6 +11,8 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/ngram_index.hpp>
+#include <cicada/ngram_state.hpp>
+#include <cicada/ngram_state_chart.hpp>
 
 #include <boost/array.hpp>
 
@@ -95,6 +97,26 @@ namespace cicada
 
     typedef shard_index_type::state_type state_type;
     
+    // this is a returned result... POD
+    struct Result
+    {
+      typedef NGram::logprob_type    logprob_type;
+      typedef NGram::state_type      state_type;
+      typedef NGram::size_type       size_type;
+      typedef NGram::difference_type difference_type;
+      
+      state_type state;  // current state
+      
+      logprob_type prob;  // probability w/o backoff
+      logprob_type bound; // upper bound w/o backoff
+      
+      uint32_t length;   // mathed ngram length
+      uint32_t complete; // complete implies a complete ngram w/o further context
+
+      Result() : state(), prob(0), bound(0), length(0), complete(false) {}
+    };
+    typedef Result result_type;
+
   public:
     NGram(const int _debug=0) : debug(_debug) { clear(); }
     NGram(const path_type& path, const int _debug=0) : debug(_debug) { open(path); }
@@ -105,230 +127,501 @@ namespace cicada
     
   public:
     
-    state_type root() const { return index.root(); }
-
-    template <typename Iterator>
-    std::pair<Iterator, Iterator> prefix(Iterator first, Iterator last) const
+    template <typename Word_>
+    result_type ngram_score(const void* buffer_in, const Word_& word, void* buffer_out) const
     {
-      return index.prefix(first, last);
-    }
-    
-    template <typename Iterator>
-    state_type suffix(Iterator first, Iterator last) const
-    {
-      return index.suffix(first, last);
-    }
-    
-    template <typename _Word>
-    std::pair<state_type, logprob_type> logbound(state_type state, const _Word& word, bool backoffed=false, int max_order=0) const
-    {
-      return logbound(state, index.vocab()[word], backoffed, max_order);
-    }
-    
-    std::pair<state_type, logprob_type> logbound(state_type state, const id_type& word, bool backoffed=false, int max_order=0) const
-    {
-      // returned state... maximum suffix of state + word, since we may forced backoff :-)
-      max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
+      NGramState ngram_state(index.order());
       
-      int order = index.order(state) + 1;
-      while (order > max_order) {
-	state = index.suffix(state);
-	order = index.order(state) + 1;
+      result_type result = lookup(buffer_in, word, buffer_out);
+      
+      const size_type context_length = ngram_state.size(buffer_in);
+      
+      const logprob_type* biter     = ngram_state.backoff(buffer_in) + result.length + (result.length == 0) - 1;
+      const logprob_type* biter_end = ngram_state.backoff(buffer_in) + context_length;
+      
+      for (/**/; biter < biter_end; ++ biter) {
+	result.prob  += *biter;
       }
       
-      state_type state_ret;
-      logprob_type logbackoff = 0.0;
-      for (;;) {
-	const state_type state_next = index.next(state, word);
+      return result;
+    }
+    
+    result_type ngram_partial_score(const void* buffer_in, const state_type& state, const int order, void* buffer_out) const
+    {
+      NGramState ngram_state(index.order());
+      
+      result_type result = lookup_partial(buffer_in, state, order, buffer_out);
+      
+      const size_type context_length = ngram_state.size(buffer_in);
+      
+      const logprob_type* biter     = ngram_state.backoff(buffer_in) + utils::bithack::max(static_cast<int>(result.length + (result.length == 0) - order), 0);
+      const logprob_type* biter_end = ngram_state.backoff(buffer_in) + context_length;
+      
+      for (/**/; biter < biter_end; ++ biter) {
+	result.prob  += *biter;
+      }
+      
+      return result;
+    }
+
+    template <typename Iterator>
+    double ngram_score_update(Iterator first, Iterator last, int order) const
+    {
+      double adjust = 0.0;
+
+      for (/**/; first != last; ++ first, ++ order) {
+	if (first->is_root_node()) continue;
 	
-	if (! state_next.is_root_node()) {
-	  
-	  if (state_ret.is_root())
-	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
-	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
-	  const logprob_type __logprob = (! backoffed && state_next.node() < logbounds[shard_index].size()
-					  ? logbounds[shard_index](state_next.node(), order)
-					  : logprobs[shard_index](state_next.node(), order));
-	  
-	  if (__logprob != logprob_min())
-	    return std::make_pair(state_ret, __logprob + logbackoff);
+	const size_type shard_index = utils::bithack::branch(first->is_root_shard(), size_type(0), first->shard());
+	const size_type shard_node = first->node();
+
+	const logprob_type logprob = logprobs[shard_index](shard_node, order);
+	
+	adjust += logprob;
+	adjust -= (! logbounds.empty() && shard_node < logbounds[shard_index].size()
+		   ? logbounds[shard_index](shard_node, order)
+		   : logprob);
+      }
+      
+      return adjust;
+    }
+    
+    template <typename Word_>
+    result_type lookup(const void* buffer_in, const Word_& word, void* buffer_out) const
+    {
+      NGramState ngram_state(index.order());
+
+      word_type::id_type* output         = ngram_state.context(buffer_out);
+      logprob_type*       output_backoff = ngram_state.backoff(buffer_out);
+      
+      const result_type result = lookup(ngram_state.context(buffer_in),
+					ngram_state.context(buffer_in) + ngram_state.size(buffer_in),
+					word,
+					output,
+					output_backoff);
+      
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
+      
+      return result;
+    }
+    
+    template <typename Iterator, typename Temp, typename Output, typename OutputBackoff>
+    result_type lookup(Iterator rfirst, Iterator rend,
+		       const Temp& word,
+		       Output& output,
+		       OutputBackoff& output_backoff) const
+    {
+      return lookup(rfirst, rend, index.vocab()[word], output, output_backoff);
+    }
+    
+    template <typename Iterator, typename Output, typename OutputBackoff>
+    result_type lookup(Iterator rfirst, Iterator rend,
+		       const word_type::id_type& word,
+		       Output& output,
+		       OutputBackoff& output_backoff) const
+    {
+      result_type result;
+      
+      state_type state = index.next(state_type(), word);
+      
+      // non-unigram match...
+      if (state.is_root_node()) {
+	result.state    = state;
+	result.prob     = smooth;
+	result.bound    = smooth;
+	result.length   = 0;
+	result.complete = true;
+	
+	return result;
+      }
+      
+      // we need a special handling for bigram/unigram here...!
+      
+      int order = 1;
+      
+      *output = word;
+      ++ output;
+      *output_backoff = backoffs[0](state.node(), order);
+      ++ output_backoff;
+      
+      // at least we have unigram...
+      
+      // we will try to find out the longest matches...
+      // Here, we do not check .shard(), since we already know we are working with bigram and higher...
+      for (/**/; rfirst != rend; ++ rfirst) {
+	const state_type state_next = index.next(state, *rfirst);
+	
+	if (state_next.is_root_node()) {
+	  result.complete = true;
+	  break;
 	}
 	
-	backoffed = true;
+	++ order;
 	
-	if (state.is_root())
-	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
-	
-	// we will backoff
-	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
-	logbackoff += backoffs[shard_index](state.node(), order - 1);
-	state = index.suffix(state);
-	order = index.order(state) + 1;
-      }
-    }
-    
-    template <typename _Word>
-    std::pair<state_type, logprob_type> logprob(state_type state, const _Word& word, bool backoffed = false, int max_order = 0) const
-    {
-      return logprob(state, index.vocab()[word], backoffed, max_order);
-    }
-    
-    std::pair<state_type, logprob_type> logprob(state_type state, const id_type& word, bool backoffed = false, int max_order = 0) const
-    {
-      // returned state... maximum suffix of state + word, since we may forced backoff :-)
-      max_order = utils::bithack::branch(max_order <= 0, index.order(), utils::bithack::min(index.order(), max_order));
-      
-      int order = index.order(state) + 1;
-      while (order > max_order) {
-	state = index.suffix(state);
-	order = index.order(state) + 1;
-      }
-
-      state_type state_ret;
-      
-      logprob_type logbackoff = 0.0;
-      for (;;) {
-	const state_type state_next = index.next(state, word);
-
-	if (! state_next.is_root_node()) {
-	  
-	  if (state_ret.is_root())
-	    state_ret = (order >= max_order ? index.suffix(state_next) : state_next);
-	  
-	  const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
-	  const logprob_type __logprob = logprobs[shard_index](state_next.node(), order);
-	  
-	  if (__logprob != logprob_min())
-	    return std::make_pair(state_ret, __logprob + logbackoff);
+	// do we need to check whether it is possible to extend further...?
+	if (order < index.order()) {
+	  *output = *rfirst;
+	  ++ output;
+	  *output_backoff = backoffs[state_next.shard()](state_next.node(), order);
+	  ++ output_backoff;
 	}
-
-	backoffed = true;
 	
-	if (state.is_root())
-	  return std::make_pair(state_ret, (index.is_bos(word) ? logprob_bos() : smooth) + logbackoff);
-	
-	// we will backoff
-	const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
-	logbackoff += backoffs[shard_index](state.node(), order - 1);
-	state = index.suffix(state);
-	order = index.order(state) + 1;
+	state = state_next;
       }
+      
+      const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
+      const size_type shard_node = state.node();
+      
+      if (! result.complete)
+	result.complete = (order == index.order() || ! index[shard_index].has_child(shard_node));
+      
+      lookup_result(state, order, result);
+      
+      return result;
     }
 
+    // lookup ngram from partial state
+    
+    result_type lookup_partial(const void* buffer_in,
+			       state_type state,
+			       int order,
+			       void* buffer_out) const
+    {
+      NGramState ngram_state(index.order());
+      
+      word_type::id_type* output         = ngram_state.context(buffer_out);
+      logprob_type*       output_backoff = ngram_state.backoff(buffer_out);
+      
+      const result_type result = lookup_partial(ngram_state.context(buffer_in),
+						ngram_state.context(buffer_in) + ngram_state.size(buffer_in),
+						state,
+						order,
+						output,
+						output_backoff);
+      
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
+      
+      return result;
+    }
+    
+    template <typename Iterator, typename Output, typename OutputBackoff>
+    result_type lookup_partial(Iterator rfirst, Iterator rend,
+			       state_type state,
+			       int order,
+			       Output& output,
+			       OutputBackoff& output_backoff) const
+    {
+      result_type result;
+      
+      if (order <= 0)
+	throw std::runtime_error("invalid ngram state/length for partial lookup!");
+      
+      lookup_result(state, order, result);
+
+      if (result.complete)
+	throw std::runtime_error("we assume non-completed context");
+            
+      // we use bound score...
+      //
+      // TODO: we need to different lobounds and logprobs....
+      //
+      const logprob_type adjust = result.bound;
+      
+      // at least we have unigram...
+      for (/**/; rfirst != rend; ++ rfirst) {
+	const state_type state_next = index.next(state, *rfirst);
+	
+	if (state_next.is_root_node()) {
+	  result.complete = true;
+	  break;
+	}
+	
+	++ order;
+	
+	// do we need to check whether it is possible to extend further...?
+	if (order < index.order()) {
+	  *output = *rfirst;
+	  ++ output;
+	  *output_backoff = backoffs[state_next.shard()](state_next.node(), order);
+	  ++ output_backoff;
+	}
+	
+	state = state_next;
+      }
+      
+      const size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
+      const size_type shard_node = state.node();
+      
+      if (! result.complete)
+	result.complete = (order == index.order() || ! index[shard_index].has_child(shard_node));
+      
+      lookup_result(state, order, result);
+      
+      // make an adjustment to the score...
+      result.prob  -= adjust;
+      result.bound -= adjust;
+      
+      return result;
+    }
     
     template <typename Iterator>
-    logprob_type logbound(Iterator first, Iterator last, bool smooth_smallest=false) const
+    state_type lookup_context(Iterator first, Iterator last, void* buffer_out) const
     {
+      NGramState ngram_state(index.order());
+      
+      word_type::id_type* output         = ngram_state.context(buffer_out);
+      logprob_type*       output_backoff = ngram_state.backoff(buffer_out);
+      
+      const state_type state = lookup_context(first, last, output, output_backoff);
+      
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
+      
+      return state;
+    }
+
+    template <typename Iterator, typename Output, typename OutputBackoff>
+    state_type lookup_context(Iterator first, Iterator last,
+			      Output& output,
+			      OutputBackoff& output_backoff) const
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
+      
+      return lookup_context(first, last, output, output_backoff, value_type());
+    }
+    
+    template <typename Iterator>
+    logprob_type logbound(Iterator first, Iterator last) const
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
+      
       if (first == last) return 0.0;
       
-      const int order = last - first;
+      logbound(first, last, value_type());
+    }    
+    
+    template <typename Iterator>
+    logprob_type logprob(Iterator first, Iterator last) const
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value_type;
       
-      if (order >= index.order())
-	return logprob(first, last, smooth_smallest);
+      if (first == last) return 0.0;
       
-      if (order >= 2) { 
-	const size_type shard_index = index.shard_index(first, last);
-	const size_type shard_index_backoff = size_type((order == 2) - 1) & shard_index;
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+      return logprob(first, last, value_type());
+    }
+
+  private:
+    
+    void lookup_result(const state_type& state, int order, result_type& result) const
+    {
+      if (state.is_root()) {
+	result.state = state;
+	result.prob     = smooth;
+	result.bound    = smooth;
+	result.length   = 0;
 	
-	if (result.first == last) {
-	  const logprob_type __logbound = (result.second < logbounds[shard_index].size()
-					   ? logbounds[shard_index](result.second, order)
-					   : logprobs[shard_index](result.second, order));
-	  if(__logbound != logprob_min())
-	    return __logbound;
-	  else {
-	    const size_type parent = index[shard_index].parent(result.second);
-	    const logprob_type logbackoff = (parent != size_type(-1)
-					     ? backoffs[shard_index_backoff](parent, order - 1)
-					     : logprob_type(0.0));
-	    return logprob(first + 1, last, smooth_smallest) + logbackoff;
-	  }
-	} else {
-	  const logprob_type logbackoff = (result.first == last - 1
-					   ? backoffs[shard_index_backoff](result.second, order - 1)
-					   : logprob_type(0.0));
-	  return logprob(first + 1, last, smooth_smallest) + logbackoff; 
+	return;
+      }
+      
+      size_type shard_index = utils::bithack::branch(state.is_root_shard(), size_type(0), state.shard());
+      size_type shard_node = state.node();
+      
+      result.state = state;
+            
+      while (1) {
+	result.prob     = logprobs[shard_index](shard_node, order);
+	result.bound    = result.prob;
+	result.bound    = (! logbounds.empty() && shard_node < logbounds[shard_index].size()
+			   ? logbounds[shard_index](shard_node, order)
+			   : result.prob);
+	result.length   = order;
+	
+	if (result.prob != logprob_min()) break;
+
+	if (order == 1) {
+	  // very strange, though...
+	  result.prob   = smooth;
+	  result.bound  = smooth;
+	  result.length = 0;
+	  break;
 	}
-      } else {
-	const size_type shard_index = index.shard_index(first, last);
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
 	
-	if (result.first == last) {
-	  const logprob_type __logbound = (result.second < logbounds[shard_index].size()
-					   ? logbounds[shard_index](result.second, order)
-					   : logprobs[shard_index](result.second, order));
-	  return (__logbound != logprob_min()
-		  ? __logbound
-		  : (index.is_bos(*first)
-		     ? logprob_bos()
-		     : (smooth_smallest ? logprob_min() : smooth)));
+	shard_node = index[shard_index].parent(shard_node);
+	-- order;
+	if (order == 1)
+	  shard_index = 0;
+      }
+    }
+
+    struct ExtractVocab
+    {
+      const vocab_type& vocab_;
+      ExtractVocab(const vocab_type& vocab)  : vocab_(vocab) {}
+
+      template <typename Word_>
+      word_type::id_type operator()(const Word_& word) const { return vocab_[word]; }
+    };
+
+    struct ExtractId
+    {
+      word_type::id_type operator()(const word_type::id_type& id) const { return id; }
+    };
+    
+    template <typename Iterator, typename Word_>
+    logprob_type logbound(Iterator first, Iterator last, Word_) const
+    {
+      return logbound_dispatch(first, last, ExtractVocab(index.vocab()));
+    }
+    
+    template <typename Iterator>
+    logprob_type logbound(Iterator first, Iterator last, word_type::id_type) const
+    {
+      return logbound_dispatch(first, last, ExtractId());
+    }
+
+    template <typename Iterator, typename Word_>
+    logprob_type logprob(Iterator first, Iterator last, Word_) const
+    {
+      return logprob_dispatch(first, last, ExtractVocab(index.vocab()));
+    }
+    
+    template <typename Iterator>
+    logprob_type logprob(Iterator first, Iterator last, word_type::id_type) const
+    {
+      return logprob_dispatch(first, last, ExtractId());
+    }
+
+    template <typename Iterator, typename Output, typename OutputBackoff, typename Word_>
+    state_type lookup_context(Iterator first, Iterator last,
+			      Output& output,
+			      OutputBackoff& output_backoff,
+			      Word_) const
+    {
+      return lookup_context_dispatch(first, last, output, output_backoff, ExtractVocab(index.vocab()));
+    }
+    
+    template <typename Iterator, typename Output, typename OutputBackoff>
+    state_type lookup_context(Iterator first, Iterator last,
+			      Output& output,
+			      OutputBackoff& output_backoff,
+			      word_type::id_type) const
+    {
+      return lookup_context_dispatch(first, last, output, output_backoff, ExtractId());
+    }
+
+    template <typename Iterator, typename Output, typename OutputBackoff, typename Extract>
+    state_type lookup_context_dispatch(Iterator first, Iterator last,
+				       Output& output,
+				       OutputBackoff& output_backoff,
+				       Extract extractor) const
+    {
+      // clip context size...
+      first = std::max(first, last - (index.order() - 1));
+      
+      state_type state;
+      int order = 1;
+      
+      for (/**/; last != first; -- last, ++ order) {
+	const word_type::id_type word = extractor(*(last - 1));
+	const state_type state_next = index.next(state, word);
+	
+	if (state_next.is_root_node()) break;
+
+	const size_type shard_index = utils::bithack::branch(state_next.is_root_shard(), size_type(0), state_next.shard());
+	
+	*output = word;
+	++ output;
+	*output_backoff = backoffs[shard_index](state_next.node(), order);
+	++ output_backoff;
+	
+	state = state_next;
+      }
+      
+      return state;
+    }
+
+    struct IgnoreIterator
+    {
+      IgnoreIterator& operator=(const logprob_type& x) { return *this; }
+      IgnoreIterator& operator=(const word_type::id_type& x) { return *this; }
+      IgnoreIterator& operator*()  { return *this; }
+      IgnoreIterator& operator++() { return *this; }
+    };
+
+    template <typename Iterator, typename Extract>
+    logprob_type logbound_dispatch(Iterator first, Iterator last, Extract extractor) const
+    {
+      typedef std::vector<char, std::allocator<char> > buffer_type;
+      
+      NGramState ngram_state(index.order());
+      
+      buffer_type __buffer(ngram_state.buffer_size());
+      void* buffer = &(*__buffer.begin());
+      
+      // first, lookup from last - 1 to first and fill-in the buffer...
+      word_type::id_type* citer = ngram_state.context(buffer);
+      logprob_type*       biter = ngram_state.backoff(buffer);
+
+      lookup_context(first, last - 1, citer, biter);
+
+      const size_type context_length = citer - ngram_state.context(buffer);
+      
+      // second, use lookup(rfirst, rend, word, output, output_backoff) with output/output-backoff ignored!
+      IgnoreIterator output;
+      IgnoreIterator output_backoff;
+      
+      const result_type result = lookup(ngram_state.context(buffer), ngram_state.context(buffer) + context_length,
+					extractor(*(last - 1)),
+					output,
+					output_backoff);
+      {
+	const logprob_type* backoff = ngram_state.backoff(buffer);
+	const logprob_type* biter = backoff + result.length - (result.length != 0);
+	const logprob_type* blast = backoff + context_length;
+
+	// if this is a complete context or backoff, use probability, not upper bound!
+	if (biter < blast || result.complete) {
+	  for (/**/; biter < blast; ++ biter)
+	    result.prob += *biter;
+	  return result.prob;
 	} else
-	  return (smooth_smallest ? logprob_min() : smooth);
+	  return result.bound;
       }
     }
     
-    template <typename Iterator>
-    logprob_type operator()(Iterator first, Iterator last, bool smooth_smallest=false) const
+    template <typename Iterator, typename Extract>
+    logprob_type logprob_dispatch(Iterator first, Iterator last, Extract extractor) const
     {
-      return logprob(first, last, smooth_smallest);
-    }
-    
-    template <typename Iterator>
-    logprob_type logprob(Iterator first, Iterator last, bool smooth_smallest=false) const
-    {
-      if (first == last) return 0.0;
+      typedef std::vector<char, std::allocator<char> > buffer_type;
       
-      first = std::max(first, last - index.order());
+      NGramState ngram_state(index.order());
       
-      int       shard_prev = -1;
-      size_type node_prev = size_type(-1);
+      buffer_type __buffer(ngram_state.buffer_size());
+      void* buffer = &(*__buffer.begin());
       
-      logprob_type logbackoff = 0.0;
-      for (/**/; first != last - 1; ++ first) {
-	const int order = last - first;
-	const size_type shard_index = index.shard_index(first, last);
-	const size_type shard_index_backoff = size_type((order == 2) - 1) & shard_index;
-	
-	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+      // first, lookup from last - 1 to first and fill-in the buffer...
+      
+      word_type::id_type* citer = ngram_state.context(buffer);
+      logprob_type*       biter = ngram_state.backoff(buffer);
 
-	shard_prev = -1;
-	node_prev = size_type(-1);
-	
-	if (result.first == last) {
-	  
-	  const logprob_type __logprob = logprobs[shard_index](result.second, order);
-	  if (__logprob != logprob_min())
-	    return logbackoff + __logprob;
-	  else {
-	    const size_type parent = index[shard_index].parent(result.second);
-	    if (parent != size_type(-1)) {
-	      logbackoff += backoffs[shard_index_backoff](parent, order - 1);
-	      
-	      shard_prev = shard_index;
-	      node_prev = parent;
-	    }
-	  }
-	} else if (result.first == last - 1) {
-	  logbackoff += backoffs[shard_index_backoff](result.second, order - 1);
-	  
-	  shard_prev = shard_index;
-	  node_prev = result.second;
-	}
-      }
-      
-      const int order = last - first;
-      const size_type shard_index = index.shard_index(first, last);
-      std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
-      
-      return (result.first == last && logprobs[shard_index](result.second, order) != logprob_min()
-	      ? logbackoff + logprobs[shard_index](result.second, order)
-	      : (index.is_bos(*first)
-		 ? logprob_bos()
-		 : (smooth_smallest ? logprob_min() : logbackoff + smooth)));
-    }
+      lookup_context(first, last - 1, citer, biter);
 
+      const size_type context_length = citer - ngram_state.context(buffer);
+      
+      // second, use lookup(rfirst, rend, word, output, output_backoff) with output/output-backoff ignored!
+      IgnoreIterator output;
+      IgnoreIterator output_backoff;
+      
+      result_type result = lookup(ngram_state.context(buffer), ngram_state.context(buffer) + context_length,
+				  extractor(*(last - 1)),
+				  output,
+				  output_backoff);
+      
+      const logprob_type* backoff = ngram_state.backoff(buffer);
+      for (const logprob_type* biter = backoff + result.length - (result.length != 0); biter < backoff + context_length; ++ biter)
+	result.prob += *biter;
+      
+      return result.prob;
+    }
     
   public:
     path_type path() const { return index.path().parent_path(); }
