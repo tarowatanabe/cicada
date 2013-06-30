@@ -56,22 +56,22 @@ namespace cicada
       return (const char*) buffer + offset_suffix();
     }
     
-    size_type& length_suffix(void* buffer) const
+    size_type& size_suffix(void* buffer) const
     {
-      return suffix_.length(suffix(buffer));
+      return suffix_.size(suffix(buffer));
     }
     
-    const size_type& length_suffix(const void* buffer) const
+    const size_type& size_suffix(const void* buffer) const
     {
-      return suffix_.length(suffix(buffer));
+      return suffix_.size(suffix(buffer));
     }
 
-    size_type& length_prefix(void* buffer) const
+    size_type& size_prefix(void* buffer) const
     {
       return *reinterpret_cast<size_type*>(buffer);
     }
     
-    const size_type& length_prefix(const void* buffer) const
+    const size_type& size_prefix(const void* buffer) const
     {
       return *reinterpret_cast<const size_type*>(buffer);
     }
@@ -118,7 +118,7 @@ namespace cicada
     
     void fill(void* buffer) const
     {
-      const size_type len = length_prefix(buffer);
+      const size_type len = size_prefix(buffer);
       
       std::fill(reinterpret_cast<char*>(state(buffer) + len), reinterpret_cast<char*>(state(buffer) + suffix_.order_ - 1), 0);
       

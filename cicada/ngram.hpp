@@ -134,7 +134,7 @@ namespace cicada
       
       result_type result = lookup(buffer_in, word, buffer_out);
       
-      const size_type context_length = ngram_state.length(buffer_in);
+      const size_type context_length = ngram_state.size(buffer_in);
       
       const logprob_type* biter     = ngram_state.backoff(buffer_in) + result.length + (result.length == 0) - 1;
       const logprob_type* biter_end = ngram_state.backoff(buffer_in) + context_length;
@@ -152,7 +152,7 @@ namespace cicada
       
       result_type result = lookup_partial(buffer_in, state, order, buffer_out);
       
-      const size_type context_length = ngram_state.length(buffer_in);
+      const size_type context_length = ngram_state.size(buffer_in);
       
       const logprob_type* biter     = ngram_state.backoff(buffer_in) + utils::bithack::max(static_cast<int>(result.length + (result.length == 0) - order), 0);
       const logprob_type* biter_end = ngram_state.backoff(buffer_in) + context_length;
@@ -195,12 +195,12 @@ namespace cicada
       logprob_type*       output_backoff = ngram_state.backoff(buffer_out);
       
       const result_type result = lookup(ngram_state.context(buffer_in),
-					ngram_state.context(buffer_in) + ngram_state.length(buffer_in),
+					ngram_state.context(buffer_in) + ngram_state.size(buffer_in),
 					word,
 					output,
 					output_backoff);
       
-      ngram_state.length(buffer_out) = output - ngram_state.context(buffer_out);
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
       
       return result;
     }
@@ -293,13 +293,13 @@ namespace cicada
       logprob_type*       output_backoff = ngram_state.backoff(buffer_out);
       
       const result_type result = lookup_partial(ngram_state.context(buffer_in),
-						ngram_state.context(buffer_in) + ngram_state.length(buffer_in),
+						ngram_state.context(buffer_in) + ngram_state.size(buffer_in),
 						state,
 						order,
 						output,
 						output_backoff);
       
-      ngram_state.length(buffer_out) = output - ngram_state.context(buffer_out);
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
       
       return result;
     }
@@ -374,7 +374,7 @@ namespace cicada
       
       const state_type state = lookup_context(first, last, output, output_backoff);
       
-      ngram_state.length(buffer_out) = output - ngram_state.context(buffer_out);
+      ngram_state.size(buffer_out) = output - ngram_state.context(buffer_out);
       
       return state;
     }

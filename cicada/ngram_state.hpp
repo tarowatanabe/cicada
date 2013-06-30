@@ -34,12 +34,12 @@ namespace cicada
       return sizeof(size_type) + (sizeof(word_type::id_type) + sizeof(logprob_type)) * (order_ - 1);
     }
     
-    size_type& length(void* buffer) const
+    size_type& size(void* buffer) const
     {
       return *reinterpret_cast<size_type*>(buffer);
     }
     
-    const size_type& length(const void* buffer) const
+    const size_type& size(const void* buffer) const
     {
       return *reinterpret_cast<const size_type*>(buffer);
     }
@@ -66,7 +66,7 @@ namespace cicada
     
     void fill(void* buffer) const
     {
-      const size_type len = length(buffer);
+      const size_type len = size(buffer);
       
       std::fill(reinterpret_cast<char*>(context(buffer) + len), reinterpret_cast<char*>(context(buffer) + order_ - 1), 0);
       std::fill(reinterpret_cast<char*>(backoff(buffer) + len), reinterpret_cast<char*>(backoff(buffer) + order_ - 1), 0);
@@ -80,8 +80,8 @@ namespace cicada
 
     void append(const void* buffer1, const void* buffer2, void* appended)
     {
-      const size_type len1 = length(buffer1);
-      const size_type len2 = length(buffer2);
+      const size_type len1 = size(buffer1);
+      const size_type len2 = size(buffer2);
 
       // merge context
       std::copy(context(buffer1), context(buffer1) + len1, context(appended));
@@ -91,9 +91,9 @@ namespace cicada
       std::copy(backoff(buffer1), backoff(buffer1) + len1, backoff(appended));
       std::copy(backoff(buffer2), backoff(buffer2) + len2, backoff(appended) + len1);
       
-      // merge length
+      // merge size
       
-      length(appended) = len1 + len2;
+      size(appended) = len1 + len2;
     }
   };
 };
