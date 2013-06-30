@@ -167,7 +167,6 @@ namespace cicada
     template <typename Iterator>
     double ngram_score_update(Iterator first, Iterator last, int order) const
     {
-#if 0
       double adjust = 0.0;
 
       for (/**/; first != last; ++ first, ++ order) {
@@ -185,7 +184,6 @@ namespace cicada
       }
       
       return adjust;
-#endif
     }
     
     template <typename Word_>
@@ -432,11 +430,9 @@ namespace cicada
       while (1) {
 	result.prob     = logprobs[shard_index](shard_node, order);
 	result.bound    = result.prob;
-#if 0
 	result.bound    = (! logbounds.empty() && shard_node < logbounds[shard_index].size()
 			   ? logbounds[shard_index](shard_node, order)
 			   : result.prob);
-#endif
 	result.length   = order;
 	
 	if (result.prob != logprob_min()) break;
