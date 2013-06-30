@@ -32,7 +32,7 @@ template <class Model> void Query(const Model &model, bool sentence_context, std
       if (vocab == 0) ++oov;
       ret = model.FullScore(state, vocab, out);
       total += ret.prob;
-      out_stream << word << '=' << vocab << ' ' << static_cast<unsigned int>(ret.ngram_length)  << ' ' << ret.prob << '\t';
+      out_stream << word << '=' << vocab << ' ' << static_cast<unsigned int>(ret.ngram_length)  << ' ' << (ret.independent_left ? "true" : "false") << ' ' << int(state.length) << ' ' << ret.prob << '\n';
       state = out;
       char c;
       while (true) {
@@ -50,7 +50,7 @@ template <class Model> void Query(const Model &model, bool sentence_context, std
     if (sentence_context) {
       ret = model.FullScore(state, model.GetVocabulary().EndSentence(), out);
       total += ret.prob;
-      out_stream << "</s>=" << model.GetVocabulary().EndSentence() << ' ' << static_cast<unsigned int>(ret.ngram_length)  << ' ' << ret.prob << '\t';
+      out_stream << "</s>=" << model.GetVocabulary().EndSentence() << ' ' << static_cast<unsigned int>(ret.ngram_length) << ' ' << (ret.independent_left ? "true" : "false")  << ' ' << int(state.length) << ' '<< ret.prob << '\n';
     }
     out_stream << "Total: " << total << " OOV: " << oov << '\n';
   }
