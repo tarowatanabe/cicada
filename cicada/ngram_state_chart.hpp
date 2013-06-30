@@ -29,7 +29,7 @@ namespace cicada
     typedef NGramIndex::state_type state_type;
     typedef NGramState suffix_state_type;
     
-    NGramStateChart(const size_type order) : suffix_(order) {}
+    NGramStateChart(const size_type order=1) : suffix_(order) {}
     
     size_type buffer_size() const
     {
