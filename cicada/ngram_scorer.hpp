@@ -144,7 +144,7 @@ namespace cicada
     
     void non_terminal(const void* antecedent)
     {
-      // antecedent has no prefxi for scoring...
+      // antecedent has no prefix for re-scoring...
       if (ngram_state_.size_prefix(antecedent) == 0) {
 	
 	// if this antecedent is complete, we will copy suffix from antecedent to state_.
@@ -238,8 +238,8 @@ namespace cicada
       // antecedent is a complete state
       if (ngram_state_.complete(antecedent)) {
 	// score all the backoff..
-	const logprob_type* biter     = ngram_state_.backoff(suffix_curr);
-	const logprob_type* biter_end = biter + ngram_state_.size_suffix(suffix_curr);
+	const logprob_type* biter     = ngram_state_.suffix_.backoff(suffix_curr);
+	const logprob_type* biter_end = biter + ngram_state_.suffix_.size(suffix_curr);
 	for (/**/; biter < biter_end; ++ biter)
 	  prob_ += *biter;
 	
