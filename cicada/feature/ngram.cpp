@@ -253,7 +253,7 @@ namespace cicada
 	    initial = false;
 	  } else if (! skipper(*titer)) {
 	    
-	    if (initial && *titer == vocab_type::BOS)
+	    if (no_bos_eos && initial && *titer == vocab_type::BOS)
 	      scorer.initial_bos(&(*buffer_bos.begin()));
 	    else {
 	      const word_type::id_type id = ngram->index.vocab()[extract(*titer)];
@@ -286,16 +286,68 @@ namespace cicada
 	}
       }
 
+      double ngram_coarse_score(const edge_type& edge,
+				int& oov)
+      {
+	if (cluster) {
+          if (skip_sgml_tag)
+            return ngram_coarse_score(edge, oov, extract_cluster(cluster), skipper_sgml());
+          else
+            return ngram_coarse_score(edge, oov, extract_cluster(cluster), skipper_epsilon());
+        } else {
+          if (skip_sgml_tag)
+            return ngram_coarse_score(edge, oov, extract_word(), skipper_sgml());
+          else
+            return ngram_coarse_score(edge, oov, extract_word(), skipper_epsilon());
+        }
+      }
+      
+      template <typename Extract, typename Skipper>
+      double ngram_coarse_score(const edge_type& edge,
+				int& oov,
+				Extract extract,
+				Skipper skipper)
+      {
+	const rule_type& rule = *(edge.rule);
+	const phrase_type& phrase = rule.rhs;
+	
+	scorer.assign(&(*buffer_tmp.begin()));
+	
+	bool initial = true;
+	double score = 0.0;
+	
+	phrase_type::const_iterator piter_end = phrase.end();
+	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
+	  if (piter->is_non_terminal()) {
+	    score += scorer.complete();
+
+	    scorer.assign(&(*buffer_tmp.begin()));
+	    
+	    initial = false;
+	  } else if (! skipper(*piter)) {
+	    const word_type::id_type id = ngram->index.vocab()[extract(*piter)];
+	    
+	    oov += (id == id_oov);
+	    
+	    if (no_bos_eos && initial && *piter == vocab_type::BOS)
+	      scorer.initial_bos(&(*buffer_bos.begin()));
+	    else
+	      scorer.terminal(id);
+	    
+	    initial = false;
+	  }
+	}
+	
+	return score + scorer.complete();
+      }
+      
       double ngram_predict_score(state_ptr_type& state)
       {
 	scorer.assign(state);
 	
-	if (! no_bos_eos) {
-	  scorer.assign(state);
-	  
+	if (! no_bos_eos)
 	  scorer.ngram_state_.suffix_.copy(scorer.ngram_state_.suffix(&(*buffer_bos.begin())),
 					   scorer.ngram_state_.suffix(state));
-	}
 	
 	return 0.0;
       }
@@ -589,28 +641,10 @@ namespace cicada
 	  features[pimpl->feature_name_oov] = - oov;
 	else
 	  features.erase(pimpl->feature_name_oov);
-      } else
-	apply(state, states, edge, features, final);
-#if 0
-      if (pimpl_coarse) {
-	int oov = 0;
-	double score = pimpl_coarse->ngram_score(state, states, edge, oov);
-	if (final)
-	  score += pimpl_coarse->ngram_final_score(state);
-      
-	if (score != 0.0)
-	  features[pimpl->feature_name] = score;
-	else
-	  features.erase(pimpl->feature_name);
-	
-	if (oov)
-	  features[pimpl->feature_name_oov] = - oov;
-	else
-	  features.erase(pimpl->feature_name_oov);
       } else {
 	// state-less.
 	int oov = 0;
-	const double score = pimpl->ngram_estimate(edge, oov);
+	const double score = pimpl->ngram_coarse_score(edge, oov);
 	
 	if (score != 0.0)
 	  features[pimpl->feature_name] = score;
@@ -622,7 +656,6 @@ namespace cicada
 	else
 	  features.erase(pimpl->feature_name_oov);
       }
-#endif
     }
 
     // temporarily assigned feature function...
@@ -665,8 +698,6 @@ namespace cicada
 			       feature_set_type& features,
 			       const bool final) const
     {
-      //apply(state, states, edge, features, final);
-      
       // if final, add scoring for </s>
       
       if (final) {
