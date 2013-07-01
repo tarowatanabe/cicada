@@ -569,15 +569,15 @@ namespace cicada
       IgnoreIterator output;
       IgnoreIterator output_backoff;
       
-      const result_type result = lookup(ngram_state.context(buffer), ngram_state.context(buffer) + context_length,
-					extractor(*(last - 1)),
-					output,
-					output_backoff);
+      result_type result = lookup(ngram_state.context(buffer), ngram_state.context(buffer) + context_length,
+				  extractor(*(last - 1)),
+				  output,
+				  output_backoff);
       {
 	const logprob_type* backoff = ngram_state.backoff(buffer);
 	const logprob_type* biter = backoff + result.length - (result.length != 0);
 	const logprob_type* blast = backoff + context_length;
-
+	
 	// if this is a complete context or backoff, use probability, not upper bound!
 	if (biter < blast || result.complete) {
 	  for (/**/; biter < blast; ++ biter)

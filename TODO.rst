@@ -245,3 +245,6 @@ Revise and test restaurtna implementation:
     counts.
 
 Revise the merge features in cicada_mpi for large # of features
+
+Revise the ngram language model handling:
+  -  Use better ngram state representation
