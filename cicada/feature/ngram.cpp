@@ -642,7 +642,7 @@ namespace cicada
 	else
 	  features.erase(pimpl->feature_name_oov);
       } else {
-	// state-less.
+	// state-less.... here, we ignored final flag...do we add this...?
 	int oov = 0;
 	const double score = pimpl->ngram_coarse_score(edge, oov);
 	
