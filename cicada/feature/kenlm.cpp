@@ -276,7 +276,7 @@ namespace cicada
 	    initial = false;
 	  } else if (! skipper(*titer)) {
 	    
-	    if (initial && *titer == vocab_type::BOS)
+	    if (no_bos_eos && initial && *titer == vocab_type::BOS)
 	      ruleScore.BeginSentence();
 	    else {
 	      const lm::WordIndex id = ngram->vocabulary(extract(*titer));
@@ -314,6 +314,70 @@ namespace cicada
 	  
 	  return ruleScore.Finish() * log10;
 	}
+      }
+
+      double ngram_coarse_score(const edge_type& edge,
+				int& oov)
+      {
+	if (cluster) {
+          if (skip_sgml_tag)
+            return ngram_coarse_score(edge, oov, extract_cluster(cluster), skipper_sgml());
+          else
+            return ngram_coarse_score(edge, oov, extract_cluster(cluster), skipper_epsilon());
+        } else {
+          if (skip_sgml_tag)
+            return ngram_coarse_score(edge, oov, extract_word(), skipper_sgml());
+          else
+            return ngram_coarse_score(edge, oov, extract_word(), skipper_epsilon());
+        }
+      }
+      
+      template <typename Extract, typename Skipper>
+      double ngram_coarse_score(const edge_type& edge,
+				int& oov,
+				Extract extract,
+				Skipper skipper)
+      {
+	return 0.0;
+      }
+
+      double ngram_predict_score(state_ptr_type& state)
+      {
+	return 0.0;
+      }
+
+      double ngram_scan_score(state_ptr_type& state,
+			      const edge_type& edge,
+			      const int dot,
+			      int& oov)
+      {
+	if (cluster) {
+          if (skip_sgml_tag)
+            return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_sgml());
+          else
+            return ngram_scan_score(state, edge, dot, oov, extract_cluster(cluster), skipper_epsilon());
+        } else {
+          if (skip_sgml_tag)
+            return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_sgml());
+          else
+            return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_epsilon());
+        }
+      }
+      
+      template <typename Extract, typename Skipper>
+      double ngram_scan_score(state_ptr_type& state,
+                              const edge_type& edge,
+                              const int dot,
+                              int& oov,
+                              Extract extract,
+                              Skipper skipper)
+      {
+	return 0.0;
+      }
+      
+      double ngram_complete_score(state_ptr_type& state)
+      {
+	return 0.0;
       }
 
       size_type reserve_state_size() const
@@ -516,11 +580,23 @@ namespace cicada
 	features[pimpl->feature_name_oov] = - oov;
       else
 	features.erase(pimpl->feature_name_oov);	
-      } else
-	apply(state, states, edge, features, final);
+      } else {
+	// state-less.... here, we ignored final flag...do we add this...?
+	int oov = 0;
+	const double score = pimpl->ngram_coarse_score(edge, oov);
+	
+	if (score != 0.0)
+	  features[pimpl->feature_name] = score;
+	else
+	  features.erase(pimpl->feature_name);
+	
+	if (oov)
+	  features[pimpl->feature_name_oov] = - oov;
+	else
+	  features.erase(pimpl->feature_name_oov);
+      }
     }
-
-    // temporarily assigned feature function...
+    
     
     template <typename Model>
     void KenLM<Model>::apply_predict(state_ptr_type& state,
@@ -529,7 +605,9 @@ namespace cicada
 				     feature_set_type& features,
 				     const bool final) const
     {
-      
+      // add <s>
+      if (final)
+	pimpl->ngram_predict_score(state);      
     }
     
     template <typename Model>
@@ -540,7 +618,18 @@ namespace cicada
 				  feature_set_type& features,
 				  const bool final) const
     {
+      int oov = 0;
+      const double score = pimpl->ngram_scan_score(state, edge, dot, oov);
       
+      if (score != 0.0)
+	features[pimpl->feature_name] = score;
+      else
+	features.erase(pimpl->feature_name);
+      
+      if (oov)
+	features[pimpl->feature_name_oov] = - oov;
+      else
+	features.erase(pimpl->feature_name_oov);      
     }
     
     template <typename Model>
@@ -550,7 +639,16 @@ namespace cicada
 				      feature_set_type& features,
 				      const bool final) const
     {
-      apply(state, states, edge, features, final);
+      // if final, add scoring for </s>
+      
+      if (final) {
+	const double score = pimpl->ngram_complete_score(state);
+	
+	if (score != 0.0)
+	  features[pimpl->feature_name] = score;
+	else
+	  features.erase(pimpl->feature_name);
+      }
     }
     
     FeatureFunction::feature_function_ptr_type KenLMFactory::create(const std::string& parameter) const
