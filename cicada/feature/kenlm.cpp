@@ -255,7 +255,7 @@ namespace cicada
 	const rule_type& rule = *(edge.rule);
         const phrase_type& target = rule.rhs;
 	
-	lm::ngram::RuleScore<Model> ruleScore(ngram->model_, *reinterpret_cast<ngram_state_type*>(state));
+	lm::ngram::RuleScore<Model> scorer(ngram->model_, *reinterpret_cast<ngram_state_type*>(state));
 
 	phrase_type::const_iterator titer_begin = target.begin();
         phrase_type::const_iterator titer_end   = target.end();
@@ -269,28 +269,31 @@ namespace cicada
             ++ non_terminal_pos;
 	    
 	    if (initial) // special case for left-edge NT
-	      ruleScore.BeginNonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
+	      scorer.BeginNonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
 	    else
-	      ruleScore.NonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
+	      scorer.NonTerminal(*reinterpret_cast<const ngram_state_type*>(states[antecedent_index]));
 	    
 	    initial = false;
 	  } else if (! skipper(*titer)) {
 	    
-	    if (no_bos_eos && initial && *titer == vocab_type::BOS)
-	      ruleScore.BeginSentence();
+	    if (no_bos_eos
+		&& extract(*titer) == vocab_type::BOS
+		&& reinterpret_cast<ngram_state_type*>(state)->left.length == 0
+		&& reinterpret_cast<ngram_state_type*>(state)->right.length == 0)
+	      scorer.BeginSentence();
 	    else {
 	      const lm::WordIndex id = ngram->vocabulary(extract(*titer));
 	      
 	      oov += (id == id_oov);
 	      
-	      ruleScore.Terminal(id);
+	      scorer.Terminal(id);
 	    }
 	    
 	    initial = false;
 	  }
 	}
 	
-	const double ret = ruleScore.Finish();
+	const double ret = scorer.Finish();
 	
 	reinterpret_cast<ngram_state_type*>(state)->ZeroRemaining();
 	
@@ -299,20 +302,23 @@ namespace cicada
       
       double ngram_final_score(const state_ptr_type& state)
       {
-	if (no_bos_eos) {
-	  // we do not need scoring by bos and eos...
+	if (no_bos_eos) // we do not need scoring by bos and eos...
 	  return 0.0;
-	} else {
+	else {
 	  const ngram_state_type& ngram_state = *reinterpret_cast<const ngram_state_type*>(state);
 	  
 	  ngram_state_type ngram_state_next;
-	  lm::ngram::RuleScore<Model> ruleScore(ngram->model_, ngram_state_next);
+	  lm::ngram::RuleScore<Model> scorer(ngram->model_, ngram_state_next);
 	  
-	  ruleScore.BeginSentence();
-	  ruleScore.NonTerminal(ngram_state);
-	  ruleScore.Terminal(id_eos);
+	  scorer.BeginSentence();
+	  scorer.NonTerminal(ngram_state);
+	  scorer.Terminal(id_eos);
 	  
-	  return ruleScore.Finish() * log10;
+	  const double ret = scorer.Finish() * log10;
+	  
+	  reinterpret_cast<ngram_state_type*>(state)->ZeroRemaining();
+	  
+	  return ret;
 	}
       }
 
@@ -338,11 +344,47 @@ namespace cicada
 				Extract extract,
 				Skipper skipper)
       {
-	return 0.0;
+	const rule_type& rule = *(edge.rule);
+	const phrase_type& phrase = rule.rhs;
+	
+	lm::ngram::ChartState state;
+	lm::ngram::RuleScore<Model> scorer(ngram->model_, state);
+	
+	double score = 0.0;
+
+	phrase_type::const_iterator piter_end = phrase.end();
+	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
+	  if (piter->is_non_terminal()) {
+	    score += scorer.Finish();
+	    scorer.Reset();
+	  } else if (! skipper(*piter)) {
+	    if (no_bos_eos
+		&& extract(*piter) == vocab_type::BOS
+		&& state.left.length == 0 
+		&& state.right.length == 0)
+	      scorer.BeginSentence();
+	    else {
+	      const lm::WordIndex id = ngram->vocabulary(extract(*piter));
+	      
+	      oov += (id == id_oov);
+	      
+	      scorer.Terminal(id);
+	    }
+	  }
+	}
+	
+	return score + scorer.Finish();
       }
 
       double ngram_predict_score(state_ptr_type& state)
       {
+	lm::ngram::RuleScore<Model> scorer(ngram->model_, *reinterpret_cast<ngram_state_type*>(state));
+	
+	if (! no_bos_eos)
+	  scorer.BeginSentence();
+	
+	reinterpret_cast<ngram_state_type*>(state)->ZeroRemaining();
+	
 	return 0.0;
       }
 
@@ -372,12 +414,56 @@ namespace cicada
                               Extract extract,
                               Skipper skipper)
       {
-	return 0.0;
+	lm::ngram::State state_tmp;
+	
+	lm::ngram::State* state_curr = &(reinterpret_cast<ngram_state_type*>(state)->right);
+	lm::ngram::State* state_next = &state_tmp;
+	
+	const rule_type& rule = *(edge.rule);
+	const phrase_type& phrase = rule.rhs;
+
+	double score = 0.0;
+	
+	phrase_type::const_iterator piter_end = phrase.end();
+	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
+	  if (! skipper(*piter)) {
+	    
+	    if (no_bos_eos && extract(*piter) == vocab_type::BOS && state_curr->length == 0)
+	      *state_next = ngram->model_.BeginSentenceState();
+	    else {
+	      const lm::WordIndex id = ngram->vocabulary(extract(*piter));
+	      
+	      oov += (id == id_oov);
+	      
+	      score += ngram->model_.Score(*state_curr, id, *state_next);
+	    }
+	    
+	    std::swap(state_curr, state_next);
+	  }
+
+	if (state_curr != &(reinterpret_cast<ngram_state_type*>(state)->right))
+	  reinterpret_cast<ngram_state_type*>(state)->right = *state_curr;
+	
+	reinterpret_cast<ngram_state_type*>(state)->right.ZeroRemaining();
+
+	return score;
       }
       
       double ngram_complete_score(state_ptr_type& state)
       {
-	return 0.0;
+	if (no_bos_eos) // we do not need scoring by bos and eos...
+	  return 0.0;
+	
+	lm::ngram::State& state_curr = reinterpret_cast<ngram_state_type*>(state)->right;
+	lm::ngram::State state_next;
+	
+	const double score =  ngram->model_.Score(state_curr, id_eos, state_next);
+
+	reinterpret_cast<ngram_state_type*>(state)->right = state_next;
+	
+	reinterpret_cast<ngram_state_type*>(state)->right.ZeroRemaining();
+	
+	return score;
       }
 
       size_type reserve_state_size() const

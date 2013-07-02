@@ -55,6 +55,11 @@ namespace cicada
     {
       return (const char*) buffer + offset_suffix();
     }
+
+    bool empty(const void* buffer) const
+    {
+      return size_prefix(buffer) == 0 && size_suffix(buffer) == 0;
+    }
     
     size_type& size_suffix(void* buffer) const
     {

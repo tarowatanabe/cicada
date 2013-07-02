@@ -33,6 +33,11 @@ namespace cicada
     {
       return sizeof(size_type) + (sizeof(word_type::id_type) + sizeof(logprob_type)) * (order_ - 1);
     }
+
+    bool empty(const void* buffer) const
+    {
+      return size(buffer) == 0;
+    }
     
     size_type& size(void* buffer) const
     {

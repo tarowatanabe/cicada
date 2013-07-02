@@ -253,7 +253,7 @@ namespace cicada
 	    initial = false;
 	  } else if (! skipper(*titer)) {
 	    
-	    if (no_bos_eos && initial && *titer == vocab_type::BOS)
+	    if (no_bos_eos && extract(*titer) == vocab_type::BOS && scorer.ngram_state_.empty(state))
 	      scorer.initial_bos(&(*buffer_bos.begin()));
 	    else {
 	      const word_type::id_type id = ngram->index.vocab()[extract(*titer)];
@@ -313,28 +313,24 @@ namespace cicada
 	
 	scorer.assign(&(*buffer_tmp.begin()));
 	
-	bool initial = true;
 	double score = 0.0;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
 	  if (piter->is_non_terminal()) {
 	    score += scorer.complete();
-
+	    
 	    scorer.assign(&(*buffer_tmp.begin()));
-	    
-	    initial = false;
 	  } else if (! skipper(*piter)) {
-	    const word_type::id_type id = ngram->index.vocab()[extract(*piter)];
 	    
-	    oov += (id == id_oov);
-	    
-	    if (no_bos_eos && initial && *piter == vocab_type::BOS)
+	    if (no_bos_eos && extract(*piter) == vocab_type::BOS && scorer.ngram_state_.empty(&(*buffer_tmp.begin())))
 	      scorer.initial_bos(&(*buffer_bos.begin()));
-	    else
+	    else {
+	      const word_type::id_type id = ngram->index.vocab()[extract(*piter)];
+	      
+	      oov += (id == id_oov);
 	      scorer.terminal(id);
-	    
-	    initial = false;
+	    }
 	  }
 	}
 	
@@ -386,32 +382,32 @@ namespace cicada
 	void* state_curr = state;
 	void* state_next = &(*buffer_tmp.begin());
 
-	bool initial = false;
-	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
 	  if (! skipper(*piter)) {
-	    const word_type::id_type id = ngram->index.vocab()[extract(*piter)];
 	    
-	    oov += (id == id_oov);
-	    
-	    if (no_bos_eos && initial && id == id_bos && scorer.ngram_state_.size_suffix(state) == 0)
+	    if (no_bos_eos && extract(*piter) == vocab_type::BOS && scorer.ngram_state_.size_suffix(state_curr) == 0)
 	      scorer.ngram_state_.suffix_.copy(scorer.ngram_state_.suffix(&(*buffer_bos.begin())),
 					       scorer.ngram_state_.suffix(state_next));
-	    else
+	    else {
+	      const word_type::id_type id = ngram->index.vocab()[extract(*piter)];
+	      
+	      oov += (id == id_oov);
+	      
 	      score += ngram->ngram_score(scorer.ngram_state_.suffix(state_curr), 
 					  id_eos,
 					  scorer.ngram_state_.suffix(state_next)).prob;
+	    }
 	    
 	    std::swap(state_curr, state_next);
-	    
-	    initial = false;
 	  }
 	
 	// copy state...
 	if (state_curr != state)
 	  scorer.ngram_state_.suffix_.copy(scorer.ngram_state_.suffix(state_next),
 					   scorer.ngram_state_.suffix(state));
+	
+	scorer.ngram_state_.suffix_.fill(scorer.ngram_state_.suffix(state));
 	
 	return score;
       }
