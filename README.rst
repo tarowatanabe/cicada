@@ -142,6 +142,8 @@ After the hypergraph generation, you can:
 	lower-order ngrams etc.
       * cube-pruning implements algorithm 2 of faster cube pruning
 	[31]_.
+      * The ngram language model feaature supports expgram [39]_ and
+	kenlm [40]_.
    - Perform variational decoding for hypergraph [10]_.
    - Perform MBR decoding for hypergraph [12]_.
       * Above two computations rely on expected ngram-counts over
@@ -775,3 +777,33 @@ References
     pages     = {967--975},
     url       = {http://www.aclweb.org/anthology/D/D07/D07-1103}
   }
+
+.. [39]
+.. code:: latex
+
+@InProceedings{watanabe-tsukada-isozaki:2009:Short,
+  author    = {Watanabe, Taro  and  Tsukada, Hajime  and  Isozaki, Hideki},
+  title     = {A Succinct N-gram Language Model},
+  booktitle = {Proceedings of the ACL-IJCNLP 2009 Conference Short Papers},
+  month     = {August},
+  year      = {2009},
+  address   = {Suntec, Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {341--344},
+  url       = {http://www.aclweb.org/anthology/P/P09/P09-2086}
+}
+
+.. [40]
+.. code:: latex
+
+@InProceedings{heafield:2011:WMT,
+  author    = {Heafield, Kenneth},
+  title     = {KenLM: Faster and Smaller Language Model Queries},
+  booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
+  month     = {July},
+  year      = {2011},
+  address   = {Edinburgh, Scotland},
+  publisher = {Association for Computational Linguistics},
+  pages     = {187--197},
+  url       = {http://www.aclweb.org/anthology/W11-2123}
+}
