@@ -691,7 +691,6 @@ void merge_statistics(const operation_set_type& operations,
   }
 }
 
-
 void synchronize()
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();

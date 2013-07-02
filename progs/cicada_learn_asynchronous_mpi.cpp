@@ -22,6 +22,13 @@
 #include "cicada_text_impl.hpp"
 #include "cicada_output_impl.hpp"
 
+#include "cicada/eval/score.hpp"
+#include "cicada/format.hpp"
+#include "cicada/signature.hpp"
+#include "cicada/stemmer.hpp"
+#include "cicada/tokenizer.hpp"
+#include "cicada/matcher.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -72,9 +79,17 @@ bool tree_grammar_list = false;
 
 feature_parameter_set_type feature_parameters;
 bool feature_list = false;
+path_type output_feature;
 
 op_set_type ops;
 bool op_list = false;
+
+bool scorer_list = false;
+bool format_list = false;
+bool signature_list = false;
+bool stemmer_list   = false;
+bool tokenizer_list = false;
+bool matcher_list = false;
 
 // learning options...
 path_type refset_file;
@@ -134,6 +149,9 @@ void cicada_learn(operation_set_type& operations,
 		  const function_document_type& functions,
 		  weight_set_type& weights);
 void synchronize();
+void merge_features();
+void merge_statistics(const operation_set_type& operations, operation_set_type::statistics_type& statistics);
+
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void bcast_weights(weight_set_type& weights);
@@ -153,27 +171,40 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (feature_list) {
-      if (mpi_rank == 0)
-	std::cout << cicada::FeatureFunction::lists();
-      return 0;
-    }
+    if (feature_list || op_list || grammar_list || tree_grammar_list || scorer_list || format_list || signature_list || stemmer_list || tokenizer_list || matcher_list) {
+      
+      if (mpi_rank == 0) {
+	if (scorer_list)
+	  std::cout << cicada::eval::Scorer::lists();
+	
+	if (feature_list)
+	  std::cout << cicada::FeatureFunction::lists();
 
-    if (op_list) {
-      if (mpi_rank == 0)
-	std::cout << operation_set_type::lists();
-      return 0;
-    }
+	if (format_list)
+	  std::cout << cicada::Format::lists();
 
-    if (grammar_list) {
-      if (mpi_rank == 0)
-	std::cout << grammar_type::lists();
-      return 0;
-    }
+	if (grammar_list)
+	  std::cout << grammar_type::lists();
 
-    if (tree_grammar_list) {
-      if (mpi_rank == 0)
-	std::cout << tree_grammar_type::lists();
+	if (matcher_list)
+	  std::cout << cicada::Matcher::lists();
+      
+	if (op_list)
+	  std::cout << operation_set_type::lists();
+
+	if (signature_list)
+	  std::cout << cicada::Signature::lists();
+      
+	if (stemmer_list)
+	  std::cout << cicada::Stemmer::lists();
+
+	if (tokenizer_list)
+	  std::cout << cicada::Tokenizer::lists();
+      
+	if (tree_grammar_list)
+	  std::cout << tree_grammar_type::lists();
+      }
+      
       return 0;
     }
     
@@ -226,6 +257,9 @@ int main(int argc, char ** argv)
     if (int(mix_none_mode) + mix_average_mode + mix_select_mode + (mix_kbest_features > 0) == 0)
       mix_none_mode = true;
     
+    // random number seed
+    ::srandom(utils::random_seed());
+
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
     if (debug && mpi_rank == 0)
@@ -340,11 +374,34 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
     } else
       throw std::runtime_error("invalid yield");
-    
+
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file, 1024 * 1024);
       os.precision(20);
       os << weights;
+    }
+
+    synchronize();
+    
+    ::sync();
+    
+    operation_set_type::statistics_type statistics;
+    merge_statistics(operations, statistics);
+    
+    if (mpi_rank == 0 && debug)
+      std::cerr << "statistics"<< '\n'
+		<< statistics;
+    
+    if (! output_feature.empty()) {
+      merge_features();
+      
+      if (mpi_rank == 0) {
+	utils::compress_ostream os(output_feature, 1024 * 1024);
+	
+	for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+	  if (! feature_type(id).empty())
+	    os << feature_type(id) << '\n';
+      }
     }
   }
   catch (const std::exception& err) {
@@ -359,6 +416,9 @@ enum {
   score_tag,
   notify_tag,
   update_tag,
+  feature_tag,
+  stat_tag,
+
 };
 
 inline
@@ -381,6 +441,183 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
+void merge_features()
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    typedef utils::mpi_device_source            device_type;
+    typedef boost::iostreams::filtering_istream stream_type;
+    
+    typedef boost::shared_ptr<device_type> device_ptr_type;
+    typedef boost::shared_ptr<stream_type> stream_ptr_type;
+    
+    typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+    typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+    
+    device_ptr_set_type device(mpi_size);
+    stream_ptr_set_type stream(mpi_size);
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      device[rank].reset(new device_type(rank, feature_tag, 1024 * 1024));
+      stream[rank].reset(new stream_type());
+      
+      stream[rank]->push(boost::iostreams::zlib_decompressor());
+      stream[rank]->push(*device[rank]);
+    }
+    
+    std::string line;
+    
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
+      
+      for (int rank = 1; rank != mpi_size; ++ rank)
+	while (stream[rank] && device[rank] && device[rank]->test()) {
+	  if (std::getline(*stream[rank], line)) {
+	    if (! line.empty())
+	      feature_type(line);
+	  } else {
+	    stream[rank].reset();
+	    device[rank].reset();
+	  }
+	  
+	  found = true;
+	}
+      
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_sink(0, feature_tag, 1024 * 1024));
+    
+    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+      if (! feature_type(id).empty())
+	os << feature_type(id) << '\n';
+  }
+}
+
+void merge_statistics(const operation_set_type& operations,
+		      operation_set_type::statistics_type& statistics)
+{
+  typedef operation_set_type::statistics_type statistics_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  statistics.clear();
+  
+  if (mpi_rank == 0) {
+    typedef utils::mpi_device_source            device_type;
+    typedef boost::iostreams::filtering_istream stream_type;
+    
+    typedef boost::shared_ptr<device_type> device_ptr_type;
+    typedef boost::shared_ptr<stream_type> stream_ptr_type;
+    
+    typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+    typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+    
+    device_ptr_set_type device(mpi_size);
+    stream_ptr_set_type stream(mpi_size);
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      device[rank].reset(new device_type(rank, stat_tag, 4096));
+      stream[rank].reset(new stream_type());
+      
+      stream[rank]->push(boost::iostreams::zlib_decompressor());
+      stream[rank]->push(*device[rank]);
+    }
+    
+    statistics = operations.get_statistics();
+
+    std::string line;
+    
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
+      
+      for (int rank = 1; rank != mpi_size; ++ rank)
+	while (stream[rank] && device[rank] && device[rank]->test()) {
+	  if (std::getline(*stream[rank], line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
+	    
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece name = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece count = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece node = *iter;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece edge = *iter;
+	
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece user_time = *iter;
+	    
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece cpu_time = *iter;
+
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece thread_time = *iter;
+	
+	    statistics[name] += statistics_type::statistic_type(utils::lexical_cast<statistics_type::count_type>(count),
+								utils::lexical_cast<statistics_type::count_type>(node),
+								utils::lexical_cast<statistics_type::count_type>(edge),
+								utils::decode_base64<statistics_type::second_type>(user_time),
+								utils::decode_base64<statistics_type::second_type>(cpu_time),
+								utils::decode_base64<statistics_type::second_type>(thread_time));
+	  } else {
+	    stream[rank].reset();
+	    device[rank].reset();
+	  }
+	  
+	  found = true;
+	}
+      
+      if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+    
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::zlib_compressor());
+    os.push(utils::mpi_device_sink(0, stat_tag, 4096));
+    
+    statistics_type::const_iterator siter_end = operations.get_statistics().end();
+    for (statistics_type::const_iterator siter = operations.get_statistics().begin(); siter != siter_end; ++ siter) {
+      os << siter->first
+	 << ' ' << siter->second.count
+	 << ' ' << siter->second.node
+	 << ' ' << siter->second.edge;
+      os << ' ';
+      utils::encode_base64(siter->second.user_time, std::ostream_iterator<char>(os));
+      os << ' ';
+      utils::encode_base64(siter->second.cpu_time, std::ostream_iterator<char>(os));
+      os << ' ';
+      utils::encode_base64(siter->second.thread_time, std::ostream_iterator<char>(os));
+      os << '\n';
+    }
+    os << '\n';
+  }
+}
 
 void synchronize()
 {
@@ -1392,10 +1629,19 @@ void options(int argc, char** argv)
     // models...
     ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
     ("feature-function-list", po::bool_switch(&feature_list),                                           "list of available feature function(s)")
+    ("output-feature-function", po::value<path_type>(&output_feature),                                    "output feature function(s)")
     
     //operatins...
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")
-    ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)");
+    ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)")
+
+    ("scorer-list",    po::bool_switch(&scorer_list),    "list of available scorers")
+    ("format-list",    po::bool_switch(&format_list),    "list of available formatters")
+    ("signature-list", po::bool_switch(&signature_list), "list of available signatures")
+    ("stemmer-list",   po::bool_switch(&stemmer_list),   "list of available stemmers")
+    ("tokenizer-list", po::bool_switch(&tokenizer_list), "list of available tokenizers")
+    ("matcher-list",   po::bool_switch(&matcher_list),   "list of available matchers")
+    ;
 
   po::options_description opts_learn("learning options");
   opts_learn.add_options()
