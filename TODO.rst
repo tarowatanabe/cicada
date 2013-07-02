@@ -235,7 +235,6 @@ Documentation:
 Lua integration:
   - Any use...????
 
-
 Correctly implement alignment/distortion model estimation in lexicon_hmm/model4
   - Currenlty, it is very hacky, and gives non-optimal parameters...
 

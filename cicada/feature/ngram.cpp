@@ -39,6 +39,20 @@
 //  url       = {http://www.aclweb.org/anthology/P11-1027}
 // }
 
+// and employes the idea from
+//
+// @InProceedings{heafield-koehn-lavie:2012:EMNLP-CoNLL,
+//   author    = {Heafield, Kenneth  and  Koehn, Philipp  and  Lavie, Alon},
+//   title     = {Language Model Rest Costs and Space-Efficient Storage},
+//   booktitle = {Proceedings of the 2012 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning},
+//   month     = {July},
+//   year      = {2012},
+//   address   = {Jeju Island, Korea},
+//   publisher = {Association for Computational Linguistics},
+//   pages     = {1169--1178},
+//   url       = {http://www.aclweb.org/anthology/D12-1107}
+// }
+
 namespace cicada
 {
   namespace feature
