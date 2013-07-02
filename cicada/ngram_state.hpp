@@ -69,6 +69,14 @@ namespace cicada
       return reinterpret_cast<const logprob_type*>((const char*) buffer + sizeof(size_type) + sizeof(word_type::id_type) * (order_ - 1));
     }
     
+    void clear(void* buffer) const
+    {
+      size(buffer) = 0;
+      
+      std::fill(reinterpret_cast<char*>(context(buffer)), reinterpret_cast<char*>(context(buffer) + order_ - 1), 0);
+      std::fill(reinterpret_cast<char*>(backoff(buffer)), reinterpret_cast<char*>(backoff(buffer) + order_ - 1), 0);
+    }
+    
     void fill(void* buffer) const
     {
       const size_type len = size(buffer);

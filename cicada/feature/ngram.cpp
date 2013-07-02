@@ -100,10 +100,10 @@ namespace cicada
 	
 	buffer_bos.resize(scorer.buffer_size());
 	buffer_tmp.resize(scorer.buffer_size());
+
+	scorer.ngram_state_.clear(&(*buffer_bos.begin()));
 	
 	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
-
-	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
       }
 
       NGramImpl(const NGramImpl& x)
@@ -126,10 +126,10 @@ namespace cicada
 	
 	buffer_bos.resize(scorer.buffer_size());
 	buffer_tmp.resize(scorer.buffer_size());
+
+	scorer.ngram_state_.clear(&(*buffer_bos.begin()));
 	
 	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
-
-	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
       }
 
       NGramImpl& operator=(const NGramImpl& x)
@@ -155,9 +155,9 @@ namespace cicada
 	buffer_bos.resize(scorer.buffer_size());
 	buffer_tmp.resize(scorer.buffer_size());
 	
-	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
+	scorer.ngram_state_.clear(&(*buffer_bos.begin()));
 	
-	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
+	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
 	
 	return *this;
       }

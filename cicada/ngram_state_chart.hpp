@@ -120,6 +120,17 @@ namespace cicada
     {
       return suffix_.backoff(suffix(buffer));
     }
+
+    void clear(void* buffer) const
+    {
+      complete(buffer) = 0;
+      size_prefix(buffer) = 0;
+      size_suffix(buffer) = 0;
+      
+      std::fill(reinterpret_cast<char*>(state(buffer)), reinterpret_cast<char*>(state(buffer) + suffix_.order_ - 1), 0);
+      
+      suffix_.clear(suffix(buffer));
+    }
     
     void fill(void* buffer) const
     {
