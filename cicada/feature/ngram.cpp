@@ -103,7 +103,7 @@ namespace cicada
 	
 	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
 
-	scorer.ngram_state_.suffix_.fill(&(*buffer_bos.begin()));
+	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
       }
 
       NGramImpl(const NGramImpl& x)
@@ -129,7 +129,7 @@ namespace cicada
 	
 	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
 
-	scorer.ngram_state_.suffix_.fill(&(*buffer_bos.begin()));
+	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
       }
 
       NGramImpl& operator=(const NGramImpl& x)
@@ -157,7 +157,7 @@ namespace cicada
 	
 	ngram->lookup_context(&id_bos, (&id_bos) + 1, scorer.ngram_state_.suffix(&(*buffer_bos.begin())));
 	
-	scorer.ngram_state_.suffix_.fill(&(*buffer_bos.begin()));
+	scorer.ngram_state_.fill(&(*buffer_bos.begin()));
 	
 	return *this;
       }
