@@ -184,7 +184,19 @@ namespace cicada
 
       bool has_child(size_type pos) const
       {
-	return children_first(pos) != children_last(pos);
+	if (pos == size_type(-1))
+	  return (offsets[1] != 0);
+	else if (pos == 0)
+	  return offsets[1] != children_last(pos);
+	else if (pos >= position_size())
+	  return false;
+	else {
+	  const position_set_type::size_type iter = positions.select(pos, false);
+	  
+	  return (iter == position_set_type::size_type(-1) ? false : positions[iter + 1] != 0);
+	}
+
+	//return children_first(pos) != children_last(pos);
       }
       
       size_type children_first(size_type pos) const
