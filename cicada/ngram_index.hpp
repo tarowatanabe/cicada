@@ -191,9 +191,9 @@ namespace cicada
 	else if (pos >= position_size())
 	  return false;
 	else {
-	  const position_set_type::size_type iter = positions.select(pos, false);
+	  const position_set_type::size_type last = positions.select(pos + 2 - 1, false);
 	  
-	  return (iter == position_set_type::size_type(-1) ? false : positions[iter + 1] != 0);
+	  return (last == position_set_type::size_type(-1) ? false : positions[last - 1] != 0);
 	}
 
 	//return children_first(pos) != children_last(pos);
