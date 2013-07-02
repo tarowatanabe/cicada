@@ -85,6 +85,11 @@ int main(int argc, char** argv)
 	std::cerr << "next is sibling!" << std::endl;
       else
 	std::cerr << "no sibling" << std::endl;
+
+      if (succinct_trie.has_children(node_pos))
+	std::cerr << "has child!" << std::endl;
+      else
+	std::cerr << "no child" << std::endl;
     }
     
     
@@ -116,19 +121,19 @@ int main(int argc, char** argv)
     size_type key_pos = 0;
     
     const int result = succinct_trie.traverse((const uint8_t*) "A", node_pos, key_pos, 1);
-    std::cout << node_pos << ' ' << result << ' ' << succinct_trie.parent(node_pos) << std::endl;
+    std::cout << node_pos << ' ' << result << ' ' << succinct_trie.parent(node_pos) << ' ' << succinct_trie.has_children(node_pos) << std::endl;
 
     key_pos = 0;
     const int result2 = succinct_trie.traverse((const uint8_t*) "p", node_pos, key_pos, 1);
-    std::cout << node_pos << ' ' << result2 << ' ' << succinct_trie.parent(node_pos) << std::endl;
+    std::cout << node_pos << ' ' << result2 << ' ' << succinct_trie.parent(node_pos) << ' ' << succinct_trie.has_children(node_pos) << std::endl;
     
     key_pos = 0;
     const int result3 = succinct_trie.traverse((const uint8_t*) "r", node_pos, key_pos, 1);
-    std::cout << node_pos << ' ' << result3 << ' ' << succinct_trie.parent(node_pos) << std::endl;
+    std::cout << node_pos << ' ' << result3 << ' ' << succinct_trie.parent(node_pos) << ' ' << succinct_trie.has_children(node_pos) << std::endl;
 
     key_pos = 0;
     const int result4 = succinct_trie.traverse((const uint8_t*) "i", node_pos, key_pos, 1);
-    std::cout << node_pos << ' ' << result4 << ' ' << succinct_trie.parent(node_pos) << std::endl;
+    std::cout << node_pos << ' ' << result4 << ' ' << succinct_trie.parent(node_pos) << ' ' << succinct_trie.has_children(node_pos) << std::endl;
     
     succinct_trie_type::const_reverse_iterator riter_end = succinct_trie.rend();
     for (succinct_trie_type::const_reverse_iterator riter = succinct_trie.rbegin(node_pos); riter != riter_end; ++ riter)
@@ -137,7 +142,7 @@ int main(int argc, char** argv)
     
     key_pos = 0;
     const int result5 = succinct_trie.traverse((const uint8_t*) "l", node_pos, key_pos, 1);
-    std::cout << node_pos << ' ' << result5 << ' ' << succinct_trie.parent(node_pos) << std::endl;    
+    std::cout << node_pos << ' ' << result5 << ' ' << succinct_trie.parent(node_pos) << ' ' << succinct_trie.has_children(node_pos) << std::endl;    
   }
   
   

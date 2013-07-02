@@ -405,8 +405,13 @@ namespace succinctdb
     template <typename Index, typename Positions>
     bool __has_children(const Index& index, const Positions& positions, size_type node_pos) const
     {
+      const typename Positions::size_type last = positions.select(node_pos + 2, false);
+      
+      return (last == typename Positions::size_type(-1) ? false : positions[last - 1] != false);
+#if 0
       const std::pair<size_type, size_type> result = __range(index, positions, node_pos);
       return result.first < result.second;
+#endif
     }
     
     template <typename Positions>
