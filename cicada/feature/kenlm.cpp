@@ -373,7 +373,7 @@ namespace cicada
 	  }
 	}
 	
-	return score + scorer.Finish();
+	return (score + scorer.Finish()) * log10;
       }
 
       double ngram_predict_score(state_ptr_type& state)
@@ -446,7 +446,7 @@ namespace cicada
 	
 	reinterpret_cast<ngram_state_type*>(state)->right.ZeroRemaining();
 
-	return score;
+	return score * log10;
       }
       
       double ngram_complete_score(state_ptr_type& state)
@@ -463,7 +463,7 @@ namespace cicada
 	
 	reinterpret_cast<ngram_state_type*>(state)->right.ZeroRemaining();
 	
-	return score;
+	return score * log10;
       }
 
       size_type reserve_state_size() const
