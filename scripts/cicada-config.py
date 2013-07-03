@@ -313,15 +313,20 @@ if __name__ == '__main__':
     print
 
     print "# MBR decoding"
+    print
+    print "# Optionally, prune forest"
+    print "# operation = prune:density=4,${weights}"
+    print
     print "# First, collect expected ngrams"
     print "# operation = expected-ngram:${weights},scale=1.2,order=4"
     print
     print "# Second, compute expected-BLEU"
-    print "# Here, we simply add bleu-expected feature w/o pruning"
-    print "# operation = apply:exact=true,feature=\"bleu-expected:order=4\""
+    print "# Here, we rescore by bleu-expected"
+    print "# The weight file, \"weights.mbr\" should contains a single line: \"bleu-expected 1\""
+    print "# so that the bleu-expected feature is used to guide the cube-pruning."
+    print "# operation = apply:prune=true,size=%d,feature=\"bleu-expected:order=4\",weights=weights.mbr" %(options.beam)
     print
     print "# Third, output!"
-    print "# The weight file, \"weights.mbr\" should contains a single line: \"bleu-expected 1\""
-    print "# so that the bleu-expected feature is used to compute k-best!"
+    print "# Here, we use the same parameter employed in the previous cube-pruning"
     print "# operation = output:${file},kbest=${kbest},unique=true,weights=weights.mbr"
     print 
