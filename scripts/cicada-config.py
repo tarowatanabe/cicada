@@ -315,7 +315,7 @@ if __name__ == '__main__':
     print "# MBR decoding"
     print
     print "# Optionally, prune forest"
-    print "# operation = prune:density=4,${weights}"
+    print "# operation = prune:density=10,${weights}"
     print
     print "# First, collect expected ngrams"
     print "# operation = expected-ngram:${weights},scale=1.2,order=4"
