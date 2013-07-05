@@ -49,15 +49,11 @@ For the rest:
     along with Avenue code.  If not, see <http://www.gnu.org/licenses/>.
 
 
-Murmurhash2
-
-smhasher <http://code.google.com/p/smhasher/>
+Murmurhash2 <http://code.google.com/p/smhasher/>
 
 All code is released to the public domain. For business purposes, Murmurhash is under the MIT license. 
 
-Murmurhash3
-
-smhasher <http://code.google.com/p/smhasher/>
+Murmurhash3 <http://code.google.com/p/smhasher/>
 
 MurmurHash3 was written by Austin Appleby, and is placed in the public
 domain. The author hereby disclaims copyright to this source code.
@@ -85,9 +81,7 @@ Snowball stemmer <http://snowball.tartarus.org/>
  of the Snowball software. 
 
 
-WordNet-3.0 
-
-WordNet <http://wordnet.princeton.edu/>
+WordNet-3.0 <http://wordnet.princeton.edu/>
 
 Actually, we do not include data, but uses c-library.
 
@@ -150,8 +144,6 @@ libLBFGS <http://www.chokkan.org/software/liblbfgs/>
   THE SOFTWARE.
 
 
-boost.m4
-
 boost.m4 <http://github.com/tsuna/boost.m4>
 
  The code of boost.m4 is released under GPLv3+ with the following additional
@@ -169,9 +161,6 @@ boost.m4 <http://github.com/tsuna/boost.m4>
  *think* you can get advices at <copyright-clerk at fsf dot org>.  The intent
  here is to keep the code Free but to allow anyone to *use* it.
 
-
-
-liblinear
 
 liblinear <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>
 
@@ -206,8 +195,6 @@ liblinear <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
-edmonds_optimum_branching.hpp
 
 Edmonds's Algorithm <http://edmonds-alg.sourceforge.net>
 
@@ -283,8 +270,6 @@ fastlz <http://fastlz.org>
 
   FastLZ is distributed using the MIT license, see file LICENSE
   for details.
-
-::
 
   FastLZ - lightning-fast lossless compression library
 
