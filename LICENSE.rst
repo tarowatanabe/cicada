@@ -3,7 +3,7 @@ License
 
 The cicada toolkit is released under the LGPL. The libraries and codes
 bundled in this toolkit may have their own licenses. For details, see
-the section, Bundled Libraries.
+the section, "Bundled Libraries".
 
 For the rest:
 
@@ -24,8 +24,9 @@ For the rest:
 Bundled Libraries
 -----------------
 
-cicada comes with other libraries which are licensed under different
-copyrights. For details, see the licenses, briefly listed here.
+The cicada toolkit comes with other libraries which are licensed under
+different copyrights. For details, see the licenses, briefly listed
+here.
 
 kenlm
 `````

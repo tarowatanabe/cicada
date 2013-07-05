@@ -1,5 +1,7 @@
 2013-x-x
 --------
+ - INCOMPATIBLE: ngram language model code is completely written, and
+   follows the latest "expgram" codebase.
  - INCOMPATIBLE: feature application by
    apply_cube_{prune,grow,grow_coarse} are modified:
    If two candidates share the same score, we prefer
@@ -15,6 +17,10 @@
    TreeGrammarFallback (or fallback tree grammar) which captures the
    number of "copied" terminals.
  - Bugfix: strange getline behavior when line is very long.
+ - Added KenLM as an ngram language model, in addition to
+   ExpGram. Currently, ExpGram is smaller, but a little bit slower,
+   but better in terms of translation quality, thanks to better
+   rest-cost estimation.
  - Added debug messages for "inputs" so that we can know when
    lattices/forests are loaded.
  - Added cicada_filter_normalize which can perform normalization,
