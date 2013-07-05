@@ -1,11 +1,6 @@
 License
-=======
 
-The cicada toolkit is released under the LGPL. The libraries and codes
-bundled in this toolkit may have their own licenses. For details, see
-the section, "Bundled Libraries".
-
-For the rest:
+The cicada toolkit is released under the LGPL.
 
   The cicada toolkit is free software: you can redistribute it and/or modify
   it under the terms of the GNU Lesser General Public License as published
@@ -22,14 +17,10 @@ For the rest:
 
 
 Bundled Libraries
------------------
 
 The cicada toolkit comes with other libraries which are licensed under
 different copyrights. For details, see the licenses, briefly listed
 here.
-
-kenlm
-`````
 
 KenLM <http://kheafield.com/code/kenlm/>
 
@@ -59,14 +50,12 @@ For the rest:
 
 
 Murmurhash2
-```````````
 
 smhasher <http://code.google.com/p/smhasher/>
 
 All code is released to the public domain. For business purposes, Murmurhash is under the MIT license. 
 
 Murmurhash3
-```````````
 
 smhasher <http://code.google.com/p/smhasher/>
 
@@ -75,12 +64,9 @@ domain. The author hereby disclaims copyright to this source code.
 
 MIT license
 
-libstemmer\_c
-`````````````
+libstemmer_c
 
 Snowball stemmer <http://snowball.tartarus.org/>
-
-::
 
  All the software given out on this Snowball site is covered by the BSD
  License (see http://www.opensource.org/licenses/bsd-license.html ),
@@ -100,13 +86,10 @@ Snowball stemmer <http://snowball.tartarus.org/>
 
 
 WordNet-3.0 
-```````````
 
 WordNet <http://wordnet.princeton.edu/>
 
 Actually, we do not include data, but uses c-library.
-
-::
 
   WordNet Release 3.0
 
@@ -141,12 +124,7 @@ Actually, we do not include data, but uses c-library.
   Princeton University and LICENSEE agrees to preserve same.  
 
 
-libLBFGS
-````````
-
 libLBFGS <http://www.chokkan.org/software/liblbfgs/>
-
-::
 
   The MIT License
 
@@ -173,11 +151,8 @@ libLBFGS <http://www.chokkan.org/software/liblbfgs/>
 
 
 boost.m4
-````````
 
 boost.m4 <http://github.com/tsuna/boost.m4>
-
-::
 
  The code of boost.m4 is released under GPLv3+ with the following additional
  clause:
@@ -197,11 +172,8 @@ boost.m4 <http://github.com/tsuna/boost.m4>
 
 
 liblinear
-`````````
 
 liblinear <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>
-
-::
 
   Copyright (c) 2007-2011 The LIBLINEAR Project.
   All rights reserved.
@@ -236,10 +208,8 @@ liblinear <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>
 
 
 edmonds_optimum_branching.hpp
-`````````````````````````````
-Edmonds's Algorithm <http://edmonds-alg.sourceforge.net>
 
-::
+Edmonds's Algorithm <http://edmonds-alg.sourceforge.net>
 
  MIT License
 
@@ -264,17 +234,12 @@ Edmonds's Algorithm <http://edmonds-alg.sourceforge.net>
  THE SOFTWARE.
 
 
-lz4
-```
-
 lz4 <http://code.google.com/p/lz4/>
 
    LZ4 - Fast LZ compression algorithm
    Header File
    Copyright (C) 2011-2012, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
-
-::
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -303,26 +268,16 @@ lz4 <http://code.google.com/p/lz4/>
    - LZ4 homepage : http://fastcompression.blogspot.com/p/lz4.html
    - LZ4 source repository : http://code.google.com/p/lz4/
 
-
-quicklz
-```````
-
 quicklz <http://www.quicklz.com>
 
 Fast data compression library
 Copyright (C) 2006-2011 Lasse Mikkel Reinhold
 lar@quicklz.com
 
-::
-
   QuickLZ can be used for free under the GPL 1, 2 or 3 license (where anything 
   released into public must be open source) or under a commercial license if such 
   has been acquired (see http://www.quicklz.com/order.html). The commercial license 
   does not cover derived or ported versions created by third parties under GPL.
-
-
-fastlz
-``````
 
 fastlz <http://fastlz.org>
 
@@ -356,15 +311,9 @@ fastlz <http://fastlz.org>
   THE SOFTWARE.
 
 
-Eigen
-`````
-
-eigen <http://eigen.tuxfamily.org>
+Eigen <http://eigen.tuxfamily.org>
 
 Since the 3.1.1 release, Eigen is licensed under the MPL2. We refer to the MPL2 FAQ for initial questions.
-
-xxhash
-``````
 
 xxhash <http://code.google.com/p/xxhash/>
 
@@ -372,8 +321,6 @@ xxhash <http://code.google.com/p/xxhash/>
    Header File
    Copyright (C) 2012, Yann Collet.
    BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
-
-::
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are
@@ -401,12 +348,7 @@ xxhash <http://code.google.com/p/xxhash/>
         You can contact the author at :
         - xxHash source repository : http://code.google.com/p/xxhash/
 
-CG_DESCENT
-``````````
-
-cg_descent <http://www.math.ufl.edu/~hager/papers/CG>
-
-::
+CG_DESCENT <http://www.math.ufl.edu/~hager/papers/CG>
 
             A conjugate gradient method with guaranteed descent       
                    C-code Version 1.1  (October 6, 2005)              
