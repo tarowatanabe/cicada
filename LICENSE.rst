@@ -30,6 +30,8 @@ copyrights. For details, see the licenses, briefly listed here.
 kenlm
 `````
 
+KenLM <http://kheafield.com/code/kenlm/>
+
 Most of the code here is licensed under the LGPL.  There are exceptions that
 have their own licenses, listed below.  See comments in those files for more
 details.  
@@ -58,10 +60,14 @@ For the rest:
 Murmurhash2
 ```````````
 
+smhasher <http://code.google.com/p/smhasher/>
+
 All code is released to the public domain. For business purposes, Murmurhash is under the MIT license. 
 
 Murmurhash3
 ```````````
+
+smhasher <http://code.google.com/p/smhasher/>
 
 MurmurHash3 was written by Austin Appleby, and is placed in the public
 domain. The author hereby disclaims copyright to this source code.
@@ -71,7 +77,7 @@ MIT license
 libstemmer\_c
 `````````````
 
-Snowball stemmer <http://snowball.tartarus.org/>.
+Snowball stemmer <http://snowball.tartarus.org/>
 
 ::
 
@@ -95,7 +101,7 @@ Snowball stemmer <http://snowball.tartarus.org/>.
 WordNet-3.0 
 ```````````
 
-WordNet <http://wordnet.princeton.edu/>.
+WordNet <http://wordnet.princeton.edu/>
 
 Actually, we do not include data, but uses c-library.
 
@@ -137,7 +143,7 @@ Actually, we do not include data, but uses c-library.
 libLBFGS
 ````````
 
-libLBFGS <http://www.chokkan.org/software/liblbfgs/>.
+libLBFGS <http://www.chokkan.org/software/liblbfgs/>
 
 ::
 
@@ -168,6 +174,8 @@ libLBFGS <http://www.chokkan.org/software/liblbfgs/>.
 boost.m4
 ````````
 
+boost.m4 <http://github.com/tsuna/boost.m4>
+
 ::
 
  The code of boost.m4 is released under GPLv3+ with the following additional
@@ -189,6 +197,8 @@ boost.m4
 
 liblinear
 `````````
+
+liblinear <http://www.csie.ntu.edu.tw/~cjlin/liblinear/>
 
 ::
 
@@ -226,6 +236,7 @@ liblinear
 
 edmonds_optimum_branching.hpp
 `````````````````````````````
+Edmonds's Algorithm <http://edmonds-alg.sourceforge.net>
 
 ::
 
@@ -254,6 +265,8 @@ edmonds_optimum_branching.hpp
 
 lz4
 ```
+
+lz4 <http://code.google.com/p/lz4/>
 
    LZ4 - Fast LZ compression algorithm
    Header File
@@ -293,6 +306,8 @@ lz4
 quicklz
 ```````
 
+quicklz <http://www.quicklz.com>
+
 Fast data compression library
 Copyright (C) 2006-2011 Lasse Mikkel Reinhold
 lar@quicklz.com
@@ -307,6 +322,8 @@ lar@quicklz.com
 
 fastlz
 ``````
+
+fastlz <http://fastlz.org>
 
   FastLZ is distributed using the MIT license, see file LICENSE
   for details.
@@ -341,10 +358,14 @@ fastlz
 Eigen
 `````
 
+eigen <http://eigen.tuxfamily.org>
+
 Since the 3.1.1 release, Eigen is licensed under the MPL2. We refer to the MPL2 FAQ for initial questions.
 
 xxhash
 ``````
+
+xxhash <http://code.google.com/p/xxhash/>
 
    xxHash - Fast Hash algorithm
    Header File
@@ -381,6 +402,8 @@ xxhash
 
 CG_DESCENT
 ``````````
+
+cg_descent <http://www.math.ufl.edu/~hager/papers/CG>
 
 ::
 
