@@ -429,7 +429,6 @@ namespace cicada
             
       while (1) {
 	result.prob     = logprobs[shard_index](shard_node, order);
-	result.bound    = result.prob;
 	result.bound    = (! logbounds.empty() && shard_node < logbounds[shard_index].size()
 			   ? logbounds[shard_index](shard_node, order)
 			   : result.prob);
