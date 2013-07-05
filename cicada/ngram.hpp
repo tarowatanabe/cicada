@@ -318,8 +318,9 @@ namespace cicada
       
       lookup_result(state, order, result);
 
-      if (result.complete)
-	throw std::runtime_error("we assume non-completed context");
+      // no checking...!
+      //if (result.complete)
+      // throw std::runtime_error("we assume non-completed context");
             
       // we use bound score...
       //
