@@ -1,7 +1,24 @@
 License
 =======
 
-cicada is released under .....
+The cicada toolkit is released under the LGPL. The libraries and codes
+bundled in this toolkit may have their own licenses. For details, see
+the section, Bundled Libraries.
+
+For the rest:
+
+  The cicada toolkit is free software: you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as published
+  by the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  The cicada toolkit is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with Avenue code.  If not, see <http://www.gnu.org/licenses/>.
 
 
 Bundled Libraries
