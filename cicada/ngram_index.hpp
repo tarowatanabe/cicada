@@ -114,7 +114,7 @@ namespace cicada
       struct cache_pos_type
       {
 	typedef uint64_t value_type;
-	
+
 	value_type value;
         
 	cache_pos_type(const value_type& __value) : value(__value) {}
@@ -158,11 +158,11 @@ namespace cicada
 	if (offsets.size() > 1) {
 	  caches_size = position_size();
 	  
-	  // 20 bits for id
-	  // 22 bits for position
+	  // 18 bits for id
+	  // 23 bits for position
 	  
-	  if (size() >= 0x3fffff)
-	    caches_size = parent(0x3fffff - (size() == 0x3fffff));
+	  if (size() > 0x7fffff)
+	    caches_size = parent(0x7fffff);
 	}
       }
 
@@ -259,26 +259,26 @@ namespace cicada
 	else if (pos == size_type(-1))
 	  return utils::bithack::branch(id < offsets[1], size_type(id), size_type(-1));
 	else {
-	  // 20 bits for id
-	  // 22 bits for position
-	  if (id < 0xfffff && pos < caches_size) {
+	  // 18 bits for id
+	  // 23 bits for position
+	  if (id < 0x3ffff && pos < caches_size) {
 	    const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos.size() - 1);
 	    cache_pos_type& cache = const_cast<cache_pos_type&>(caches_pos[cache_pos]);
 	    
 	    cache_pos_type ret(utils::atomicop::fetch_and_add(cache.value, cache_pos_type::value_type(0)));
 	    
-	    id_type   ret_id   = (ret.value >> 44) & 0xfffff;
-	    size_type ret_pos  = (ret.value >> 22) & 0x3fffff;
-	    size_type ret_next = ret.value & 0x3fffff;
+	    id_type   ret_id   = (ret.value >> 46) & 0x3ffff;
+	    size_type ret_pos  = (ret.value >> 23) & 0x7fffff;
+	    size_type ret_next = ret.value & 0x7fffff;
 	    
 	    if (ret_id == id && ret_pos == pos)
-	      return utils::bithack::branch(ret_next == 0x3fffff, size_type(-1), ret_next);
+	      return utils::bithack::branch(ret_next == 0x7fffff, size_type(-1), ret_next);
 	    
 	    ret_next = __find(pos, id);
 	    
-	    cache_pos_type ret_new(((cache_pos_type::value_type(id) & 0xfffff) << 44)
-				   | ((cache_pos_type::value_type(pos) & 0x3fffff) << 22)
-				   | (cache_pos_type::value_type(ret_next) & 0x3fffff));
+	    cache_pos_type ret_new(((cache_pos_type::value_type(id) & 0x3ffff) << 46)
+				   | ((cache_pos_type::value_type(pos) & 0x7fffff) << 23)
+				   | (cache_pos_type::value_type(ret_next) & 0x7fffff));
 	    
 	    utils::atomicop::compare_and_swap(cache.value, ret.value, ret_new.value);
 	    
