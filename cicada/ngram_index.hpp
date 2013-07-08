@@ -27,6 +27,7 @@
 #include <utils/succinct_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/hashmurmur3.hpp>
+#include <utils/spinlock.hpp>
 #include <utils/bithack.hpp>
 
 namespace cicada
@@ -111,14 +112,17 @@ namespace cicada
       typedef std::vector<size_type, std::allocator<size_type> >               off_set_type;
 
     public:
+      typedef utils::spinlock spinlock_type;
+      typedef spinlock_type::scoped_lock     lock_type;
+      typedef spinlock_type::scoped_try_lock trylock_type;
+      
       struct cache_pos_type
       {
-	typedef uint64_t value_type;
-
-	value_type value;
+	size_type pos;
+	size_type pos_next;
+	id_type id;
         
-	cache_pos_type(const value_type& __value) : value(__value) {}
-	cache_pos_type() : value(value_type(-1)) {}
+	cache_pos_type() : pos(size_type(-1)), pos_next(size_type(-1)), id(id_type(-1)) {}
       };
       
       typedef utils::array_power2<cache_pos_type, 1024 * 32, std::allocator<cache_pos_type> > cache_pos_set_type;
@@ -153,17 +157,6 @@ namespace cicada
       void clear_cache()
       {
 	caches_pos.clear();
-	caches_size = 0;
-	
-	if (offsets.size() > 1) {
-	  caches_size = position_size();
-	  
-	  // 18 bits for id
-	  // 23 bits for position
-	  
-	  if (size() > 0x7fffff)
-	    caches_size = parent(0x7fffff);
-	}
       }
 
       void open(const path_type& path);
@@ -259,30 +252,18 @@ namespace cicada
 	else if (pos == size_type(-1))
 	  return utils::bithack::branch(id < offsets[1], size_type(id), size_type(-1));
 	else {
-	  // 18 bits for id
-	  // 23 bits for position
-	  if (id < 0x3ffff && pos < caches_size) {
+	  // lock here!
+	  trylock_type lock(const_cast<spinlock_type&>(spinlock_pos));
+	  
+	  if (lock) {
 	    const size_type cache_pos = hasher_type::operator()(id, pos) & (caches_pos.size() - 1);
 	    cache_pos_type& cache = const_cast<cache_pos_type&>(caches_pos[cache_pos]);
-	    
-	    cache_pos_type ret(utils::atomicop::fetch_and_add(cache.value, cache_pos_type::value_type(0)));
-	    
-	    id_type   ret_id   = (ret.value >> 46) & 0x3ffff;
-	    size_type ret_pos  = (ret.value >> 23) & 0x7fffff;
-	    size_type ret_next = ret.value & 0x7fffff;
-	    
-	    if (ret_id == id && ret_pos == pos)
-	      return utils::bithack::branch(ret_next == 0x7fffff, size_type(-1), ret_next);
-	    
-	    ret_next = __find(pos, id);
-	    
-	    cache_pos_type ret_new(((cache_pos_type::value_type(id) & 0x3ffff) << 46)
-				   | ((cache_pos_type::value_type(pos) & 0x7fffff) << 23)
-				   | (cache_pos_type::value_type(ret_next) & 0x7fffff));
-	    
-	    utils::atomicop::compare_and_swap(cache.value, ret.value, ret_new.value);
-	    
-	    return ret_next;
+	    if (cache.pos != pos || cache.id != id) {
+	      cache.pos      = pos;
+	      cache.id       = id;
+	      cache.pos_next = __find(pos, id);
+	    }
+	    return cache.pos_next;
 	  } else
 	    return __find(pos, id);
         }
@@ -360,8 +341,8 @@ namespace cicada
       position_set_type  positions;
       off_set_type       offsets;
       
+      spinlock_type      spinlock_pos;
       cache_pos_set_type caches_pos;
-      size_type          caches_size;
     };
     
     typedef Shard shard_type;
