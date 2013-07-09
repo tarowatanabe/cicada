@@ -297,10 +297,8 @@ namespace cicada
 	      middle = first + half;
 	      middle_id = ids[middle];
 	      
-	      const bool is_less = middle_id < id;
-	      
-	      first  = utils::bithack::branch(is_less, middle + 1, first);
-	      length = utils::bithack::branch(is_less, length - half - 1, half);
+	      first  = utils::bithack::branch(middle_id < id, middle + 1, first);
+	      length = utils::bithack::branch(middle_id < id, length - half - 1, half);
 	    }
 	    return std::make_pair(first + offset, middle != first && first != last ? ids[first] : middle_id);
 	  }
