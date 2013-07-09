@@ -290,20 +290,19 @@ namespace cicada
 	    return std::make_pair(first + offset, first_id);
 	  } else {
 	    id_type middle_id = 0;
-	    size_t  middle_pos = 0;
+	    size_t  middle = 0;
 	    while (length) {
 	      const size_t half  = length >> 1;
-	      const size_t middle = first + half;
 	      
+	      middle = first + half;
 	      middle_id = ids[middle];
-	      middle_pos = middle;
 	      
 	      const bool is_less = middle_id < id;
 	      
 	      first  = utils::bithack::branch(is_less, middle + 1, first);
 	      length = utils::bithack::branch(is_less, length - half - 1, half);
 	    }
-	    return std::make_pair(first + offset, middle_pos != first && first != last ? ids[first] : middle_id);
+	    return std::make_pair(first + offset, middle != first && first != last ? ids[first] : middle_id);
 	  }
 	}
       }
