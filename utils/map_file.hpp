@@ -134,8 +134,12 @@ namespace utils
 
     void close()
     {
-      if (mmapped)
+      if (mmapped) {
+	if (modifiable)
+	  ::msync(mmapped, filesize, MS_SYNC);
+	
 	::munmap(mmapped, filesize);
+      }
       
       mmapped = 0;
       filesize = 0;
