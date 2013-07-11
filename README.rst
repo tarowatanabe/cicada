@@ -43,7 +43,7 @@ shell's newline):
 
    cicada \
       --input samples/sample.input \
-      --grammar samples/sample.grammar.gz \
+      --grammar samples/sample.grammar.bin \
       --grammar "glue:straight=true,inverted=false,non-terminal=[x],goal=[s]" \
       --grammar "insertion:non-terminal=[x]" \
       --feature-function "ngram:file=samples/sample.ngram.bin" \
@@ -58,18 +58,22 @@ This sample means:
   - Input is `samples/sample.init`
   - Grammar consists of three gramamr specs:
 
-    - the grammar file is `samples/sample.grammar.gz`
+    - the grammar file is `samples/sample.grammar.bin` which is a
+      binary version of `samples/sample.grammar.gz`.
     - Additional grammar is a "glue grammar" which consists of two rules
       of "[s] -> <[x], [x]>" and "[s] -> <[s,1] [x,1], [s,1] [x,1]>"
     - Another additional grammar is an "insertion grammar" which simply
       copies the input string to output string, "[x] -> <word-x, word-x>"
-  - Three feature functions
 
-    - 5-gram language model from `samples/sample.ngram.gz`.
+  - Three feature functions:
+
+    - 5-gram language model from `samples/sample.ngram.bin` which is a
+      binary version of `samples/sample.ngram.gz`.
     - word penalty feature which penalize by the number of words in
       the target side.
     - rule penalty feature which penaltize by the number of words in a
       derivation.
+
   - Actual operation:
 
     1. Input is composed by cky algorithm (compose-cky) which result
@@ -142,8 +146,6 @@ After the hypergraph generation, you can:
 	lower-order ngrams etc.
       * cube-pruning implements algorithm 2 of faster cube pruning
 	[31]_.
-      * The ngram language model feaature supports expgram [39]_ and
-	kenlm [40]_.
    - Perform variational decoding for hypergraph [10]_.
    - Perform MBR decoding for hypergraph [12]_.
       * Above two computations rely on expected ngram-counts over
@@ -207,6 +209,10 @@ Various learning components are implemented:
      + Now, this is a recommended optimization method (either kbest or hypergraph learning)
    - We support feature selection by kbest-feature merging [36]_
    - Asynchronous online learning employed in [6]_.
+
+Feature functions:
+   -  The ngram language model feaature supports expgram [39]_ and
+      kenlm [40]_.
 
 Word clustering tool is also included to support word alignment
 learning + translation [20]_
