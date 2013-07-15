@@ -227,7 +227,8 @@ namespace cicada
       cache_type cache;
       cache_type cache_new;
       
-      cache.value = utils::atomicop::fetch_and_add(caches[word.id() & (caches.size() - 1)].value, int64_t(0));
+      //cache.value = utils::atomicop::fetch_and_add(caches[word.id() & (caches.size() - 1)].value, int64_t(0));
+      cache.value = const_cast<const volatile cache_type::value_type&>(caches[word.id() & (caches.size() - 1)].value);
       
       uint32_t __word = (cache.value >> 32) & 0xffffffff;
       uint32_t __id   = (cache.value) & 0xffffffff;
@@ -253,7 +254,8 @@ namespace cicada
       cache_type cache;
       cache_type cache_new;
       
-      cache.value = utils::atomicop::fetch_and_add(caches[id & (caches.size() - 1)].value, int64_t(0));
+      //cache.value = utils::atomicop::fetch_and_add(caches[id & (caches.size() - 1)].value, int64_t(0));
+      cache.value = const_cast<const volatile cache_type::value_type&>(caches[id & (caches.size() - 1)].value);
       
       uint32_t __word = (cache.value >> 32) & 0xffffffff;
       uint32_t __id   = (cache.value) & 0xffffffff;
