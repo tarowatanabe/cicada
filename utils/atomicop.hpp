@@ -30,7 +30,7 @@ namespace utils
 #elif defined(__APPLE__)
       OSMemoryBarrier();
 #elif defined(__GNUC__) && defined(__x86_64__)
-      __asm__ __volatile__("mfence" ::: "memory");
+      __asm__ __volatile__("" ::: "memory");
 #elif defined(__GNUC__)
       __sync_synchronize();
 #else
