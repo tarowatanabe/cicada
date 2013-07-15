@@ -120,10 +120,14 @@ namespace cicada
 	  uint64_t hi;
 	  
 	  value_type() : lo(uint64_t(-1)), hi(uint64_t(-1)) {}
+	  value_type(const value_type& x) : lo(x.lo), hi(x.hi) {}
+	  value_type(const volatile value_type& x) : lo(x.lo), hi(x.hi) {}
 	  value_type(const uint64_t& __lo, const uint64_t& __hi) : lo(__lo), hi(__hi) {}
 	} __attribute__ (( __aligned__( 16 ) ));
 	
 	cache_type() : value()  {}
+	cache_type(const cache_type& x) : value(x.value) {}
+	cache_type(const volatile cache_type& x) : value(x.value) {}
 	cache_type(const uint64_t& lo, const uint64_t& hi) : value(lo, hi) {}
 	
 	bool compare_and_swap(const cache_type& value_old, const cache_type& value_new)
@@ -276,9 +280,11 @@ namespace cicada
 	  cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
 	  
 	  // fetch...
-	  const cache_type cache_fetch = cache;
+	  //const cache_type cache_fetch = cache;
 	  
-	  utils::atomicop::memory_barrier();
+	  //utils::atomicop::memory_barrier();
+
+	  const cache_type cache_fetch = const_cast<const volatile cache_type&>(cache);
 	  
 	  // store positions in 48 bits
 	  const size_type cache_pos_prev = cache_fetch.value.lo & 0xffffffffffffll;
