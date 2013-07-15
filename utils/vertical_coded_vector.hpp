@@ -307,7 +307,8 @@ namespace utils
       cache_type cache;
       cache_type cache_new;
       
-      cache.value = utils::atomicop::fetch_and_add(caches[pos & mask_cache].value, int64_t(0));
+      //cache.value = utils::atomicop::fetch_and_add(caches[pos & mask_cache].value, int64_t(0));
+      cache.value = const_cast<const volatile typename cache_type::value_type&>(caches[pos & mask_cache].value);
       
       uint64_t __pos   = (cache.value & __mask_pos);
       uint64_t __value = (cache.value & __mask_value);
@@ -417,7 +418,7 @@ namespace utils
   inline
   bool operator==(const vertical_coded_vector_mapped<T,A>& x, const vertical_coded_vector_mapped<T,A>& y)
   {
-    return x.compressede == y.compressed && x.off == y.off;
+    return x.compressed == y.compressed && x.off == y.off;
   }
   
   template <typename T, typename A>
