@@ -280,10 +280,6 @@ namespace cicada
 	  cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
 	  
 	  // fetch...
-	  //const cache_type cache_fetch = cache;
-	  
-	  //utils::atomicop::memory_barrier();
-
 	  const cache_type cache_fetch = const_cast<const volatile cache_type&>(cache);
 	  
 	  // store positions in 48 bits
