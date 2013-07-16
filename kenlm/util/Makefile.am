@@ -82,3 +82,6 @@ string_piece_hash.hh \
 thread_pool.hh \
 tokenize_piece.hh \
 usage.hh
+
+EXTRA_DIST = \
+Jamfile

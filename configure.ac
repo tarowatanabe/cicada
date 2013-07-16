@@ -637,7 +637,9 @@ AC_CONFIG_FILES([Makefile
 		 cg_descent/Makefile
 		 wn/Makefile
 		 progs/Makefile
+		 samples/Makefile
 		 scripts/Makefile
+		 sgml_entity/Makefile
                  succinct_db/Makefile
                  utils/Makefile])
 

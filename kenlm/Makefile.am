@@ -1,1 +1,9 @@
 SUBDIRS = util lm
+
+EXTRA_DIST = \
+BUILDING \
+COPYING \
+COPYING.LESSER \
+Jamroot \
+LICENSE \
+README.md

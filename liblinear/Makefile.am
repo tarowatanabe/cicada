@@ -39,4 +39,9 @@ train_LDADD = liblinear.la
 predict_SOURCES = predict.cpp
 predict_LDADD = liblinear.la
 
+EXTRA_DIST = \
+COPYRIGHT \
+README \
+Makefile.orig \
+heart_scale
 

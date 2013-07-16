@@ -90,6 +90,9 @@ $(BOOST_THREAD_LIBS) \
 $(BOOST_PROGRAM_OPTIONS_LDFLAGS) \
 $(BOOST_PROGRAM_OPTIONS_LIBS)
 
+EXTRA_DIST = \
+Jamfile
+
 noinst_DATA = .gitignore
 
 .gitignore: Makefile.am

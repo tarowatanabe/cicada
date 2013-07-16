@@ -289,3 +289,14 @@ Eigen/StdVector \
 Eigen/SuperLUSupport \
 Eigen/SVD \
 Eigen/UmfPackSupport
+
+noinst_SCRIPTS = \
+makefile.sh
+
+EXTRA_DIST = \
+COPYING.BSD \
+COPYING.GPL \
+COPYING.LGPL \
+COPYING.MINPACK \
+COPYING.MPL2 \
+COPYING.README

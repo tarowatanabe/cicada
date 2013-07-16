@@ -6,6 +6,11 @@ libstemmer_la_SOURCES = $(snowball_sources)
 
 noinst_PROGRAMS = stemwords
 
+EXTRA_DIST = \
+MANIFEST \
+Makefile.orig \
+README
+
 noinst_DATA = .gitignore
 
 .gitignore: Makefile.am
