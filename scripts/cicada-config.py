@@ -248,7 +248,7 @@ if __name__ == '__main__':
     
     ### inputs
     print "#"
-    print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency,directory}"
+    print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency}"
     print "#"
     
     if options.scfg:
@@ -278,8 +278,6 @@ if __name__ == '__main__':
     elif options.tree_cky:
         print "# string-to-{string,tree} translation"
         print "operation = compose-tree-cky:frontier=false"
-    else:
-        raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
     print
 
     print "# annotate <s> and </s> to the forest"
