@@ -321,7 +321,7 @@ if __name__ == '__main__':
     print "# Second, compute expected-BLEU"
     print "# Here, we rescore by bleu-expected"
     print "# The weight file, \"weights.mbr\" should contains a single line: \"bleu-expected 1\""
-    print "# so that the bleu-expected feature is used to guide the cube-pruning."
+    print "# so that the bleu-expected feature is used during cube-pruning."
     print "# operation = apply:prune=true,size=%d,feature=\"bleu-expected:order=4\",weights=weights.mbr" %(options.beam)
     print
     print "# Third, output!"
