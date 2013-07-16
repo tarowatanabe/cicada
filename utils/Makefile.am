@@ -57,7 +57,6 @@ compact_map.hpp \
 compact_set.hpp \
 compress_stream.hpp \
 config.hpp \
-config.h \
 double_base64_generator.hpp \
 double_base64_parser.hpp \
 filesystem.hpp \
@@ -150,6 +149,9 @@ vector2_aligned.hpp \
 vector3_aligned.hpp \
 vertical_coded_device.hpp \
 vertical_coded_vector.hpp
+
+nodist_libutilsinclude_HEADERS = \
+config.h
 
 noinst_PROGRAMS = \
 alloc_vector_main \

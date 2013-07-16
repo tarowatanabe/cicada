@@ -16,7 +16,7 @@ dist_bin_SCRIPTS = \
 	cicada-pipe.py \
 	cicada-sh.py
 
-noinst_SCRIPTS = \
+dist_noinst_SCRIPTS = \
 	cicada-learn-moses.sh \
 	cicada-learn.sh \
 	cicada-maxent.sh \

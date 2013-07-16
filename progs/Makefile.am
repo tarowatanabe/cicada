@@ -146,10 +146,10 @@ noinst_DATA = .gitignore
 	  echo $$bin >> .gitignore; \
 	done
 
-cicada_SOURCES = cicada.cpp cicada_impl.hpp
+cicada_SOURCES = cicada.cpp cicada_impl.hpp cicada_output_impl.hpp
 cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_mpi_SOURCES  = cicada_mpi.cpp cicada_impl.hpp
+cicada_mpi_SOURCES  = cicada_mpi.cpp cicada_impl.hpp cicada_output_impl.hpp
 cicada_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
@@ -169,37 +169,37 @@ cicada_convex_hull_mpi_SOURCES = cicada_convex_hull_mpi.cpp
 cicada_convex_hull_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_convex_hull_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_convex_hull_kbest_SOURCES = cicada_convex_hull_kbest.cpp
+cicada_convex_hull_kbest_SOURCES = cicada_convex_hull_kbest.cpp cicada_mert_kbest_impl.hpp
 cicada_convex_hull_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_convex_hull_kbest_mpi_SOURCES = cicada_convex_hull_kbest_mpi.cpp
+cicada_convex_hull_kbest_mpi_SOURCES = cicada_convex_hull_kbest_mpi.cpp cicada_mert_kbest_impl.hpp
 cicada_convex_hull_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_convex_hull_kbest_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_eval_SOURCES = cicada_eval.cpp cicada_text_impl.hpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_ghkm_SOURCES = cicada_extract_ghkm.cpp cicada_extract_ghkm_impl.hpp
+cicada_extract_ghkm_SOURCES = cicada_extract_ghkm.cpp cicada_extract_ghkm_impl.hpp cicada_extract_impl.hpp
 cicada_extract_ghkm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_ghkm_mpi_SOURCES  = cicada_extract_ghkm_mpi.cpp cicada_extract_ghkm_impl.hpp
+cicada_extract_ghkm_mpi_SOURCES  = cicada_extract_ghkm_mpi.cpp cicada_extract_ghkm_impl.hpp cicada_extract_impl.hpp
 cicada_extract_ghkm_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_ghkm_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_phrase_SOURCES = cicada_extract_phrase.cpp cicada_extract_phrase_impl.hpp
+cicada_extract_phrase_SOURCES = cicada_extract_phrase.cpp cicada_extract_phrase_impl.hpp cicada_extract_impl.hpp
 cicada_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_phrase_mpi_SOURCES  = cicada_extract_phrase_mpi.cpp cicada_extract_phrase_impl.hpp
+cicada_extract_phrase_mpi_SOURCES  = cicada_extract_phrase_mpi.cpp cicada_extract_phrase_impl.hpp cicada_extract_impl.hpp
 cicada_extract_phrase_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_phrase_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_rule_SOURCES = cicada_extract_rule.cpp
 cicada_extract_rule_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_scfg_SOURCES = cicada_extract_scfg.cpp cicada_extract_scfg_impl.hpp
+cicada_extract_scfg_SOURCES = cicada_extract_scfg.cpp cicada_extract_scfg_impl.hpp cicada_extract_impl.hpp
 cicada_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_scfg_mpi_SOURCES  = cicada_extract_scfg_mpi.cpp cicada_extract_scfg_impl.hpp
+cicada_extract_scfg_mpi_SOURCES  = cicada_extract_scfg_mpi.cpp cicada_extract_scfg_impl.hpp cicada_extract_impl.hpp
 cicada_extract_scfg_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_scfg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
@@ -213,10 +213,10 @@ cicada_extract_score_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LI
 cicada_extract_sort_SOURCES = cicada_extract_sort.cpp cicada_extract_score_impl.hpp
 cicada_extract_sort_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_tree_SOURCES = cicada_extract_tree.cpp cicada_extract_tree_impl.hpp
+cicada_extract_tree_SOURCES = cicada_extract_tree.cpp cicada_extract_tree_impl.hpp cicada_extract_impl.hpp
 cicada_extract_tree_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_extract_tree_mpi_SOURCES  = cicada_extract_tree_mpi.cpp cicada_extract_tree_impl.hpp
+cicada_extract_tree_mpi_SOURCES  = cicada_extract_tree_mpi.cpp cicada_extract_tree_impl.hpp cicada_extract_impl.hpp
 cicada_extract_tree_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
@@ -362,10 +362,12 @@ cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(bo
 
 cicada_lexicon_hmm_SOURCES = \
 	cicada_lexicon_hmm.cpp \
+	cicada_lexicon_impl.hpp \
 	cicada_lexicon_hmm_impl.hpp \
 	cicada_lexicon_model1_impl.hpp \
 	cicada_lexicon_maximize_impl.hpp \
 	dependency_hybrid.hpp \
+	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp
@@ -373,9 +375,11 @@ cicada_lexicon_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools
 
 cicada_lexicon_model1_SOURCES = \
 	cicada_lexicon_model1.cpp \
+	cicada_lexicon_impl.hpp \
 	cicada_lexicon_model1_impl.hpp \
 	cicada_lexicon_maximize_impl.hpp \
 	dependency_hybrid.hpp \
+	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
@@ -383,11 +387,13 @@ cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_lexicon_model4_SOURCES = \
 	cicada_lexicon_model4.cpp \
+	cicada_lexicon_impl.hpp \
 	cicada_lexicon_hmm_impl.hpp \
 	cicada_lexicon_model1_impl.hpp \
 	cicada_lexicon_model4_impl.hpp \
 	cicada_lexicon_maximize_impl.hpp \
 	dependency_hybrid.hpp \
+	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
@@ -400,10 +406,10 @@ cicada_mert_mpi_SOURCES  = cicada_mert_mpi.cpp cicada_text_impl.hpp
 cicada_mert_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mert_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_mert_kbest_SOURCES = cicada_mert_kbest.cpp cicada_text_impl.hpp
+cicada_mert_kbest_SOURCES = cicada_mert_kbest.cpp cicada_text_impl.hpp cicada_mert_kbest_impl.hpp
 cicada_mert_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_mert_kbest_mpi_SOURCES  = cicada_mert_kbest_mpi.cpp cicada_text_impl.hpp
+cicada_mert_kbest_mpi_SOURCES  = cicada_mert_kbest_mpi.cpp cicada_text_impl.hpp cicada_mert_kbest_impl.hpp
 cicada_mert_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mert_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 

@@ -459,6 +459,7 @@ discounter.hpp \
 dot_product.hpp \
 edit_distance_forest.hpp \
 eval.hpp \
+expand_ngram.hpp \
 expected_ngram.hpp \
 feature.hpp \
 feature_function.hpp \

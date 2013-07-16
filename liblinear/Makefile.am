@@ -43,7 +43,5 @@ EXTRA_DIST = \
 COPYRIGHT \
 README \
 Makefile.orig \
-heart_scale \
-predict.c \
-train.c
+heart_scale
 
