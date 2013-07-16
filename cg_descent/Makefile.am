@@ -28,18 +28,18 @@ noinst_DATA = .gitignore
 	  echo $$bin >> .gitignore; \
 	done
 
-driver1_SOURCES = driver1.cpp
+driver1_SOURCES = driver1.c
 driver1_LDADD = libcg_descent.la
 
-driver2_SOURCES = driver2.cpp
+driver2_SOURCES = driver2.c
 driver2_LDADD = libcg_descent.la
 
-driver3_SOURCES = driver3.cpp
+driver3_SOURCES = driver3.c
 driver3_LDADD = libcg_descent.la
 
-driver4_SOURCES = driver4.cpp
+driver4_SOURCES = driver4.c
 driver4_LDADD = libcg_descent.la
 
-driver5_SOURCES = driver5.cpp
+driver5_SOURCES = driver5.c
 driver5_LDADD = libcg_descent.la
 
