@@ -59,6 +59,8 @@ double-conversion/fixed-dtoa.h \
 double-conversion/ieee.h \
 double-conversion/strtod.h \
 double-conversion/utils.h \
+bit_packing.hh \
+ersatz_progress.hh \
 exception.hh \
 fake_ofstream.hh \
 file.hh \

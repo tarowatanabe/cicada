@@ -290,7 +290,7 @@ Eigen/SuperLUSupport \
 Eigen/SVD \
 Eigen/UmfPackSupport
 
-noinst_SCRIPTS = \
+dist_noinst_SCRIPTS = \
 makefile.sh
 
 EXTRA_DIST = \

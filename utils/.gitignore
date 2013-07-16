@@ -84,6 +84,10 @@ vector2_main
 vertical_coded_vector_main
 bitpack_gen.py
 group_aligned_code_offsets.py
+parse-sgml-entity.py
+parse-sgml-entity-inverse.py
+parse-uspatent.py
+uspatent-table.py
 bitpack16_impl.hpp
 bitpack32_impl.hpp
 bitpack64_impl.hpp

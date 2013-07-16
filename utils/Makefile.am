@@ -29,6 +29,7 @@ libutils_la_LIBADD = \
 
 libutilsincludedir = $(pkgincludedir)/utils
 libutilsinclude_HEADERS = \
+aligned_allocator.hpp \
 alloc_vector.hpp \
 allocinfo_allocator.hpp \
 arc_list.hpp \
@@ -106,6 +107,7 @@ restaurant.hpp \
 restaurant_floor.hpp \
 restaurant_sync.hpp \
 restaurant_vector.hpp \
+rwphase.hpp \
 rwspinlock.hpp \
 rwticket.hpp \
 sampler.hpp \
@@ -209,7 +211,11 @@ vertical_coded_vector_main
 
 dist_noinst_SCRIPTS = \
 bitpack_gen.py \
-group_aligned_code_offsets.py
+group_aligned_code_offsets.py \
+parse-sgml-entity.py \
+parse-sgml-entity-inverse.py \
+parse-uspatent.py \
+uspatent-table.py
 
 IGNORES = \
 bitpack16_impl.hpp \

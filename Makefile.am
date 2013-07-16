@@ -12,5 +12,6 @@ COPYING.LGPL \
 LICENSE \
 NEWS.rst \
 README.rst \
-TODO.rst
+TODO.rst \
+.gitignore
 

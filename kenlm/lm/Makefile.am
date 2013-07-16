@@ -73,6 +73,19 @@ cicada_kenlm_query_SOURCES = query_main.cc
 cicada_kenlm_query_LDADD   = $(LIBKENLM)
 
 cicada_kenlm_lmplz_SOURCES = \
+builder/adjust_counts.hh \
+builder/corpus_count.hh \
+builder/discount.hh \
+builder/header_info.hh \
+builder/initial_probabilities.hh \
+builder/interpolate.hh \
+builder/joint_order.hh \
+builder/multi_stream.hh \
+builder/ngram.hh \
+builder/ngram_stream.hh \
+builder/pipeline.hh \
+builder/print.hh \
+builder/sort.hh \
 builder/adjust_counts.cc \
 builder/corpus_count.cc \
 builder/initial_probabilities.cc \
