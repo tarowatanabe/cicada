@@ -15,6 +15,10 @@ framework [1]_. Based on the generic framework, we can
    - dependency parse sentences (or lattices)
    - analyze forest/tree/lattice
 
+The cicada toolkit is developed at Multilingual Translation
+Laboratory, Universal Communication Institute, National Institute of
+Information and Communications Technology (NICT).
+
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
 
 Quick Start
@@ -22,13 +26,13 @@ Quick Start
 
 Compile
 ```````
-Get the source code from `cicada <...>`_ by git and simply follow GNU
-the standard pipiline. For details, see BUILD.rst.
+Get the source code from `cicada <...>`_ by git and simply follow the
+GNU standard pipiline. For details, see BUILD.rst.
 
 ::
 
-   ./autogen.sh
-   ./configure --prefix <prefix where you want to install. detault = /usr/local>
+   ./autogen.sh (required when you get the code by git clone)
+   ./configure
    make
    make install (optional)
 
@@ -215,7 +219,7 @@ Feature functions:
       kenlm [40]_.
 
 Word clustering tool is also included to support word alignment
-learning + translation [20]_
+learning + translation [20]_.
 
 References
 ----------
@@ -787,29 +791,29 @@ References
 .. [39]
 .. code:: latex
 
-@InProceedings{watanabe-tsukada-isozaki:2009:Short,
-  author    = {Watanabe, Taro  and  Tsukada, Hajime  and  Isozaki, Hideki},
-  title     = {A Succinct N-gram Language Model},
-  booktitle = {Proceedings of the ACL-IJCNLP 2009 Conference Short Papers},
-  month     = {August},
-  year      = {2009},
-  address   = {Suntec, Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {341--344},
-  url       = {http://www.aclweb.org/anthology/P/P09/P09-2086}
-}
+  @InProceedings{watanabe-tsukada-isozaki:2009:Short,
+    author    = {Watanabe, Taro  and  Tsukada, Hajime  and  Isozaki, Hideki},
+    title     = {A Succinct N-gram Language Model},
+    booktitle = {Proceedings of the ACL-IJCNLP 2009 Conference Short Papers},
+    month     = {August},
+    year      = {2009},
+    address   = {Suntec, Singapore},
+    publisher = {Association for Computational Linguistics},
+    pages     = {341--344},
+    url       = {http://www.aclweb.org/anthology/P/P09/P09-2086}
+  }
 
 .. [40]
 .. code:: latex
 
-@InProceedings{heafield:2011:WMT,
-  author    = {Heafield, Kenneth},
-  title     = {KenLM: Faster and Smaller Language Model Queries},
-  booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
-  month     = {July},
-  year      = {2011},
-  address   = {Edinburgh, Scotland},
-  publisher = {Association for Computational Linguistics},
-  pages     = {187--197},
-  url       = {http://www.aclweb.org/anthology/W11-2123}
-}
+  @InProceedings{heafield:2011:WMT,
+    author    = {Heafield, Kenneth},
+    title     = {KenLM: Faster and Smaller Language Model Queries},
+    booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
+    month     = {July},
+    year      = {2011},
+    address   = {Edinburgh, Scotland},
+    publisher = {Association for Computational Linguistics},
+    pages     = {187--197},
+    url       = {http://www.aclweb.org/anthology/W11-2123}
+  }
