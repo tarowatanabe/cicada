@@ -18,10 +18,10 @@
    number of "copied" terminals.
  - Bugfix: strange getline behavior when line is very long.
  - Added KenLM as an ngram language model, in addition to
-   ExpGram. Currently, ExpGram is smaller, but a little bit slower,
+   ExpGram. Currently, ExpGram is smaller, a little bit slower,
    but better in terms of translation quality, thanks to better
    rest-cost estimation.
- - Added debug messages for "inputs" so that we can know when
+ - Added debug messages for "inputs" so that we can identify when
    lattices/forests are loaded.
  - Added cicada_filter_normalize which can perform normalization,
    i.e. NFKC and remove controls etc. with support for colorization of
@@ -30,8 +30,7 @@
    using the ICU chardet API
  - Added cg_descent as an optimization algorithm.
  - Added attributes for each arc in the lattice data structure.
- - Added Fisher's exact test feature. (But it is not recommended,
-   since it may take inifinity value!)
+ - Added Fisher's exact test feature.
  - Faster grammar extraction and scoring by eliminating spurious
    locking
  - Better help messages in python scripts with default values
@@ -42,6 +41,7 @@
    with md-based docs.
  - Potential speed up for mpi-based learning algorithm especially when
    exchanging parameters.
+ - Potential speed up by revising lockfree implementation.
  - Tweaked ngram cache size.
 
 2013-1-9

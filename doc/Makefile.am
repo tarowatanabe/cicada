@@ -14,6 +14,11 @@ cicada_filter_config.man \
 cicada_filter_config_moses.man \
 cicada_filter_dependency.man
 
+.rst.man: $*.rst
+	$(RST2MAN) < $*.rst > $*.man
+
+endif WITH_RST2MAN
+
 EXTRA_DIST = \
 alignment.rst \
 attributes.rst \
@@ -44,8 +49,3 @@ operation.rst \
 parameter.rst \
 pyp.rst \
 tree-grammar.rst
-
-.rst.man: $*.rst
-	$(RST2MAN) < $*.rst > $*.man
-
-endif WITH_RST2MAN
