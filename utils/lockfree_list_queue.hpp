@@ -48,8 +48,8 @@ namespace utils
 	nl_p = false;
 	to_be_freed = false;
       }
-      bool clean() { return count == 0 && transfers_left == 0; }
-      bool freeable() { return clean() && nl_p && to_be_freed; }
+      bool clean() const { return count == 0 && transfers_left == 0; }
+      bool freeable() const { return clean() && nl_p && to_be_freed; }
     };
 
     template <typename __Tp>
@@ -355,7 +355,7 @@ namespace utils
     template <typename Assigner>
     bool __push(const value_type& __value, Assigner __assign)
     {
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       if (__max_size > 0 && size_type(__size) >= __max_size) return false;
       
       local_data_type local_data;
@@ -409,8 +409,8 @@ namespace utils
       entry_holder_type entry_post;
       
       do {
-	atomicop::memory_barrier();
-	entry_prev.integer() = llsc.entry.integer();
+	//atomicop::memory_barrier();
+	entry_prev.integer() = const_cast<const volatile typename entry_holder_type::integer_type&>(llsc.entry.integer());
 	
 	local_data.version = entry_prev.value().version;
 	local_data.node = llsc.current(entry_prev.value().version);
@@ -424,7 +424,7 @@ namespace utils
     }
       
     bool sc_op(llsc_type& llsc, node_type* node, local_data_type& local_data) {
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       node_type* pred_node = const_cast<node_type*>(local_data.node->pred);
       const bool success = atomicop::compare_and_swap((volatile void**) llsc.non_current_ptr(local_data.version), 
 						      (void*) pred_node,
@@ -436,8 +436,8 @@ namespace utils
       entry_holder_type entry_post;
 	
       for (;;) {
-	atomicop::memory_barrier();
-	entry_prev.integer() = llsc.entry.integer();
+	//atomicop::memory_barrier();
+	entry_prev.integer() = const_cast<const volatile typename entry_holder_type::integer_type&>(llsc.entry.integer());
 	
 	if (entry_prev.value().version != local_data.version) break;
 	
@@ -459,8 +459,8 @@ namespace utils
       entry_holder_type entry_post;
 	
       for (;;) {
-	atomicop::memory_barrier();
-	entry_prev.integer() = llsc.entry.integer();
+	//atomicop::memory_barrier();
+	entry_prev.integer() = const_cast<const volatile typename entry_holder_type::integer_type&>(llsc.entry.integer());
 	
 	if (entry_prev.value().version != local_data.value().version) break;
 	  
@@ -478,8 +478,8 @@ namespace utils
       exit_holder_type exit_post;
       
       do {
-	atomicop::memory_barrier();
-	exit_prev.integer() = node->exit.integer();
+	//atomicop::memory_barrier();
+	exit_prev.integer() = const_cast<const volatile typename exit_holder_type::integer_type&>(node->exit.integer());
 	
 	exit_post.value().count          = exit_prev.value().count + count;
 	exit_post.value().transfers_left = exit_prev.value().transfers_left - 1;
@@ -490,13 +490,13 @@ namespace utils
       
     void release_op(node_type* node)
     {
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       node_type* node_pred = const_cast<node_type*>(node->pred);
       exit_holder_type exit_prev;
       exit_holder_type exit_post;
       do {
-	atomicop::memory_barrier();
-	exit_prev.integer() = node->exit.integer();
+	//atomicop::memory_barrier();
+	exit_prev.integer() = const_cast<const volatile typename exit_holder_type::integer_type&>(node->exit.integer());
 	  
 	exit_post.value().count          = exit_prev.value().count - 1;
 	exit_post.value().transfers_left = exit_prev.value().transfers_left;
@@ -504,7 +504,7 @@ namespace utils
 	exit_post.value().to_be_freed    = exit_prev.value().to_be_freed;
       } while (! atomicop::compare_and_swap(node->exit.integer(), exit_prev.integer(), exit_post.integer()));
       
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       if (exit_post.value().clean())
 	set_nl_pred(node_pred);
       if (exit_post.value().freeable())
@@ -517,8 +517,8 @@ namespace utils
       exit_holder_type exit_prev;
       exit_holder_type exit_post;
       do {
-	atomicop::memory_barrier();
-	exit_prev.integer() = node->exit.integer();
+	//atomicop::memory_barrier();
+	exit_prev.integer() = const_cast<const volatile typename exit_holder_type::integer_type&>(node->exit.integer());
 	
 	exit_post.value().count          = exit_prev.value().count;
 	exit_post.value().transfers_left = exit_prev.value().transfers_left;
@@ -527,7 +527,7 @@ namespace utils
 	
       } while (! atomicop::compare_and_swap(node->exit.integer(), exit_prev.integer(), exit_post.integer()));
       
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       if (exit_post.value().freeable())
 	deallocate(node);
     }
@@ -538,8 +538,8 @@ namespace utils
       exit_holder_type exit_prev;
       exit_holder_type exit_post;
       do {
-	atomicop::memory_barrier();
-	exit_prev.integer() = node->exit.integer();
+	//atomicop::memory_barrier();
+	exit_prev.integer() = const_cast<const volatile typename exit_holder_type::integer_type&>(node->exit.integer());
 	  
 	exit_post.value().count          = exit_prev.value().count;
 	exit_post.value().transfers_left = exit_prev.value().transfers_left;
@@ -548,7 +548,7 @@ namespace utils
 	
       } while (! atomicop::compare_and_swap(node->exit.integer(), exit_prev.integer(), exit_post.integer()));
       
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       if (exit_post.value().freeable())
 	deallocate(node);
     }
@@ -558,7 +558,7 @@ namespace utils
     
     node_type* allocate(const value_type& __value)
     {
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       node_type* node = alloc().allocate(1);
       utils::construct_object(&(node->value), __value);
       //atomicop::fetch_and_add(__alloc_size, difference_type(1));
@@ -575,7 +575,7 @@ namespace utils
 
     void deallocate(node_type* node)
     {
-      atomicop::memory_barrier();
+      //atomicop::memory_barrier();
       utils::destroy_object(&(node->value));
       alloc().deallocate(node, 1);
       //atomicop::fetch_and_add(__alloc_size, difference_type(-1));
