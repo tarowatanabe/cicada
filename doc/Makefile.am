@@ -18,4 +18,5 @@ non-terminals.rst \
 operation.rst \
 parameter.rst \
 pyp.rst \
+training.rst \
 tree-grammar.rst
