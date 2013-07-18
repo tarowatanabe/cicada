@@ -27,7 +27,7 @@ Quick Start
 Compile
 ```````
 Get the source code from `cicada <...>`_ by git and simply follow the
-GNU standard pipiline. For details, see BUILD.rst.
+GNU standard pipiline. For details, see `BUILD.rst`.
 
 ::
 
@@ -45,7 +45,7 @@ shell's newline):
 
 ::
 
-   cicada \
+   ./progs/cicada \
       --input samples/sample.input \
       --grammar samples/sample.grammar.bin \
       --grammar "glue:straight=true,inverted=false,non-terminal=[x],goal=[s]" \
@@ -59,7 +59,7 @@ shell's newline):
       --debug
 
 This sample means:
-  - Input is `samples/sample.init`
+  - Input is `samples/sample.input`
   - Grammar consists of three gramamr specs:
 
     - the grammar file is `samples/sample.grammar.bin` which is a
@@ -77,10 +77,12 @@ This sample means:
       the target side.
     - rule penalty feature which penaltize by the number of words in a
       derivation.
+    - In addition, there exist features already defined for each
+      hierarchical phrase pair in `samples/sample.grammar.gz`.
 
   - Actual operation:
 
-    1. Input is composed by cky algorithm (compose-cky) which result
+    1. Input is composed by CKY algorithm (compose-cky) which result
        in a hypergraph.
     2. Cube-pruning (apply) to apply feature functions using 100 as a
        histogram pruning threshold using the weights at
@@ -89,16 +91,27 @@ This sample means:
        `samples/output.test` using `samples/sample.weights` as a
        weight vector to compute the score for each derivation.
 
+In depth
+````````
+
+In order to train a model, see `doc/training.rst` which describes how
+to create your own {tree,string}-to-{tree,string} models, and tune
+parameters.
+
 
 Descriptions
 ------------
 
 Basically, we have four distinct structures:
 
-   - lattice: a representation of graph implemented as a two-dimentional array.
-   - grammar: a collection of WFST implemented as a trie structure.
-   - tree-grammar: a collectin of WFSTT (tree-transducer) implemented as a (nested) trie structure.
-   - hypergraph: a compact representation of set of trees (or forest).
+   - lattice: a representation of graph implemented as a
+     two-dimentional array (see `doc/lattice.rst`).
+   - grammar: a collection of WFST implemented as a trie structure
+     (see `doc/grammar.rst`).
+   - tree-grammar: a collectin of WFSTT (tree-transducer) implemented
+     as a (nested) trie structure (see `doc/tree-grammar.rst`).
+   - hypergraph: a compact representation of set of trees (or forest)
+     (see `doc/hypergraph.rst`).
 
 Translation/parsing can be carried out by:
 
@@ -128,6 +141,8 @@ Alignment can be carried out by:
      (AKA grow-diag-final-and etc.) or by ITG or max-matching from
      posterior probabilities.
      Also, lexicon model can be discriminatively trained [28]_.
+     For details of the training process, please refer to
+     `doc/traiing.rst` and `doc/alignment.rst`.
 
 Dependency parsing can be carried out by:
 

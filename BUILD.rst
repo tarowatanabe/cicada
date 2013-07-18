@@ -37,15 +37,29 @@ Requirements
 ------------
 
  - expgram: ngram language model training/indexing.
+   
  - Boost library     (http://www.boost.org/)
+   
+   The minimum requirement is boost version 1.42. Prior to this
+   version, there were a couple of serious bugs which prevent us from
+   running correctly.
+
  - MPI (Open MPI)    (http://www.open-mpi.org/)
 
    We strongly recommend open-mpi since it is regularly tested.
+   The MPI libraries are automatically detected by the `configure`
+   script by finding either mpic++, mpicxx or mpiCC. Thus, those mpi
+   specific compilers should be on the executable path.
 
  - ICU               (http://site.icu-project.org/)
+   
+   The `configure` script relies on `icu-config` installed by the ICU
+   library. Thus, `icu-config` must be in the executable path.
+
  - Optional:
 
    + snappy: http://code.google.com/p/snappy/
+
    + msgpack: http://msgpack.org
 
      NOTE: msgpack-0.5.7 has a bug in which deletion may be called twice!
@@ -69,6 +83,9 @@ Requirements
      * gperftools (http://code.google.com/p/gperftools/)
      * jemalloc  (http://www.canonware.com/jemalloc/)
 
-       For Linux, you should install one of them for better memory performance
-       and to measure how many bytes malloced, since mallinfo is "broken" for memory more than 4GB.
+     For Linux, you should install one of them for better memory performance
+     and to measure how many bytes malloced, since mallinfo is
+     "broken" for memory more than 4GB.
+     They are configured by --with-{jemalloc,tcmalloc} and should be
+     enabled using --enable-{jemalloc,tcmalloc}
 
