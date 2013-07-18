@@ -9,21 +9,14 @@ Word alignment
 Translation Model
 -----------------
 
-Phrase Model
-````````````
+Extraction
+``````````
 
-Hierarchical Phrase Model
-`````````````````````````
-
-Tree-to-string Model
-````````````````````
-
-{String,Tree}-to-tree Model
-```````````````````````````
+Features
+````````
 
 Language Model
 --------------
-
 
 Configuration file
 ------------------

@@ -969,8 +969,8 @@ namespace cicada
       
       std::vector<double, std::allocator<double> > factors(thresholds.size(), 1.0);
       
-      // up to 10 iterations...
-      for (size_t i = 0; i != 10; ++ i) {
+      // up to 4 iterations...
+      for (size_t i = 0; i != 4; ++ i) {
 	scores = scores_init;
 	
 	bool succeed = true;
