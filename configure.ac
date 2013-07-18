@@ -626,6 +626,7 @@ AC_CHECK_FUNCS([dup2 gethostname getpagesize gettimeofday memset munmap pow sele
 AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
 		 doc/Makefile
+		 man/Makefile
 		 eigen/Makefile
 		 kenlm/Makefile
 		 kenlm/util/Makefile

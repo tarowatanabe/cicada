@@ -1,7 +1,7 @@
 
 ACLOCAL_AMFLAGS = -I config
 
-SUBDIRS = sgml_entity utils codec succinct_db libstemmer_c wn liblinear liblbfgs cg_descent eigen kenlm cicada progs scripts doc samples
+SUBDIRS = sgml_entity utils codec succinct_db libstemmer_c wn liblinear liblbfgs cg_descent eigen kenlm cicada progs scripts man doc samples
 
 AUTOMAKE_OPTIONS = foreign
 
