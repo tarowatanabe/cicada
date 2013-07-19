@@ -37,8 +37,6 @@ typedef utils::unordered_map<symbol_set_type, double, boost::hash<symbol_set_typ
 
 typedef utils::unordered_map<symbol_type, symbol_set_count_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 			     std::allocator<std::pair<const symbol_type, symbol_set_count_type> > >::type lhs_rhs_count_type;
-typedef utils::unordered_map<symbol_set_type, symbol_count_type, boost::hash<symbol_set_type>, std::equal_to<symbol_set_type>,
-			     std::allocator<std::pair<const symbol_set_type, symbol_count_type> > >::type rhs_lhs_count_type;
 
 typedef boost::filesystem::path path_type;
 
@@ -93,47 +91,15 @@ int main(int argc, char** argv)
       process(is, Counts(counts));
       
       symbol_count_type     lhs_counts;
-      symbol_set_count_type rhs_counts;
       lhs_rhs_count_type    lhs_rhs_counts;
-      rhs_lhs_count_type    rhs_lhs_counts;
-
-      rhs_lhs_count_type left_right_counts;
-      rhs_lhs_count_type right_left_counts;
-      symbol_set_count_type left_counts;
-      symbol_set_count_type right_counts;
-      
-      context_type context_left;
-      context_type context_right;
       
       count_set_type::const_iterator iter_end = counts.end();
       for (count_set_type::const_iterator iter = counts.begin(); iter != iter_end; ++ iter) {
 	const rule_type& rule = iter->first;
 	const double& count = iter->second;
 	
-	lhs_rhs_counts[rule.lhs][rule.rhs] += count;
-	rhs_lhs_counts[rule.rhs][rule.lhs] += count;
 	lhs_counts[rule.lhs] += count;
-	rhs_counts[rule.rhs] += count;
-
-	const symbol_type& head_left = rule.rhs.front();
-	const symbol_type& head_right = rule.rhs.back();
-	
-	context_left.clear();
-	context_left.push_back(rule.lhs);
-	context_left.insert(context_left.end(), rule.rhs.begin(), rule.rhs.end() - 1);
-	
-	context_right.clear();
-	context_right.push_back(rule.lhs);
-	context_right.insert(context_right.end(), rule.rhs.begin() + 1, rule.rhs.end());
-	
-	const symbol_set_type left(context_left.begin(), context_left.end());
-	const symbol_set_type right(context_right.begin(), context_right.end());
-	
-	left_right_counts[left][head_right] += count;
-	right_left_counts[right][head_left] += count;
-	
-	left_counts[left]   += count;
-	right_counts[right] += count;
+	lhs_rhs_counts[rule.lhs][rule.rhs] += count;
       }
       
       utils::compress_ostream os(output_file);
@@ -147,44 +113,13 @@ int main(int argc, char** argv)
 	  const double count_lhs = lhs_counts[lhs];
 	  const double observed_lhs = liter->second.size();
 	  const double factor_lhs = utils::mathop::digamma(count_lhs + observed_lhs * prior);
-	
+	  
 	  symbol_set_count_type::const_iterator riter_end = liter->second.end();
 	  for (symbol_set_count_type::const_iterator riter = liter->second.begin(); riter != riter_end; ++ riter) {
 	    const symbol_set_type& rhs = riter->first;
 	    const double& count = riter->second;
 	    
-	    const double count_rhs = rhs_counts[rhs];
-	    const double observed_rhs = rhs_lhs_counts[rhs].size();
-	    const double factor_rhs = utils::mathop::digamma(count_rhs + observed_rhs * prior);
-	    
-	    const symbol_type& head_left  = rhs.front();
-	    const symbol_type& head_right = rhs.back();
-	    
-	    context_left.clear();
-	    context_left.push_back(lhs);
-	    context_left.insert(context_left.end(), rhs.begin(), rhs.end() - 1);
-	    
-	    context_right.clear();
-	    context_right.push_back(lhs);
-	    context_right.insert(context_right.end(), rhs.begin() + 1, rhs.end());
-	    
-	    const symbol_set_type left(context_left.begin(), context_left.end());
-	    const symbol_set_type right(context_right.begin(), context_right.end());
-	    
-	    const double count_left  = left_counts[left];
-	    const double count_right = right_counts[right];
-	    
-	    const double observed_left  = left_right_counts[left].size();
-	    const double observed_right = right_left_counts[right].size();
-	    
-	    const double factor_left  = utils::mathop::digamma(count_left + observed_left * prior);
-	    const double factor_right = utils::mathop::digamma(count_right + observed_right * prior);
-	  
-	    os << lhs << " ||| " << rhs << " ||| ||| "
-	       << utils::mathop::digamma(count + prior) - factor_lhs << ' '
-	       << utils::mathop::digamma(count + prior) - factor_rhs << ' '
-	       << utils::mathop::digamma(count + prior) - factor_left << ' '
-	       << utils::mathop::digamma(count + prior) - factor_right << '\n';
+	    os << lhs << " ||| " << rhs << " ||| ||| " << (utils::mathop::digamma(count + prior) - factor_lhs) << '\n';
 	  }
 	}
       } else {
@@ -200,39 +135,8 @@ int main(int argc, char** argv)
 	  for (symbol_set_count_type::const_iterator riter = liter->second.begin(); riter != riter_end; ++ riter) {
 	    const symbol_set_type& rhs = riter->first;
 	    const double& count = riter->second;
-	  
-	    const double count_rhs = rhs_counts[rhs];
-	    const double observed_rhs = rhs_lhs_counts[rhs].size();
-	    const double factor_rhs = 1.0 / (count_rhs + observed_rhs * prior);
-
-	    const symbol_type& head_left  = rhs.front();
-	    const symbol_type& head_right = rhs.back();
 	    
-	    context_left.clear();
-	    context_left.push_back(lhs);
-	    context_left.insert(context_left.end(), rhs.begin(), rhs.end() - 1);
-	    
-	    context_right.clear();
-	    context_right.push_back(lhs);
-	    context_right.insert(context_right.end(), rhs.begin() + 1, rhs.end());
-	    
-	    const symbol_set_type left(context_left.begin(), context_left.end());
-	    const symbol_set_type right(context_right.begin(), context_right.end());
-	    
-	    const double count_left  = left_counts[left];
-	    const double count_right = right_counts[right];
-	    
-	    const double observed_left  = left_right_counts[left].size();
-	    const double observed_right = right_left_counts[right].size();
-
-	    const double factor_left  = 1.0 / (count_left + observed_left * prior);
-	    const double factor_right = 1.0 / (count_right + observed_right * prior);
-	    
-	    os << lhs << " ||| " << rhs << " ||| ||| "
-	       << utils::mathop::log((count + prior) * factor_lhs) << ' '
-	       << utils::mathop::log((count + prior) * factor_rhs) << ' '
-	       << utils::mathop::log((count + prior) * factor_left) << ' '
-	       << utils::mathop::log((count + prior) * factor_right) << '\n';
+	    os << lhs << " ||| " << rhs << " ||| ||| " << utils::mathop::log((count + prior) * factor_lhs) << '\n';
 	  }
 	}
       }

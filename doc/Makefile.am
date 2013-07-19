@@ -17,6 +17,7 @@ mpi.rst \
 non-terminals.rst \
 operation.rst \
 parameter.rst \
+parsing.rst \
 pyp.rst \
 training.rst \
 tree-grammar.rst
