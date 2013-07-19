@@ -195,10 +195,11 @@ namespace cicada
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
 	double score = 0.0;
-	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n)
+	int norm = 0;
+	for (size_t n = 0; n < ngrams_hypothesis.size() && ngrams_hypothesis[n] > 0; ++ n, ++ norm)
 	  score += std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
 	
-	score /= ngrams_hypothesis.size();
+	score /= norm;
 	score += penalty;
 	
 	bleus->bleu = std::exp(score);

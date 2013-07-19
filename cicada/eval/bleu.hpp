@@ -46,17 +46,19 @@ namespace cicada
 	
 	double smooth = 0.5;
 	double score = 0.0;
+	int norm = 0;
 	
 	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
 	  const double p = (ngrams_reference[n] > 0
 			    ? (ngrams_hypothesis[n] > 0 ? ngrams_hypothesis[n] : smooth) / ngrams_reference[n]
 			    : 0.0);
 	  
+	  norm += (ngrams_reference[n] > 0);
 	  score += p > 0.0 ? std::log(p) : 0.0;
 	  smooth *= 0.5;
 	}
 	
-	score /= ngrams_hypothesis.size();
+	score /= norm;
 	score += penalty;
 	
 	return std::exp(score);
