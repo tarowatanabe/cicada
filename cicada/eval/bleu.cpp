@@ -37,7 +37,7 @@ namespace cicada
       }
       
       std::ostringstream stream;
-      stream << "bleu: " << std::exp(score / norm + penalty);
+      stream << "bleu: " << std::exp(norm ? score / norm + penalty : 0.0);
       
       // stats for precision
       if (! ngrams_matched.empty()) {
