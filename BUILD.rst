@@ -2,7 +2,15 @@
 How to Build cicada
 ===================
 
-Instructions:
+Get the source code from `github.com <http://github.com/tarowatanabe/cicada>`_:
+::
+
+  git clone https://github.com/tarowatanabe/cicada.git
+
+Or, grab the latest tar archive from `cicada <...>`_.
+
+Compile
+-------
 ::
 
    ./autogen.sh (required when you get the code by git clone)

@@ -7,8 +7,33 @@
 #define __CICADA__NGRAM_STATE_CHART__HPP__ 1
 
 //
-// ngram state manager for chart
+// ngram state represent for chart-style decoding based on
 //
+// @InProceedings{heafield:2011:WMT,
+//  author    = {Heafield, Kenneth},
+//  title     = {KenLM: Faster and Smaller Language Model Queries},
+//  booktitle = {Proceedings of the Sixth Workshop on Statistical Machine Translation},
+//  month     = {July},
+//  year      = {2011},
+//  address   = {Edinburgh, Scotland},
+//  publisher = {Association for Computational Linguistics},
+//  pages     = {187--197},
+//  url       = {http://www.aclweb.org/anthology/W11-2123}
+// }
+//
+// and
+//
+// @InProceedings{heafield-koehn-lavie:2012:EMNLP-CoNLL,
+//   author    = {Heafield, Kenneth  and  Koehn, Philipp  and  Lavie, Alon},
+//   title     = {Language Model Rest Costs and Space-Efficient Storage},
+//   booktitle = {Proceedings of the 2012 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning},
+//   month     = {July},
+//   year      = {2012},
+//   address   = {Jeju Island, Korea},
+//   publisher = {Association for Computational Linguistics},
+//   pages     = {1169--1178},
+//   url       = {http://www.aclweb.org/anthology/D12-1107}
+// }
 
 #include <algorithm>
 
