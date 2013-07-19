@@ -541,20 +541,19 @@ namespace cicada
 	
 	const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	const double reference_length  = ref_size(hypothesis_length);
+
+	const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
 	
-	double bleus = brevity_penalty(hypothesis_length, reference_length);
-	
-	const double factor = 1.0 / order;
-	for (int n = 1; n <= order; ++ n) {
+	double bleus = 0.0;
+	for (int n = 1; n <= ngram_size; ++ n) {
 	  const double smooth = double(n != 1);
+	  const double numer = (n <= static_cast<int>(counts.size()) ? counts[n - 1] + smooth : smooth);
+	  const double denom = hypothesis_size + 1 - n + smooth;
 	  
-	  if (n <= static_cast<int>(counts.size()))
-	    bleus += (std::log(counts[n - 1] + smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
-	  else
-	    bleus += (std::log(smooth) - std::log(hypothesis_size + 1 - n + smooth)) * factor;
+	  bleus += std::log(numer / denom);
 	}
 	
-	return std::exp(bleus);
+	return std::exp(bleus / ngram_size + brevity_penalty(hypothesis_length, reference_length));
       }
 
       double tst_size(int length, const bool scaling=true) const
