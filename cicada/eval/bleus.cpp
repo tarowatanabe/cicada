@@ -193,16 +193,13 @@ namespace cicada
 	bleus->bleu = 0.0;
       else {
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
+	const int norm = utils::bithack::min(order, hypothesis_size);
 	
 	double score = 0.0;
-	int norm = 0;
-	for (size_t n = 0; n < ngrams_matched.size() && ngrams_matched[n] > 0; ++ n, ++ norm)
+	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n)
 	  score += std::log(ngrams_matched[n] + (n != 0)) - std::log(ngrams_hypothesis[n] + (n != 0));
 	
-	score /= norm;
-	score += penalty;
-	
-	bleus->bleu = std::exp(score);
+	bleus->bleu = std::exp(score / norm + penalty);
       }
       
       return score_ptr_type(bleus.release());

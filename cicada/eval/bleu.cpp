@@ -27,21 +27,17 @@ namespace cicada
       double score = 0.0;
       int norm = 0;
       
-      for (size_t n = 0; n < ngrams_matched.size(); ++ n) {
-	const double p = (ngrams_hypothesis[n] > 0
-			  ? (ngrams_matched[n] > 0 ? ngrams_matched[n] : smooth) / ngrams_hypothesis[n]
-			  : 0.0);
+      for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
+	if (ngrams_hypothesis[n] > 0) {
+	  score += std::log((n < ngrams_matched.size() && ngrams_matched[n] > 0 ? ngrams_matched[n] : smooth) / ngrams_hypothesis[n]);
+	  ++ norm;
+	}
 	
-	norm += (ngrams_hypothesis[n] > 0);
-	score += p > 0.0 ? std::log(p) : 0.0;
 	smooth *= 0.5;
       }
       
-      score /= norm;
-      score += penalty;
-      
       std::ostringstream stream;
-      stream << "bleu: " << std::exp(score);
+      stream << "bleu: " << std::exp(score / norm + penalty);
       
       // stats for precision
       if (! ngrams_matched.empty()) {
