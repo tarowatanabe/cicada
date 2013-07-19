@@ -7,3 +7,21 @@
 	for how to set up your ssh. Also, http://www.funtoo.org/wiki/Keychain
 	is a good starting point to set up ssh with the "keychain" utility
 	under Linux.
+
+* "mca_btl_tcp_frag_recv: readv failed: Connection timed out" when using MPI applications
+
+	This is a strange error, but you can try this patch against the open-mpi which will
+	force open-mpi to re-reading buffer again, even after timeout.
+
+*** ompi/mca/btl/tcp/btl_tcp_frag.c.org	2012-04-03 23:30:11.000000000 +0900
+--- ompi/mca/btl/tcp/btl_tcp_frag.c	2013-05-02 10:43:21.571867286 +0900
+***************
+*** 201,206 ****
+--- 201,207 ----
+  	switch(opal_socket_errno) {
+  	case EINTR:
+  	    continue;
++ 	case ETIMEDOUT:
+  	case EWOULDBLOCK:
+  	    return false;
+  	case EFAULT:
