@@ -564,48 +564,8 @@ namespace cicada
 	
 	if (__ribes && __ribes->length_reference > 0) {
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
-	  const double reference_length  = ref_size(hypothesis_length);
-	  
-	  double smooth = 0.5;
-	  double ribes = brevity_penalty(hypothesis_length + __ribes->length_hypothesis, reference_length + __ribes->length_reference);
-	  
-	  const size_t ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	  const size_t ribes_order = utils::bithack::max(counts.size(), __ribes->ngrams_hypothesis.size());
-	  
-	  const double factor = 1.0 / order;
-	  for (size_t n = 1; n <= ribes_order; ++ n) {
-	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
-				  + (n <= __ribes->ngrams_hypothesis.size() ? double(__ribes->ngrams_hypothesis[n - 1]) : 0.0));
-	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
-				  + (n <= __ribes->ngrams_reference.size() ? double(__ribes->ngrams_reference[n - 1]) : 0.0));
-	    const double p = (norm > 0.0 ? ((count > 0.0 ? count : smooth) / norm) : 0.0);
-	    
-	    ribes += (p > 0.0 ? std::log(p) : 0.0) * factor;
-	    smooth *= 0.5;
-	  }
-	  
-	  return std::exp(ribes);
 	} else {
-	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
-	  const double reference_length  = ref_size(hypothesis_length);
-	  
-	  double smooth = 0.5;
-	  double ribes = brevity_penalty(hypothesis_length, reference_length);
-	  
-	  const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	  
-	  const double factor = 1.0 / order;
-	  for (int n = 1; n <= ngram_size; ++ n) {
-	    const int count = counts[n - 1];
-	    
-	    ribes += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
-	    smooth *= 0.5;
-	  }
-	  
-	  return std::exp(ribes);
 	}
       }
 

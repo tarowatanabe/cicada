@@ -407,7 +407,7 @@ namespace cicada
 	  const double bp = brevity_penalty(hypothesis_length + __bleu->length_hypothesis, reference_length + __bleu->length_reference);
 	  
 	  const size_t ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	  const size_t bleu_order = utils::bithack::max(counts.size(), __bleu->ngrams_hypothesis.size());
+	  const size_t bleu_order = utils::bithack::max(counts.size(), __bleu->ngrams_matched.size());
 	  
 	  double smooth = 0.5;
 	  double bleu = 0.0;
@@ -415,9 +415,9 @@ namespace cicada
 	  int norm_bleu = 0;
 	  for (size_t n = 1; n <= bleu_order; ++ n) {
 	    const double count = (double(n <= ngram_size ? counts[n - 1] : 0.0)
-				  + (n <= __bleu->ngrams_hypothesis.size() ? double(__bleu->ngrams_hypothesis[n - 1]) : 0.0));
+				  + (n <= __bleu->ngrams_matched.size() ? double(__bleu->ngrams_matched[n - 1]) : 0.0));
 	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
-				  + (n <= __bleu->ngrams_reference.size() ? double(__bleu->ngrams_reference[n - 1]) : 0.0));
+				  + (n <= __bleu->ngrams_hypothesis.size() ? double(__bleu->ngrams_hypothesis[n - 1]) : 0.0));
 	    const double p = (norm > 0.0 ? ((count > 0.0 ? count : smooth) / norm) : 0.0);
 	    
 	    norm_bleu += (norm > 0);

@@ -289,10 +289,10 @@ struct LearnXBLEU : public LearnBase
       
       // collect scaled bleu stats
       for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
-	if (n - 1 < bleu->ngrams_reference.size())
-	  hypo[n] += prob * bleu->ngrams_reference[n - 1];
 	if (n - 1 < bleu->ngrams_hypothesis.size())
-	  matched[n] += prob * bleu->ngrams_hypothesis[n - 1];
+	  hypo[n] += prob * bleu->ngrams_hypothesis[n - 1];
+	if (n - 1 < bleu->ngrams_matched.size())
+	  matched[n] += prob * bleu->ngrams_matched[n - 1];
       }
       
       // collect reference length
@@ -346,11 +346,11 @@ struct LearnXBLEU : public LearnBase
 	  weight_type& grad_hypo    = gradients_hypo[n][fiter->first];
 	  weight_type& grad_matched = gradients_matched[n][fiter->first];
 	  
-	  if (n - 1 < bleu->ngrams_reference.size())
-	    grad_hypo += value * prob * bleu->ngrams_reference[n - 1];
-	  
 	  if (n - 1 < bleu->ngrams_hypothesis.size())
-	    grad_matched += value * prob * bleu->ngrams_hypothesis[n - 1];
+	    grad_hypo += value * prob * bleu->ngrams_hypothesis[n - 1];
+	  
+	  if (n - 1 < bleu->ngrams_matched.size())
+	    grad_matched += value * prob * bleu->ngrams_matched[n - 1];
 	}
 	
 	// reference lengths

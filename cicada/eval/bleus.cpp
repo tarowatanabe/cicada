@@ -138,8 +138,8 @@ namespace cicada
       std::auto_ptr<BleuS> bleus(new BleuS());
       counts_set_type counts(order);
       
-      ngram_counts_type ngrams_reference(order, 0);
       ngram_counts_type ngrams_hypothesis(order, 0);
+      ngram_counts_type ngrams_matched(order, 0);
       count_type        length_reference(0);
       count_type        length_hypothesis(0);
       
@@ -163,7 +163,7 @@ namespace cicada
 	
       // collect total counts...
       for (int n = 0; n < utils::bithack::min(order, hypothesis_size); ++ n)
-	ngrams_reference[n] += hypothesis_size - n;
+	ngrams_hypothesis[n] += hypothesis_size - n;
 	
       // collect ngrams matched with references
       sentence_type::const_iterator siter_end = sentence.end();
@@ -185,19 +185,19 @@ namespace cicada
       for (int n = 0; n < order; ++ n) {
 	counts_type::const_iterator citer_end = counts[n].end();
 	for (counts_type::const_iterator citer = counts[n].begin(); citer != citer_end; ++ citer)
-	  ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
+	  ngrams_matched[n] += std::min(citer->second, ngrams[citer->first]);
       }
       
       bleus->norm = 1;
-      if (ngrams_hypothesis[0] == 0.0)
+      if (ngrams_matched[0] == 0.0)
 	bleus->bleu = 0.0;
       else {
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
 	double score = 0.0;
 	int norm = 0;
-	for (size_t n = 0; n < ngrams_hypothesis.size() && ngrams_hypothesis[n] > 0; ++ n, ++ norm)
-	  score += std::log(ngrams_hypothesis[n] + (n != 0)) - std::log(ngrams_reference[n] + (n != 0));
+	for (size_t n = 0; n < ngrams_matched.size() && ngrams_matched[n] > 0; ++ n, ++ norm)
+	  score += std::log(ngrams_matched[n] + (n != 0)) - std::log(ngrams_hypothesis[n] + (n != 0));
 	
 	score /= norm;
 	score += penalty;

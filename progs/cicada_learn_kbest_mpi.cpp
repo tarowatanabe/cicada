@@ -3532,10 +3532,10 @@ struct ObjectiveXBLEU
 	    
 	    // collect scaled bleu stats
 	    for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
-	      if (n - 1 < bleu->ngrams_reference.size())
-		hypo[n] += prob * bleu->ngrams_reference[n - 1];
 	      if (n - 1 < bleu->ngrams_hypothesis.size())
-		matched[n] += prob * bleu->ngrams_hypothesis[n - 1];
+		hypo[n] += prob * bleu->ngrams_hypothesis[n - 1];
+	      if (n - 1 < bleu->ngrams_matched.size())
+		matched[n] += prob * bleu->ngrams_matched[n - 1];
 	    }
 	    
 	    // collect reference length
@@ -3591,11 +3591,11 @@ struct ObjectiveXBLEU
 	      
 	      // bleu statistics
 	      for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
-		if (n - 1 < bleu->ngrams_reference.size())
-		  gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_reference[n - 1];
-		
 		if (n - 1 < bleu->ngrams_hypothesis.size())
-		  gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
+		  gradients_hypo[n][fiter->first] += value * prob * bleu->ngrams_hypothesis[n - 1];
+		
+		if (n - 1 < bleu->ngrams_matched.size())
+		  gradients_matched[n][fiter->first] += value * prob * bleu->ngrams_matched[n - 1];
 	      }
 	      
 	      // reference lengths
@@ -3608,11 +3608,11 @@ struct ObjectiveXBLEU
 	    const weight_type value_scale(margin);
 	    
 	    for (size_t n = 1; n <= static_cast<size_t>(order); ++ n) {
-	      if (n - 1 < bleu->ngrams_reference.size())
-		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_reference[n - 1];
-	      
 	      if (n - 1 < bleu->ngrams_hypothesis.size())
-		gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n - 1];
+		gradients_hypo[n][feature_scale] += value_scale * prob * bleu->ngrams_hypothesis[n - 1];
+	      
+	      if (n - 1 < bleu->ngrams_matched.size())
+		gradients_matched[n][feature_scale] += value_scale * prob * bleu->ngrams_matched[n - 1];
 	    }
 	    
 	    gradient_reference[feature_scale] += value_scale * prob * bleu->length_reference;

@@ -44,8 +44,8 @@ std::string score.encode();
 score_ptr score::decode(std::string);
 
 Evaluator score JSON format:
-{"eval":"bleu", "reference":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "hypothesis":[...]}
-{"eval":"bleus", "reference":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "hypothesis":[...]}
+{"eval":"bleu", "matched":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "norm":[...]}
+{"eval":"bleus", "bleu":"base64", "norm":"base64"}
 {"eval":"ter", "edits": ["base64", ... (insertion,deletion,substitution,shift,reference)]}
 {"eval":"wer", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
 {"eval":"inv-wer", "edits": ["base64", ... (insertion,deletion,substitution,inversion,reference)]}

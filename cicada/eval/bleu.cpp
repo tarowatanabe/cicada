@@ -27,12 +27,12 @@ namespace cicada
       double score = 0.0;
       int norm = 0;
       
-      for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	const double p = (ngrams_reference[n] > 0
-			  ? (ngrams_hypothesis[n] > 0 ? ngrams_hypothesis[n] : smooth) / ngrams_reference[n]
+      for (size_t n = 0; n < ngrams_matched.size(); ++ n) {
+	const double p = (ngrams_hypothesis[n] > 0
+			  ? (ngrams_matched[n] > 0 ? ngrams_matched[n] : smooth) / ngrams_hypothesis[n]
 			  : 0.0);
 	
-	norm += (ngrams_reference[n] > 0);
+	norm += (ngrams_hypothesis[n] > 0);
 	score += p > 0.0 ? std::log(p) : 0.0;
 	smooth *= 0.5;
       }
@@ -44,10 +44,10 @@ namespace cicada
       stream << "bleu: " << std::exp(score);
       
       // stats for precision
-      if (! ngrams_hypothesis.empty()) {
+      if (! ngrams_matched.empty()) {
 	char delim = ' ';
-	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	  stream << delim << ngrams_hypothesis[n] << ':' << ngrams_reference[n];
+	for (size_t n = 0; n < ngrams_matched.size(); ++ n) {
+	  stream << delim << ngrams_matched[n] << ':' << ngrams_hypothesis[n];
 	  delim = '|';
 	}
       }
@@ -65,13 +65,13 @@ namespace cicada
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"bleu\",";
-      stream << "\"reference\":[";
-      stream << escaper(length_reference);
-      for (size_t i = 0; i != ngrams_reference.size(); ++ i)
-	stream << ',' << escaper(ngrams_reference[i]);
-      stream << "],";
-      stream << "\"hypothesis\":[";
+      stream << "\"matched\":[";
       stream << escaper(length_hypothesis);
+      for (size_t i = 0; i != ngrams_matched.size(); ++ i)
+	stream << ',' << escaper(ngrams_matched[i]);
+      stream << "],";
+      stream << "\"norm\":[";
+      stream << escaper(length_reference);
       for (size_t i = 0; i != ngrams_hypothesis.size(); ++ i)
 	stream << ',' << escaper(ngrams_hypothesis[i]);
       stream << "]";
@@ -95,9 +95,9 @@ namespace cicada
 	
 	bleu_parsed %= (qi::lit('{')
 			>> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"bleu\"") >> qi::lit(',')
-			>> qi::lit("\"reference\"") >> qi::lit(':')
+			>> qi::lit("\"matched\"") >> qi::lit(':')
 			>> qi::lit('[') >> double_values >> qi::lit(']') >> qi::lit(',')
-			>> qi::lit("\"hypothesis\"") >> qi::lit(':')
+			>> qi::lit("\"norm\"") >> qi::lit(':')
 			>> qi::lit('[') >> double_values >> qi::lit(']')
 			>> qi::lit('}'));
 	  
@@ -125,11 +125,13 @@ namespace cicada
 	return score_ptr_type();
       
       std::auto_ptr<Bleu> bleu(new Bleu(0));
+
+      bleu->length_hypothesis = bleu_parsed.first.front();
+      bleu->ngrams_matched.insert(bleu->ngrams_matched.end(), bleu_parsed.first.begin() + 1, bleu_parsed.first.end());
       
-      bleu->length_reference = bleu_parsed.first.front();
-      bleu->ngrams_reference.insert(bleu->ngrams_reference.end(), bleu_parsed.first.begin() + 1, bleu_parsed.first.end());
-      bleu->length_hypothesis = bleu_parsed.second.front();
+      bleu->length_reference = bleu_parsed.second.front();
       bleu->ngrams_hypothesis.insert(bleu->ngrams_hypothesis.end(), bleu_parsed.second.begin() + 1, bleu_parsed.second.end());
+      
       
       return score_ptr_type(bleu.release());
     }
@@ -204,7 +206,7 @@ namespace cicada
 	
       // collect total counts...
       for (int n = 0; n < utils::bithack::min(order, hypothesis_size); ++ n)
-	bleu->ngrams_reference[n] += hypothesis_size - n;
+	bleu->ngrams_hypothesis[n] += hypothesis_size - n;
 	
       // collect ngrams matched with references
       sentence_type::const_iterator siter_end = sentence.end();
@@ -226,7 +228,7 @@ namespace cicada
       for (int n = 0; n < order; ++ n) {
 	counts_type::const_iterator citer_end = counts[n].end();
 	for (counts_type::const_iterator citer = counts[n].begin(); citer != citer_end; ++ citer)
-	  bleu->ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
+	  bleu->ngrams_matched[n] += std::min(citer->second, ngrams[citer->first]);
       }
 	
       return score_ptr_type(bleu.release());

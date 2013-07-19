@@ -35,12 +35,12 @@ namespace cicada
 
     public:      
       Bleu(const int order)
-	: ngrams_reference(order, 0),  ngrams_hypothesis(order, 0),
+	: ngrams_hypothesis(order, 0),  ngrams_matched(order, 0),
 	  length_reference(0), length_hypothesis(0) {}
       
       double score() const
       {
-	if (ngrams_hypothesis.empty() || ngrams_hypothesis[0] == 0.0) return 0.0;
+	if (ngrams_matched.empty() || ngrams_matched[0] == 0.0) return 0.0;
 	
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
@@ -48,12 +48,12 @@ namespace cicada
 	double score = 0.0;
 	int norm = 0;
 	
-	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
-	  const double p = (ngrams_reference[n] > 0
-			    ? (ngrams_hypothesis[n] > 0 ? ngrams_hypothesis[n] : smooth) / ngrams_reference[n]
+	for (size_t n = 0; n < ngrams_matched.size(); ++ n) {
+	  const double p = (ngrams_hypothesis[n] > 0
+			    ? (ngrams_matched[n] > 0 ? ngrams_matched[n] : smooth) / ngrams_hypothesis[n]
 			    : 0.0);
 	  
-	  norm += (ngrams_reference[n] > 0);
+	  norm += (ngrams_hypothesis[n] > 0);
 	  score += p > 0.0 ? std::log(p) : 0.0;
 	  smooth *= 0.5;
 	}
@@ -76,8 +76,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEU score");
 	
-	return (ngrams_reference == rhs->ngrams_reference
-		&& ngrams_hypothesis == rhs->ngrams_hypothesis
+	return (ngrams_hypothesis == rhs->ngrams_hypothesis
+		&& ngrams_matched == rhs->ngrams_matched
 		&& length_reference == rhs->length_reference
 		&& length_hypothesis == rhs->length_hypothesis);
       }
@@ -88,8 +88,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEU score");
 	
-	ngrams_reference  = rhs->ngrams_reference;
-	ngrams_hypothesis = rhs->ngrams_hypothesis;
+	ngrams_hypothesis  = rhs->ngrams_hypothesis;
+	ngrams_matched = rhs->ngrams_matched;
 	
 	length_reference  = rhs->length_reference;
 	length_hypothesis = rhs->length_hypothesis;
@@ -101,8 +101,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEU score");
 	
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  rhs->ngrams_reference.begin(),  ngrams_reference.begin(),  std::plus<count_type>());
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), rhs->ngrams_hypothesis.begin(), ngrams_hypothesis.begin(), std::plus<count_type>());
+	std::transform(ngrams_hypothesis.begin(),  ngrams_hypothesis.end(),  rhs->ngrams_hypothesis.begin(),  ngrams_hypothesis.begin(),  std::plus<count_type>());
+	std::transform(ngrams_matched.begin(), ngrams_matched.end(), rhs->ngrams_matched.begin(), ngrams_matched.begin(), std::plus<count_type>());
 	
 	length_reference  += rhs->length_reference;
 	length_hypothesis += rhs->length_hypothesis;
@@ -114,8 +114,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid BLEU score");
 	
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  rhs->ngrams_reference.begin(),  ngrams_reference.begin(),  std::minus<count_type>());
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), rhs->ngrams_hypothesis.begin(), ngrams_hypothesis.begin(), std::minus<count_type>());
+	std::transform(ngrams_hypothesis.begin(),  ngrams_hypothesis.end(),  rhs->ngrams_hypothesis.begin(),  ngrams_hypothesis.begin(),  std::minus<count_type>());
+	std::transform(ngrams_matched.begin(), ngrams_matched.end(), rhs->ngrams_matched.begin(), ngrams_matched.begin(), std::minus<count_type>());
 	
 	length_reference  -= rhs->length_reference;
 	length_hypothesis -= rhs->length_hypothesis;
@@ -123,8 +123,8 @@ namespace cicada
       
       void multiplies_equal(const double& scale)
       {
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  ngrams_reference.begin(),  std::bind2nd(std::multiplies<count_type>(), scale));
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), ngrams_hypothesis.begin(), std::bind2nd(std::multiplies<count_type>(), scale));
+	std::transform(ngrams_hypothesis.begin(),  ngrams_hypothesis.end(),  ngrams_hypothesis.begin(),  std::bind2nd(std::multiplies<count_type>(), scale));
+	std::transform(ngrams_matched.begin(), ngrams_matched.end(), ngrams_matched.begin(), std::bind2nd(std::multiplies<count_type>(), scale));
 	
 	length_reference  *= scale;
 	length_hypothesis *= scale;
@@ -132,8 +132,8 @@ namespace cicada
       
       void divides_equal(const double& scale)
       {
-	std::transform(ngrams_reference.begin(),  ngrams_reference.end(),  ngrams_reference.begin(),  std::bind2nd(std::divides<count_type>(), scale));
-	std::transform(ngrams_hypothesis.begin(), ngrams_hypothesis.end(), ngrams_hypothesis.begin(), std::bind2nd(std::divides<count_type>(), scale));
+	std::transform(ngrams_hypothesis.begin(),  ngrams_hypothesis.end(),  ngrams_hypothesis.begin(),  std::bind2nd(std::divides<count_type>(), scale));
+	std::transform(ngrams_matched.begin(), ngrams_matched.end(), ngrams_matched.begin(), std::bind2nd(std::divides<count_type>(), scale));
 	
 	length_reference  /= scale;
 	length_hypothesis /= scale;
@@ -141,7 +141,7 @@ namespace cicada
       
       score_ptr_type zero() const
       {
-	return score_ptr_type(new Bleu(ngrams_hypothesis.size()));
+	return score_ptr_type(new Bleu(ngrams_matched.size()));
       }
 
       score_ptr_type clone() const
@@ -155,8 +155,8 @@ namespace cicada
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
       static score_ptr_type decode(const utils::piece& encoded);
 
-      ngram_counts_type ngrams_reference;
       ngram_counts_type ngrams_hypothesis;
+      ngram_counts_type ngrams_matched;
       count_type        length_reference;
       count_type        length_hypothesis;
     };
