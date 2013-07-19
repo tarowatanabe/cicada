@@ -115,9 +115,9 @@ opt_parser = OptionParser(
     make_option("--cutoff", default=0.0, action="store", type="float",
                 help="cutoff counts (default: %default)"),
     make_option("--collapse-source", default=None, action="store_true",
-                help="collapse source side for CKY parsing"),
+                help="collapse source side in GHKM and Tree"),
     make_option("--collapse-target", default=None, action="store_true",
-                help="collapse target side for CKY parsing"),
+                help="collapse target side in GHKM and Tree"),
     make_option("--exhaustive", default=None, action="store_true",
                 help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
@@ -127,7 +127,7 @@ opt_parser = OptionParser(
     make_option("--project", default=None, action="store_true",
                 help="project non-terminal symbols in GHKM"),
     make_option("--sentential", default=None, action="store_true",
-                help="extract sentential rule for SCFG"),
+                help="extract sentential rules for SCFG"),
     
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",

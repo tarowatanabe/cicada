@@ -9,7 +9,9 @@
 #include <cicada/eval/score.hpp>
 
 #include <cicada/eval/bleu.hpp>
+#include <cicada/eval/cder.hpp>
 #include <cicada/eval/depeval.hpp>
+#include <cicada/eval/inv_wer.hpp>
 #include <cicada/eval/per.hpp>
 #include <cicada/eval/parseval.hpp>
 #include <cicada/eval/ribes.hpp>

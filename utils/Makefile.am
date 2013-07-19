@@ -245,6 +245,10 @@ noinst_DATA = .gitignore
 
 noinst_HEADERS = \
 bitpack_impl.hpp \
+bitpack8_impl.hpp \
+bitpack16_impl.hpp \
+bitpack32_impl.hpp \
+bitpack64_impl.hpp \
 sgml_entity_table.hpp \
 sgml_entity_table_inverse.hpp \
 sgml_uspatent_table.hpp \
