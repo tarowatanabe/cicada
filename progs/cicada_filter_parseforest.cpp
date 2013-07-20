@@ -167,7 +167,7 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
     
     sentence %= +cat >> qi::eol;
     
-    forest %= ("sentence" >> qi::int_ >> ':' >> qi::eol) >> (-sentence) >> (*item) >> qi::eol;
+    forest %= ("sentence" >> qi::int_ >> ':' >> qi::eol) >> (-sentence) >> (+item | qi::eol) >> qi::eol;
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
