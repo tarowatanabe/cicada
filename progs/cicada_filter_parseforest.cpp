@@ -3,7 +3,7 @@
 //
 
 //
-// filter for forest-output of parseIt
+// filter for forest-output from egret and/or parseIt
 //
 
 #include <iostream>
@@ -79,8 +79,34 @@ std::string normalize_cat(const std::string& cat)
     default: return cat;
     }
   } else
-      return cat;
+    return cat;
 }
+
+template <typename Iterator>
+struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+{
+  terminal_parser() : terminal_parser::base_type(terminal)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    escape_char.add
+      ("-LRB-", '(')
+      ("-RRB-", ')')
+      ("-LSB-", '[')
+      ("-RSB-", ']')
+      ("-LCB-", '{')
+      ("-RCB-", '}')
+      ("-PLUS-", '+') // added for ATB
+      ("\\/", '/')
+      ("\\*", '*');
+    
+    terminal %= +(escape_char | standard::char_);
+  }
+  
+  boost::spirit::qi::symbols<char, char> escape_char;
+  boost::spirit::qi::rule<Iterator, std::string()> terminal;
+};
 
 typedef std::vector<category_type, std::allocator<category_type> > category_set_type;
 
@@ -91,16 +117,21 @@ typedef std::vector<std::string, std::allocator<std::string> > sentence_type;
 
 struct forest_type
 {
+  int id;
   sentence_type sentence;
   item_set_type items;
 
   forest_type()
-    : sentence(), items() {}
+    : id(0), sentence(), items() {}
   forest_type(const sentence_type& __sentence, const item_set_type& __items)
-    : sentence(__sentence), items(__items) {}
+    : id(0), sentence(__sentence), items(__items) {}
+
+  forest_type(const int& __id, const sentence_type& __sentence, const item_set_type& __items)
+    : id(__id), sentence(__sentence), items(__items) {}
 
   void clear()
   {
+    id = 0;
     sentence.clear();
     items.clear();
   }
@@ -115,6 +146,7 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  forest_type,
+			  (int, id)
 			  (sentence_type, sentence)
 			  (item_set_type, items)
 			  )
@@ -132,9 +164,10 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
     category %= qi::hold[cat >> '[' >> qi::int_ >> ',' >> qi::int_ >> ']'] | cat;
     
     item %= category >> "=>" >> (+category) >> "|||" >> qi::double_ >> -qi::lit("EXTRAVAL") >> qi::eol;
+    
     sentence %= +cat >> qi::eol;
     
-    forest %= (-sentence) >> (*item) >> qi::eol;
+    forest %= ("sentence" >> qi::int_ >> ':' >> qi::eol) >> (-sentence) >> (*item) >> qi::eol;
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
@@ -143,6 +176,7 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
   boost::spirit::qi::rule<Iterator, category_type(), blank_type> category;
   
   boost::spirit::qi::rule<Iterator, item_type(), blank_type> item;
+  
   boost::spirit::qi::rule<Iterator, sentence_type(), blank_type>   sentence;
 
   boost::spirit::qi::rule<Iterator, forest_type(), blank_type> forest;
@@ -181,6 +215,7 @@ path_type output_file = "-";
 path_type map_file;
 
 std::string root;
+bool unescape_terminal = false;
 bool normalize = false;
 bool collapse = false;
 
@@ -296,7 +331,21 @@ int main(int argc, char** argv)
 	  if (cat.is_terminal()) {
 	    if (mapping)
 	      phrase.push_back(forest.sentence[lhs.first]);
-	    else
+	    else if (unescape_terminal) {
+	      namespace qi = boost::spirit::qi;
+	      
+	      static terminal_parser<std::string::const_iterator> parser;
+	      
+	      std::string::const_iterator iter = cat.cat.begin();
+	      std::string::const_iterator iter_end = cat.cat.end();
+	      
+	      std::string terminal;
+	      
+	      if (! qi::parse(iter, iter_end, parser, terminal) || iter != iter_end)
+		throw std::runtime_error("terminal parsing failed?");
+	      
+	      phrase.push_back(terminal);
+	    } else
 	      phrase.push_back(cat.cat);
 	  } else {
 	    // perform normalization if specified...!
@@ -424,6 +473,7 @@ void options(int argc, char** argv)
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     ("root",      po::value<std::string>(&root), "root label")
     
+    ("unescape",  po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
     ("normalize", po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
     ("collapse",  po::bool_switch(&collapse),  "collapse root labels")
     
