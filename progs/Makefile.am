@@ -67,8 +67,8 @@ bin_PROGRAMS = \
 	cicada_filter_kbest \
 	cicada_filter_kbest_moses \
 	cicada_filter_normalize \
-	cicada_filter_charniak \
 	cicada_filter_dependency \
+	cicada_filter_parseforest \
 	cicada_filter_penntreebank \
 	cicada_filter_pialign \
 	cicada_filter_refset \
@@ -220,8 +220,8 @@ cicada_extract_tree_mpi_SOURCES  = cicada_extract_tree_mpi.cpp cicada_extract_tr
 cicada_extract_tree_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_filter_charniak_SOURCES = cicada_filter_charniak.cpp
-cicada_filter_charniak_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_filter_parseforest_SOURCES = cicada_filter_parseforest.cpp
+cicada_filter_parseforest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_dependency_SOURCES = cicada_filter_dependency.cpp
 cicada_filter_dependency_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

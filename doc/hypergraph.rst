@@ -129,23 +129,23 @@ Example
 Tools
 -----
 
-cicada\_filter\_penntreebank
+`cicada_filter_penntreebank`
 
   A tool which transform Penn Treebank style constituency parse
   tree(s) into JSON hypergrpah format.
 
-cicada\_filter\_dependency
+`cicada_filter_dependency`
 
   A tool which transforms dependency trees into a JSON hypergraph
   format. Currently, we support: MST, CoNLL, Malt, Cabocha and cicada
   native format.
 
-ciada\_filter\_charniak
+`ciada_filter_parseforest`
 
-  A tool which transforms Charniak's parser forest output into a JSON
+  A tool which transforms parser forest output into a JSON
   hypergraph format.
 
-cicada\_unite\_forest
+`cicada_unite_forest`
 
   A tool to merge multiple hypergraphs into one. If the label of goal
   nodes differ, then, we will introduce an additional goal node,

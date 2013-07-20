@@ -62,8 +62,8 @@ cicada_filter_join
 cicada_filter_kbest
 cicada_filter_kbest_moses
 cicada_filter_normalize
-cicada_filter_charniak
 cicada_filter_dependency
+cicada_filter_parseforest
 cicada_filter_penntreebank
 cicada_filter_pialign
 cicada_filter_refset

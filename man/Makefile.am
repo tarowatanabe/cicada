@@ -9,7 +9,7 @@ cicada_mpi.man \
 cicada_filter_alignment.man \
 cicada_filter_bitext.man \
 cicada_filter_chardet.man \
-cicada_filter_charniak.man \
+cicada_filter_parseforest.man \
 cicada_filter_config.man \
 cicada_filter_config_moses.man \
 cicada_filter_dependency.man
@@ -26,7 +26,7 @@ cicada.rst \
 cicada_filter_alignment.rst \
 cicada_filter_bitext.rst \
 cicada_filter_chardet.rst \
-cicada_filter_charniak.rst \
+cicada_filter_parseforest.rst \
 cicada_filter_config.rst \
 cicada_filter_config_moses.rst \
 cicada_filter_dependency.rst \
