@@ -103,6 +103,9 @@ namespace utils
 	  ::close(pout[1]);
 	}
 	
+	// new group-id
+	::setpgid(0, 0);
+	
 	__pid = ::getpid();
 	
 	// back to default signal handler
