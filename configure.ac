@@ -127,6 +127,43 @@ AC_SUBST(BZLIB_CPPFLAGS)
 AC_SUBST(BZLIB_LDFLAGS)
 AM_CONDITIONAL([WITH_BZLIB], [test "x$ac_have_bzlib" = "xyes" -a "x$ac_cv_header_bzlib_h" = "xyes"])
 
+AC_ARG_WITH(lzma,
+	[AC_HELP_STRING([--with-lzma=DIR], [lzma in DIR])],
+	[lzmalib_dir="${withval}"], [lzmalib_dir=''])
+
+if test "x$lzmalib_dir" != "x"; then
+  LZMALIB_CPPFLAGS="-DHAVE_LZMALIB -DHAVE_XZLIB -I${lzmalib_dir}/include"
+  LZMALIB_LDFLAGS="-L${lzmalib_dir}/lib -llzma"
+else
+  LZMALIB_CPPFLAGS="-DHAVE_LZMALIB -DHAVE_XZLIB"
+  LZMALIB_LDFLAGS="-llzma"
+fi
+
+AC_MSG_CHECKING(for lzma)
+
+save_CXXFLAGS="$CXXFLAGS"
+save_LDFLAGS="$LDFLAGS"
+CXXFLAGS="$CXXFLAGS $LZMALIB_CPPFLAGS"
+LDFLAGS="$LDFLAGS $LZMALIB_LDFLAGS"
+
+AC_TRY_LINK([], [], [ac_have_lzmalib=yes], [ac_have_lzmalib=no])
+AC_MSG_RESULT($ac_have_lzmalib)
+AC_CHECK_HEADERS([lzma.h])
+
+if test "x$ac_have_lzmalib" = "xno" -o "x$ac_cv_header_lzma_h" = "xno"; then
+  LZMALIB_CPPFLAGS=""
+  LZMALIB_LDFLAGS=""
+else
+  AC_DEFINE(HAVE_LZMALIB, 1, [Define if you have lzma])
+fi
+
+CXXFLAGS="$save_CXXFLAGS"
+LDFLAGS="$save_LDFLAGS"
+
+AC_SUBST(LZMALIB_CPPFLAGS)
+AC_SUBST(LZMALIB_LDFLAGS)
+AM_CONDITIONAL([WITH_LZMALIB], [test "x$ac_have_lzmalib" = "xyes" -a "x$ac_cv_header_lzma_h" = "xyes"])
+
 
 AC_ARG_WITH(blas,
 	[AC_HELP_STRING([--with-blas=DIR], [blas in DIR])],

@@ -33,6 +33,7 @@ You can set several options. For details see the requirement section.
                           kenlm's max order [default=6]
   --with-zlib=DIR         zlib in DIR
   --with-bzlib=DIR        bzlib in DIR
+  --with-lzma=DIR         lzma in DIR
   --with-blas=DIR         blas in DIR
   --with-snappy=DIR       snappy in DIR
   --with-msgpack=DIR      msgpack in DIR
