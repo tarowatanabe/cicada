@@ -83,12 +83,12 @@ PLF:
 Tools
 -----
 
-cicada\_unite\_lattice
+`cicada_unite_lattice`
 
   Merge multiple lattices (or sentences) in one. Here, we simply compute the union sharing start/goal states.
   Optionally dump output in graphviz format (`--graphviz` flag).
 
-cicada\_unite\_sentence
+`cicada_unite_sentence`
 
   Merge multiple sentences into one confusion-network via TER alignment.
   Support incrementat merging by confusion-network-TER. (`--merge` flag)

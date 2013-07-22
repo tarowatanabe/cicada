@@ -58,7 +58,7 @@ AC_ARG_WITH(zlib,
 	[zlib_dir="${withval}"], [zlib_dir=''])
 
 if test "x$zlib_dir" != "x"; then
-  ZLIB_CPPFLAGS="-DHAVA_ZLIB -I${zlib_dir}/include"
+  ZLIB_CPPFLAGS="-DHAVE_ZLIB -I${zlib_dir}/include"
   ZLIB_LDFLAGS="-L${zlib_dir}/lib -lz"
 else
   ZLIB_CPPFLAGS="-DHAVE_ZLIB"
@@ -95,7 +95,7 @@ AC_ARG_WITH(bzlib,
 	[bzlib_dir="${withval}"], [bzlib_dir=''])
 
 if test "x$bzlib_dir" != "x"; then
-  BZLIB_CPPFLAGS="-DHAVA_BZLIB -I${bzlib_dir}/include"
+  BZLIB_CPPFLAGS="-DHAVE_BZLIB -I${bzlib_dir}/include"
   BZLIB_LDFLAGS="-L${bzlib_dir}/lib -lbz2"
 else
   BZLIB_CPPFLAGS="-DHAVE_BZLIB"

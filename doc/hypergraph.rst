@@ -48,7 +48,7 @@ to the last node in the node list.
 No goal implies an invalid hypergraph.
 
 Each rule is a JSON string, thus some characters employed in rhs
-and/or lhs should be escaped, i.e. " to \\", \\ to \\\\ etc.
+and/or lhs should be escaped, i.e. " to \", \ to \\ etc.
 The lhs of a rule consists of a single non-terminal, whereby its rhs
 consists of a sequence of non-terminal or terminal.
 Note that the lhs is also used as a label for each node.

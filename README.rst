@@ -26,6 +26,7 @@ Quick Start
 
 Compile
 ```````
+
 Get the source code from `cicada <...>`_, or from `github.com
 <http://github.com/tarowatanabe/cicada>`_, and simply follow the
 GNU standard pipiline. For details, see `BUILD.rst`.
