@@ -33,8 +33,8 @@ path_type alignment_file;
 
 path_type output_file;
 
-int max_length = 7;
-int max_fertility = 10;
+int max_length = 5;
+int max_fertility = 4;
 bool inverse = false;
 
 double max_malloc = 8; // 8 GB
