@@ -656,7 +656,7 @@ if __name__ == '__main__':
                              oracle_tstset,
                              Option('--output', Quoted(oracle)),
                              Option('--scorer', options.scorer),
-                             oracle_cube_size,
+                             oracle_scorer_cube,
                              oracle_forest,
                              Option('--directory'),
                              Option('--threads', options.threads),
