@@ -87,7 +87,6 @@ opt_parser = OptionParser(
     
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),
-    make_option("--plain",    default=None, action="store_true", help="plain output, meaning no-binary indexing"),
     
     ## kbest options
     make_option("--kbest", default=0, action="store", type="int",
@@ -379,6 +378,8 @@ class CICADA:
                         'cicada_filter_extract_phrase',
                         'cicada_filter_extract_scfg',
                         'cicada_filter_extract_ghkm',
+                        ### misc...
+                        'cicada_filter_tee',
                         ### filters
                         'mpish', ### mpi-launcher
                         'thrsh', ### thread-launcher
@@ -566,7 +567,7 @@ class Index(UserString.UserString):
                  prefix_attribute="",
                  input="",
                  output="",
-                 plain=None,
+                 plain="",
                  name="",
                  root_joint="",
                  root_source="",
@@ -589,6 +590,8 @@ class Index(UserString.UserString):
             raise ValueError, "no input? %s" %(input)
         if not output:
             raise ValueError, "no output? %s" %(output)
+        if not plain:
+            raise ValueError, "no output? %s" %(plain)
         if not root_joint:
             raise ValueError, "no root count? %s" %(root_joint)
         if not root_source:
@@ -695,23 +698,24 @@ class Index(UserString.UserString):
         if temporary_dir:
             command_indexer += " --temporary \"%s\"" %(temporary_dir)
             
-        if plain:
-            command += " --output \"%s\"" %(output)
-        else:
-            self.threads += 1
-            command += " | " + command_indexer
-            
+        self.threads += 1
+        
+        command += " | " + cicada.cicada_filter_tee + " \"%s\"" %(plain)
+        
+        command += " | " + command_indexer
+        
         UserString.UserString.__init__(self, '('+command+')')
         
 class Score:
-    def __init__(self, input="", output="", name=""):
+    def __init__(self, input="", output="", plain="", name=""):
         self.input = input
         self.output = output
+        self.plain = plain
         self.name = name
 
 
 class Scores(UserList.UserList):
-    def __init__(self, indexer=None, plain=None):
+    def __init__(self, indexer=None):
 
         UserList.UserList.__init__(self)
 
@@ -754,10 +758,7 @@ class Scores(UserList.UserList):
 
             root,stem = os.path.splitext(name)
             
-            if plain:
-                self.append(Score(path, os.path.join(output, root + '.gz'), root))
-            else:
-                self.append(Score(path, os.path.join(output, root + '.bin'), root))
+            self.append(Score(path, os.path.join(output, root + '.bin'), os.path.join(output, root + '.gz'), root))
             
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -830,7 +831,7 @@ if __name__ == '__main__':
     else:
         raise ValueError, "no indexer?"
 
-    scores = Scores(indexer,plain=options.plain)
+    scores = Scores(indexer)
     features = Features(root=options.feature_root,
                         fisher=options.feature_fisher,
                         types=options.feature_type,
@@ -863,7 +864,7 @@ if __name__ == '__main__':
                           prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
-                          plain=options.plain,
+                          plain=score.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
@@ -905,7 +906,7 @@ if __name__ == '__main__':
                           prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
-                          plain=options.plain,
+                          plain=score.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,
@@ -942,7 +943,7 @@ if __name__ == '__main__':
                           prefix_attribute=options.prefix_attribute,
                           input=score.input,
                           output=score.output,
-                          plain=options.plain,
+                          plain=score.plain,
                           name=score.name,
                           root_joint=scores.root_joint,
                           root_source=scores.root_source,

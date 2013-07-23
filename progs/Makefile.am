@@ -72,6 +72,7 @@ bin_PROGRAMS = \
 	cicada_filter_penntreebank \
 	cicada_filter_pialign \
 	cicada_filter_refset \
+	cicada_filter_tee \
 	cicada_filter_terminal \
 	cicada_filter_text \
 	cicada_filter_weights \
@@ -262,6 +263,9 @@ cicada_filter_giza_LDADD   = $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_join_SOURCES = cicada_filter_join.cpp
 cicada_filter_join_LDADD   = $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_tee_SOURCES = cicada_filter_tee.cpp
+cicada_filter_tee_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_terminal_SOURCES = cicada_filter_terminal.cpp
 cicada_filter_terminal_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
