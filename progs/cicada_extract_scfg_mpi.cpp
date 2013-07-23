@@ -44,14 +44,14 @@ path_type spans_target_file;
 
 path_type output_file;
 
-int max_length = 7;
-int max_fertility = 10;
+int max_length = 5;
+int max_fertility = 4;
 int max_span_source = 15;
 int max_span_target = 20;
 int min_hole_source = 1;
 int min_hole_target = 1;
 int max_rank = 2;
-int max_scope = 3;
+int max_scope = 0;
 bool exhaustive = false;
 bool constrained = false;
 bool exclude = false;

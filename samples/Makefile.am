@@ -1,5 +1,6 @@
 
 EXTRA_DIST = \
+scfg \
 cicada.config.hiero \
 cicada.config.hiero-mbr \
 cicada.config.string-to-tree \

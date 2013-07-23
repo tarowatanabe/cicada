@@ -35,9 +35,9 @@ path_type output_file;
 
 std::string non_terminal = "[x]";
 int max_sentence_length = 0;
-int max_nodes = 15;
-int max_height = 3;
-int max_compose = 0;
+int max_nodes = 7;
+int max_height = 4;
+int max_compose = 4;
 int max_scope = 0;
 double cutoff = 0;
 bool exhaustive = false;
