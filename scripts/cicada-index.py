@@ -700,8 +700,10 @@ class Index(UserString.UserString):
             
         self.threads += 1
         
+        # tee the content!
         command += " | " + cicada.cicada_filter_tee + " \"%s\"" %(plain)
         
+        # actual indexing!
         command += " | " + command_indexer
         
         UserString.UserString.__init__(self, '('+command+')')
