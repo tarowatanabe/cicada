@@ -14,6 +14,9 @@ libcg_descent_la_SOURCES = \
 
 libcg_descent_la_LDFLAGS = -version-info $(CICADA_LTVERSION)
 
+libcg_descent_la_LIBADD = \
+	-lm
+
 noinst_PROGRAMS = driver1 driver2 driver3 driver4 driver5
 
 noinst_DATA = .gitignore
