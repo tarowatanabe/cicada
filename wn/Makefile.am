@@ -1,7 +1,12 @@
 AM_CPPFLAGS = -I.. -Iutils $(BOOST_CPPFLAGS)
 
 noinst_LTLIBRARIES = libwn.la
-noinst_HEADERS = wn.h wordnet.hpp
+
+noinst_HEADERS = wn.h
+
+libwnincludedir = $(pkgincludedir)/wn
+
+libwninclude_HEADERS = wordnet.hpp
 
 libwn_la_SOURCES = \
 binsrch.c  \
