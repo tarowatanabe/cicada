@@ -1,0 +1,6 @@
+1-gram-offset = 4630
+2-gram-offset = 11863
+3-gram-offset = 26185
+4-gram-offset = 44560
+5-gram-offset = 63775
+order = 5

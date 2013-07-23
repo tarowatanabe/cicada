@@ -41,30 +41,30 @@ GNU standard pipiline. For details, see `BUILD.rst`.
 Run
 ```
 
-You can find a sample grammar file at *samples* directory to gether with
+You can find a sample grammar file at *samples* directory together with
 *ngram* language model. Here is an example run (Note that \\ indicates
 shell's newline).
 ::
 
    ./progs/cicada \
-      --input samples/sample.input \
-      --grammar samples/sample.grammar.bin \
+      --input samples/scfg/input.txt \
+      --grammar samples/scfg/grammar.bin \
       --grammar "glue:straight=true,inverted=false,non-terminal=[x],goal=[s]" \
       --grammar "insertion:non-terminal=[x]" \
-      --feature-function "ngram:file=samples/sample.ngram.bin" \
+      --feature-function "ngram:file=samples/scfg/ngram.bin" \
       --feature-function word-penalty \
       --feature-function rule-penalty \
       --operation compose-cky \
-      --operation apply:prune=true,size=100,weights=samples/sample.weights \
-      --operation output:file=samples/output.test,kbest=10,weights=samples/sample.weights \
+      --operation apply:prune=true,size=100,weights=samples/scfg/weights \
+      --operation output:file=-,kbest=10,weights=samples/scfg/weights \
       --debug
 
 This sample means:
-  - Input is `samples/sample.input`
-  - Grammar consists of three gramamr specs:
+  - Input is `samples/scfg/input.txt`
+  - Three grammars:
 
-    - the grammar file is `samples/sample.grammar.bin` which is a
-      binary version of `samples/sample.grammar.gz`.
+    - The SCFG file is `samples/scfg/grammar.bin` which is a
+      binary version of `samples/scfg/grammar.bz2`.
     - Additional grammar is a "glue grammar" which consists of two rules
       of "[s] -> <[x], [x]>" and "[s] -> <[s,1] [x,1], [s,1] [x,1]>"
     - Another additional grammar is an "insertion grammar" which simply
@@ -72,14 +72,14 @@ This sample means:
 
   - Three feature functions:
 
-    - 5-gram language model from `samples/sample.ngram.bin` which is a
-      binary version of `samples/sample.ngram.gz`.
+    - 5-gram language model from `samples/scfg/ngram.bin` which is a
+      binary version of `samples/scfg/ngram.bz2`.
     - word penalty feature which penalize by the number of words in
       the target side.
     - rule penalty feature which penaltize by the number of words in a
       derivation.
     - In addition, there exist features already defined for each
-      hierarchical phrase pair in `samples/sample.grammar.gz`.
+      hierarchical phrase pair. For example, see `samples/scfg/grammar.bz2`.
 
   - Actual operation:
 
@@ -87,9 +87,9 @@ This sample means:
        in a hypergraph.
     2. Cube-pruning (apply) to apply feature functions using 100 as a
        histogram pruning threshold using the weights at
-       `samples/sample.weights`.
+       `samples/scfg/weights`.
     3. 10-best derivations are computed and output at
-       `samples/output.test` using `samples/sample.weights` as a
+       `-` (stdout) using `samples/scfg/weights` as a
        weight vector to compute the score for each derivation.
 
 In depth
