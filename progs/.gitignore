@@ -90,6 +90,7 @@ cicada_learn_online_kbest_mpi
 cicada_lexicon
 cicada_lexicon_pair
 cicada_lexicon_dice
+cicada_lexicon_fisher
 cicada_lexicon_global
 cicada_lexicon_global_mpi
 cicada_lexicon_hmm

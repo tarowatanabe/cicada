@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -13,6 +13,8 @@
 #include "utils/compress_stream.hpp"
 #include "utils/alloc_vector.hpp"
 #include "utils/compact_map.hpp"
+#include "utils/unordered_set.hpp"
+#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -64,11 +66,57 @@ struct count_map_type
 
 typedef utils::alloc_vector<count_map_type, std::allocator<count_map_type> > count_dict_type;
 
+typedef utils::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >::type word_set_type;
+
+
+double fisher(const count_type cfe, const count_type cf, const count_type ce, const count_type n)
+{
+  if (cfe > cf || cfe > ce || cfe <= 0 || cf <= 0 || ce <= 0 || n <= 0 || n < cfe || n < cf || n < ce)
+    throw std::runtime_error(std::string("invalid count:")
+			     + ' ' + boost::lexical_cast<std::string>(cfe)
+			     + ' ' + boost::lexical_cast<std::string>(cf)
+			     + ' ' + boost::lexical_cast<std::string>(ce)
+			     + ' ' + boost::lexical_cast<std::string>(n));
+
+  count_type a = cfe;
+  count_type b = cf - cfe;
+  count_type c = ce - cfe;
+  count_type d = n - ce - cf + cfe;
+    
+  double log_p = (utils::mathop::lgamma<double>(1+a+c)
+		  + utils::mathop::lgamma<double>(1+a+b)
+		  - utils::mathop::lgamma<double>(1+a)
+		  - utils::mathop::lgamma<double>(1+b)
+		  - utils::mathop::lgamma<double>(1+c)
+		  + utils::mathop::lgamma<double>(1+b+d)
+		  - utils::mathop::lgamma<double>(1+n)
+		  + utils::mathop::lgamma<double>(1+c+d)
+		  - utils::mathop::lgamma<double>(1+d));
+
+  if (! std::isfinite(log_p))
+    return std::numeric_limits<double>::infinity();
+    
+  double log_total_p = log_p;
+    
+  const count_type total_count = utils::bithack::min(b, c);
+  for (count_type i = 0; i < total_count; ++ i, ++ a, -- b, -- c, ++ d) {
+    log_p += std::log(b) + std::log(c) - std::log(a + 1) - std::log(d + 1);
+      
+    if (! std::isfinite(log_p))
+      return - log_total_p;
+      
+    log_total_p = utils::mathop::logsum(log_total_p, log_p);
+  }
+    
+  return - log_total_p; 
+}
+
 path_type source_file = "-";
 path_type target_file = "-";
 path_type output_file = "-";
 bool inverse = false;
 bool normalize = false;
+bool cutoff = false;
 
 void options(int argc, char** argv);
 
@@ -87,6 +135,11 @@ int main(int argc, char ** argv)
     sentence_type source;
     sentence_type target;
     
+    word_set_type words_source;
+    word_set_type words_target;
+
+    count_type n = 0;
+    
     while (1) {
       is_src >> source;
       is_trg >> target;
@@ -94,24 +147,32 @@ int main(int argc, char ** argv)
       if (! is_src || ! is_trg) break;
 
       if (source.empty() || target.empty()) continue;
-      
-      sentence_type::const_iterator siter_begin = source.begin();
-      sentence_type::const_iterator siter_end   = source.end();
-      sentence_type::const_iterator titer_begin = target.begin();
-      sentence_type::const_iterator titer_end   = target.end();
 
-      for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+      ++ n;
+      
+      words_source.clear();
+      words_source.insert(source.begin(), source.end());
+
+      words_target.clear();
+      words_target.insert(target.begin(), target.end());
+      
+      word_set_type::const_iterator siter_begin = words_source.begin();
+      word_set_type::const_iterator siter_end   = words_source.end();
+      word_set_type::const_iterator titer_begin = words_target.begin();
+      word_set_type::const_iterator titer_end   = words_target.end();
+
+      for (word_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	if (titer->id() >= targets.size())
 	  targets.resize(titer->id() + 1, 0);
 	++ targets[titer->id()];
       }
       
-      for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+      for (word_set_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	if (siter->id() >= sources.size())
 	  sources.resize(siter->id() + 1, 0);
 	++ sources[siter->id()];
 	
-	for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	for (word_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	  ++ dict[siter->id()][*titer];
       }
     }
@@ -124,57 +185,62 @@ int main(int argc, char ** argv)
     typedef std::multimap<double, word_type, std::greater<double>, std::allocator<std::pair<const double, word_type> > > sorted_type;
     
     sorted_type sorted;
-    
-    // dump..
+
+    const double threshold = fisher(1, 1, 1, n) - 0.001;
+
     if (normalize) {
+      // dump..
       count_dict_type::const_iterator siter_begin = dict.begin();
       count_dict_type::const_iterator siter_end   = dict.end();
       for (count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	if (*siter) {
 	  const word_type source(word_type::id_type(siter - siter_begin));
 	  const count_map_type& target = *(*siter);
-	  
+
 	  sorted.clear();
 
-	  double sum = 0.0;
-	  
+	  double logsum = boost::numeric::bounds<double>::lowest();
+	
 	  count_map_type::const_iterator titer_end = target.end();
 	  for (count_map_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	    const double score = ((2.0 * titer->second) / (sources[source.id()] + targets[titer->first.id()]));
-	    
-	    sorted.insert(std::make_pair(score, titer->first));
-	    sum += score;
-	  }
+	    const double score = fisher(titer->second, sources[source.id()], targets[titer->first.id()], n);
 
-	  const double factor = 1.0 / sum;
+	    if (cutoff && score < threshold) continue;
 	  
+	    sorted.insert(std::make_pair(score, titer->first));
+	    
+	    logsum = utils::mathop::logsum(logsum, score);
+	  }
+	
 	  sorted_type::const_iterator iter_end = sorted.end();
 	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    os << iter->second << ' ' << source << ' ' << (iter->first * factor) << '\n';
+	    os << iter->second << ' ' << source << ' ' << utils::mathop::exp(iter->first - logsum) << '\n';
 	}
     } else {
+      // dump..
       count_dict_type::const_iterator siter_begin = dict.begin();
       count_dict_type::const_iterator siter_end   = dict.end();
       for (count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	if (*siter) {
 	  const word_type source(word_type::id_type(siter - siter_begin));
 	  const count_map_type& target = *(*siter);
-	  
+
 	  sorted.clear();
-	  
+	
 	  count_map_type::const_iterator titer_end = target.end();
 	  for (count_map_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
-	    const double score = ((2.0 * titer->second) / (sources[source.id()] + targets[titer->first.id()]));
-	    
+	    const double score = fisher(titer->second, sources[source.id()], targets[titer->first.id()], n);
+
+	    if (cutoff && score < threshold) continue;
+	  
 	    sorted.insert(std::make_pair(score, titer->first));
 	  }
-	  
+	
 	  sorted_type::const_iterator iter_end = sorted.end();
 	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
 	    os << iter->second << ' ' << source << ' ' << iter->first << '\n';
 	}
-    }
-    
+    }    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -196,6 +262,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value("-"), "dice: for target source")
     ("inverse",   po::bool_switch(&inverse),   "inverse source/target")
     ("normalize", po::bool_switch(&normalize), "normalize as probability")
+    ("cutoff",    po::bool_switch(&cutoff),    "cutoff by 1-1-1-N")
     
     ("help", "help message");
 

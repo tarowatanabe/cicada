@@ -95,6 +95,7 @@ bin_PROGRAMS = \
 	cicada_lexicon \
 	cicada_lexicon_pair \
 	cicada_lexicon_dice \
+	cicada_lexicon_fisher \
 	cicada_lexicon_global \
 	cicada_lexicon_global_mpi \
 	cicada_lexicon_hmm \
@@ -352,6 +353,9 @@ cicada_lexicon_pair_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_lexicon_dice_SOURCES = cicada_lexicon_dice.cpp
 cicada_lexicon_dice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_fisher_SOURCES = cicada_lexicon_fisher.cpp
+cicada_lexicon_fisher_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_lexicon_global_SOURCES = cicada_lexicon_global.cpp cicada_lexicon_global_impl.hpp
 cicada_lexicon_global_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS)
