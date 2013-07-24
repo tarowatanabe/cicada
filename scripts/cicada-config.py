@@ -56,6 +56,7 @@ opt_parser = OptionParser(
     make_option("--tree",     default=None, action="store_true", help="tree-to-{string,tree}"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
 
+    # beam size
     make_option("--beam", default=200, type=int, action="store", help="beam size (default: %default)"),
     
     ## debug messages
@@ -133,6 +134,22 @@ if __name__ == '__main__':
     opt_parser.disable_interspersed_args()
     
     (options, args) = opt_parser.parse_args()
+
+    # check compositions...
+    num_composition = 0
+    if options.phrase:
+        num_composition += 1
+    if options.scfg:
+        num_composition += 1
+    if options.ghkm:
+        num_composition += 1
+    if options.tree:
+        num_composition += 1
+    if options.tree_cky:
+        num_composition += 1
+
+    if num_composition > 1:
+        raise ValueError, "only one of --{phrase,scfg,ghkm,tree,tree-cky} can be specified"
 
     ### grammars
     options.goal = non_terminal(options.goal)
@@ -275,15 +292,24 @@ if __name__ == '__main__':
     if options.scfg:
         print "# SCFG translation"
         print "operation = compose-cky:frontier=false"
+        print "# Alternatively, you can use parse-cky to perform beam search during composition"
+        print "# Here, we use the features found only in the grammar"
+        print "# operatin = parse-cky:frontier=false,size=%d,${weights}" %(options.beam)
     elif options.phrase:
         print "# phrase translation"
         print "operation = compose-phrase:frontier=false"
     elif options.tree or options.ghkm:
         print "# tree-to-{string,tree} translation"
         print "operation = compose-tree:frontier=false"
+        print "# Alternatively, you can use parse-tree to perform beam search during composition"
+        print "# Here, we use the features found only in the grammar"
+        print "# operatin = parse-tree:frontier=false,size=%d,${weights}" %(options.beam)
     elif options.tree_cky:
         print "# string-to-{string,tree} translation"
         print "operation = compose-tree-cky:frontier=false"
+        print "# Alternatively, you can use parse-tree-cky to perform beam search during composition"
+        print "# Here, we use the features found only in the grammar"
+        print "# operatin = parse-tree-cky:frontier=false,size=%d,${weights}" %(options.beam)
     print
 
     print "# annotate <s> and </s> to the forest"
