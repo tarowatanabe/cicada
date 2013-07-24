@@ -34,11 +34,11 @@ opt_parser = OptionParser(
     make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: %default)"),
     make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: %default)"),
     
-    make_option("--straight", default=None, action="store_true", help="straight gulue rule"),
-    make_option("--invert",   default=None, action="store_true", help="invert gulue rule"),
+    make_option("--straight", default=None, action="store_true", help="straight gulue rule for string-to-{string,tree}"),
+    make_option("--invert",   default=None, action="store_true", help="invert gulue rule for string-to-{string,tree}"),
     
-    make_option("--insertion", default=None, action="store_true", help="insertion grammar"),
-    make_option("--deletion",  default=None, action="store_true", help="deletion grammar"),
+    make_option("--insertion", default=None, action="store_true", help="insertion grammar for string-to-{string,tree}"),
+    make_option("--deletion",  default=None, action="store_true", help="deletion grammar for string-to-{string,tree}"),
     make_option("--fallback-glue", default=None, action="store_true", help="fallback tree-grammar with glue non-terminal"),
     make_option("--fallback",      default=None, action="store_true", help="fallback tree-grammar"),
     
@@ -184,6 +184,8 @@ if __name__ == '__main__':
             straight = "true"
         if options.invert:
             invert = "true"
+            
+        print "# glue rules for string-to-{string,tree}"
         print "# straight glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2))
@@ -195,10 +197,10 @@ if __name__ == '__main__':
 
     if options.insertion or options.deletion:
         if options.insertion:
-            print "# insertion grammar %s ||| terminal ||| terminal" %(options.glue)
+            print "# insertion grammar %s ||| terminal ||| terminal for string-to-{string,tree}" %(options.glue)
             print "grammar = insertion:non-terminal=%s" %(options.glue)
         if options.deletion:
-            print "# deletion grammar %s ||| terminal ||| <epsilon>" %(options.glue)
+            print "# deletion grammar %s ||| terminal ||| <epsilon> for string-to-{string,tree}" %(options.glue)
             print "grammar = deletion:non-terminal=%s" %(options.glue)
         print
 
@@ -217,13 +219,13 @@ if __name__ == '__main__':
         raise ValueError, "specified both of fallback glue and fallback"
 
     if options.fallback:
-        print "# fallback grammar with glue non-terminal"
+        print "# fallback grammar with glue non-terminal for tree-to-{string,tree}"
         print "# tree-grammar = fallback:non-terminal=%s" %(options.glue)
         print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
         print "tree-grammar = fallback"
         print
     elif options.fallback_glue:
-        print "# fallback grammar with glue non-terminal"
+        print "# fallback grammar with glue non-terminal for tree-to-{string,tree}"
         print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
         print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
         print "# tree-grammar = fallback"
@@ -312,7 +314,7 @@ if __name__ == '__main__':
         print "# operatin = parse-tree-cky:frontier=false,size=%d,${weights}" %(options.beam)
     print
 
-    print "# annotate <s> and </s> to the forest"
+    print "# annotate <s> and </s> to the forest, so that we can compute ngram LM scores with no-bos-eos=true"
     print "operation = push-bos-eos"
     print
 
