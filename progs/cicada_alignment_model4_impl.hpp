@@ -2,13 +2,13 @@
 //  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA_LEXICON_MODEL4_IMPL__HPP__
-#define __CICADA_LEXICON_MODEL4_IMPL__HPP__ 1
+#ifndef __CICADA_ALIGNMENT_MODEL4_IMPL__HPP__
+#define __CICADA_ALIGNMENT_MODEL4_IMPL__HPP__ 1
 
 #include <numeric>
 #include <set>
 
-#include "cicada_lexicon_impl.hpp"
+#include "cicada_alignment_impl.hpp"
 
 #include "cicada/semiring/logprob.hpp"
 

@@ -29,6 +29,9 @@ libtool
 cicada
 cicada_mpi
 cicada_alignment
+cicada_alignment_hmm
+cicada_alignment_model1
+cicada_alignment_model4
 cicada_clean
 cicada_cluster_word
 cicada_convex_hull
@@ -94,9 +97,6 @@ cicada_lexicon_dice
 cicada_lexicon_fisher
 cicada_lexicon_global
 cicada_lexicon_global_mpi
-cicada_lexicon_hmm
-cicada_lexicon_model1
-cicada_lexicon_model4
 cicada_maxlike
 cicada_maxlike_mpi
 cicada_mert

@@ -2,14 +2,13 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include "cicada_lexicon_impl.hpp"
+#include "cicada_alignment_impl.hpp"
 
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
-#include "utils/mathop.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -22,18 +21,12 @@ path_type dependency_source_file;
 path_type dependency_target_file;
 path_type span_source_file;
 path_type span_target_file;
-path_type classes_source_file;
-path_type classes_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
-path_type alignment_source_target_file;
-path_type alignment_target_source_file;
 double length_source_target = 1.0;
 double length_target_source = 1.0;
 path_type output_lexicon_source_target_file;
 path_type output_lexicon_target_source_file;
-path_type output_alignment_source_target_file;
-path_type output_alignment_target_source_file;
 path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
 path_type projected_source_file;
@@ -42,8 +35,7 @@ path_type posterior_source_target_file;
 path_type posterior_target_source_file;
 path_type posterior_combined_file;
 
-int iteration_model1 = 5;
-int iteration_hmm = 5;
+int iteration = 5;
 
 bool symmetric_mode = false;
 bool posterior_mode = false;
@@ -64,8 +56,6 @@ bool single_root_mode = false;
 double p0    = 0.01;
 double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-100;
-double prior_alignment = 0.01;
-double smooth_alignment = 1e-100;
 
 double l0_alpha = 100;
 double l0_beta = 0.01;
@@ -76,46 +66,27 @@ int threads = 2;
 
 int debug = 0;
 
-#include "cicada_lexicon_maximize_impl.hpp"
-#include "cicada_lexicon_model1_impl.hpp"
-#include "cicada_lexicon_hmm_impl.hpp"
+#include "cicada_alignment_maximize_impl.hpp"
+#include "cicada_alignment_model1_impl.hpp"
 
 template <typename Learner, typename Maximizer>
-void learn(const Maximizer& maximier,
-	   const int iteration,
+void learn(const Maximizer& maximizer,
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
-	   atable_type& atable_source_target,
-	   atable_type& atalbe_target_source,
-	   const classes_type& classes_source,
-	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source);
 
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
-	     const ttable_type& ttable_target_source,
-	     const atable_type& atable_source_target,
-	     const atable_type& atalbe_target_source,
-	     const classes_type& classes_source,
-	     const classes_type& classes_target);
+	     const ttable_type& ttable_target_source);
 
 template <typename Analyzer>
 void project_dependency(const ttable_type& ttable_source_target,
-			const ttable_type& ttable_target_source,
-			const atable_type& atable_source_target,
-			const atable_type& atalbe_target_source,
-			const classes_type& classes_source,
-			const classes_type& classes_target);
+			const ttable_type& ttable_target_source);
 
 template <typename Infer>
 void posterior(const ttable_type& ttable_source_target,
-	       const ttable_type& ttable_target_source,
-	       const atable_type& atable_source_target,
-	       const atable_type& atalbe_target_source,
-	       const classes_type& classes_source,
-	       const classes_type& classes_target);
-
+	       const ttable_type& ttable_target_source);
 
 void options(int argc, char** argv);
 
@@ -126,11 +97,11 @@ int main(int argc, char ** argv)
     
     if (itg_mode && max_match_mode)
       throw std::runtime_error("you cannot specify both of ITG and max-match for Viterbi alignment");
-    
+
     if (variational_bayes_mode && pgd_mode)
       throw std::runtime_error("either variational-bayes, pgd or none");
-
-    if (! projected_target_file.empty())    
+    
+    if (! projected_target_file.empty())
       if (dependency_source_file != "-" && ! boost::filesystem::exists(dependency_source_file))
 	throw std::runtime_error("no source side dependency");
     
@@ -143,17 +114,11 @@ int main(int argc, char ** argv)
     
     if (int(hybrid_mode) + degree2_mode + mst_mode + permutation_mode == 0)
       hybrid_mode = true;
-    
+
     threads = utils::bithack::max(threads, 1);
     
     ttable_type ttable_source_target(prior_lexicon, smooth_lexicon);
     ttable_type ttable_target_source(prior_lexicon, smooth_lexicon);
-    
-    atable_type atable_source_target(prior_alignment, smooth_alignment);
-    atable_type atable_target_source(prior_alignment, smooth_alignment);
-    
-    classes_type classes_source;
-    classes_type classes_target;
     
     aligned_type aligned_source_target;
     aligned_type aligned_target_source;
@@ -166,346 +131,56 @@ int main(int argc, char ** argv)
       if (lexicon_target_source_file != "-" && ! boost::filesystem::exists(lexicon_target_source_file))
 	throw std::runtime_error("no file: " + lexicon_target_source_file.string());
 
-    if (! alignment_source_target_file.empty())
-      if (alignment_source_target_file != "-" && ! boost::filesystem::exists(alignment_source_target_file))
-	throw std::runtime_error("no file: " + alignment_source_target_file.string());
-
-    if (! alignment_target_source_file.empty())
-      if (alignment_target_source_file != "-" && ! boost::filesystem::exists(alignment_target_source_file))
-	throw std::runtime_error("no file: " + alignment_target_source_file.string());
-
-    if (! classes_source_file.empty())
-      if (classes_source_file != "-" && ! boost::filesystem::exists(classes_source_file))
-	throw std::runtime_error("no file: " + classes_source_file.string());
-
-    if (! classes_target_file.empty())
-      if (classes_target_file != "-" && ! boost::filesystem::exists(classes_target_file))
-	throw std::runtime_error("no file: " + classes_target_file.string());
-    
     boost::thread_group workers_read;
     
-    // read lexicon
     if (! lexicon_source_target_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
     if (! lexicon_target_source_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
     
-    // read alignment
-    if (! alignment_source_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_source_target_file), boost::ref(atable_source_target))));
-    if (! alignment_target_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_target_source_file), boost::ref(atable_target_source))));
-
-    // read classes
-    if (! classes_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_source_file), boost::ref(classes_source))));
-    if (! classes_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_target_file), boost::ref(classes_target))));
-    
     workers_read.join_all();
     
-    if (iteration_model1 > 0) {
+    if (iteration > 0) {
       if (debug)
 	std::cerr << "start Model1 training" << std::endl;
-      
+
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(MaximizeBayes(),
-								iteration_model1,
-								ttable_source_target,
-								ttable_target_source,
-								atable_source_target,
-								atable_target_source,
-								classes_source,
-								classes_target,
-								aligned_source_target,
-								aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeBayes>(MaximizeBayes(),
-						       iteration_model1,
-						       ttable_source_target,
-						       ttable_target_source,
-						       atable_source_target,
-						       atable_target_source,
-						       classes_source,
-						       classes_target,
-						       aligned_source_target,
-						       aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeBayes>(MaximizeBayes(),
-						       iteration_model1,
-						       ttable_source_target,
-						       ttable_target_source,
-						       atable_source_target,
-						       atable_target_source,
-						       classes_source,
-						       classes_target,
-						       aligned_source_target,
-						       aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeBayes>(MaximizeBayes(),
-					      iteration_model1,
-					      ttable_source_target,
-					      ttable_target_source,
-					      atable_source_target,
-					      atable_target_source,
-					      classes_source,
-					      classes_target,
-					      aligned_source_target,
-					      aligned_target_source);
+	    learn<LearnModel1, MaximizeBayes>(MaximizeBayes(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 
       } else if (pgd_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-							     iteration_model1,
-							     ttable_source_target,
-							     ttable_target_source,
-							     atable_source_target,
-							     atable_target_source,
-							     classes_source,
-							     classes_target,
-							     aligned_source_target,
-							     aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-						    iteration_model1,
-						    ttable_source_target,
-						    ttable_target_source,
-						    atable_source_target,
-						    atable_target_source,
-						    classes_source,
-						    classes_target,
-						    aligned_source_target,
-						    aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-						    iteration_model1,
-						    ttable_source_target,
-						    ttable_target_source,
-						    atable_source_target,
-						    atable_target_source,
-						    classes_source,
-						    classes_target,
-						    aligned_source_target,
-						    aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-					   iteration_model1,
-					   ttable_source_target,
-					   ttable_target_source,
-					   atable_source_target,
-					   atable_target_source,
-					   classes_source,
-					   classes_target,
-					   aligned_source_target,
-					   aligned_target_source);
+	    learn<LearnModel1, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, Maximize>(Maximize(),
-							   iteration_model1,
-							   ttable_source_target,
-							   ttable_target_source,
-							   atable_source_target,
-							   atable_target_source,
-							   classes_source,
-							   classes_target,
-							   aligned_source_target,
-							   aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, Maximize>(Maximize(),
-						  iteration_model1,
-						  ttable_source_target,
-						  ttable_target_source,
-						  atable_source_target,
-						  atable_target_source,
-						  classes_source,
-						  classes_target,
-						  aligned_source_target,
-						  aligned_target_source);
+	    learn<LearnModel1Symmetric, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, Maximize>(Maximize(),
-						  iteration_model1,
-						  ttable_source_target,
-						  ttable_target_source,
-						  atable_source_target,
-						  atable_target_source,
-						  classes_source,
-						  classes_target,
-						  aligned_source_target,
-						  aligned_target_source);
+	    learn<LearnModel1Posterior, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnModel1, Maximize>(Maximize(),
-					 iteration_model1,
-					 ttable_source_target,
-					 ttable_target_source,
-					 atable_source_target,
-					 atable_target_source,
-					 classes_source,
-					 classes_target,
-					 aligned_source_target,
-					 aligned_target_source);
-	}
-      }
-    }
-    
-    if (iteration_hmm > 0) {
-      if (debug)
-	std::cerr << "start HMM training" << std::endl;
-
-      if (variational_bayes_mode) {
-	if (symmetric_mode) {
-	  if (posterior_mode)
-	    learn<LearnHMMSymmetricPosterior, MaximizeBayes>(MaximizeBayes(),
-							     iteration_hmm,
-							     ttable_source_target,
-							     ttable_target_source,
-							     atable_source_target,
-							     atable_target_source,
-							     classes_source,
-							     classes_target,
-							     aligned_source_target,
-							     aligned_target_source);
-	  else
-	    learn<LearnHMMSymmetric, MaximizeBayes>(MaximizeBayes(),
-						    iteration_hmm,
-						    ttable_source_target,
-						    ttable_target_source,
-						    atable_source_target,
-						    atable_target_source,
-						    classes_source,
-						    classes_target,
-						    aligned_source_target,
-						    aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    learn<LearnHMMPosterior, MaximizeBayes>(MaximizeBayes(),
-						    iteration_hmm,
-						    ttable_source_target,
-						    ttable_target_source,
-						    atable_source_target,
-						    atable_target_source,
-						    classes_source,
-						    classes_target,
-						    aligned_source_target,
-						    aligned_target_source);
-	  else
-	    learn<LearnHMM, MaximizeBayes>(MaximizeBayes(),
-					   iteration_hmm,
-					   ttable_source_target,
-					   ttable_target_source,
-					   atable_source_target,
-					   atable_target_source,
-					   classes_source,
-					   classes_target,
-					   aligned_source_target,
-					   aligned_target_source);
-	}
-
-      } else if (pgd_mode) {
-	if (symmetric_mode) {
-	  if (posterior_mode)
-	    learn<LearnHMMSymmetricPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-							  iteration_hmm,
-							  ttable_source_target,
-							  ttable_target_source,
-							  atable_source_target,
-							  atable_target_source,
-							  classes_source,
-							  classes_target,
-							  aligned_source_target,
-							  aligned_target_source);
-	  else
-	    learn<LearnHMMSymmetric, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-						 iteration_hmm,
-						 ttable_source_target,
-						 ttable_target_source,
-						 atable_source_target,
-						 atable_target_source,
-						 classes_source,
-						 classes_target,
-						 aligned_source_target,
-						 aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    learn<LearnHMMPosterior, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-						 iteration_hmm,
-						 ttable_source_target,
-						 ttable_target_source,
-						 atable_source_target,
-						 atable_target_source,
-						 classes_source,
-						 classes_target,
-						 aligned_source_target,
-						 aligned_target_source);
-	  else
-	    learn<LearnHMM, MaximizeL0>(MaximizeL0(l0_alpha, l0_beta),
-					iteration_hmm,
-					ttable_source_target,
-					ttable_target_source,
-					atable_source_target,
-					atable_target_source,
-					classes_source,
-					classes_target,
-					aligned_source_target,
-					aligned_target_source);
-	}	
-	
-      } else {
-	if (symmetric_mode) {
-	  if (posterior_mode)
-	    learn<LearnHMMSymmetricPosterior, Maximize>(Maximize(),
-							iteration_hmm,
-							ttable_source_target,
-							ttable_target_source,
-							atable_source_target,
-							atable_target_source,
-							classes_source,
-							classes_target,
-							aligned_source_target,
-							aligned_target_source);
-	  else
-	    learn<LearnHMMSymmetric, Maximize>(Maximize(),
-					       iteration_hmm,
-					       ttable_source_target,
-					       ttable_target_source,
-					       atable_source_target,
-					       atable_target_source,
-					       classes_source,
-					       classes_target,
-					       aligned_source_target,
-					       aligned_target_source);
-	} else {
-	  if (posterior_mode)
-	    learn<LearnHMMPosterior, Maximize>(Maximize(),
-					       iteration_hmm,
-					       ttable_source_target,
-					       ttable_target_source,
-					       atable_source_target,
-					       atable_target_source,
-					       classes_source,
-					       classes_target,
-					       aligned_source_target,
-					       aligned_target_source);
-	  else
-	    learn<LearnHMM, Maximize>(Maximize(),
-				      iteration_hmm,
-				      ttable_source_target,
-				      ttable_target_source,
-				      atable_source_target,
-				      atable_target_source,
-				      classes_source,
-				      classes_target,
-				      aligned_source_target,
-				      aligned_target_source);
+	    learn<LearnModel1, Maximize>(Maximize(), ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
       }
     }
@@ -514,123 +189,66 @@ int main(int argc, char ** argv)
       if (itg_mode) {
 	if (debug)
 	  std::cerr << "ITG alignment" << std::endl;
-
-	viterbi<ITGHMM>(ttable_source_target,
-			ttable_target_source,
-			atable_source_target,
-			atable_target_source,
-			classes_source,
-			classes_target);
+	
+	viterbi<ITGModel1>(ttable_source_target, ttable_target_source);
       } else if (max_match_mode) {
 	if (debug)
 	  std::cerr << "Max-Match alignment" << std::endl;
 	
-	viterbi<MaxMatchHMM>(ttable_source_target,
-			     ttable_target_source,
-			     atable_source_target,
-			     atable_target_source,
-			     classes_source,
-			     classes_target);
+	viterbi<MaxMatchModel1>(ttable_source_target, ttable_target_source);
       } else {
 	if (debug)
 	  std::cerr << "Viterbi alignment" << std::endl;
 	
-	viterbi<ViterbiHMM>(ttable_source_target,
-			    ttable_target_source,
-			    atable_source_target,
-			    atable_target_source,
-			    classes_source,
-			    classes_target);
+	viterbi<ViterbiModel1>(ttable_source_target, ttable_target_source);
       }
     }
-
+    
     // dependency parsing projection
     if (! projected_source_file.empty() || ! projected_target_file.empty()) {
       if (hybrid_mode) {
 	if (debug)
 	  std::cerr << "hybrid projective dependency" << std::endl;
-	
-	if (single_root_mode)
-	  project_dependency<DependencyHybridSingleRootHMM>(ttable_source_target,
-							    ttable_target_source,
-							    atable_source_target,
-							    atable_target_source,
-							    classes_source,
-							    classes_target);
-	else
-	  project_dependency<DependencyHybridHMM>(ttable_source_target,
-						  ttable_target_source,
-						  atable_source_target,
-						  atable_target_source,
-						  classes_source,
-						  classes_target);
 
+	if (single_root_mode)
+	  project_dependency<DependencyHybridSingleRootModel1>(ttable_source_target, ttable_target_source);
+	else
+	  project_dependency<DependencyHybridModel1>(ttable_source_target, ttable_target_source);
       } else if (degree2_mode) {
 	if (debug)
 	  std::cerr << "degree2 non-projective dependency" << std::endl;
 	
 	if (single_root_mode)
-	  project_dependency<DependencyDegree2SingleRootHMM>(ttable_source_target,
-							     ttable_target_source,
-							     atable_source_target,
-							     atable_target_source,
-							     classes_source,
-							     classes_target);
+	  project_dependency<DependencyDegree2SingleRootModel1>(ttable_source_target, ttable_target_source);
 	else
-	  project_dependency<DependencyDegree2HMM>(ttable_source_target,
-						   ttable_target_source,
-						   atable_source_target,
-						   atable_target_source,
-						   classes_source,
-						   classes_target);
+	  project_dependency<DependencyDegree2Model1>(ttable_source_target, ttable_target_source);
       } else if (mst_mode) {
 	if (debug)
 	  std::cerr << "MST non-projective dependency" << std::endl;
 	
 	if (single_root_mode)
-	  project_dependency<DependencyMSTSingleRootHMM>(ttable_source_target,
-							 ttable_target_source,
-							 atable_source_target,
-							 atable_target_source,
-							 classes_source,
-							 classes_target);
+	  project_dependency<DependencyMSTSingleRootModel1>(ttable_source_target, ttable_target_source);
 	else
-	  project_dependency<DependencyMSTHMM>(ttable_source_target,
-					       ttable_target_source,
-					       atable_source_target,
-					       atable_target_source,
-					       classes_source,
-					       classes_target);
+	  project_dependency<DependencyMSTModel1>(ttable_source_target, ttable_target_source);
       } else if (permutation_mode) {
 	if (debug)
 	  std::cerr << "permutation" << std::endl;
 	
-	project_dependency<PermutationHMM>(ttable_source_target,
-					   ttable_target_source,
-					   atable_source_target,
-					   atable_target_source,
-					   classes_source,
-					   classes_target);
+	project_dependency<PermutationModel1>(ttable_source_target, ttable_target_source);
       } else
 	throw std::runtime_error("no dependency algorithm?");
     }
-    
+
     if (! posterior_source_target_file.empty() || ! posterior_target_source_file.empty() || ! posterior_combined_file.empty()) {
       if (debug)
 	std::cerr << "compute posterior" << std::endl;
       
-      posterior<PosteriorHMM>(ttable_source_target,
-			      ttable_target_source,
-			      atable_source_target,
-			      atable_target_source,
-			      classes_source,
-			      classes_target);
+      posterior<PosteriorModel1>(ttable_source_target, ttable_target_source);
     }
-    
+      
     // final writing
     boost::thread_group workers_write;
     
-    // write lexicon
     if (! output_lexicon_source_target_file.empty())
       workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
 							     boost::cref(output_lexicon_source_target_file),
@@ -644,18 +262,6 @@ int main(int argc, char ** argv)
 							     boost::cref(ttable_target_source),
 							     boost::cref(aligned_target_source),
 							     threshold)));
-
-    // write alignment
-    if (! output_alignment_source_target_file.empty())
-      workers_write.add_thread(new boost::thread(boost::bind(write_alignment,
-							     boost::cref(output_alignment_source_target_file),
-							     boost::cref(atable_source_target))));
-    
-    if (! output_alignment_target_source_file.empty())
-      workers_write.add_thread(new boost::thread(boost::bind(write_alignment,
-							     boost::cref(output_alignment_target_source_file),
-							     boost::cref(atable_target_source))));
-    
     
     workers_write.join_all();
   }
@@ -666,14 +272,6 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct greater_second
-{
-  template <typename Tp>
-  bool operator()(const Tp* x, const Tp* y) const
-  {
-    return x->second > y->second;
-  }
-};
 
 struct LearnMapReduce
 {
@@ -794,6 +392,7 @@ struct LearnReducer : public Maximizer
   aligned_type& aligned_new;
 };
 
+
 template <typename Learner>
 struct LearnMapper : public Learner
 {
@@ -871,10 +470,10 @@ struct LearnMapper : public Learner
 	
     for (word_type::id_type target_id = 0; target_id != target_max; ++ target_id) {
       ttable_counts_type counts;
-      
+	  
       if (Learner::ttable_counts_target_source.exists(target_id) && ! Learner::ttable_counts_target_source[target_id].empty())
 	counts.counts.swap(Learner::ttable_counts_target_source[target_id]);
-      
+	  
       if (Learner::aligned_target_source.exists(target_id) && ! Learner::aligned_target_source[target_id].empty())
 	counts.aligned.swap(Learner::aligned_target_source[target_id]);
 	  
@@ -905,7 +504,7 @@ void merge_tables(TableSet& tables, Table& merged)
   size_t size_max = 0;
   for (size_t i = 0; i != tables.size(); ++ i)
     size_max = utils::bithack::max(size_max, tables[i].size());
-
+  
   merged.reserve(size_max);
   merged.resize(size_max);
   
@@ -916,14 +515,9 @@ void merge_tables(TableSet& tables, Table& merged)
 }
 
 template <typename Learner, typename Maximizer>
-void learn(const Maximizer& maximizer,
-	   const int iteration,
+void learn(const Maximizer& maximizer, 
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
-	   atable_type& atable_source_target,
-	   atable_type& atable_target_source,
-	   const classes_type& classes_source,
-	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source)
 {
@@ -944,20 +538,18 @@ void learn(const Maximizer& maximizer,
   queue_ttable_set_type queue_ttable_source_target(utils::bithack::max(1, threads / 2));
   queue_ttable_set_type queue_ttable_target_source(utils::bithack::max(1, threads / 2));
   
-  mapper_set_type mappers(threads, mapper_type(queue_bitext,
-					       queue_ttable_source_target,
-					       queue_ttable_target_source,
-					       LearnBase(ttable_source_target, ttable_target_source,
-							 atable_source_target, atable_target_source,
-							 classes_source, classes_target)));
+  mapper_set_type  mappers(threads, mapper_type(queue_bitext,
+						queue_ttable_source_target,
+						queue_ttable_target_source,
+						LearnBase(ttable_source_target, ttable_target_source)));
   
   etable_type etable_source_target(length_source_target);
   etable_type etable_target_source(length_target_source);
-  
+
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
-    
+
     utils::resource accumulate_start;
 
     std::vector<ttable_type, std::allocator<ttable_type> > ttable_source_target_new(threads, ttable_type(ttable_source_target.prior,
@@ -1065,7 +657,7 @@ void learn(const Maximizer& maximizer,
     
     objective_source_target /= num_bitext;
     objective_target_source /= num_bitext;
-
+    
     for (size_t i = 0; i != mappers.size(); ++ i) {
       objective_source_target += mappers[i].objective_source_target / num_bitext;
       objective_target_source += mappers[i].objective_target_source / num_bitext;
@@ -1079,26 +671,6 @@ void learn(const Maximizer& maximizer,
 		<< "                          entropy: " << std::exp(- objective_target_source) << '\n'
 		<< "                       perplexity: " << (- objective_target_source / std::log(2.0)) << '\n';
     
-    // merge atable counts... (we will dynamically create probability table!)
-    // first, initialize all the threaded alignment
-    // we need to initialize cache-local atable, first, since we will clear all the entries again!
-    atable_source_target.initialize();
-    atable_target_source.initialize();
-    
-    // second, merge counts
-    for (size_t i = 0; i != mappers.size(); ++ i) {
-      atable_source_target += mappers[i].atable_counts_source_target;
-      atable_target_source += mappers[i].atable_counts_target_source;
-    }
-    
-    // third, estimate unk
-    atable_source_target.estimate_unk();
-    atable_target_source.estimate_unk();
-
-    // initialize cache
-    atable_source_target.initialize_cache();
-    atable_target_source.initialize_cache();
-
     // etable..
     length_source_target = double(length_target) / length_source;
     length_target_source = double(length_source) / length_target;
@@ -1114,12 +686,13 @@ void learn(const Maximizer& maximizer,
     merge_tables(ttable_target_source_new, ttable_target_source);
     merge_tables(aligned_source_target_new, aligned_source_target);
     merge_tables(aligned_target_source_new, aligned_target_source);
-    
+
     utils::resource accumulate_end;
     
     if (debug)
       std::cerr << "cpu time:  " << accumulate_end.cpu_time() - accumulate_start.cpu_time() << std::endl
 		<< "user time: " << accumulate_end.user_time() - accumulate_start.user_time() << std::endl;
+    
   }
 }
 
@@ -1205,9 +778,9 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
     alignment_type alignment_source_target;
     alignment_type alignment_target_source;
 
-    const int iter_mask = (1 << 8) - 1;
+    const int iter_mask = (1 << 12) - 1;
     
-    for (int iter = 0;; ++ iter) {
+    for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
       
@@ -1242,7 +815,7 @@ struct ViterbiReducer : public ViterbiMapReduce
   ostream_ptr_type os;
   queue_type& queue;
   
-  ViterbiReducer(const path_type& path, queue_type& __queue) : os(), queue(__queue)
+  ViterbiReducer(const path_type& path, queue_type& __queue) : os(), queue(__queue) 
   {
     if (! path.empty()) {
       const bool flush_output = (path == "-"
@@ -1252,7 +825,7 @@ struct ViterbiReducer : public ViterbiMapReduce
       os.reset(new utils::compress_ostream(path, 1024 * 1024 * (! flush_output)));
     }
   }
-  
+
   typedef int index_type;
   typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
   typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
@@ -1310,7 +883,7 @@ struct ViterbiReducer : public ViterbiMapReduce
   
   void operator()()
   {
-    if (! os) {
+    if (! os ) {
       bitext_type bitext;
       for (;;) {
 	queue.pop_swap(bitext);
@@ -1351,11 +924,7 @@ struct ViterbiReducer : public ViterbiMapReduce
 
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
-	     const ttable_type& ttable_target_source,
-	     const atable_type& atable_source_target,
-	     const atable_type& atable_target_source,
-	     const classes_type& classes_source,
-	     const classes_type& classes_target)
+	     const ttable_type& ttable_target_source)
 {
   typedef ViterbiReducer         reducer_type;
   typedef ViterbiMapper<Aligner> mapper_type;
@@ -1368,20 +937,18 @@ void viterbi(const ttable_type& ttable_source_target,
   queue_type queue(threads * 4096);
   queue_type queue_source_target;
   queue_type queue_target_source;
-  
+
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
   reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
-
+  
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(mapper_type(Aligner(ttable_source_target, ttable_target_source,
-							    atable_source_target, atable_target_source,
-							    classes_source, classes_target),
+    mapper.add_thread(new boost::thread(mapper_type(Aligner(ttable_source_target, ttable_target_source),
 						    queue,
 						    queue_source_target,
 						    queue_target_source)));
-    
+  
   bitext_type bitext;
   bitext.id = 0;
   
@@ -1398,7 +965,7 @@ void viterbi(const ttable_type& ttable_source_target,
   for (;;) {
     is_src >> bitext.source;
     is_trg >> bitext.target;
-
+    
     bitext.span_source.clear();
     bitext.span_target.clear();
     
@@ -1420,7 +987,7 @@ void viterbi(const ttable_type& ttable_source_target,
 	std::cerr << '\n';
     }
   }
-  
+
   if (debug && ((bitext.id % 10000) % 100))
     std::cerr << std::endl;
   if (debug)
@@ -1546,7 +1113,7 @@ struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
     projected_type projected_source;
     projected_type projected_target;
     
-    const int iter_mask = (1 << 8) - 1;
+    const int iter_mask = (1 << 12) - 1;
     
     for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
@@ -1596,8 +1163,8 @@ struct ProjectionReducer : public ProjectionMapReduce
   {
     if (! path.empty()) {
       const bool flush_output = (path == "-"
-				|| (boost::filesystem::exists(path)
-				    && ! boost::filesystem::is_regular_file(path)));
+				 || (boost::filesystem::exists(path)
+				     && ! boost::filesystem::is_regular_file(path)));
       
       os.reset(new utils::compress_ostream(path, 1024 * 1024 * (! flush_output)));
     }
@@ -1605,7 +1172,7 @@ struct ProjectionReducer : public ProjectionMapReduce
   
   void operator()()
   {
-    if (os) {
+    if (! os) {
       projected_type projected;
       for (;;) {
 	queue.pop_swap(projected);
@@ -1646,11 +1213,7 @@ struct ProjectionReducer : public ProjectionMapReduce
 
 template <typename Analyzer>
 void project_dependency(const ttable_type& ttable_source_target,
-			const ttable_type& ttable_target_source,
-			const atable_type& atable_source_target,
-			const atable_type& atable_target_source,
-			const classes_type& classes_source,
-			const classes_type& classes_target)
+			const ttable_type& ttable_target_source)
 {
   typedef ProjectionMapper<Analyzer> mapper_type;
   typedef ProjectionReducer          reducer_type;
@@ -1663,6 +1226,7 @@ void project_dependency(const ttable_type& ttable_source_target,
 
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
   
+  
   queue_mapper_type  queue(threads * 4096);
   queue_reducer_type queue_source;
   queue_reducer_type queue_target;
@@ -1673,9 +1237,7 @@ void project_dependency(const ttable_type& ttable_source_target,
 
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(mapper_type(Analyzer(ttable_source_target, ttable_target_source,
-							     atable_source_target, atable_target_source,
-							     classes_source, classes_target),
+    mapper.add_thread(new boost::thread(mapper_type(Analyzer(ttable_source_target, ttable_target_source),
 						    queue,
 						    queue_source,
 						    queue_target)));
@@ -1696,10 +1258,10 @@ void project_dependency(const ttable_type& ttable_source_target,
   for (;;) {
     is_src >> bitext.source;
     is_trg >> bitext.target;
-    
+
     bitext.dependency_source.clear();
     bitext.dependency_target.clear();
-
+    
     if (is_dep_src.get())
       *is_dep_src >> bitext.dependency_source;
     if (is_dep_trg.get())
@@ -1743,7 +1305,6 @@ void project_dependency(const ttable_type& ttable_source_target,
     std::cerr << "cpu time:  " << projection_end.cpu_time() - projection_start.cpu_time() << std::endl
 	      << "user time: " << projection_end.user_time() - projection_start.user_time() << std::endl;
 }
-
 
 struct PosteriorMapReduce
 {
@@ -1841,7 +1402,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
     posterior_type posterior_target_source;
     posterior_type posterior_combined;
     
-    const int iter_mask = (1 << 8) - 1;
+    const int iter_mask = (1 << 12) - 1;
     
     for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
@@ -1852,7 +1413,6 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
       posterior_combined.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty()) {
-	
 	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
 	
 	// merging...
@@ -1871,7 +1431,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
 	for (size_type src = 1; src <= source_size; ++ src)
 	  posterior_combined.matrix(0, src) = posterior_target_source.matrix(src, 0);
       }
-
+      
       posterior_source_target.id = bitext.id;
       posterior_target_source.id = bitext.id;
       posterior_combined.id      = bitext.id;
@@ -1896,7 +1456,7 @@ struct PosteriorReducer : public PosteriorMapReduce
     }
   };
   typedef std::set<posterior_type, less_posterior, std::allocator<posterior_type> > posterior_set_type;
-
+  
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
@@ -1914,7 +1474,7 @@ struct PosteriorReducer : public PosteriorMapReduce
     }
   }
   
-  void operator()() throw()
+  void operator()()
   {
     if (! os) {
       posterior_type posterior;
@@ -1930,7 +1490,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       for (;;) {
 	queue.pop_swap(posterior);
 	if (posterior.id == size_type(-1)) break;
-
+	
 	if (posterior.id == id) {
 	  write(*os, posterior);
 	  ++ id;
@@ -1982,11 +1542,7 @@ struct PosteriorReducer : public PosteriorMapReduce
 
 template <typename Infer>
 void posterior(const ttable_type& ttable_source_target,
-	       const ttable_type& ttable_target_source,
-	       const atable_type& atable_source_target,
-	       const atable_type& atable_target_source,
-	       const classes_type& classes_source,
-	       const classes_type& classes_target)
+	       const ttable_type& ttable_target_source)
 {
   typedef PosteriorMapper<Infer> mapper_type;
   typedef PosteriorReducer       reducer_type;
@@ -2011,14 +1567,12 @@ void posterior(const ttable_type& ttable_source_target,
 
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(mapper_type(Infer(ttable_source_target, ttable_target_source,
-							  atable_source_target, atable_target_source,
-							  classes_source, classes_target),
+    mapper.add_thread(new boost::thread(mapper_type(Infer(ttable_source_target, ttable_target_source),
 						    queue,
 						    queue_source_target,
 						    queue_target_source,
-						    queue_combined)));  
-  
+						    queue_combined)));
+    
   bitext_type bitext;
   bitext.id = 0;
   
@@ -2062,7 +1616,7 @@ void posterior(const ttable_type& ttable_source_target,
   queue_source_target.push(posterior_type());
   queue_target_source.push(posterior_type());
   queue_combined.push(posterior_type());
-
+  
   reducer.join_all();
 
   utils::resource posterior_end;
@@ -2071,7 +1625,6 @@ void posterior(const ttable_type& ttable_source_target,
     std::cerr << "cpu time:  " << posterior_end.cpu_time() - posterior_start.cpu_time() << std::endl
 	      << "user time: " << posterior_end.user_time() - posterior_start.user_time() << std::endl;
 }
-
 
 void options(int argc, char** argv)
 {
@@ -2084,43 +1637,36 @@ void options(int argc, char** argv)
     ("source",    po::value<path_type>(&source_file),    "source file")
     ("target",    po::value<path_type>(&target_file),    "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
-    
+
     ("dependency-source", po::value<path_type>(&dependency_source_file), "source dependency file")
     ("dependency-target", po::value<path_type>(&dependency_target_file), "target dependency file")
     
     ("span-source", po::value<path_type>(&span_source_file), "source span file")
     ("span-target", po::value<path_type>(&span_target_file), "target span file")
-
-    ("classes-source", po::value<path_type>(&classes_source_file), "source classes file")
-    ("classes-target", po::value<path_type>(&classes_target_file), "target classes file")
     
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
-    ("alignment-source-target", po::value<path_type>(&alignment_source_target_file), "alignment model for P(target | source)")
-    ("alignment-target-source", po::value<path_type>(&alignment_target_source_file), "alignment model for P(source | target)")
+    
     ("length-source-target",  po::value<double>(&length_source_target)->default_value(length_source_target), "length model for P(target | source)")
     ("length-target-source",  po::value<double>(&length_target_source)->default_value(length_target_source), "length model for P(source | target)")
     
     ("output-lexicon-source-target", po::value<path_type>(&output_lexicon_source_target_file), "lexicon model output for P(target | source)")
     ("output-lexicon-target-source", po::value<path_type>(&output_lexicon_target_source_file), "lexicon model output for P(source | target)")
-    ("output-alignment-source-target", po::value<path_type>(&output_alignment_source_target_file), "alignment model output for P(target | source)")
-    ("output-alignment-target-source", po::value<path_type>(&output_alignment_target_source_file), "alignment model output for P(source | target)")
     
     ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
     ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
-
+    
     ("projected-source", po::value<path_type>(&projected_source_file), "source dependnecy projected from target")
     ("projected-target", po::value<path_type>(&projected_target_file), "target dependency projected from source")
     
     ("posterior-source-target", po::value<path_type>(&posterior_source_target_file), "posterior for P(target | source)")
     ("posterior-target-source", po::value<path_type>(&posterior_target_source_file), "posterior for P(source | target)")
     ("posterior-combined",      po::value<path_type>(&posterior_combined_file),      "posterior for P(source | target) P(target | source)")
-
-    ("iteration-model1", po::value<int>(&iteration_model1)->default_value(iteration_model1), "max Model1 iteration")
-    ("iteration-hmm", po::value<int>(&iteration_hmm)->default_value(iteration_hmm), "max HMM iteration")
     
-    ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric training")
-    ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained training")
+    ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
+    
+    ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
+    ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
     ("pgd",               po::bool_switch(&pgd_mode),               "projected gradient descent")
     
@@ -2133,16 +1679,14 @@ void options(int argc, char** argv)
     ("degree2",     po::bool_switch(&degree2_mode),     "degree2 non-projective dependency parsing")
     ("mst",         po::bool_switch(&mst_mode),         "MST non-projective dependency parsing")
     ("single-root", po::bool_switch(&single_root_mode), "single root dependency")
-
-    ("p0",             po::value<double>(&p0)->default_value(p0),                               "parameter for NULL alignment")
-    ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),         "Dirichlet prior for variational Bayes")
-    ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon),       "smoothing parameter for uniform distribution")
-    ("prior-alignment",  po::value<double>(&prior_alignment)->default_value(prior_alignment),   "Dirichlet prior for variational Bayes")
-    ("smooth-alignment", po::value<double>(&smooth_alignment)->default_value(smooth_alignment), "smoothing parameter for uniform distribution")
     
+    ("p0",             po::value<double>(&p0)->default_value(p0),                         "parameter for NULL alignment")
+    ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),   "Dirichlet prior for variational Bayes")
+    ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon), "smoothing parameter for uniform distribution")
+
     ("l0-alpha", po::value<double>(&l0_alpha)->default_value(l0_alpha), "L0 regularization")
     ("l0-beta",  po::value<double>(&l0_beta)->default_value(l0_beta),   "L0 regularization")
-    
+
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "write with beam-threshold (<= 0.0 implies no beam)")
 
     ("threads", po::value<int>(&threads), "# of threads")

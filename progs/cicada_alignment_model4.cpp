@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #define BOOST_SPIRIT_THREADSAFE
@@ -8,7 +8,7 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
-#include "cicada_lexicon_impl.hpp"
+#include "cicada_alignment_impl.hpp"
 
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
@@ -98,10 +98,10 @@ int threads = 2;
 
 int debug = 0;
 
-#include "cicada_lexicon_maximize_impl.hpp"
-#include "cicada_lexicon_model1_impl.hpp"
-#include "cicada_lexicon_hmm_impl.hpp"
-#include "cicada_lexicon_model4_impl.hpp"
+#include "cicada_alignment_maximize_impl.hpp"
+#include "cicada_alignment_model1_impl.hpp"
+#include "cicada_alignment_hmm_impl.hpp"
+#include "cicada_alignment_model4_impl.hpp"
 
 template <typename Learner, typename Maximizer>
 void learn(const Maximizer& maximier,

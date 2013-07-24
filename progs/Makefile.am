@@ -34,6 +34,9 @@ bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
 	cicada_alignment \
+	cicada_alignment_hmm \
+	cicada_alignment_model1 \
+	cicada_alignment_model4 \
 	cicada_clean \
 	cicada_cluster_word \
 	cicada_convex_hull \
@@ -99,9 +102,6 @@ bin_PROGRAMS = \
 	cicada_lexicon_fisher \
 	cicada_lexicon_global \
 	cicada_lexicon_global_mpi \
-	cicada_lexicon_hmm \
-	cicada_lexicon_model1 \
-	cicada_lexicon_model4 \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
 	cicada_mert \
@@ -368,44 +368,44 @@ cicada_lexicon_global_mpi_SOURCES = cicada_lexicon_global_mpi.cpp cicada_lexicon
 cicada_lexicon_global_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS)
 
-cicada_lexicon_hmm_SOURCES = \
-	cicada_lexicon_hmm.cpp \
-	cicada_lexicon_impl.hpp \
-	cicada_lexicon_hmm_impl.hpp \
-	cicada_lexicon_model1_impl.hpp \
-	cicada_lexicon_maximize_impl.hpp \
+cicada_alignment_hmm_SOURCES = \
+	cicada_alignment_hmm.cpp \
+	cicada_alignment_impl.hpp \
+	cicada_alignment_hmm_impl.hpp \
+	cicada_alignment_model1_impl.hpp \
+	cicada_alignment_maximize_impl.hpp \
 	dependency_hybrid.hpp \
 	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp
-cicada_lexicon_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_alignment_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_lexicon_model1_SOURCES = \
-	cicada_lexicon_model1.cpp \
-	cicada_lexicon_impl.hpp \
-	cicada_lexicon_model1_impl.hpp \
-	cicada_lexicon_maximize_impl.hpp \
+cicada_alignment_model1_SOURCES = \
+	cicada_alignment_model1.cpp \
+	cicada_alignment_impl.hpp \
+	cicada_alignment_model1_impl.hpp \
+	cicada_alignment_maximize_impl.hpp \
 	dependency_hybrid.hpp \
 	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
-cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_alignment_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_lexicon_model4_SOURCES = \
-	cicada_lexicon_model4.cpp \
-	cicada_lexicon_impl.hpp \
-	cicada_lexicon_hmm_impl.hpp \
-	cicada_lexicon_model1_impl.hpp \
-	cicada_lexicon_model4_impl.hpp \
-	cicada_lexicon_maximize_impl.hpp \
+cicada_alignment_model4_SOURCES = \
+	cicada_alignment_model4.cpp \
+	cicada_alignment_impl.hpp \
+	cicada_alignment_hmm_impl.hpp \
+	cicada_alignment_model1_impl.hpp \
+	cicada_alignment_model4_impl.hpp \
+	cicada_alignment_maximize_impl.hpp \
 	dependency_hybrid.hpp \
 	dependency_mst.hpp \
 	dependency_degree2.hpp \
 	itg_alignment.hpp \
 	kuhn_munkres.hpp 
-cicada_lexicon_model4_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_alignment_model4_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp cicada_text_impl.hpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

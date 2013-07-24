@@ -304,10 +304,9 @@ class CICADA:
 	
         for binprog in ('cicada_cluster_word',
                         ## step 1
-                        'cicada_lexicon_model4',
-                        'cicada_lexicon_model1',
-                        'cicada_lexicon_hmm',
-                        'cicada_lexicon_dice',
+                        'cicada_alignment_model4',
+                        'cicada_alignment_model1',
+                        'cicada_alignment_hmm',
                         ## step2
                         'cicada_alignment', 
                         ## step 3
@@ -483,11 +482,11 @@ class Giza:
         
         command = ""
         if iteration_model4 > 0:
-            command = cicada.cicada_lexicon_model4
+            command = cicada.cicada_alignment_model4
         elif iteration_hmm > 0:
-            command = cicada.cicada_lexicon_hmm
+            command = cicada.cicada_alignment_hmm
         elif iteration_model1 > 0:
-            command = cicada.cicada_lexicon_model1
+            command = cicada.cicada_alignment_model1
         else:
             raise ValueError, "invalid model iterations"
         
@@ -707,11 +706,11 @@ class AlignmentPosterior:
             learn_model4 = 1
             
         
-        command = cicada.cicada_lexicon_model1
+        command = cicada.cicada_alignment_model1
         if learn_hmm:
-            command = cicada.cicada_lexicon_hmm
+            command = cicada.cicada_alignment_hmm
         if learn_model4:
-            command = cicada.cicada_lexicon_model4
+            command = cicada.cicada_alignment_model4
            
         command += " --source \"%s\"" %(corpus.source)
         command += " --target \"%s\"" %(corpus.target)
@@ -812,11 +811,11 @@ class Aligner:
         if hasattr(giza, 'distortion_source_target'):
             learn_model4 = 1
 
-        command = cicada.cicada_lexicon_model1
+        command = cicada.cicada_alignment_model1
         if learn_hmm:
-            command = cicada.cicada_lexicon_hmm
+            command = cicada.cicada_alignment_hmm
         if learn_model4:
-            command = cicada.cicada_lexicon_model4
+            command = cicada.cicada_alignment_model4
         command += " \\\n"
 
         if learn_hmm or learn_model4:
