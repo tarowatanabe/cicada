@@ -52,7 +52,8 @@ opt_parser = OptionParser(
     # cicada composition
     make_option("--phrase",   default=None, action="store_true", help="phrase-based grammar"),
     make_option("--scfg",     default=None, action="store_true", help="SCFG"),
-    make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
+    make_option("--ghkm",     default=None, action="store_true", help="GHKM (or tree-to-{string,tree})"),
+    make_option("--tree",     default=None, action="store_true", help="tree-to-{string,tree}"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
 
     make_option("--beam", default=200, type=int, action="store", help="beam size (default: %default)"),
@@ -240,8 +241,13 @@ if __name__ == '__main__':
 
     print "feature-function = word-penalty"
     print "feature-function = rule-penalty"
+    
+    if options.tree or options.ghkm or options.tree_cky:
+        print "feature-function = glue-tree-penalty"
+    else:
+        print "# feature-function = glue-tree-penalty"
+    
     print "# feature-function = arity-penalty"
-    print "# feature-function = glue-tree-penalty"
     print "# feature-function = non-latin-penalty"
     print "# feature-function = rule-shape"
     print
@@ -250,12 +256,12 @@ if __name__ == '__main__':
     print "#"
     print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,dependency}"
     print "#"
-    
+
     if options.scfg:
         print "input-sentence = true"
     elif options.phrase:
         print "input-sentence = true"
-    elif options.tree:
+    elif options.tree or options.ghkm:
         print "input-forest = true"
     elif options.tree_cky:
         print "input-sentence = true"
@@ -272,7 +278,7 @@ if __name__ == '__main__':
     elif options.phrase:
         print "# phrase translation"
         print "operation = compose-phrase:frontier=false"
-    elif options.tree:
+    elif options.tree or options.ghkm:
         print "# tree-to-{string,tree} translation"
         print "operation = compose-tree:frontier=false"
     elif options.tree_cky:

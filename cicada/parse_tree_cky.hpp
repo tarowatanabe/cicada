@@ -301,10 +301,19 @@ namespace cicada
     
     struct compare_heap_type
     {
+      size_t cardinality(const candidate_type& x) const
+      {
+	return std::accumulate(x.j.begin(), x.j.end(), x.is_rule() ? x.rule_iter - x.rule_first : x.tree_iter - x.tree_first);
+      }
+      
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score < y->score;
+	return ((x->score < y->score)
+		|| (!(y->score < x->score)
+		    && (x->level > y->level
+			|| (!(y->level > x->level)
+			    && cardinality(*x) > cardinality(*y)))));
       }
     };
     
@@ -555,6 +564,7 @@ namespace cicada
 	  node_map.clear();
 	  candidates.clear();
 	  heap.clear();
+	  heap_unary.clear();
 	  
 	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
 	    active_tree_set_type&  cell = actives_tree[table](first, last);
@@ -604,6 +614,8 @@ namespace cicada
 	  
 	  derivations.clear();
 	  
+	  //std::cerr << "initial heap size: " << heap.size() << std::endl;
+	  
 	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
 	    // pop-best...
 	    const candidate_type* item = heap.top();
@@ -614,7 +626,7 @@ namespace cicada
 	    //
 	    // we will always expand into unary rules, in order to find out better unary chain!
 	    //
-	    
+
 	    // check unary rule, and see if this edge is already inserted!
 	    const score_type score = item->score;
 	    
@@ -631,6 +643,8 @@ namespace cicada
 		unary_tree_set_type& unaries = unary_tree_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 		
 		if (! unaries.insert(&(*(item->tree_iter))).second) {
+		  //std::cerr << "already inserted! " << std::endl;
+		  
 		  typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		  if (niter == node_map.end())
 		    throw std::runtime_error("no node-map?");
@@ -639,7 +653,8 @@ namespace cicada
 		  node_passive.second = score > scores[niter->second];
 		  
 		  scores[niter->second] = std::max(scores[niter->second], score);
-		} else
+		} else {
+		  //std::cerr << "higher level unary rule: " << *(rule.rule) << std::endl;
 		  node_passive = apply_rule(score,
 					    rule.lhs,
 					    rule.rule,
@@ -651,8 +666,11 @@ namespace cicada
 					    first,
 					    last,
 					    utils::bithack::branch(unique_goal && rule.rule->label == goal, 0, item->level));
+		}
 	      } else {
-		if (item->j.empty())
+		if (item->j.empty()) {
+		  //std::cerr << "unary rule: " << *(rule.rule) << std::endl;
+		  
 		  node_passive = apply_rule(score,
 					    rule.lhs,
 					    rule.rule,
@@ -664,7 +682,9 @@ namespace cicada
 					    first,
 					    last,
 					    item->level);
-		else {
+		} else {
+		  //std::cerr << "non-unary rule: " << *(rule.rule) << std::endl;
+
 		  hypergraph_type::edge_type::node_set_type tails(active.tails);
 		  for (size_t i = 0; i != tails.size(); ++ i)
 		    tails[i] = derivation_map[active.tails[i]][item->j[i]];
@@ -766,7 +786,7 @@ namespace cicada
 	      
 	      actives_tree_unary.push_back(active_tree_type(hypergraph_type::edge_type::node_set_type(1, node_passive.first)));
 	      candidates.push_back(candidate_type(&actives_tree_unary.back(), rules.begin(), rules.end(), score_antecedent * rules.begin()->score, item->level + 1));
-	      heap.push(&candidates.back());
+	      heap_unary.push(&candidates.back());
 	    }
 
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -783,9 +803,12 @@ namespace cicada
 	      
 	      actives_rule_unary.push_back(active_rule_type(hypergraph_type::edge_type::node_set_type(1, node_passive.first)));
 	      candidates.push_back(candidate_type(&actives_rule_unary.back(), rules.begin(), rules.end(), score_antecedent * rules.begin()->score, item->level + 1));
-	      heap.push(&candidates.back());
+	      heap_unary.push(&candidates.back());
 	    }
 	  }
+	  
+
+	  //std::cerr << "constructed graph: nodes: " << graph.nodes.size() << " edges: " << graph.edges.size() << std::endl;
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
 	  
@@ -837,7 +860,7 @@ namespace cicada
 	    }
 	  }
 	  
-	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
+	  //std::cerr << "span: " << first << ".." << last << " passives: " << passive_map[passives(first, last)].size() << std::endl;
 	}
       
       //
@@ -845,6 +868,11 @@ namespace cicada
       //
       // we will connect node_graph_rule into node_graph_tree
       //
+
+      //std::cerr << "patch work:" << node_graph_tree.size() << std::endl;
+
+      //size_t patched = 0;
+
       for (size_t node_id = 0; node_id != node_graph_tree.size(); ++ node_id) {
 	const node_set_type& node_set_tree = node_graph_tree[node_id];
 	const node_set_type& node_set_rule = node_graph_rule[node_id];
@@ -863,8 +891,12 @@ namespace cicada
 	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
 	    
 	    graph.connect_edge(edge.id, piter->second);
+
+	    //++ patched;
 	  }
       }
+
+      //std::cerr << "pathced: " << patched << std::endl;
       
       // final goal assignment...
       if (unique_goal) {
@@ -886,6 +918,9 @@ namespace cicada
 	}
 	
       } else {
+	
+	//size_t goals = 0;
+	
 	const passive_set_type passive_arcs = passive_map[passives(0, lattice.size())];
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
 	  derivation_mapped_type ref = derivation_map[passive_arcs[p]];
@@ -905,8 +940,12 @@ namespace cicada
 	      graph.goal = graph.add_node().id;
 	    
 	    graph.connect_edge(edge.id, graph.goal);
+	    
+	    //++ goals;
 	  }
 	}
+
+	//std::cerr << "connected to goals: " << goals << std::endl;
       }
       
       // we will sort to remove unreachable nodes......
@@ -925,7 +964,10 @@ namespace cicada
 	    ++ const_cast<candidate_type*>(item)->tree_iter;
 	    const_cast<candidate_type*>(item)->score *= item->tree_iter->score;
 	    
-	    heap.push(item);
+	    if (item->j.empty())
+	      heap_unary.push(item);
+	    else
+	      heap.push(item);
 	  }
 	} else {
 	  if (item->tree_iter + 1 != item->tree_last) {
@@ -964,7 +1006,10 @@ namespace cicada
 	    ++ const_cast<candidate_type*>(item)->rule_iter;
 	    const_cast<candidate_type*>(item)->score *= item->rule_iter->score;
 	    
-	    heap.push(item);
+	    if (item->j.empty())
+	      heap_unary.push(item);
+	    else
+	      heap.push(item);
 	  }
 	} else {
 	  if (item->rule_iter + 1 != item->rule_last) {
@@ -1284,7 +1329,7 @@ namespace cicada
     
     template <typename Transducer, typename Actives>
     bool extend_actives(const Transducer& transducer,
-			const Actives& actives, 
+			const Actives& actives,
 			const passive_set_type& passives,
 			Actives& cell)
     {
@@ -1494,6 +1539,7 @@ namespace cicada
     
     candidate_set_type    candidates;
     candidate_heap_type   heap;
+    candidate_heap_type   heap_unary;
 
     rule_candidate_table_type rule_tables;
     tree_candidate_table_type tree_tables;

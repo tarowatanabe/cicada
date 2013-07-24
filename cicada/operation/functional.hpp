@@ -158,6 +158,32 @@ namespace cicada
     };
 
     template <typename Weight>
+    struct weight_function_bias
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+
+      weight_function_bias(const weight_set_type& __weights, const double __bias)
+	: weights(__weights),
+	  bias(__bias) {}
+      
+      const weight_set_type& weights;
+      const double bias;
+
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x.features, weights) + bias);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights) + bias);
+      }
+    };
+
+    template <typename Weight>
     struct weight_function_one
     {
       typedef cicada::Operation::hypergraph_type hypergraph_type;
@@ -173,6 +199,29 @@ namespace cicada
       value_type operator()(const FeatureSet& x) const
       {
 	return cicada::semiring::traits<value_type>::exp(x.sum());
+      }
+    };
+
+    template <typename Weight>
+    struct weight_function_one_bias
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+      
+      weight_function_one_bias(const double bias) : bias_(bias) {}
+
+      double bias_;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(x.features.sum() + bias_);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(x.sum() + bias_);
       }
     };
 

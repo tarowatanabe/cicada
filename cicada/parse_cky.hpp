@@ -234,11 +234,20 @@ namespace cicada
     
     struct compare_heap_type
     {
+      size_t cardinality(const index_set_type& x) const
+      {
+	return std::accumulate(x.begin(), x.end(), 0);
+      }
+
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
 	//return x->score * x->iter->score < y->score * y->iter->score;
-	return x->score < y->score;
+	return ((x->score < y->score)
+		|| (!(y->score < x->score)
+		    && (x->level > y->level
+			|| (!(y->level > x->level)
+			    && cardinality(x->j) > cardinality(y->j)))));
       }
     };
     

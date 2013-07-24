@@ -1,6 +1,11 @@
 
-EXTRA_DIST = \
+sample_models = \
 scfg \
+s2t \
+t2s
+
+EXTRA_DIST = \
+$(sample_models) \
 cicada.config.hiero \
 cicada.config.hiero-mbr \
 cicada.config.string-to-tree \

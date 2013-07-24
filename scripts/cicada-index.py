@@ -101,8 +101,10 @@ opt_parser = OptionParser(
                 metavar="THRESHOLD", help="probability threshold of rules (default: %default)"),
     make_option("--sigtest", default=0, action="store", type="float",
                 metavar="SIGTEST", help="significance testing threshold relative to 1-1-1-N log-p-value (or \epsilon in \"discarding most of the phrasetable\") (default: %default)"),
-
-    
+    make_option("--sigtest-inclusive", default=None, action="store_true", 
+                help="significance testing which includes 1-1-1-N event (this will assign --sigtest -0.001)"),
+    make_option("--sigtest-exclusive", default=None, action="store_true", 
+                help="significance testing which excludes 1-1-1-N event (this will assign --sigtest +0.001)"),
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -708,7 +710,7 @@ class Index(UserString.UserString):
         
         UserString.UserString.__init__(self, '('+command+')')
         
-class Score:
+class Model:
     def __init__(self, input="", output="", plain="", name=""):
         self.input = input
         self.output = output
@@ -716,7 +718,7 @@ class Score:
         self.name = name
 
 
-class Scores(UserList.UserList):
+class Models(UserList.UserList):
     def __init__(self, indexer=None):
 
         UserList.UserList.__init__(self)
@@ -760,7 +762,7 @@ class Scores(UserList.UserList):
 
             root,stem = os.path.splitext(name)
             
-            self.append(Score(path, os.path.join(output, root + '.bin'), os.path.join(output, root + '.gz'), root))
+            self.append(Model(path, os.path.join(output, root + '.bin'), os.path.join(output, root + '.gz'), root))
             
 if __name__ == '__main__':
     (options, args) = opt_parser.parse_args()
@@ -799,6 +801,22 @@ if __name__ == '__main__':
     else:
         os.environ['TMPDIR_SPEC'] = options.temporary_dir
 
+    num_sigtest = 0
+    if options.sigtest != 0.0:
+        num_sigtest += 1
+    if options.sigtest_inclusive:
+        num_sigtest += 1
+    if options.sigtest_exclusive:
+        num_sigtest += 1
+
+    if num_sigtest > 1:
+        raise ValueError, "you can specify either one of --sigtest <\epsilon> or --sigtest-inclusive, --sigtest-exclusive"
+        
+    if options.sigtest_inclusive:
+        options.sigtest = -0.001
+    elif options.sigtest_exclusive:
+        options.sigtest = 0.001
+
     cicada = CICADA(options.cicada_dir)
 
     indexer = None
@@ -833,7 +851,7 @@ if __name__ == '__main__':
     else:
         raise ValueError, "no indexer?"
 
-    scores = Scores(indexer)
+    models = Models(indexer)
     features = Features(root=options.feature_root,
                         fisher=options.feature_fisher,
                         types=options.feature_type,
@@ -857,20 +875,20 @@ if __name__ == '__main__':
         # we use pbs to run jobs
         pbs = PBS(queue=options.pbs_queue)
     
-        for score in scores:
+        for model in models:
             index = Index(cicada=cicada,
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
                           prefix_feature=options.prefix_feature,
                           prefix_attribute=options.prefix_attribute,
-                          input=score.input,
-                          output=score.output,
-                          plain=score.plain,
-                          name=score.name,
-                          root_joint=scores.root_joint,
-                          root_source=scores.root_source,
-                          root_target=scores.root_target,
+                          input=model.input,
+                          output=model.output,
+                          plain=model.plain,
+                          name=model.name,
+                          root_joint=models.root_joint,
+                          root_source=models.root_source,
+                          root_target=models.root_target,
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
@@ -885,7 +903,7 @@ if __name__ == '__main__':
                           features=options.feature,
                           attributes=options.attribute)
             
-            fp.write(os.path.basename(score.output)+'\n')
+            fp.write(os.path.basename(model.output)+'\n')
 
             print str(index), '2> %s'%(index.logfile)
             
@@ -899,20 +917,20 @@ if __name__ == '__main__':
                   number=options.mpi,
                   options=options.mpi_options)
         
-        for score in scores:
+        for model in models:
             index = Index(cicada=cicada,
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
                           prefix_feature=options.prefix_feature,
                           prefix_attribute=options.prefix_attribute,
-                          input=score.input,
-                          output=score.output,
-                          plain=score.plain,
-                          name=score.name,
-                          root_joint=scores.root_joint,
-                          root_source=scores.root_source,
-                          root_target=scores.root_target,
+                          input=model.input,
+                          output=model.output,
+                          plain=model.plain,
+                          name=model.name,
+                          root_joint=models.root_joint,
+                          root_source=models.root_source,
+                          root_target=models.root_target,
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
@@ -927,7 +945,7 @@ if __name__ == '__main__':
                           features=options.feature,
                           attributes=options.attribute)
 
-            fp.write(os.path.basename(score.output)+'\n')
+            fp.write(os.path.basename(model.output)+'\n')
 
             print str(index), '2> %s'%(index.logfile)
 
@@ -936,20 +954,20 @@ if __name__ == '__main__':
     else:
         threads = Threads(cicada=cicada, threads=options.threads)
     
-        for score in scores:
+        for model in models:
             index = Index(cicada=cicada,
                           indexer=indexer,
                           lexicon=lexicon,
                           feats=features,
                           prefix_feature=options.prefix_feature,
                           prefix_attribute=options.prefix_attribute,
-                          input=score.input,
-                          output=score.output,
-                          plain=score.plain,
-                          name=score.name,
-                          root_joint=scores.root_joint,
-                          root_source=scores.root_source,
-                          root_target=scores.root_target,
+                          input=model.input,
+                          output=model.output,
+                          plain=model.plain,
+                          name=model.name,
+                          root_joint=models.root_joint,
+                          root_source=models.root_source,
+                          root_target=models.root_target,
                           temporary_dir=options.temporary_dir,
                           prior=options.prior,
                           kbest=options.kbest,
@@ -964,7 +982,7 @@ if __name__ == '__main__':
                           features=options.feature,
                           attributes=options.attribute)
         
-            fp.write(os.path.basename(score.output)+'\n')
+            fp.write(os.path.basename(model.output)+'\n')
 
             print str(index), '2> %s'%(index.logfile)
 
