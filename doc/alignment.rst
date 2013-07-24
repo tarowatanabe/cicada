@@ -8,21 +8,21 @@ Currently, we implemented:
 cicada_lexicon_dice
 	Dice
 
-cicada_lexicon_model1
+cicada_alignment_model1
 	IBM Model1[1] + symmetric learning[2] + posterior constrained learning [3]
 	+ naive variational Bayes
 	+ L0 regularization [5]
 	+ ITG constrained posterior alignment
 	+ MaxMatch posterior alignment (using Hungarian algorithm)
 
-cicada_lexicon_hmm
+cicada_alignment_hmm
 	HMM Model[2] + symmetric learning[2] + posterior constrained learning [3]
 	+ naive variational Bayes
 	+ L0 regularization [5]
 	+ ITG constrained posteriors
 	+ MaxMatch posteriors (using Hungarian algorithm)
 
-cicada_lexicon_model4
+cicada_alignment_model4
 	IBM Model4[1] + symmetric learning[2] + posterior constrained learning [3]
 	+ naive variational Bayes
 	+ L0 regularization [5]

@@ -29,7 +29,8 @@ Compile
 Get the source code from `cicada <http://www2.nict.go.jp/univ-com/multi_trans/cicada>`_,
 or from `github.com <http://github.com/tarowatanabe/cicada>`_, and
 simply follow the GNU standard pipiline. For details, see `BUILD.rst`.
-::
+
+.. code:: bash
 
    ./autogen.sh (required when you get the code by git clone)
    ./configure
@@ -42,7 +43,8 @@ Run
 You can find a sample grammar file at *samples* directory together with
 *ngram* language model. Here is an example run (Note that \\ indicates
 shell's newline).
-::
+
+.. code:: bash
 
    ./progs/cicada \
       --input samples/scfg/input.txt \
@@ -136,6 +138,7 @@ Alignment can be carried out by:
      Model1/HMM/Model4 by symmetized learning [22]_ or
      symmetric posterior constrained learning [23]_ with smoothing via
      variational Bayes or via L0 prior.
+
      Final combined alignment can be generated either by heuristic
      (AKA grow-diag-final-and etc.) or by ITG or max-matching from
      posterior probabilities.
@@ -158,9 +161,10 @@ After the hypergraph generation, you can:
      cicada implementes cube-pruning [4]_, cube-growing [4]_,
      incremental [18]_ and exact (and stateless-inside-algorithm)
      methods.
-     cube-growing employs coarse-heuristics [11]_, such as lower-order
-     ngrams etc.
-     cube-pruning implements algorithm 2 of faster cube pruning [31]_.
+
+     * cube-growing employs coarse-heuristics [11]_, such as lower-order
+       ngrams etc.
+     * cube-pruning implements algorithm 2 of faster cube pruning [31]_.
 
    - Perform variational decoding for hypergraph [10]_ or MBR decoding for hypergraph [12]_
      based on the expected ngram-counts over forest [13]_.
@@ -215,9 +219,11 @@ Various learning components are implemented:
      hypergraph-MaxEnt (optimized by LBFGS or SGD) + softmax-margin [9]_
    - Small/large feature set learned by iteratively construncting
      training samples with rank-learning.
-     optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling).
-     larger batching with optimized updates [37]_.
-     We have a script-based implementation + single-binary implementation for efficiency
+
+     * optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling).
+     * larger batching with optimized updates [37]_.
+     * We have a script-based implementation + single-binary implementation for efficiency
+
    - xBLEU objective learned either by L-BFGS or SGD, which directly
      maximize expected-BLEU (not BLEU expectaiton) [35]_.
      Now, this is a recommended optimization method (either kbest or hypergraph learning)
