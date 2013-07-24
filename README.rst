@@ -11,8 +11,7 @@ framework [1]_. Based on the generic framework, we can
    - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph
      and sentence-like lattice)
    - align two sentences using symmetized IBM Model1/HMM/IBM Model4.
-   - parse lattices (or sentences)
-   - dependency parse sentences (or lattices)
+   - (dependency) parse lattices (or sentences)
    - analyze forest/tree/lattice
 
 The cicada toolkit is developed at Multilingual Translation
@@ -27,10 +26,9 @@ Quick Start
 Compile
 ```````
 
-Get the source code from `cicada <...>`_, or from `github.com
-<http://github.com/tarowatanabe/cicada>`_, and simply follow the
-GNU standard pipiline. For details, see `BUILD.rst`.
-
+Get the source code from `cicada <http://www2.nict.go.jp/univ-com/multi_trans/cicada>`_,
+or from `github.com <http://github.com/tarowatanabe/cicada>`_, and
+simply follow the GNU standard pipiline. For details, see `BUILD.rst`.
 ::
 
    ./autogen.sh (required when you get the code by git clone)
@@ -60,6 +58,7 @@ shell's newline).
       --debug
 
 This sample means:
+
   - Input is `samples/scfg/input.txt`
   - Three grammars:
 
@@ -133,9 +132,8 @@ Alignment can be carried out by:
      hypergraph, or
    - A hypergraph is composed with dictinary, generating alignment
      hypergraph [20]_.
-     
    - In order to support word alignment training, we can learn
-     Model1/HMM/Model4 lexicon model by symmetized learning [22]_ or
+     Model1/HMM/Model4 by symmetized learning [22]_ or
      symmetric posterior constrained learning [23]_ with smoothing via
      variational Bayes or via L0 prior.
      Final combined alignment can be generated either by heuristic
@@ -143,15 +141,13 @@ Alignment can be carried out by:
      posterior probabilities.
      Also, lexicon model can be discriminatively trained [28]_.
      For details of the training process, please refer to
-     `doc/traiing.rst` and `doc/alignment.rst`.
+     `doc/training.rst` and `doc/alignment.rst`.
 
 Dependency parsing can be carried out by:
 
-   - A lattice is dependency parsed by
-     compose-dependency-{arc-standard, arc-eager, hybrid, degree2},
-     generating derivation hypergraph
-   - Forests are rescored by dependency features (TODO)
-   
+   - A lattice is dependency parsed by arc-standard, arc-eager, hybrid, degree2,
+     which generates derivation hypergraph.
+   - Forests are rescored by dependency features (TODO).
      We support dependency projection [32]_ with Model1/HMM posterior
      probabilies so that we can train arbitrary dependency parses
      after projections.
@@ -159,17 +155,15 @@ Dependency parsing can be carried out by:
 After the hypergraph generation, you can:
 
    - Additional features are evaluated to generate another hypergraph [4]_.
-      * cicada implementes cube-pruning [4]_, cube-growing [4]_,
-	incremental [18]_ and exact (and stateless-inside-algorithm)
-	methods
-      * cube-growing employs coarse-heuristics [11]_, such as
-	lower-order ngrams etc.
-      * cube-pruning implements algorithm 2 of faster cube pruning
-	[31]_.
-   - Perform variational decoding for hypergraph [10]_.
-   - Perform MBR decoding for hypergraph [12]_.
-      * Above two computations rely on expected ngram-counts over
-	forest [13]_.
+     cicada implementes cube-pruning [4]_, cube-growing [4]_,
+     incremental [18]_ and exact (and stateless-inside-algorithm)
+     methods.
+     cube-growing employs coarse-heuristics [11]_, such as lower-order
+     ngrams etc.
+     cube-pruning implements algorithm 2 of faster cube pruning [31]_.
+
+   - Perform variational decoding for hypergraph [10]_ or MBR decoding for hypergraph [12]_
+     based on the expected ngram-counts over forest [13]_.
    - K-best sentences are generated from hypergraph [5]_.
    - Generate oracle translations (BLEU only).
 
@@ -178,11 +172,12 @@ Or, you can combine outputs from multiple systems by [29]_:
    - Perform parsing over nbests (use your favorite parser, such as
      Berkeley parser/Stanford parser etc.)
    - Generate context-free confusion forest by combining trees (not confusion network!)
-      * It is performed by collecting rules from parse trees, and
-	generate by Earley algorithm
+     It is performed by collecting rules from parse trees, and
+     generate by Earley algorithm
    - Generate k-best translations after feature application etc.
 
-   Or, a conventional strategy of [14]_:
+Or, a conventional system combination strategy of [14]_:
+
    - Create lattice from n-best list by incremental merging
    - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
    - Generate k-best translations after feature application etc.
@@ -197,15 +192,15 @@ Monolingual grammar learning is implemented:
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
 
-   - A conventional phrase extract algorithm in Moses
+   - A conventional phrase extract algorithm in Moses.
    - A conventional hierarchical phrase extraction algorithm in Hiero
-      + syntax augmented rule extraction is also supported [15]_
-   - Tree-to-string/strint-to-tree extractin from forest [16]_ [27]_
-   - Tree-to-tree rule extraction from forest [17]_ (experimental)
-   - max-scope constraints to limit the grammar size [34]_
+     with or without syntax augmentation [15]_.
+   - Tree-to-string/strint-to-tree extractin from forest [16]_ [27]_.
+   - Tree-to-tree rule extraction from forest [17]_ (experimental).
+   - max-scope constraints to limit the grammar size [34]_.
    - After count extraction, you can perform map/reduce to compute
-     model scores [19]_
-   - Then, prune your model based on Fisher's exact test [38]_
+     model scores [19]_.
+   - Then, prune your model based on Fisher's exact test [38]_.
 
 Various learning components are implemented:
 
@@ -217,20 +212,20 @@ Various learning components are implemented:
      hypergraph
    - Small feature set on small devset learned by hypergraph-MERT [8]_
    - Small/large feature set on small devset learned by
-     hypergraph-MaxEnt (optimized by LBFGS or SGD)
-     + softmax-margin [9]_
+     hypergraph-MaxEnt (optimized by LBFGS or SGD) + softmax-margin [9]_
    - Small/large feature set learned by iteratively construncting
      training samples with rank-learning.
-     + optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling)
-     + larger batching with optimized updates [37]_
-     + we have a script-based implementation + single-binary implementation for efficiency
+     optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling).
+     larger batching with optimized updates [37]_.
+     We have a script-based implementation + single-binary implementation for efficiency
    - xBLEU objective learned either by L-BFGS or SGD, which directly
-     maximize expected-BLEU (not BLEU expectaiton) [35]_
-     + Now, this is a recommended optimization method (either kbest or hypergraph learning)
+     maximize expected-BLEU (not BLEU expectaiton) [35]_.
+     Now, this is a recommended optimization method (either kbest or hypergraph learning)
    - We support feature selection by kbest-feature merging [36]_
    - Asynchronous online learning employed in [6]_.
 
 Feature functions:
+
    -  The ngram language model feaature supports expgram [39]_ and
       kenlm [40]_.
 

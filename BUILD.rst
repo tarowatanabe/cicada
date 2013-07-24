@@ -2,12 +2,12 @@
 How to Build cicada
 ===================
 
-Get the source code from `github.com <http://github.com/tarowatanabe/cicada>`_:
+Get the cutting-edge source code from `github.com <http://github.com/tarowatanabe/cicada>`_:
 ::
 
   git clone https://github.com/tarowatanabe/cicada.git
 
-Or, grab the latest tar archive from `cicada <...>`_.
+Or, grab the stable tar archive from `cicada <http://www2.nict.go.jp/univ-com/multi_trans/cicada>`_.
 
 Compile
 -------
