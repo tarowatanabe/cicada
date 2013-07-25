@@ -1,19 +1,19 @@
-=======================
- cicada_filter_charniak
-=======================
+==========================
+ cicada_filter_parseforest
+==========================
 
---------------------------------------------
-a filter for Charniak parser's forest output
---------------------------------------------
+--------------------------------------
+a filter for transforming parse forest
+--------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
-:Date:   2013-2-28
+:Date:   2013-7-25
 :Manual section: 1
 
 SYNOPSIS
 --------
 
-**cicada_filter_charniak** [*options*]
+**cicada_filter_parseforest** [*options*]
 
 DESCRIPTION
 -----------
@@ -30,6 +30,8 @@ OPTIONS
   **--map** `arg (="")`        map terminal symbols
 
   **--root** `arg`             root label
+
+  **--unescape** unescape terminal symbols, such as -LRB-, \* etc.
 
   **--normalize** normalize category, such as [,] [.] etc.
 

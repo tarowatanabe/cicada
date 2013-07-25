@@ -85,17 +85,17 @@ Requirements
 
    + GIZA++:  alignment model training (http://code.google.com/p/giza-pp/)
 
-     or, you can uses moses (http://www.statmt.org/moses/) for alignment training with GIZA++
-     or, try berkeley aligner (http://code.google.com/p/berkeleyaligner/)
-     or, try postcat (http://www.seas.upenn.edu/~strctlrn/CAT/CAT.html).
+     You can uses moses (http://www.statmt.org/moses/) for alignment training with GIZA++
+     or, berkeley aligner (http://code.google.com/p/berkeleyaligner/),
+     postcat (http://www.seas.upenn.edu/~strctlrn/CAT/CAT.html).
 
      Remark that cicada can "align words" using symmetized training of berkeley aligner and/or posterior
      constrained training of postcat with parameter smoothing via naive-Bayes or L0-norm.
 
    + For better memory management:
 
-     * gperftools (http://code.google.com/p/gperftools/)
-     * jemalloc  (http://www.canonware.com/jemalloc/)
+     * gperftools: http://code.google.com/p/gperftools/
+     * jemalloc: http://www.canonware.com/jemalloc/
 
      For Linux, you should install one of them for better memory performance
      and to measure how many bytes malloced, since mallinfo is
@@ -103,3 +103,7 @@ Requirements
      They are configured by `--with-{jemalloc,tcmalloc}` and should be
      enabled using `--enable-{jemalloc,tcmalloc}`
 
+   + docutils: http://docutils.sourceforge.net
+
+     Manpages are written in reStructuredText format, and if you want
+     manpages, you need to install docutils.

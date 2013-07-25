@@ -14,13 +14,15 @@ framework [1]_. Based on the generic framework, we can
 - (dependency) parse lattices (or sentences).
 - Analyze forest/tree/lattice.
 
-The cicada toolkit is developed at Multilingual Translation
-Laboratory, Universal Communication Institute, National Institute of
-Information and Communications Technology (`NICT <http://www.nict.go.jp/en/index.html>`_).
+The cicada toolkit is mainly developed by
+`Taro Watanabe <http://www2.nict.go.jp/univ-com/multi_trans/member/t_watana>`_
+at Multilingual Translation Laboratory, Universal Communication
+Institute, National Institute of Information and Communications
+Technology (`NICT <http://www.nict.go.jp/en/index.html>`_).
+If you have any questions about cicada, you can send them to
+``taro.watanabe at nict dot go dot jp``.
 
-Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
-
-
+Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced SEMI.
 
 Quick Start
 -----------
@@ -79,8 +81,8 @@ This sample means:
   - 5-gram language model from `samples/scfg/ngram.bin` which is a
     binary version of `samples/scfg/ngram.bz2`.
   - A word penalty feature which penalize by the number of words in
-    the target side.
-  - A rule penalty feature which penaltize by the number of words in a
+    the target side of a derivation.
+  - A rule penalty feature which penaltize by the number of rules in a
     derivation.
   - In addition, there exist features already defined for each
     hierarchical phrase pair. For example, see `samples/scfg/grammar.bz2`.
@@ -89,8 +91,8 @@ This sample means:
 
   1. Input is composed by CKY algorithm (compose-cky) which result
      in a hypergraph.
-  2. Cube-pruning (apply) to apply feature functions using 100 as a
-     histogram pruning threshold using the weights at
+  2. Cube-pruning (apply) to approximately compute features using 100
+     as a histogram pruning threshold using the weights at
      `samples/scfg/weights`.
   3. 10-best derivations are computed and output at
      `-` (stdout) using `samples/scfg/weights` as a
@@ -140,8 +142,9 @@ Alignment can be carried out by:
   Model1/HMM/Model4 by symmetized learning [22]_ or
   symmetric posterior constrained learning [23]_ with smoothing via
   variational Bayes or via L0 prior.
-
-  Final combined alignment can be generated either by heuristic
+- Word clustering tool is also included to support word alignment
+  learning + translation [20]_.
+- Final combined alignment can be generated either by heuristic
   (AKA grow-diag-final-and etc.) or by ITG or max-matching from
   posterior probabilities.
   Also, lexicon model can be discriminatively trained [28]_.
@@ -237,9 +240,6 @@ Feature functions:
 -  The ngram language model feaature supports
    `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
    `kenlm <http://kheafield.com/code/kenlm/>`_ [40]_.
-
-Word clustering tool is also included to support word alignment
-learning + translation [20]_.
 
 References
 ----------

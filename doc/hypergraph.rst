@@ -35,49 +35,62 @@ input/output can handle node ids in any orders.
 
 
 The hypergraph consists of three fields.
-The "rules" field is a list of rules associated with each edges.
-Each rule-id starts from one, and refered by its rule-id by each
+The ``rules`` field is a list of rules associated with each edges.
+Each rule id starts from one, and refered by its rule id by each
 hyperedge.
 Zero is reserved for no-rule, or errornous hypergraph.
-The "nodes" field is a list of nodes and each node is refered by its
+The ``nodes`` field is a list of nodes and each node is refered by its
 node id.
 The node id starts from zero.
-The "goal" field points to the final goal node id of the hypergrpah.
+The ``goal`` field points to the final goal node id of the hypergrpah.
 Unorder the topologically sorted order, the goal field usually points
 to the last node in the node list.
 No goal implies an invalid hypergraph.
 
 Each rule is a JSON string, thus some characters employed in rhs
-and/or lhs should be escaped, i.e. " to \", \ to \\ etc.
+and/or lhs should be escaped, i.e. ``"`` to ``\"``, ``\`` to ``\\`` etc.
 The lhs of a rule consists of a single non-terminal, whereby its rhs
 consists of a sequence of non-terminal or terminal.
 Note that the lhs is also used as a label for each node.
-non-terminal is represented by [.+], and terminal can be any strings
-which does not starts with '[' and does not end with ']'.
-Also, we cannot use '|||' as a terminal.
-Each non-terminal in the rhs can embed an "index" separeted by comma,
-which is represented by [.+,([0-9]+)].
+non-terminal is represented by ``[.+]``, and terminal can be any strings
+which does not starts with ``[`` and does not end with ``]``.
+Also, we cannot use ``|||`` as a terminal.
+Each non-terminal in the rhs can embed an index separeted by comma,
+which is represented by ``[.+,([0-9]+)]``.
 The index is an indice to tail nodes (one-base).
-For instance, [x,2] refers to the second position of a tail in a
+For instance, ``[x,2]`` refers to the second position of a tail in a
 hyperedge.
 
 Each node consists of a list of edge.
 Each edge consists of four fields:
-The "tail" field is a list of node in a hypergraph.
+The ``tail`` field is a list of node in a hypergraph.
 No tails implies "source nodes."
-The optional "feature" field is a list of key-value pair, consisting
+The optional ``feature`` field is a list of key-value pair, consisting
 of JSON string and FLOAT value.
-The optional "attribuete" field is a list of key-value pair,
+The optional ``attribuete`` field is a list of key-value pair,
 consisting of JSON string and attribute value.
 The attribute value can take either 64bit integer, floaring point
 value (double precision) or JSON string.
 Internally, it is implemented as
 `boost.variant <http://www.boost.org/doc/libs/release/libs/variant/>`_
 which supports "enum" like storage in an efficient fashion.
-The "rule" field is a map to a rule id in the rule list.
+The ``rule`` field is a map to a rule id in the rule list.
 
 Example
 -------
+
+A Penntree style treebank:
+::
+
+  (ROOT (S (NP (PRP I))
+           (VP (MD 'd)
+	       (VP (VB like)
+		   (S (VP (TO to)
+		           (VP (VB have) (NP (NP (DT a) (NN glass))
+	                                     (PP (IN of) (NP (NN water)))))))))
+	   (. .)))
+
+is represented in the hypergraph format as follows:
 
 .. code:: json
 
@@ -126,6 +139,7 @@ Example
 	   [{"tail":[20],"rule":22}]],
     "goal": 21}
 
+
 Tools
 -----
 
@@ -142,8 +156,11 @@ Tools
 
 `ciada_filter_parseforest`
 
-  A tool which transforms parser forest output into a JSON
-  hypergraph format.
+  A tool which transforms parse forest output into a JSON hypergraph
+  format. Currently, we support the parse forest from `Egret
+  <https://sites.google.com/site/zhangh1982/egret>`_ parser.
+  Since there exists major/minor bugs in the original distribution, it
+  is recommended to grab the source from https://github.com/neubig/egret.
 
 `cicada_unite_forest`
 

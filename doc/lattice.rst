@@ -24,24 +24,27 @@ point "." is included, or not.
   distance   ::= JSON-INT
   value      ::= JSON-STRING | JSON-FLOAT | JSON-INT
 
+Each arc consists of label, features and distance field with optional
+attributes. We allow arcs with ``<epsilon>`` label which allows us to
+directly handle abitrary confusion nework.
 In JLF, we can easily add extra features encoded in the lattice, such as
 
 .. code:: json
 
   {"lattice-cost": 0.5, "accoustic": -5000.9}
 
-
-Remark, the costs are interpreted as logarithmic value so that we can compute score by "weight \cdot feature-function".
-
-We allow <epsilon> node which allows us to directly handle confusion nework.
-Inside cicada, it is recommended to perform remove-epsilon, before
-intersecting with a grammar to form a forest.
+Remark, the costs are interpreted as logarithmic value so that we can
+compute score by "weight \cdot feature-function".
+The optional attributes is a list of key-value pair of JSON string and
+attribute value.
+The attribute value can take either 64bit integer, floaring point
+value (double precision) or JSON string.
 
 PLF Format
 ----------
 
-cicada can read PLF (Python Lattice Format) used in `Moses <http://statmt.org/moses/>`_, but do not
-support writing.
+cicada can read PLF (Python Lattice Format) used in `Moses <http://statmt.org/moses/>`_,
+but does not support writing.
 
 .. code::
 
@@ -57,7 +60,7 @@ The cost in the PLF is interpreted as a "lattice-cost" feature.
 Examples:
 ---------
 
-JLF:
+A lattice in JLF format:
 
 .. code:: json
 
@@ -70,7 +73,7 @@ JLF:
     ["preis", {"lattice-cost": 0.5}, 1]],
    [["sturz", {"lattice-cost": 1.0}, 1]]]
 
-PLF:
+is equivalently represented by PLF as follows:
 
 .. code:: python
 
@@ -86,11 +89,9 @@ Tools
 `cicada_unite_lattice`
 
   Merge multiple lattices (or sentences) in one. Here, we simply compute the union sharing start/goal states.
-  Optionally dump output in graphviz format (`--graphviz` flag).
 
 `cicada_unite_sentence`
 
   Merge multiple sentences into one confusion-network via TER alignment.
   Support incrementat merging by confusion-network-TER. (`--merge` flag)
   TER-conputation by lower-cased word (`--lower` flag)
-  Dump in graphviz format (`--graphviz` flag)

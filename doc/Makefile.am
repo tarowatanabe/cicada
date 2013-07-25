@@ -15,7 +15,7 @@ extract.rst \
 features.rst \
 grammar.rst \
 hypergraph.rst \
-index.rst \
+indexing.rst \
 lattice.rst \
 learn.rst \
 linguistic.rst \
