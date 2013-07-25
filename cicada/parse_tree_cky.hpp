@@ -886,26 +886,29 @@ namespace cicada
 	typename node_set_type::const_iterator citer_begin = node_set_rule.begin();
 	typename node_set_type::const_iterator citer_end   = node_set_rule.end();
 
+	typename node_set_type::const_iterator piter_begin = node_set_tree.begin();
 	typename node_set_type::const_iterator piter_end = node_set_tree.end();
-	for (typename node_set_type::const_iterator piter = node_set_tree.begin(); piter != piter_end; ++ piter)
-	  for (typename node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
-
-	    if (citer->second >= connected.size())
-	      connected.resize(citer->second + 1, false);
-	    
-	    if (connected[citer->second]) continue;
-	    
+	
+	for (typename node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	  
+	  if (citer->second >= connected.size())
+	    connected.resize(citer->second + 1, false);
+	  
+	  if (connected[citer->second]) continue;
+	  
+	  for (typename node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
 	    
 	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
 	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
 	    
 	    graph.connect_edge(edge.id, piter->second);
-
+	    
 	    connected[citer->second] = true;
 	    
 	    //++ patched;
 	  }
+	}
       }
 
       //std::cerr << "pathced: " << patched << std::endl;

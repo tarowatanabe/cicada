@@ -576,15 +576,17 @@ namespace cicada
 	node_set_type::const_iterator citer_begin = node_set_rule.begin();
 	node_set_type::const_iterator citer_end   = node_set_rule.end();
 
+	node_set_type::const_iterator piter_begin = node_set_tree.begin();
 	node_set_type::const_iterator piter_end = node_set_tree.end();
-	for (node_set_type::const_iterator piter = node_set_tree.begin(); piter != piter_end; ++ piter)
-	  for (node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
-
-	    if (citer->second >= connected.size())
-	      connected.resize(citer->second + 1, false);
-	    
-	    if (connected[citer->second]) continue;
-	    
+	
+	for (node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	  
+	  if (citer->second >= connected.size())
+	    connected.resize(citer->second + 1, false);
+	  
+	  if (connected[citer->second]) continue;
+	  
+	  for (node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
 	    
 	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
@@ -594,6 +596,7 @@ namespace cicada
 	    
 	    connected[citer->second] = true;
 	  }
+	}
       }
       
       // final goal assignment...
