@@ -13,5 +13,6 @@ exec $cicada/scripts/cicada-index.py \
 	--feature-root \
 	--feature-internal \
 	--feature-height \
+	\
 	--threads 4
 

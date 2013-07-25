@@ -1,6 +1,11 @@
 #!/bin/sh
 
-expgram={where did you installed expgram?}
+expgram=
+
+if test "$expgram" = ""; then
+  echo "where is your expgram?"
+  exit 1
+fi
 
 ### Following is a quick example of LM estimation on a small data set.
 

@@ -11,5 +11,5 @@ exec $cicada/scripts/cicada-index.py \
 	\
 	--feature-lexicon \
 	\
-	--threads4 
+	--threads 4 
 
