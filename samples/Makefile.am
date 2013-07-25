@@ -4,8 +4,12 @@ scfg \
 s2t \
 t2s
 
+sample_trains = \
+kftt.30k
+
 EXTRA_DIST = \
 $(sample_models) \
+$(sample_trains) \
 cicada.config.hiero \
 cicada.config.hiero-mbr \
 cicada.config.string-to-tree \

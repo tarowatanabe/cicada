@@ -270,9 +270,33 @@ namespace cicada
 
   class GrammarInsertion : public GrammarMutable
   {
+  private:
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_list_type;
+
   public:
+    template <typename Iterator>
+    GrammarInsertion(const symbol_type& __non_terminal, Iterator first, Iterator last)
+      : GrammarMutable(1), non_terminals()
+    {
+      typedef utils::compact_set<symbol_type,
+				 utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
+				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				 std::allocator<symbol_type> > non_terminal_set_type;
+      
+      non_terminal_set_type symbols;
+      symbols.insert(first, last);
+      if (! __non_terminal.empty())
+	symbols.insert(__non_terminal);
+
+      non_terminals.reserve(symbols.size());
+      non_terminals.insert(non_terminals.end(), symbols.begin(), symbols.end());
+      
+      features["insertion-penalty"] = - 1.0;
+      attributes["insertion"] = attribute_set_type::int_type(1);
+    }
+    
     GrammarInsertion(const symbol_type& __non_terminal)
-      : GrammarMutable(1), non_terminal(__non_terminal)
+      : GrammarMutable(1), non_terminals(1, __non_terminal)
     {
       features["insertion-penalty"] = - 1.0;
       attributes["insertion"] = attribute_set_type::int_type(1);
@@ -300,9 +324,14 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.insert(*siter).second) {
-	      const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
-	      insert(rule, rule, features, attributes);
+	      symbol_list_type::const_iterator niter_end = non_terminals.end();
+	      for (symbol_list_type::const_iterator niter = non_terminals.begin(); niter != niter_end; ++ niter) {
+		const symbol_type& non_terminal = *niter;
+		const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
+		
+		insert(rule, rule, features, attributes);
+	      }
 	    }
 	}
     }
@@ -318,15 +347,20 @@ namespace cicada
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
 	  if (aiter->label != vocab_type::EPSILON && symbols.insert(aiter->label).second) {
-	    const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
-	    insert(rule, rule, features, attributes);
+	    symbol_list_type::const_iterator niter_end = non_terminals.end();
+	    for (symbol_list_type::const_iterator niter = non_terminals.begin(); niter != niter_end; ++ niter) {
+	      const symbol_type& non_terminal = *niter;
+	      const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
+	      
+	      insert(rule, rule, features, attributes);
+	    }
 	  }
       }
     }
     
   private:
-    symbol_type non_terminal;
+    symbol_list_type non_terminals;
     
     symbol_set_type    symbols;
     feature_set_type   features;
@@ -336,10 +370,36 @@ namespace cicada
   
   class GrammarDeletion : public GrammarMutable
   {
+  private:
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_list_type;
+
   public:
+    template <typename Iterator>
+    GrammarDeletion(const symbol_type& __non_terminal, Iterator first, Iterator last)
+      : GrammarMutable(1),
+	non_terminals(),
+	rule_epsilon(rule_type::create(rule_type(__non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))))
+    {
+      typedef utils::compact_set<symbol_type,
+				 utils::unassigned<symbol_type>, utils::unassigned<symbol_type>,
+				 boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				 std::allocator<symbol_type> > non_terminal_set_type;
+      
+      non_terminal_set_type symbols;
+      symbols.insert(first, last);
+      if (! __non_terminal.empty())
+	symbols.insert(__non_terminal);
+      
+      non_terminals.reserve(symbols.size());
+      non_terminals.insert(non_terminals.end(), symbols.begin(), symbols.end());
+      
+      features["deletion-penalty"] = - 1.0;
+      attributes["deletion"] = attribute_set_type::int_type(1);
+    }
+    
     GrammarDeletion(const symbol_type& __non_terminal)
       : GrammarMutable(1),
-	non_terminal(__non_terminal),
+	non_terminals(1, __non_terminal),
 	rule_epsilon(rule_type::create(rule_type(__non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))))
     {
       features["deletion-penalty"] = - 1.0;
@@ -368,9 +428,14 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.insert(*siter).second) {
-	      const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
-	      insert(rule, rule_epsilon, features, attributes);
+	      symbol_list_type::const_iterator niter_end = non_terminals.end();
+	      for (symbol_list_type::const_iterator niter = non_terminals.begin(); niter != niter_end; ++ niter) {
+		const symbol_type& non_terminal = *niter;
+		const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
+		
+		insert(rule, rule_epsilon, features, attributes);
+	      }
 	    }
 	}
     }
@@ -386,16 +451,21 @@ namespace cicada
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
 	  if (aiter->label != vocab_type::EPSILON && symbols.insert(aiter->label).second) {
-	    const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
-	    
-	    insert(rule, rule_epsilon, features, attributes);
+
+	    symbol_list_type::const_iterator niter_end = non_terminals.end();
+	    for (symbol_list_type::const_iterator niter = non_terminals.begin(); niter != niter_end; ++ niter) {
+	      const symbol_type& non_terminal = *niter;
+	      const rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
+	      
+	      insert(rule, rule_epsilon, features, attributes);
+	    }
 	  }
       }
     }
     
   private:
-    symbol_type   non_terminal;
-    rule_ptr_type rule_epsilon;
+    symbol_list_type   non_terminals;
+    rule_ptr_type     rule_epsilon;
 
     symbol_set_type    symbols;
     feature_set_type   features;

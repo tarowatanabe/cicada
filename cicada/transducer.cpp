@@ -50,8 +50,10 @@ glue: glue rules\n\
 \tinverted=[true|false] inverted glue-rule\n\
 insertion: terminal insertion rule\n\
 \tnon-terminal=[defaut non-terminal]\n\
+\tfallback=[file] the list of fallback non-terminal\n\
 deletion: terminal deletion rule\n\
 \tnon-terminal=[defaut non-terminal]\n\
+\tfallback=[file] the list of fallback non-terminal\n\
 pair: terminal pair rule (for alignment composition)\n\
 \tnon-terminal=[defaut non-terminal]\n\
 pos: terminal pos rule (for POS annotated input) \n\
@@ -119,13 +121,13 @@ format: ICU's number/date format rules\n\
 	throw std::runtime_error("no insetion or straight glue rules?");
       if (goal.empty() || ! goal.is_non_terminal())
 	throw std::runtime_error("invalid goal for glue rules? " + static_cast<const std::string&>(goal));
+
+      if (! non_terminal.empty() && ! non_terminal.is_non_terminal())
+	throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
       
       if (! fallback_file.empty()) {
 	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
 	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
-	
-	if (! non_terminal.empty() && ! non_terminal.is_non_terminal())
-	  throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
 	
 	utils::compress_istream is(fallback_file, 1024 * 1024);
 	
@@ -135,18 +137,18 @@ format: ICU's number/date format rules\n\
 						   std::istream_iterator<std::string>(),
 						   straight,
 						   inverted));
-      } else {
-	if (non_terminal.empty() || ! non_terminal.is_non_terminal())
-	  throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
-	
+      } else
 	return transducer_ptr_type(new GrammarGlue(goal, non_terminal, straight, inverted));
-      }
       
     } else if (utils::ipiece(param.name()) == "insertion") {
       symbol_type non_terminal;
+      path_type fallback_file;
+
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "non-terminal")
 	  non_terminal = piter->second;
+	else if (utils::ipiece(piter->first) == "fallback")
+	  fallback_file = piter->second;
 	else
 	  throw std::runtime_error("unsupported parameter for insertion grammar: " + piter->first + "=" + piter->second);
       }
@@ -154,20 +156,45 @@ format: ICU's number/date format rules\n\
       if (non_terminal.empty() || ! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal for insertion grammar: " + static_cast<const std::string&>(non_terminal));
       
-      return transducer_ptr_type(new GrammarInsertion(non_terminal));
+      if (! fallback_file.empty()) {
+	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
+	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
+	
+	utils::compress_istream is(fallback_file, 1024 * 1024);
+	
+	return transducer_ptr_type(new GrammarInsertion(non_terminal,
+							std::istream_iterator<std::string>(is),
+							std::istream_iterator<std::string>()));
+      } else
+	return transducer_ptr_type(new GrammarInsertion(non_terminal));
     } else if (utils::ipiece(param.name()) == "deletion") {
       symbol_type non_terminal;
+      path_type fallback_file;
+
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "non-terminal")
 	  non_terminal = piter->second;
+	else if (utils::ipiece(piter->first) == "fallback")
+	  fallback_file = piter->second;
 	else
 	  throw std::runtime_error("unsupported parameter for deletion grammar: " + piter->first + "=" + piter->second);
       }
       
       if (non_terminal.empty() || ! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal for deletion grammar: " + static_cast<const std::string&>(non_terminal));
+
+      if (! fallback_file.empty()) {
+	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
+	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
+	
+	utils::compress_istream is(fallback_file, 1024 * 1024);
+	
+	return transducer_ptr_type(new GrammarDeletion(non_terminal,
+						       std::istream_iterator<std::string>(is),
+						       std::istream_iterator<std::string>()));
+      } else
+	return transducer_ptr_type(new GrammarDeletion(non_terminal));
       
-      return transducer_ptr_type(new GrammarDeletion(non_terminal));
     } else if (utils::ipiece(param.name()) == "pair") {
       symbol_type non_terminal;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
