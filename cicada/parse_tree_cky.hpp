@@ -399,6 +399,8 @@ namespace cicada
 			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
+
+    typedef std::vector<bool, std::allocator<bool> > connected_type;
     
     template <typename Tp>
     struct ptr_hash
@@ -513,6 +515,8 @@ namespace cicada
       frontiers_target.clear();
       tree_frontiers_source.clear();
       tree_frontiers_target.clear();
+
+      connected.clear();
 
       derivation_set_type derivations;
       derivation_set_type passive_arcs;
@@ -885,6 +889,12 @@ namespace cicada
 	typename node_set_type::const_iterator piter_end = node_set_tree.end();
 	for (typename node_set_type::const_iterator piter = node_set_tree.begin(); piter != piter_end; ++ piter)
 	  for (typename node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+
+	    if (citer->second >= connected.size())
+	      connected.resize(citer->second + 1, false);
+	    
+	    if (connected[citer->second]) continue;
+	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
 	    
 	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
@@ -892,6 +902,8 @@ namespace cicada
 	    
 	    graph.connect_edge(edge.id, piter->second);
 
+	    connected[citer->second] = true;
+	    
 	    //++ patched;
 	  }
       }
@@ -940,6 +952,11 @@ namespace cicada
 	      graph.goal = graph.add_node().id;
 	    
 	    graph.connect_edge(edge.id, graph.goal);
+	    
+	    if (giter->second >= connected.size())
+	      connected.resize(giter->second + 1, false);
+	    
+	    connected[giter->second] = true;
 	    
 	    //++ goals;
 	  }
@@ -1113,6 +1130,14 @@ namespace cicada
       
       graph.connect_edge(edge.id, result_mapped.first->second);
       
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	if (*titer >= connected.size())
+	  connected.resize(*titer + 1, false);
+	
+	connected[*titer] = true;
+      }
+      
       return std::make_pair(result.first->second, unary_next);
     }
 
@@ -1235,6 +1260,14 @@ namespace cicada
 	      
 	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
+
+	    tails_type::const_iterator titer_end = tails.end();
+	    for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
 	      
 	    result.first->second = edge_id;
 	  } else {
@@ -1258,6 +1291,14 @@ namespace cicada
 	      
 	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
+
+	    tails_type::const_iterator titer_end = tails.end();
+	    for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
 	      
 	    result.first->second = edge_id;
 	  } else {
@@ -1269,6 +1310,14 @@ namespace cicada
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
+
+	tails_type::const_iterator titer_end = tails.end();
+	for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	  if (*titer >= connected.size())
+	    connected.resize(*titer + 1, false);
+	  
+	  connected[*titer] = true;
+	}
       }
       
       return edge_id;
@@ -1537,6 +1586,8 @@ namespace cicada
     passive_map_type           passive_map;
     derivation_map_type        derivation_map;
     
+    connected_type connected;
+
     candidate_set_type    candidates;
     candidate_heap_type   heap;
     candidate_heap_type   heap_unary;

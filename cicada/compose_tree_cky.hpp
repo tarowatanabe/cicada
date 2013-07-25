@@ -217,6 +217,8 @@ namespace cicada
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
 
+    typedef std::vector<bool, std::allocator<bool> > connected_type;
+
     template <typename Tp>
     struct ptr_hash
     {
@@ -324,6 +326,8 @@ namespace cicada
       frontiers_target.clear();
       tree_frontiers_source.clear();
       tree_frontiers_target.clear();
+
+      connected.clear();
 
       // initialize active chart
       for (size_t table = 0; table != tree_grammar.size(); ++ table) {
@@ -575,12 +579,20 @@ namespace cicada
 	node_set_type::const_iterator piter_end = node_set_tree.end();
 	for (node_set_type::const_iterator piter = node_set_tree.begin(); piter != piter_end; ++ piter)
 	  for (node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+
+	    if (citer->second >= connected.size())
+	      connected.resize(citer->second + 1, false);
+	    
+	    if (connected[citer->second]) continue;
+	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
 	    
 	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
 	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
 	    
 	    graph.connect_edge(edge.id, piter->second);
+	    
+	    connected[citer->second] = true;
 	  }
       }
       
@@ -616,6 +628,11 @@ namespace cicada
 	    graph.goal = graph.add_node().id;
 	  
 	  graph.connect_edge(edge.id, graph.goal);
+	  
+	  if (giter->second >= connected.size())
+	    connected.resize(giter->second + 1, false);
+
+	  connected[giter->second] = true;
 	}
       }
       
@@ -852,6 +869,14 @@ namespace cicada
 	result_mapped.first->second = graph.add_node().id;
       
       graph.connect_edge(edge.id, result_mapped.first->second);
+      
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	if (*titer >= connected.size())
+	  connected.resize(*titer + 1, false);
+	
+	connected[*titer] = true;
+      }
     }
     
     void apply_rule(const symbol_type& lhs,
@@ -987,6 +1012,14 @@ namespace cicada
 	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	    
+	    tails_type::const_iterator titer_end = tails.end();
+	    for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
+	    
 	    result.first->second = edge_id;
 	  } else {
 	    edge_id = result.first->second;
@@ -1010,6 +1043,14 @@ namespace cicada
 	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	    
+	    tails_type::const_iterator titer_end = tails.end();
+	    for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
+	    
 	    result.first->second = edge_id;
 	  } else {
 	    edge_id = result.first->second;
@@ -1020,6 +1061,14 @@ namespace cicada
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
+	
+	tails_type::const_iterator titer_end = tails.end();
+	for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	  if (*titer >= connected.size())
+	    connected.resize(*titer + 1, false);
+	  
+	  connected[*titer] = true;
+	}
       }
       
       return edge_id;
@@ -1125,6 +1174,8 @@ namespace cicada
     active_tree_chart_set_type actives_tree;
     active_rule_chart_set_type actives_rule;
     passive_chart_type         passives;
+
+    connected_type connected;
     
     closure_level_type    closure;
     closure_type          closure_head;
