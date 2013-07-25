@@ -52,6 +52,9 @@ AC_MSG_RESULT([${kenlm_order}])
 AC_PATH_PROG(RST2MAN, rst2man.py, no)
 AM_CONDITIONAL(WITH_RST2MAN, test "$RST2MAN" != no)
 
+AC_PATH_PROG(RST2HTML, rst2html.py, no)
+AM_CONDITIONAL(WITH_RST2HTML, test "$RST2HTML" != no)
+
 # Checks for libraries.
 AC_ARG_WITH(zlib,
 	[AC_HELP_STRING([--with-zlib=DIR], [zlib in DIR])],
