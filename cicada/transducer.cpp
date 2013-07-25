@@ -126,7 +126,7 @@ format: ICU's number/date format rules\n\
 	throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
       
       if (! fallback_file.empty()) {
-	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
+	if (fallback_file != "-" && ! boost::filesystem::exists(fallback_file))
 	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
 	
 	utils::compress_istream is(fallback_file, 1024 * 1024);
@@ -157,8 +157,8 @@ format: ICU's number/date format rules\n\
 	throw std::runtime_error("invalid non-terminal for insertion grammar: " + static_cast<const std::string&>(non_terminal));
       
       if (! fallback_file.empty()) {
-	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
-	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
+	if (fallback_file != "-" && ! boost::filesystem::exists(fallback_file))
+	  throw std::runtime_error("invalid fallback insertion? " + fallback_file.string());
 	
 	utils::compress_istream is(fallback_file, 1024 * 1024);
 	
@@ -184,8 +184,8 @@ format: ICU's number/date format rules\n\
 	throw std::runtime_error("invalid non-terminal for deletion grammar: " + static_cast<const std::string&>(non_terminal));
 
       if (! fallback_file.empty()) {
-	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
-	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
+	if (fallback_file != "-" && ! boost::filesystem::exists(fallback_file))
+	  throw std::runtime_error("invalid fallback for deletion?" + fallback_file.string());
 	
 	utils::compress_istream is(fallback_file, 1024 * 1024);
 	
