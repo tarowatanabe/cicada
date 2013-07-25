@@ -293,13 +293,13 @@ namespace cicada
       size_type node;
       size_type next;
       uint32_t  id;
-
+      
       cache_node_type() : node(size_type(-1)), next(size_type(-1)), id(uint32_t(-1)) {}
     };
     
-    typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 2, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
-    typedef utils::array_power2<cache_rule_type,          1024 * 2, std::allocator<cache_rule_type> >          cache_rule_set_type;
-    typedef utils::array_power2<cache_node_type,          1024 * 8, std::allocator<cache_node_type> >          cache_node_set_type;
+    typedef utils::array_power2<cache_rule_pair_set_type, 1024, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
+    typedef utils::array_power2<cache_rule_type,          2048, std::allocator<cache_rule_type> >          cache_rule_set_type;
+    typedef utils::array_power2<cache_node_type,          4096, std::allocator<cache_node_type> >          cache_node_set_type;
     
     typedef std::vector<size_type, std::allocator<size_type> > cache_root_type;
 

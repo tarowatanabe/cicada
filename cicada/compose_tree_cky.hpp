@@ -593,9 +593,9 @@ namespace cicada
 	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
 	    
 	    graph.connect_edge(edge.id, piter->second);
-	    
-	    connected[citer->second] = true;
 	  }
+
+	  connected[citer->second] = true;
 	}
       }
       
