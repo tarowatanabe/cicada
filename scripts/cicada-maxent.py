@@ -25,7 +25,7 @@ opt_parser = OptionParser(
     make_option("--prefix", default="maxent", action="store", type="string",
                 metavar="PREFIX", help="prefix for outputs"),
     
-    make_option("--devset", default="", action="store", type="string",
+    make_option("--srcset", default="", action="store", type="string",
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
@@ -450,7 +450,7 @@ if __name__ == '__main__':
 
     if mpi:
         qsub.mpirun(Program(cicada.cicada_mpi,
-                            Option('--input', Quoted(options.devset)),
+                            Option('--input', Quoted(options.srcset)),
                             Option('--config', Quoted(config)),
                             options.preprocess,
                             Option('--operation', options.compose),
@@ -463,7 +463,7 @@ if __name__ == '__main__':
                     logfile=Quoted(forest+'.log'))
     else:
         qsub.run(Program(cicada.cicada,
-                         Option('--input', Quoted(options.devset)),
+                         Option('--input', Quoted(options.srcset)),
                          Option('--config', Quoted(config)),
                          options.preprocess,
                          Option('--operation', options.compose),

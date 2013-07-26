@@ -25,7 +25,7 @@ opt_parser = OptionParser(
     make_option("--prefix", default="learn", action="store", type="string",
                 metavar="PREFIX", help="prefix for outputs (default: %default)"),
     
-    make_option("--devset", default="", action="store", type="string",
+    make_option("--srcset", default="", action="store", type="string",
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
@@ -373,9 +373,9 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
 
-    ### devset
-    if not os.path.exists(options.devset):
-        raise ValueError, "no developtment file: %s" %(options.devset)
+    ### srcset
+    if not os.path.exists(options.srcset):
+        raise ValueError, "no developtment file: %s" %(options.srcset)
 
     ### refset
     if not os.path.exists(options.refset):
@@ -466,7 +466,7 @@ if __name__ == '__main__':
     learn_algorithm = Option('--learn-' + options.learn)
     
     qsub.mpirun(Program(cicada_learn,
-                        Option('--input', Quoted(options.devset)),
+                        Option('--input', Quoted(options.srcset)),
                         Option('--refset', Quoted(options.refset)),
                         Option('--scorer', options.scorer),
                         Option('--config', Quoted(options.config)),

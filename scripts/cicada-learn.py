@@ -26,7 +26,7 @@ opt_parser = OptionParser(
                 metavar="PREFIX", help="prefix for outputs (default: %default)"),
 
     
-    make_option("--devset", default="", action="store", type="string",
+    make_option("--srcset", default="", action="store", type="string",
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
@@ -384,9 +384,9 @@ if __name__ == '__main__':
     stdout = sys.stdout
     sys.stdout = sys.stderr
     
-    ### devset
-    if not os.path.exists(options.devset):
-        raise ValueError, "no developtment file: %s" %(options.devset)
+    ### srcset
+    if not os.path.exists(options.srcset):
+        raise ValueError, "no developtment file: %s" %(options.srcset)
 
     ### refset
     if not os.path.exists(options.refset):
@@ -560,7 +560,7 @@ if __name__ == '__main__':
         
         if mpi:
             qsub.mpirun(Program(cicada.cicada_mpi,
-                                Option('--input', Quoted(options.devset)),
+                                Option('--input', Quoted(options.srcset)),
                                 Option('--config', Quoted(config)),
                                 Option('--debug')),
                         name="decode",
@@ -569,7 +569,7 @@ if __name__ == '__main__':
                         logfile=Quoted(decoded+'.log'))
         else:
             qsub.run(Program(cicada.cicada,
-                             Option('--input', Quoted(options.devset)),
+                             Option('--input', Quoted(options.srcset)),
                              Option('--config', Quoted(config)),
                              Option('--threads', options.threads),
                              Option('--debug')),

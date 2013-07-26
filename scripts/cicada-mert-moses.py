@@ -25,7 +25,7 @@ opt_parser = OptionParser(
                 metavar="PREFIX", help="prefix for outputs (default: %default)"),
 
     
-    make_option("--devset", default="", action="store", type="string",
+    make_option("--srcset", default="", action="store", type="string",
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
@@ -387,9 +387,9 @@ if __name__ == '__main__':
     if not os.path.exists(options.moses):
         raise ValueError, "no moses?: %s" %(options.moses)
 
-    ### devset
-    if not os.path.exists(options.devset):
-        raise ValueError, "no developtment file: %s" %(options.devset)
+    ### srcset
+    if not os.path.exists(options.srcset):
+        raise ValueError, "no developtment file: %s" %(options.srcset)
 
     ### refset
     if not os.path.exists(options.refset):
@@ -522,7 +522,7 @@ if __name__ == '__main__':
         
         qsub.run(Program('(',
                          options.moses,
-                         Option('-input-file', Quoted(options.devset)),
+                         Option('-input-file', Quoted(options.srcset)),
                          Option('-config', Quoted(config)),
                          options.options,
                          moses_kbest,
