@@ -802,7 +802,6 @@ namespace cicada
 	    root = graph.edges[edge_id].head;
 	  }
 	} else {
-	  rhs.push_back(rule.label);  // add lhs!
 	  internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  level_map.resize(symbol_map_terminal.size(), 0);
 	  const size_t level_terminal = siter - symbol_map_terminal.begin();
@@ -817,7 +816,7 @@ namespace cicada
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
 	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end() - 1)); // -1 for lhs!
+	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	  
 	    result.first->second = edge_id;
