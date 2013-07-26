@@ -266,10 +266,6 @@ namespace cicada
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
-	tail_map.clear();
-	symbol_map.clear();
-	symbol_map_terminal.clear();
-	label_map.clear();
 	terminal_map.clear();
 	
 	match_tree(id, graph_in, graph_out);

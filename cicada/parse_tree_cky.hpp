@@ -570,6 +570,7 @@ namespace cicada
 	  terminal_map.clear();
 	  
 	  node_map.clear();
+	  
 	  candidates.clear();
 	  heap.clear();
 	  
@@ -1162,10 +1163,8 @@ namespace cicada
       
       // projected lhs
       std::pair<typename node_set_type::iterator, bool> result_mapped = node_graph_tree[result.first->second].insert(std::make_pair(rule->label, 0));
-      if (result_mapped.second) {
-	const hypergraph_type::id_type root_id = graph.add_node().id;
-	result_mapped.first->second = root_id;
-      }
+      if (result_mapped.second)
+	result_mapped.first->second = graph.add_node().id;
       
       const hypergraph_type::id_type root_id = result_mapped.first->second;
       
@@ -1210,10 +1209,8 @@ namespace cicada
 	    
 	    node_set_type& node_set = node_graph_tree[frontiers[non_terminal_index]];
 	    std::pair<typename node_set_type::iterator, bool> result = node_set.insert(std::make_pair(aiter->label.non_terminal(), 0));
-	    if (result.second) {
-	      const hypergraph_type::id_type node_id = graph.add_node().id;
-	      result.first->second = node_id;
-	    }
+	    if (result.second)
+	      result.first->second = graph.add_node().id;
 	    
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
