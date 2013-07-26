@@ -834,7 +834,7 @@ namespace cicada
       int non_terminal_pos = 0;
       level_map.clear();
       
-      const hypergraph_type::id_type edge_id = construct_graph(result.first->second, rule, result.first->second, frontiers, graph_out, non_terminal_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos);
       
       graph_out.edges[edge_id].features   = features;
       graph_out.edges[edge_id].attributes = attributes;
@@ -843,8 +843,7 @@ namespace cicada
       graph_out.edges[edge_id].attributes[attr_source_root] = static_cast<const std::string&>(root_label);
     }
     
-    hypergraph_type::id_type construct_graph(hypergraph_type::id_type root_final,
-					     const tree_rule_type& rule,
+    hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
 					     hypergraph_type::id_type root,
 					     const frontier_type& frontiers,
 					     hypergraph_type& graph,
@@ -875,7 +874,7 @@ namespace cicada
 	    
 	    tails.push_back(result.first->second);
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(root_final, *aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
