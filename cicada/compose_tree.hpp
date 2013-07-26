@@ -131,7 +131,6 @@ namespace cicada
 			       std::allocator<tail_set_type> > internal_tail_set_type;
     typedef utils::indexed_set<symbol_set_type, hash_sequence<symbol_set_type>, std::equal_to<symbol_set_type>,
 			       std::allocator<symbol_set_type> > internal_symbol_set_type;
-    typedef std::vector<int, std::allocator<int> > internal_level_map_type;
 
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
     typedef boost::fusion::tuple<hypergraph_type::id_type, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
@@ -256,6 +255,7 @@ namespace cicada
       symbol_map.clear();
       symbol_map_terminal.clear();
       label_map.clear();
+      terminal_map.clear();
 
       frontiers_source.clear();
       frontiers_target.clear();
@@ -266,6 +266,7 @@ namespace cicada
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
+	symbol_map_terminal.clear();
 	terminal_map.clear();
 	
 	match_tree(id, graph_in, graph_out);
@@ -716,7 +717,6 @@ namespace cicada
 
       int non_terminal_pos = 0;
       hypergraph_type::id_type node_prev = hypergraph_type::invalid;
-      //level_map.clear();
       
       const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos, node_prev);
       
@@ -803,14 +803,10 @@ namespace cicada
 	  }
 	} else {
 	  internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
-	  //level_map.resize(symbol_map_terminal.size(), 0);
-	  const size_t level_terminal = siter - symbol_map_terminal.begin();
 	  
 	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(node_curr,
-															     level_terminal,
+															     siter - symbol_map_terminal.begin(),
 															     rule.label), 0));
-	  
-	  //++ level_map[level_terminal];
 	  
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
@@ -841,7 +837,6 @@ namespace cicada
     phrase_unique_type phrases;
     phrase_map_type phrase_map;
     
-    internal_level_map_type  level_map;
     internal_tail_set_type   tail_map;
     internal_symbol_set_type symbol_map;
     internal_symbol_set_type symbol_map_terminal;
