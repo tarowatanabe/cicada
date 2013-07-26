@@ -441,7 +441,7 @@ if __name__ == '__main__':
         if not os.path.exists(options.weights):
             raise ValueError, "no initial weights %s" %(options.weights)
         
-        weights_config = "weights=%s" %(optins.weights)
+        weights_config = "weights=%s" %(options.weights)
     else:
         weights_file = os.path.join(options.root_dir, options.prefix + ".0.weights")
         

@@ -381,7 +381,7 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> > internal_level_map_type;
 
     typedef boost::fusion::tuple<typename internal_tail_set_type::index_type, typename internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
+    typedef boost::fusion::tuple<hypergraph_type::id_type, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
     
     template <typename Tp>
@@ -1169,9 +1169,10 @@ namespace cicada
       const hypergraph_type::id_type root_id = result_mapped.first->second;
       
       int non_terminal_pos = 0;
-      level_map.clear();
+      hypergraph_type::id_type node_prev = hypergraph_type::invalid;
+      //level_map.clear();
       
-      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos, node_prev);
       
       graph.edges[edge_id].features   = features;
       graph.edges[edge_id].attributes = attributes;
@@ -1187,13 +1188,16 @@ namespace cicada
 					     hypergraph_type::id_type root,
 					     const hypergraph_type::edge_type::node_set_type& frontiers,
 					     hypergraph_type& graph,
-					     int& non_terminal_pos)
+					     int& non_terminal_pos,
+					     hypergraph_type::id_type& node_prev)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
       
       rhs_type rhs;
       tails_type tails;
+
+      const hypergraph_type::id_type node_curr = node_prev;
 
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
@@ -1214,12 +1218,13 @@ namespace cicada
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos, node_prev);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
 	  }
 	  
+	  node_prev = tails.back();
 	  rhs.push_back(aiter->label.non_terminal());
 	} else {
 	  rhs.push_back(aiter->label);
@@ -1251,14 +1256,14 @@ namespace cicada
 	  }
 	} else {
 	  typename internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
-	  level_map.resize(symbol_map_terminal.size(), 0);
+	  //level_map.resize(symbol_map_terminal.size(), 0);
 	  const size_t level_terminal = siter - symbol_map_terminal.begin();
 	    
-	  std::pair<typename terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(level_map[level_terminal],
+	  std::pair<typename terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(node_curr,
 																      level_terminal,
 																      rule.label), 0));
 	  
-	  ++ level_map[level_terminal];
+	  // ++ level_map[level_terminal];
 	  
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
