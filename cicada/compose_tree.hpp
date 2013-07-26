@@ -134,12 +134,18 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> > internal_level_map_type;
 
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<int, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
+    typedef boost::fusion::tuple<int, internal_symbol_set_type::index_type, hypergraph_type::id_type> terminal_label_type;
     
     template <typename Tp>
-    struct unassigned_key
+    struct unassigned_key : utils::unassigned<symbol_type>
     {
-      Tp operator()() const { return Tp(-1, -1, symbol_type::id_type(-1)); }
+      Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
+    };
+
+    template <typename Tp>
+    struct unassigned_key_id
+    {
+      Tp operator()() const { return Tp(-1, -1, -1); }
     };
 
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
@@ -147,7 +153,7 @@ namespace cicada
 			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key<terminal_label_type>, unassigned_key<terminal_label_type>,
+			       unassigned_key_id<terminal_label_type>, unassigned_key_id<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
 
@@ -717,7 +723,7 @@ namespace cicada
       int non_terminal_pos = 0;
       level_map.clear();
       
-      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(result.first->second, rule, result.first->second, frontiers, graph_out, non_terminal_pos);
       
       graph_out.edges[edge_id].features   = features;
       graph_out.edges[edge_id].attributes = attributes;
@@ -729,7 +735,8 @@ namespace cicada
 	graph_out.edges[edge_id].attributes[attr_internal_node] = size_internal;
     }
     
-    hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
+    hypergraph_type::id_type construct_graph(hypergraph_type::id_type root_final,
+					     const tree_rule_type& rule,
 					     hypergraph_type::id_type root,
 					     const frontier_type& frontiers,
 					     hypergraph_type& graph,
@@ -760,7 +767,7 @@ namespace cicada
 	    
 	    tails.push_back(result.first->second);
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(root_final, *aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
@@ -797,13 +804,14 @@ namespace cicada
 	    root = graph.edges[edge_id].head;
 	  }
 	} else {
+	  rhs.push_back(rule.label);  // add lhs!
 	  internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  level_map.resize(symbol_map_terminal.size(), 0);
 	  const size_t level_terminal = siter - symbol_map_terminal.begin();
 	  
 	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(level_map[level_terminal],
 															     level_terminal,
-															     rule.label), 0));
+															     root_final), 0));
 	  
 	  ++ level_map[level_terminal];
 	  
@@ -811,7 +819,7 @@ namespace cicada
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
 	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end() - 1)); // -1 for lhs!
 	    graph.connect_edge(edge_id, root);
 	  
 	    result.first->second = edge_id;
@@ -822,10 +830,11 @@ namespace cicada
 	}
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
       }
-	
+      
       return edge_id;
     }
 
