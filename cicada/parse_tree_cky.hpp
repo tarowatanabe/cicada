@@ -573,7 +573,6 @@ namespace cicada
 	  node_map.clear();
 	  candidates.clear();
 	  heap.clear();
-	  heap_unary.clear();
 	  
 	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
 	    active_tree_set_type&  cell = actives_tree[table](first, last);
@@ -795,7 +794,7 @@ namespace cicada
 	      
 	      actives_tree_unary.push_back(active_tree_type(hypergraph_type::edge_type::node_set_type(1, node_passive.first)));
 	      candidates.push_back(candidate_type(&actives_tree_unary.back(), rules.begin(), rules.end(), score_antecedent * rules.begin()->score, item->level + 1));
-	      heap_unary.push(&candidates.back());
+	      heap.push(&candidates.back());
 	    }
 
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -812,7 +811,7 @@ namespace cicada
 	      
 	      actives_rule_unary.push_back(active_rule_type(hypergraph_type::edge_type::node_set_type(1, node_passive.first)));
 	      candidates.push_back(candidate_type(&actives_rule_unary.back(), rules.begin(), rules.end(), score_antecedent * rules.begin()->score, item->level + 1));
-	      heap_unary.push(&candidates.back());
+	      heap.push(&candidates.back());
 	    }
 	  }
 	  
@@ -976,10 +975,7 @@ namespace cicada
 	    ++ const_cast<candidate_type*>(item)->tree_iter;
 	    const_cast<candidate_type*>(item)->score *= item->tree_iter->score;
 	    
-	    if (item->j.empty())
-	      heap_unary.push(item);
-	    else
-	      heap.push(item);
+	    heap.push(item);
 	  }
 	} else {
 	  if (item->tree_iter + 1 != item->tree_last) {
@@ -1018,10 +1014,7 @@ namespace cicada
 	    ++ const_cast<candidate_type*>(item)->rule_iter;
 	    const_cast<candidate_type*>(item)->score *= item->rule_iter->score;
 	    
-	    if (item->j.empty())
-	      heap_unary.push(item);
-	    else
-	      heap.push(item);
+	    heap.push(item);
 	  }
 	} else {
 	  if (item->rule_iter + 1 != item->rule_last) {
@@ -1564,7 +1557,6 @@ namespace cicada
 
     candidate_set_type    candidates;
     candidate_heap_type   heap;
-    candidate_heap_type   heap_unary;
 
     rule_candidate_table_type rule_tables;
     tree_candidate_table_type tree_tables;
