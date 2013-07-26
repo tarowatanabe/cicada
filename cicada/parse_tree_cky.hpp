@@ -381,7 +381,7 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> > internal_level_map_type;
 
     typedef boost::fusion::tuple<typename internal_tail_set_type::index_type, typename internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, hypergraph_type::id_type> terminal_label_type;
+    typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
     
     template <typename Tp>
@@ -389,19 +389,13 @@ namespace cicada
     {
       Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
     };
-
-    template <typename Tp>
-    struct unassigned_key_id
-    {
-      Tp operator()() const { return Tp(-1, -1, -1); }
-    };
     
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
 			       unassigned_key<internal_label_type>,  unassigned_key<internal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key_id<terminal_label_type>,  unassigned_key_id<terminal_label_type>,
+			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
 
@@ -569,7 +563,12 @@ namespace cicada
 	  unary_rule_map.clear();
 	  unary_tree_map.clear();
 	  
+	  tail_map.clear();
+	  symbol_map.clear();
+	  symbol_map_terminal.clear();
+	  label_map.clear();
 	  terminal_map.clear();
+	  
 	  node_map.clear();
 	  candidates.clear();
 	  heap.clear();
@@ -814,7 +813,6 @@ namespace cicada
 	      heap.push(&candidates.back());
 	    }
 	  }
-	  
 
 	  //std::cerr << "constructed graph: nodes: " << graph.nodes.size() << " edges: " << graph.edges.size() << std::endl;
 	  
@@ -1256,14 +1254,13 @@ namespace cicada
 	    root = graph.edges[edge_id].head;
 	  }
 	} else {
-	  rhs.push_back(rule.label);  // add lhs!
 	  typename internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  level_map.resize(symbol_map_terminal.size(), 0);
 	  const size_t level_terminal = siter - symbol_map_terminal.begin();
 	    
 	  std::pair<typename terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(level_map[level_terminal],
 																      level_terminal,
-																      root_final), 0));
+																      rule.label), 0));
 	  
 	  ++ level_map[level_terminal];
 	  
@@ -1271,7 +1268,7 @@ namespace cicada
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
 	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end() - 1)); // -1 for lhs!
+	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	    
 	    result.first->second = edge_id;

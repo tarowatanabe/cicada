@@ -144,7 +144,7 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> > internal_level_map_type;
 
     typedef boost::fusion::tuple<typename internal_tail_set_type::index_type, typename internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, hypergraph_type::id_type> terminal_label_type;
+    typedef boost::fusion::tuple<int, typename internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
     template <typename Tp>
     struct unassigned_key : public utils::unassigned<symbol_type>
@@ -152,18 +152,12 @@ namespace cicada
       Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
     };
 
-    template <typename Tp>
-    struct unassigned_key_id
-    {
-      Tp operator()() const { return Tp(-1, -1, -1); }
-    };
-
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
 			       unassigned_key<internal_label_type>, unassigned_key<internal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key_id<terminal_label_type>, unassigned_key_id<terminal_label_type>,
+			       unassigned_key<terminal_label_type>, unassigned_key<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
     
@@ -437,7 +431,12 @@ namespace cicada
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
+	tail_map.clear();
+	symbol_map.clear();
+	symbol_map_terminal.clear();
+	label_map.clear();
 	terminal_map.clear();
+	
 	candidates.clear();
 	heap.clear();
 	
@@ -925,7 +924,7 @@ namespace cicada
 	  
 	  std::pair<typename terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(level_map[level_terminal],
 																      level_terminal,
-																      root_final), 0));
+																      rule.label), 0));
 	  
 	  ++ level_map[level_terminal];
 	  
