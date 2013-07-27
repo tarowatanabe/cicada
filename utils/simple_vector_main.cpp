@@ -10,6 +10,17 @@
 #include "utils/simple_vector.hpp"
 #include "utils/allocinfo_allocator.hpp"
 
+struct ConstDest
+{
+  static int counter;
+  
+  ConstDest() { ++ counter; }
+  ConstDest(const ConstDest&) { ++ counter; }
+  ~ConstDest() { -- counter; }
+};
+
+int ConstDest::counter = 0;
+
 int main(int argc, char** argv)
 {
   srandom(time(0) * getpid());
@@ -135,4 +146,27 @@ int main(int argc, char** argv)
   intvec2.swap(intvec3);
   
   std::cerr << "size: " << intvec2.size() << " " << intvec3.size() << std::endl;
+
+  typedef utils::simple_vector<ConstDest> vector_test_type;
+
+  vector_test_type vector_test(100);
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+  
+  vector_test.resize(50);
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+
+  vector_test.clear();
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+  
+  for (int i = 0; i != 100; ++ i)
+    vector_test.push_back(ConstDest());
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+  
+  vector_test.erase(vector_test.begin() + 5, vector_test.end() - 5);
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;  
 }

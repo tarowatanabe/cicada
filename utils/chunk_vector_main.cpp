@@ -9,6 +9,17 @@
 #include "utils/chunk_vector.hpp"
 #include "utils/allocinfo_allocator.hpp"
 
+struct ConstDest
+{
+  static int counter;
+  
+  ConstDest() { ++ counter; }
+  ConstDest(const ConstDest&) { ++ counter; }
+  ~ConstDest() { -- counter; }
+};
+
+int ConstDest::counter = 0;
+
 template <size_t Size>
 struct worker_str
 {
@@ -195,4 +206,29 @@ int main(int argc, char** argv)
   std::cout << "finished uint64_t: " << allocinfo.allocated() << std::endl;
   
   worker_str<34>()();
+  
+  typedef utils::chunk_vector<ConstDest, 16> vector_test_type;
+
+  vector_test_type vector_test(100);
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+  
+  vector_test.resize(50);
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+
+  for (int i = 0; i != 37; ++ i)
+    vector_test.push_back(ConstDest());
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+
+  vector_test.clear();
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+  
+  for (int i = 0; i != 100; ++ i)
+    vector_test.push_back(ConstDest());
+
+  std::cerr << "const-dest: " << ConstDest::counter << std::endl;
+
 }

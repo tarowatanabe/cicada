@@ -29,6 +29,8 @@
 #include <utils/compact_map.hpp>
 #include <utils/compact_set.hpp>
 #include <utils/unordered_map.hpp>
+#include <utisl/alloc_vector.hpp
+>
 
 #include <boost/fusion/tuple.hpp>
 
@@ -199,22 +201,35 @@ namespace cicada
 			       std::allocator<symbol_set_type> > internal_symbol_set_type;
     
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<hypergraph_type::id_type, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
+    typedef boost::fusion::tuple<internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
     
-    template <typename Tp>
-    struct unassigned_key : public utils::unassigned<symbol_type>
+    struct unassigned_internal : public utils::unassigned<symbol_type>
     {
-      Tp operator()() const { return Tp(-1, -1, utils::unassigned<symbol_type>::operator()()); }
+      internal_label_type operator()() const
+      {
+	return internal_label_type(-1, -1, utils::unassigned<symbol_type>::operator()());
+      }
+    };
+    
+    struct unassigned_terminal : public utils::unassigned<symbol_type>
+    {
+      terminal_label_type operator()() const
+      {
+	return terminal_label_type(-1, utils::unassigned<symbol_type>::operator()());
+      }
     };
 
     typedef utils::compact_map<internal_label_type, hypergraph_type::id_type,
-			       unassigned_key<internal_label_type>,  unassigned_key<internal_label_type>,
+			       unassigned_internal,  unassigned_internal,
 			       utils::hashmurmur3<size_t>, std::equal_to<internal_label_type>,
 			       std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
     typedef utils::compact_map<terminal_label_type, hypergraph_type::id_type,
-			       unassigned_key<terminal_label_type>,  unassigned_key<terminal_label_type>,
+			       unassigned_terminal,  unassigned_terminal,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
+
+    //typedef utils::chunk_vector<terminal_label_map_type, 4096 / sizeof(terminal_label_map_type), std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
+    typedef utils::alloc_vector<terminal_label_map_type, std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
 
     typedef std::vector<bool, std::allocator<bool> > connected_type;
 
@@ -306,7 +321,8 @@ namespace cicada
       symbol_map.clear();
       symbol_map_terminal.clear();
       label_map.clear();
-      terminal_map.clear();
+      terminal_map_local.clear();
+      terminal_map_global.clear();
       
       node_map.clear();
       node_graph_tree.clear();
@@ -354,8 +370,8 @@ namespace cicada
 	  tail_map.clear();
 	  symbol_map.clear();
 	  label_map.clear();
-	  symbol_map_terminal.clear();
-	  terminal_map.clear();
+	  //symbol_map_terminal.clear();
+	  terminal_map_local.clear();
 	  
 	  node_map.clear();
 	  
@@ -1022,8 +1038,14 @@ namespace cicada
 	} else {
 	  internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  
-	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(node_curr,
-															     siter - symbol_map_terminal.begin(),
+	  if (node_curr != hypergraph_type::invalid && node_curr >= terminal_map_global.size())
+	    terminal_map_global.resize(node_curr + 1);
+	  
+	  terminal_label_map_type& terminal_map = (node_curr == hypergraph_type::invalid
+						   ? terminal_map_local
+						   : terminal_map_global[node_curr]);
+	  
+	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(siter - symbol_map_terminal.begin(),
 															     rule.label), 0));
 	  
 	  if (result.second) {
@@ -1165,7 +1187,9 @@ namespace cicada
     internal_symbol_set_type symbol_map;
     internal_symbol_set_type symbol_map_terminal;
     internal_label_map_type  label_map;
-    terminal_label_map_type  terminal_map;
+    
+    terminal_label_map_type     terminal_map_local;
+    terminal_label_map_set_type terminal_map_global;
 
     frontier_set_type frontiers_source;
     frontier_set_type frontiers_target;
