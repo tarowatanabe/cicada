@@ -35,6 +35,8 @@
 #include <utils/compact_set.hpp>
 #include <utils/small_vector.hpp>
 #include <utils/simple_vector.hpp>
+#include <utils/chunk_vector.hpp>
+#include <utils/alloc_vector.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/functional/hash/hash.hpp>
@@ -159,6 +161,8 @@ namespace cicada
 			       unassigned_key<terminal_label_type>, unassigned_key<terminal_label_type>,
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
+    
+    typedef utils::alloc_vector<terminal_label_map_type, std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
     
     template <typename Tp>
     struct ptr_hash
@@ -408,7 +412,8 @@ namespace cicada
       symbol_map.clear();
       symbol_map_terminal.clear();
       label_map.clear();
-      terminal_map.clear();
+      terminal_map_local.clear();
+      terminal_map_global.clear();
       
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
@@ -431,8 +436,7 @@ namespace cicada
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
-	symbol_map_terminal.clear();
-	terminal_map.clear();
+	terminal_map_local.clear();
 	
 	candidates.clear();
 	heap.clear();
@@ -834,8 +838,9 @@ namespace cicada
       
       int non_terminal_pos = 0;
       hypergraph_type::id_type node_prev = hypergraph_type::invalid;
+      int relative_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos, node_prev);
+      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos, node_prev, relative_pos);
       
       graph_out.edges[edge_id].features   = features;
       graph_out.edges[edge_id].attributes = attributes;
@@ -849,15 +854,14 @@ namespace cicada
 					     const frontier_type& frontiers,
 					     hypergraph_type& graph,
 					     int& non_terminal_pos,
-					     hypergraph_type::id_type& node_prev)
+					     hypergraph_type::id_type& node_prev,
+					     int& relative_pos)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
       
       rhs_type rhs;
       tails_type tails;
-
-      const hypergraph_type::id_type node_curr = node_prev;
       
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
@@ -877,14 +881,22 @@ namespace cicada
 	      result.first->second = graph.add_node().id;
 	    
 	    tails.push_back(result.first->second);
+
+	    node_prev = tails.back();
+	    relative_pos = 0;
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos, node_prev);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter,
+								     hypergraph_type::invalid,
+								     frontiers,
+								     graph,
+								     non_terminal_pos,
+								     node_prev,
+								     relative_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
 	  }
 	  
-	  node_prev = tails.back();
 	  rhs.push_back(aiter->label.non_terminal());
 	} else {
 	  rhs.push_back(aiter->label);
@@ -898,10 +910,12 @@ namespace cicada
 	if (! tails.empty()) {
 	  typename internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
 	  typename internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
+
+	  typedef std::pair<typename internal_label_map_type::iterator, bool> result_type;
 	    
-	  std::pair<typename internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
-																   siter - symbol_map.begin(),
-																   rule.label), 0));
+	  result_type result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
+										   siter - symbol_map.begin(),
+										   rule.label), 0));
 	  
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
@@ -919,9 +933,18 @@ namespace cicada
 	} else {
 	  typename internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  
-	  std::pair<typename terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(node_curr,
-																      siter - symbol_map_terminal.begin(),
-																      rule.label), 0));
+	  if (node_prev != hypergraph_type::invalid && node_prev >= terminal_map_global.size())
+	    terminal_map_global.resize(node_prev + 1);
+	  
+	  terminal_label_map_type& terminal_map = (node_prev == hypergraph_type::invalid
+						   ? terminal_map_local
+						   : terminal_map_global[node_prev]);
+	  
+	  typedef std::pair<typename terminal_label_map_type::iterator, bool> result_type;
+	  
+	  result_type result = terminal_map.insert(std::make_pair(terminal_label_type(relative_pos ++,
+										      siter - symbol_map_terminal.begin(),
+										      rule.label), 0));
 	  
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
@@ -1093,7 +1116,9 @@ namespace cicada
     internal_symbol_set_type symbol_map;
     internal_symbol_set_type symbol_map_terminal;
     internal_label_map_type  label_map;
-    terminal_label_map_type  terminal_map;
+
+    terminal_label_map_type     terminal_map_local;
+    terminal_label_map_set_type terminal_map_global;
     
     candidate_set_type    candidates;
     candidate_heap_type   heap;

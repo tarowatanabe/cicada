@@ -217,12 +217,10 @@ namespace cicada
 			       utils::hashmurmur3<size_t>, std::equal_to<terminal_label_type>,
 			       std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
 
-    //typedef utils::chunk_vector<terminal_label_map_type, 4096 / sizeof(terminal_label_map_type), std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
     typedef utils::alloc_vector<terminal_label_map_type, std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
-
+    
     typedef std::vector<bool, std::allocator<bool> > connected_type;
-
-
+    
     typedef utils::unordered_map<rule_type, rule_ptr_type, boost::hash<rule_type>, std::equal_to<rule_type>,
 				 std::allocator<std::pair<const rule_type, rule_ptr_type> > >::type rule_cache_type;
 
@@ -362,10 +360,6 @@ namespace cicada
 
 	  //std::cerr << "span: " << first << ".." << last << std::endl;
 	  
-	  //tail_map.clear();
-	  //symbol_map.clear();
-	  //label_map.clear();
-	  //symbol_map_terminal.clear();
 	  terminal_map_local.clear();
 	  
 	  node_map.clear();
@@ -997,7 +991,13 @@ namespace cicada
 	    node_prev = tails.back();
 	    relative_pos = 0;
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos, node_prev, relative_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter,
+								     hypergraph_type::invalid,
+								     frontiers,
+								     graph,
+								     non_terminal_pos,
+								     node_prev,
+								     relative_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
@@ -1043,7 +1043,7 @@ namespace cicada
 	  terminal_label_map_type& terminal_map = (node_prev == hypergraph_type::invalid
 						   ? terminal_map_local
 						   : terminal_map_global[node_prev]);
-
+	  
 	  typedef std::pair<terminal_label_map_type::iterator, bool> result_type;
 	  
 	  result_type result = terminal_map.insert(std::make_pair(terminal_label_type(relative_pos ++,
