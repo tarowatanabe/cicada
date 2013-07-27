@@ -160,6 +160,11 @@ namespace cicada
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
+
+      size_t operator()(const Tp* x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
     };
     
     template <typename Tp>
@@ -169,7 +174,15 @@ namespace cicada
       {
 	return x == y ||(x && y && *x == *y);
       }
+      
+      bool operator()(const Tp* x, const Tp* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
     };
+
+    typedef utils::unordered_map<const rule_type*, rule_ptr_type, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
+				 std::allocator<std::pair<const rule_type*, rule_ptr_type> > >::type rule_cache_type;
 
     typedef utils::unordered_map<rule_ptr_type, std::string, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
 				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
@@ -260,6 +273,8 @@ namespace cicada
       label_map.clear();
       terminal_map_local.clear();
       terminal_map_global.clear();
+
+      rule_cache.clear();
 
       frontiers_source.clear();
       frontiers_target.clear();
@@ -806,7 +821,7 @@ namespace cicada
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
 	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	    graph.edges[edge_id].rule = construct_rule(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	    
 	    result.first->second = edge_id;
@@ -834,7 +849,7 @@ namespace cicada
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
 	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	    graph.edges[edge_id].rule = construct_rule(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
 	    
 	    result.first->second = edge_id;
@@ -846,11 +861,23 @@ namespace cicada
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	
-	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	graph.edges[edge_id].rule = construct_rule(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
       }
       
       return edge_id;
+    }
+
+    rule_ptr_type construct_rule(const rule_type& rule)
+    {
+      rule_cache_type::iterator riter = rule_cache.find(&rule);
+      if (riter == rule_cache.end()) {
+	const rule_ptr_type rule_ptr(rule_type::create(rule));
+	
+	riter = rule_cache.insert(std::make_pair(rule_ptr.get(), rule_ptr)).first;
+      }
+
+      return riter->second;
     }
 
     node_map_set_type node_map;
@@ -880,6 +907,8 @@ namespace cicada
     const attribute_type attr_glue_tree;
     const attribute_type attr_frontier_source;
     const attribute_type attr_frontier_target;
+
+    rule_cache_type rule_cache;
 
     frontier_set_type frontiers_source;
     frontier_set_type frontiers_target;

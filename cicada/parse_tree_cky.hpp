@@ -402,14 +402,16 @@ namespace cicada
     typedef utils::alloc_vector<terminal_label_map_type, std::allocator<terminal_label_map_type> > terminal_label_map_set_type;
     
     typedef std::vector<bool, std::allocator<bool> > connected_type;
-    
-    typedef utils::unordered_map<rule_type, rule_ptr_type, boost::hash<rule_type>, std::equal_to<rule_type>,
-				 std::allocator<std::pair<const rule_type, rule_ptr_type> > >::type rule_cache_type;
-    
+        
     template <typename Tp>
     struct ptr_hash
     {
       size_t operator()(const boost::shared_ptr<Tp>& x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+      
+      size_t operator()(const Tp* x) const
       {
 	return (x ? hash_value(*x) : size_t(0));
       }
@@ -422,7 +424,15 @@ namespace cicada
       {
 	return x == y ||(x && y && *x == *y);
       }
+      
+      bool operator()(const Tp* x, const Tp* y) const
+      {
+	return x == y ||(x && y && *x == *y);
+      }
     };
+
+    typedef typename utils::unordered_map<const rule_type*, rule_ptr_type, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
+					  std::allocator<std::pair<const rule_type*, rule_ptr_type> > >::type rule_cache_type;
 
     typedef typename utils::unordered_map<rule_ptr_type, std::string, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
 					  std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;
@@ -1542,10 +1552,13 @@ namespace cicada
 
     rule_ptr_type construct_rule(const rule_type& rule)
     {
-      rule_cache_type::iterator riter = rule_cache.find(rule);
-      if (riter == rule_cache.end())
-	riter = rule_cache.insert(std::make_pair(rule, rule_type::create(rule))).first;
-
+      typename rule_cache_type::iterator riter = rule_cache.find(&rule);
+      if (riter == rule_cache.end()) {
+	const rule_ptr_type rule_ptr(rule_type::create(rule));
+	
+	riter = rule_cache.insert(std::make_pair(rule_ptr.get(), rule_ptr)).first;
+      }
+      
       return riter->second;
     }
   
