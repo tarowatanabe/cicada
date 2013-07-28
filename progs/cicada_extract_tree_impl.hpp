@@ -622,9 +622,9 @@ struct ExtractTree
     edge_set_type edges;
     node_set_type tails;
 
-    int height;
-    int internal;
-    int compose;
+    int height;   // height of this rule
+    int internal; // # of nodes in the rule including frontiers, but excluding root.
+    int compose;  // # of composed rules
     
     rule_compact_set_type::index_type rule;
 

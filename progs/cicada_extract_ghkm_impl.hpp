@@ -619,9 +619,9 @@ struct ExtractGHKM
     edge_set_type edges;
     node_set_type tails;
 
-    int height;
-    int internal;
-    int compose;
+    int height;   // height of this rule
+    int internal; // # of nodes in the rule including frontiers, but excluding root.
+    int compose;  // # of composed rules
 
     DerivationEdge()
       : edges(), tails(), height(0), internal(0), compose(1) {}
