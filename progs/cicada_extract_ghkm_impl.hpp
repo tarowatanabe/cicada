@@ -993,11 +993,11 @@ struct ExtractGHKM
 
 	    int internal_size_prev = edge_composed.internal;
 	    if (j_i_prev >= 0)
-	      internal_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].internal;
+	      internal_size_prev -= derivations[edge.tails[i]].edges[j_i_prev].internal + 1;
 	    
 	    for (/**/; j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()); ++ j[i]) {
 	      const int composed_size = composed_size_prev + derivations[edge.tails[i]].edges[j[i]].compose;
-	      const int internal_size = internal_size_prev + derivations[edge.tails[i]].edges[j[i]].internal;
+	      const int internal_size = internal_size_prev + derivations[edge.tails[i]].edges[j[i]].internal + 1;
 	      
 	      // early checking!
 	      if (max_compose > 0 && composed_size > max_compose) continue;
@@ -1018,6 +1018,16 @@ struct ExtractGHKM
 	      
 	      // early termination...
 	      if (max_height > 0 && rule_stat.first > max_height) break;
+
+#if 0
+	      //checking!
+	      if (rule_stat.second != internal_size)
+		std::cerr << "differ: " << rule_stat.second << ' ' << internal_size << std::endl;
+
+	      std::cerr << "height: " << rule_stat.first << " internal: " << rule_stat.second << std::endl;
+	      for (size_t i = 0; i != edges_new.size(); ++ i)
+		std::cerr << "rule: " << *(graph.edges[edges_new[i]].rule) << std::endl;
+#endif
 	      
 	      candidates.push_back(candidate_type(edge, j));
 	      
@@ -1161,7 +1171,8 @@ struct ExtractGHKM
     ++ edge_iter;
 
     int height = 1;
-    int num_tails = edge.tails.size();
+    //int num_tails = edge.tails.size();
+    int num_tails = 0;
     
     hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
     for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
@@ -1169,7 +1180,7 @@ struct ExtractGHKM
 	const std::pair<int, int> result = compose_edges(graph, iter, last, tail_iter, edge_iter, edge_last, edges_new, tails_new);
 	
 	height = utils::bithack::max(height, result.first + 1);
-	num_tails += result.second;
+	num_tails += result.second + 1;
 	
 	// early termination...
 	if (max_height > 0 && height > max_height)
@@ -1180,7 +1191,7 @@ struct ExtractGHKM
 	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
 	  
 	  height = utils::bithack::max(height, edge.height + 1);
-	  num_tails += edge.internal;
+	  num_tails += edge.internal + 1;
 	  
 	  // early termination...
 	  if (max_height > 0 && height > max_height)
@@ -1918,7 +1929,8 @@ struct ExtractGHKM
     ++ iter;
     
     int max_height = 1;
-    int num_tails = edge.tails.size();
+    //int num_tails = edge.tails.size();
+    int num_tails = 0;
     
     hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
     for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
@@ -1926,7 +1938,7 @@ struct ExtractGHKM
 	const std::pair<int, int> result = rule_statistics(graph, iter, last);
 	
 	max_height = utils::bithack::max(max_height, result.first + 1);
-	num_tails += result.second;
+	num_tails += result.second + 1;
       }
     
     return std::make_pair(max_height, num_tails);
@@ -1944,7 +1956,8 @@ struct ExtractGHKM
     ++ iter;
     
     int max_height = 1;
-    int num_tails = edge.tails.size();
+    //int num_tails = edge.tails.size();
+    int num_tails = 0;
     
     hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
     for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
@@ -1952,7 +1965,7 @@ struct ExtractGHKM
 	const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
 	
 	max_height = utils::bithack::max(max_height, result.first + 1);
-	num_tails += result.second;
+	num_tails += result.second + 1;
       } else
 	tails.push_back(*titer);
     }
