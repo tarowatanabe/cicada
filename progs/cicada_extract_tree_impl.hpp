@@ -919,13 +919,13 @@ struct ExtractTree
 	      
 	      int internal_size_prev = edge_composed.internal;
 	      if (j_i_prev >= 0)
-		internal_size_prev -= derivations_next[edge.tails[i]].edges[j_i_prev].internal + 1;
+		internal_size_prev -= derivations_next[edge.tails[i]].edges[j_i_prev].internal;
 
 	      //std::cerr << "composed-prev: " << composed_size_prev << " internal-prev: " << internal_size_prev << std::endl;
 	      
 	      for (/**/; j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()); ++ j[i]) {
 		const int composed_size = composed_size_prev + derivations_next[edge.tails[i]].edges[j[i]].compose;
-		const int internal_size = internal_size_prev + derivations_next[edge.tails[i]].edges[j[i]].internal + 1;
+		const int internal_size = internal_size_prev + derivations_next[edge.tails[i]].edges[j[i]].internal;
 
 		// early checking!
 		if (max_compose > 0 && composed_size > max_compose) continue;
@@ -1013,8 +1013,8 @@ struct ExtractTree
       ++ edge_iter;
 
       int height = 1;
-      //int num_tails = edge.tails.size();
-      int num_tails = 0;
+      int num_tails = edge.tails.size();
+      //int num_tails = 0;
     
       hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
       for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
@@ -1022,13 +1022,13 @@ struct ExtractTree
 	  const std::pair<int, int> result = compose_edges(deriv, graph, iter, last, tail_iter, edge_iter, edge_last, edges_new, tails_new);
 	  
 	  height = utils::bithack::max(height, result.first + 1);
-	  num_tails += result.second + 1;
+	  num_tails += result.second;
 	} else if (iter != last) {
 	  if (*iter >= 0) {
 	    const derivation_edge_type& edge = deriv[*tail_iter].edges[*iter];
 	    
 	    height = utils::bithack::max(height, edge.height + 1);
-	    num_tails += edge.internal + 1;
+	    num_tails += edge.internal;
 
 	    edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
 	    tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
@@ -1491,8 +1491,8 @@ struct ExtractTree
       ++ iter;
       
       int max_height = 1;
-      //int num_tails = edge.tails.size();
-      int num_tails = 0;
+      int num_tails = edge.tails.size();
+      //int num_tails = 0;
       
       hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
       for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
@@ -1500,7 +1500,7 @@ struct ExtractTree
 	  const std::pair<int, int> result = rule_statistics(graph, iter, last);
 	  
 	  max_height = utils::bithack::max(max_height, result.first + 1);
-	  num_tails += result.second + 1;
+	  num_tails += result.second;
 	}
       
       return std::make_pair(max_height, num_tails);
@@ -1518,8 +1518,8 @@ struct ExtractTree
       ++ iter;
     
       int max_height = 1;
-      //int num_tails = edge.tails.size();
-      int num_tails = 0;
+      int num_tails = edge.tails.size();
+      //int num_tails = 0;
     
       hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
       for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
@@ -1527,7 +1527,7 @@ struct ExtractTree
 	  const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
 	
 	  max_height = utils::bithack::max(max_height, result.first + 1);
-	  num_tails += result.second + 1;
+	  num_tails += result.second;
 	} else
 	  tails.push_back(*titer);
       }
