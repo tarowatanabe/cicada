@@ -103,7 +103,7 @@ opt_parser = OptionParser(
     make_option("--max-fertility", default=4, action="store", type="int",
                 metavar="FERTILITY", help="maximum terminal fertility (default: %default)"),
     make_option("--max-nodes", default=7, action="store", type="int",
-                metavar="NODES", help="maximum rule nodes (default: %default)"),
+                metavar="NODES", help="maximum internal nodes (default: %default)"),
     make_option("--max-height", default=4, action="store", type="int",
                 metavar="HEIGHT", help="maximum rule height (default: %default)"),
     make_option("--max-compose", default=4, action="store", type="int",
