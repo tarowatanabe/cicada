@@ -74,7 +74,7 @@ OPTIONS
   --max-length=LENGTH   maximum terminal length (default: 7)
   --max-fertility=FERTILITY
                         maximum terminal fertility (default: 4)
-  --max-nodes=NODES     maximum rule nodes (default: 15)
+  --max-nodes=NODES     maximum internal nodes (default: 7)
   --max-height=HEIGHT   maximum rule height (default: 4)
   --max-compose=COMPOSE
                         maximum rule composition (default: 0)
