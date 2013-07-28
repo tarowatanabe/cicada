@@ -1740,7 +1740,7 @@ struct ExtractGHKM
 	    node_set_type tails;
 	    edge_set_type::const_iterator eiter     = frontier.first.begin();
 	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    const std::pair<int, int> rule_stat = construct_tails(graph, eiter, eiter_end, tails);
+	    const std::pair<int, int> rule_stat     = construct_tails(graph, eiter, eiter_end, tails);
 	    
 	    // iterate over tails and compute span...
 	    // code taken from apply_exact...
@@ -1798,8 +1798,11 @@ struct ExtractGHKM
 		    for (int first = range_max.first; first <= range.first; ++ first)
 		      for (int last = range.second; last <= range_max.second; ++ last) {
 			const range_type range_next(first, last);
+
+			typedef std::pair<range_node_map_type::iterator, bool> result_type;
 			
-			std::pair<range_node_map_type::iterator, bool> result = buf.insert(std::make_pair(range_next, derivations.size()));
+			result_type result = buf.insert(std::make_pair(range_next, derivations.size()));
+			
 			if (result.second) {
 			  node_map[id].push_back(result.first->second);
 			  
@@ -1813,8 +1816,11 @@ struct ExtractGHKM
 		      }
 		  } else {
 		    const range_type& range_next = range;
+
+		    typedef std::pair<range_node_map_type::iterator, bool> result_type;
 		    
-		    std::pair<range_node_map_type::iterator, bool> result = buf.insert(std::make_pair(range_next, derivations.size()));
+		    result_type result = buf.insert(std::make_pair(range_next, derivations.size()));
+		    
 		    if (result.second) {
 		      node_map[id].push_back(result.first->second);
 		      
@@ -1846,7 +1852,7 @@ struct ExtractGHKM
 	    if (constrained) {
 	      edge_set_type::const_iterator eiter     = frontier.first.begin();
 	      edge_set_type::const_iterator eiter_end = frontier.first.end();
-	      const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
+	      const std::pair<int, int> rule_stat     = rule_statistics(graph, eiter, eiter_end);
 
 	      if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second < max_nodes)) {
 		const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
@@ -1858,7 +1864,7 @@ struct ExtractGHKM
 		  queue.resize(queue.size() + 1);
 		  frontier_type& frontier_next = queue.back();
 		  
-		  //frontier_next.first.reserve(frontier.first.size() + 1);
+		  frontier_next.first.reserve(frontier.first.size() + 1);
 		  frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
 		  frontier_next.first.push_back(*eiter);
 		  
@@ -1882,7 +1888,7 @@ struct ExtractGHKM
 		queue.resize(queue.size() + 1);
 		frontier_type& frontier_next = queue.back();
 		
-		//frontier_next.first.reserve(frontier.first.size() + 1);
+		frontier_next.first.reserve(frontier.first.size() + 1);
 		frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
 		frontier_next.first.push_back(*eiter);
 		
