@@ -14,7 +14,6 @@ exec $cicada/scripts/cicada-extract.py \
 	--lexicon-variational \
 	\
 	--ghkm \
-	--constrained \
 	--max-scope 2 \
 	\
 	--threads 4 \
