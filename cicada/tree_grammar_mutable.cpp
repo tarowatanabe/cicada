@@ -208,7 +208,10 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
-      if (utils::ipiece(piter->first) == "max-span") {
+      if (utils::ipiece(piter->first) == "cky" || utils::ipiece(piter->first) == "cyk") {
+	cky = true;
+	continue;
+      } else if (utils::ipiece(piter->first) == "max-span") {
 	max_span = utils::lexical_cast<int>(piter->second);
 	continue;
       } else if (utils::ipiece(piter->first) == "debug") {
@@ -254,10 +257,7 @@ namespace cicada
 	}
       }
       
-      if (utils::ipiece(piter->first) == "cky" || utils::ipiece(piter->first) == "cyk")
-	cky = true;
-      else
-	throw std::runtime_error("unsupported key: " + piter->first);
+      throw std::runtime_error("unsupported key: " + piter->first);
     }
 
     typedef tree_rule_scores_parser_mutable<std::string::const_iterator> scores_parser_type;

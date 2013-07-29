@@ -1,0 +1,5 @@
+The code is modified so that:
+
+- Use CG_INT not INT.
+- add a pointer to an "instance" so that we can compute
+  gradients/values by differentiating instances.

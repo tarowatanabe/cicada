@@ -46,3 +46,7 @@ driver4_LDADD = libcg_descent.la
 driver5_SOURCES = driver5.c
 driver5_LDADD = libcg_descent.la
 
+EXTRA_DIST = \
+README \
+README.cicada
+

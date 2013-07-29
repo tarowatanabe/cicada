@@ -1029,7 +1029,7 @@ namespace cicada
     parameter_type::const_iterator kiter = param.find("key-value");
     if (kiter != param.end())
       key_value = utils::lexical_cast<bool>(kiter->second);
-
+    
     parameter_type::const_iterator diter = param.find("debug");
     if (diter != param.end())
       debug = utils::lexical_cast<int>(diter->second);
@@ -1151,9 +1151,11 @@ namespace cicada
     if (boost::filesystem::exists(rep.path("attribute-vocab")))
       attribute_vocab.open(rep.path("attribute-vocab"));
     
-    repository_type::const_iterator citer = rep.find("cky");
-    if (citer != rep.end())
-      cky = utils::lexical_cast<bool>(citer->second);
+    {
+      repository_type::const_iterator citer = rep.find("cky");
+      if (citer != rep.end())
+	cky = utils::lexical_cast<bool>(citer->second);
+    }
     
     repository_type::const_iterator iter = rep.find("feature-size");
     if (iter == rep.end())
@@ -1457,6 +1459,11 @@ namespace cicada
     
     {
       parameter_type::const_iterator citer = param.find("cky");
+      if (citer != param.end())
+	cky = utils::lexical_cast<bool>(citer->second);
+    }
+    {
+      parameter_type::const_iterator citer = param.find("cyk");
       if (citer != param.end())
 	cky = utils::lexical_cast<bool>(citer->second);
     }
@@ -1773,6 +1780,11 @@ namespace cicada
     
     {
       parameter_type::const_iterator citer = param.find("cky");
+      if (citer != param.end())
+	cky = utils::lexical_cast<bool>(citer->second);
+    }
+    {
+      parameter_type::const_iterator citer = param.find("cyk");
       if (citer != param.end())
 	cky = utils::lexical_cast<bool>(citer->second);
     }

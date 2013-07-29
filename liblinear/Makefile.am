@@ -42,6 +42,7 @@ predict_LDADD = liblinear.la
 EXTRA_DIST = \
 COPYRIGHT \
 README \
+README.cicada \
 Makefile.orig \
 heart_scale
 
