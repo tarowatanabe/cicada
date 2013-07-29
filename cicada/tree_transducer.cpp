@@ -26,6 +26,7 @@ namespace cicada
   {
     static const char* desc ="\
 file-name: indexed tree grammar or plain text tree grammar\n\
+\tmax-span=[int] maximum span (<=0 for no-constraint)\n\
 \tcky|cyk=[true|false] indexing for CKY|CYK parsing/composition\n\
 \tkey-value=[true|false] store key-value format of features/attributes\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
@@ -37,7 +38,7 @@ file-name: indexed tree grammar or plain text tree grammar\n\
 \tattribute0=[attribute-name]\n\
 \tattribute1=[attribute-name]\n\
 \t...\n\
-fallback: fallback source-to-target transfer rule\n\
+fallback: fallback source-to-target, tree-to-string transfer rule\n\
 \tnon-terminal=[defaut non-terminal] target side non-terminal\n\
 ";
     return desc;
