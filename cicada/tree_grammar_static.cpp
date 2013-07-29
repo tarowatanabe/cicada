@@ -2198,6 +2198,11 @@ namespace cicada
     return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
   }
 
+  bool TreeGrammarStatic::is_cky() const
+  {
+    return pimpl->is_cky();
+  }
+
   TreeGrammarStatic::edge_type TreeGrammarStatic::edge(const symbol_type& symbol) const
   {
     const id_type node = pimpl->find_edge(symbol.non_terminal(), 0);

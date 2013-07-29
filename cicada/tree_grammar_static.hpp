@@ -58,6 +58,7 @@ namespace cicada
     transducer_ptr_type clone() const;
 
     bool valid_span(int first, int last, int distance) const;
+    bool is_cky() const;
     
     edge_type edge(const symbol_type& symbol) const;
     edge_type edge(const symbol_set_type& symbols) const;

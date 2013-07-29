@@ -103,8 +103,8 @@ namespace cicada
     TreeGrammarMutableImpl(const std::string& parameter)
       : trie(), edges(), cky(false), max_span(0), debug(0) { read(parameter); }
 
-    TreeGrammarMutableImpl(const int __max_span=0)
-      : trie(), edges(), cky(false), max_span(__max_span), debug(0) {  }
+    TreeGrammarMutableImpl(const bool __cky=false, const int __max_span=0)
+      : trie(), edges(), cky(__cky), max_span(__max_span), debug(0) {  }
     
     edge_id_type edge(const symbol_type* first, const symbol_type* last) const
     {
@@ -551,8 +551,8 @@ namespace cicada
     }
   }
 
-  TreeGrammarMutable::TreeGrammarMutable(const int __max_span)
-    : pimpl(new impl_type(__max_span)) {}
+  TreeGrammarMutable::TreeGrammarMutable(const bool __cky, const int __max_span)
+    : pimpl(new impl_type(__cky, __max_span)) {}
   
   TreeGrammarMutable::TreeGrammarMutable(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
@@ -576,6 +576,11 @@ namespace cicada
   bool TreeGrammarMutable::valid_span(int first, int last, int distance) const
   {
     return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
+  }
+
+  bool TreeGrammarMutable::is_cky() const
+  {
+    return pimpl->is_cky();
   }
   
   TreeGrammarMutable::edge_type TreeGrammarMutable::edge(const symbol_type& symbol) const

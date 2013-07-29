@@ -44,20 +44,19 @@ namespace cicada
     //
     // if not supplied we will use rule-table-0, rule-table-1 etc.
     
-    TreeGrammarMutable(const int __max_span=0);
+    TreeGrammarMutable(const bool __cky=false, const int __max_span=0);
     TreeGrammarMutable(const std::string& parameter);
     ~TreeGrammarMutable();
     
     TreeGrammarMutable(const TreeGrammarMutable& x);
     TreeGrammarMutable& operator=(const TreeGrammarMutable& x);
-
-    
     
   public:
     // virtual members
     transducer_ptr_type clone() const;
     
     bool valid_span(int first, int last, int distance) const;
+    bool is_cky() const;
     
     edge_type edge(const symbol_type& symbol) const;
     edge_type edge(const symbol_set_type& symbols) const;
@@ -68,15 +67,13 @@ namespace cicada
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;
     const rule_pair_set_type& rules(const id_type& node) const;
-
+    
     // grammar_mutable specific members
     void read(const std::string& parameter);
     void clear();
     
-
     void insert(const std::string& pattern);
     void insert(const rule_pair_type& rule_pair);
-    
     
     void insert(const rule_type& source, const rule_type& target)
     {

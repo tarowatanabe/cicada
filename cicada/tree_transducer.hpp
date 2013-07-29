@@ -95,6 +95,8 @@ namespace cicada
 
     // valid span
     virtual bool valid_span(int first, int last, int distance) const = 0;
+    virtual bool is_cky() const = 0;
+    bool is_cyk() const { return is_cky(); }
 
     // operation over edges...
     virtual edge_type edge(const symbol_type& symbol) const = 0;
