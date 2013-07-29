@@ -233,7 +233,8 @@ table {
   margin-bottom: 0.5em }
 
 table.citation {
-  border-left: solid thin gray ;
+  /*border-left: solid thin gray ;*/
+  bofder-left: none ;
   padding-left: 0.5ex }
 
 table.docinfo {
@@ -241,7 +242,8 @@ table.docinfo {
 }
 
 table.footnote {
-  border-left: solid thin black ;
+/*  border-left: solid thin black ;*/
+  border-left: none ;
   padding-left: 0.5ex }
 
 td, th {

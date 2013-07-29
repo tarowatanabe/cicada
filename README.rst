@@ -72,7 +72,7 @@ This sample means:
   - The SCFG file is `samples/scfg/grammar.bin` which is a
     binary version of `samples/scfg/grammar.bz2`.
   - Additional grammar is a `glue grammar` consisting of two rules:
-    ``[s] -> <[x], [x]>`` and ``[s] -> <[s,1] [x,2], [s,1] [x,2]>``.
+    ``[s] -> <[x,1], [x,1]>`` and ``[s] -> <[s,1] [x,2], [s,1] [x,2]>``.
   - Another additional grammar is an `insertion grammar` which simply
     copies the input string to output string, ``[x] -> <word-x, word-x>``
 
@@ -143,7 +143,7 @@ Alignment can be carried out by:
   symmetric posterior constrained learning [23]_ with smoothing via
   variational Bayes or via L0 prior.
 - Word clustering tool is also included to support word alignment
-  learning + translation [20]_.
+  learning + translation [21]_.
 - Final combined alignment can be generated either by heuristic
   (AKA grow-diag-final-and etc.) or by ITG or max-matching from
   posterior probabilities.
@@ -237,7 +237,7 @@ Various learning components are implemented:
 
 Feature functions:
 
--  The ngram language model feaature supports
+-  The ngram language model feature supports both of
    `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
    `kenlm <http://kheafield.com/code/kenlm/>`_ [40]_.
 
