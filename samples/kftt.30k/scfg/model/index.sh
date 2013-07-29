@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cicada=../../..
+cicada=../../../..
 
 exec $cicada/scripts/cicada-index.py \
 	--root-dir . \

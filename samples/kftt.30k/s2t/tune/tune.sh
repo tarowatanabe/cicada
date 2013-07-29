@@ -1,10 +1,10 @@
 #!/bin/sh
 
-cicada=../../../..
+cicada=../../../../
 
 exec $cicada/scripts/cicada-learn.py \
-	--srcset ../data/tune.forest.ja.gz \
-	--refset ../../data/tune.en.ref \
+	--srcset ../data/tune.ja \
+	--refset ../data/tune.en.ref \
 	--config cicada.config \
 	--kbest 1000 \
 	--threads 4

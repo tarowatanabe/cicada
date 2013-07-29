@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cicada=../../..
+cicada=../../../..
 
 exec $cicada/scripts/cicada-learn.py \
 	--srcset ../../data/tune.ja \

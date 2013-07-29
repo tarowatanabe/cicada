@@ -4,7 +4,7 @@
 # Note that the Japanese side was segmented by mecab (https://code.google.com/p/mecab/).
 # Thus, it is a natural choice to use cabocha (https://code.google.com/p/cabocha/).
 
-cicada=../../..
+cicada=../../../..
 mecab=
 cabocha=
 
@@ -26,9 +26,9 @@ for data in train dev tune; do
     cat="bzcat ../../data/$data.ja.bz2"
   fi
 
-  # Here, we perform mecab to assign POS
-  # cabocha for dependency
-  # cicada_fiter_dependency to generate the dependency in hypergraph format
+  # Here, we perform mecab to assign POS (but preserves word segmentation via -p)
+  # cabocha for dependency (Input is POS tagged, and output is a lattice format)
+  # cicada_fiter_dependency to generate the dependency in hypergraph
   # cicada to binarize the forest via CYK-binarization
   $cat | \
   gawk '{for (i=1;i<=NF;++i) {printf "%s\t*\n", $i } print "EOS";}' | \

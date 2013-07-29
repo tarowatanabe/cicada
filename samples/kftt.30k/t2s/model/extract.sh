@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cicada=../../..
+cicada=../../../..
 
 exec $cicada/scripts/cicada-extract.py \
 	--f ../../data/train.ja.bz2 \

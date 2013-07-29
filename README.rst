@@ -10,7 +10,7 @@ framework [1]_. Based on the generic framework, we can
 - Translate sentence, lattice and/or parsed tree.
 - Align between {hypergraph,lattice}-to-lattice (currently, we assume
   penn-treebank style hypergraph and sentence-like lattice).
-- Align two sentences using symmetized IBM Model1/HMM/IBM Model4.
+- Align bilingual sentences using symmetized IBM Model1/HMM/IBM Model4.
 - (dependency) parse lattices (or sentences).
 - Analyze forest/tree/lattice.
 
