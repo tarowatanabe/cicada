@@ -321,7 +321,7 @@ namespace cicada
 
   public:
     GrammarStaticImpl(const std::string& parameter)
-      : max_span(15),
+      : max_span(0),
 	debug(0)
     {
       read(parameter);
@@ -389,7 +389,7 @@ namespace cicada
       cache_nodes.clear();
       cache_root.clear();
 
-      max_span = 15;
+      max_span = 0;
     }
     
     size_type find(const word_type& word, size_type node) const

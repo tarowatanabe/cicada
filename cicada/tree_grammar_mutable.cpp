@@ -101,10 +101,10 @@ namespace cicada
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
     
     TreeGrammarMutableImpl(const std::string& parameter)
-      : trie(), edges(), cky(false), debug(0) { read(parameter); }
+      : trie(), edges(), cky(false), max_span(0), debug(0) { read(parameter); }
 
-    TreeGrammarMutableImpl()
-      : trie(), edges(), cky(false), debug(0) {  }
+    TreeGrammarMutableImpl(const int __max_span=0)
+      : trie(), edges(), cky(false), max_span(__max_span), debug(0) {  }
     
     edge_id_type edge(const symbol_type* first, const symbol_type* last) const
     {
@@ -136,6 +136,7 @@ namespace cicada
     attribute_name_set_type attribute_names_default;
 
     bool cky;
+    int max_span;
     int debug;
   };
   
@@ -207,7 +208,10 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
-      if (utils::ipiece(piter->first) == "debug") {
+      if (utils::ipiece(piter->first) == "max-span") {
+	max_span = utils::lexical_cast<int>(piter->second);
+	continue;
+      } else if (utils::ipiece(piter->first) == "debug") {
 	debug = utils::lexical_cast<int>(piter->second);
 	continue;
       } else if (utils::ipiece(piter->first) == "feature-prefix") {
@@ -547,8 +551,8 @@ namespace cicada
     }
   }
 
-  TreeGrammarMutable::TreeGrammarMutable()
-    : pimpl(new impl_type()) {}
+  TreeGrammarMutable::TreeGrammarMutable(const int __max_span)
+    : pimpl(new impl_type(__max_span)) {}
   
   TreeGrammarMutable::TreeGrammarMutable(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
@@ -567,6 +571,11 @@ namespace cicada
   TreeGrammarMutable::transducer_ptr_type TreeGrammarMutable::clone() const
   {
     return transducer_ptr_type(new TreeGrammarMutable(*this));
+  }
+
+  bool TreeGrammarMutable::valid_span(int first, int last, int distance) const
+  {
+    return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
   }
   
   TreeGrammarMutable::edge_type TreeGrammarMutable::edge(const symbol_type& symbol) const

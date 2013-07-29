@@ -40,6 +40,8 @@ namespace cicada
   public:
     // virtual members
     transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarShared(*this)); }
+
+    bool valid_span(int first, int last, int distance) const { return pimpl->valid_span(first, last, distance); }
     
     edge_type edge(const symbol_type& symbol) const { return pimpl->edge(symbol); }
     edge_type edge(const symbol_set_type& symbols) const { return pimpl->edge(symbols); }

@@ -303,7 +303,7 @@ namespace cicada
     
     typedef std::vector<size_type, std::allocator<size_type> > cache_root_type;
 
-    TreeGrammarStaticImpl(const std::string& parameter) : cky(false), debug(0) { read(parameter); }
+    TreeGrammarStaticImpl(const std::string& parameter) : cky(false), max_span(0), debug(0) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
 	rule_db(x.rule_db),
@@ -319,6 +319,7 @@ namespace cicada
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
 	cky(x.cky),
+	max_span(x.max_span),
 	debug(x.debug) {}
 
     TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
@@ -339,6 +340,7 @@ namespace cicada
       feature_names = x.feature_names;
       attribute_names = x.attribute_names;
       cky = x.cky;
+      max_span = x.max_span;
       debug = x.debug;
       
       return *this;
@@ -370,6 +372,8 @@ namespace cicada
       cache_nodes.clear();
 
       cache_root.clear();
+
+      max_span = 0;
     }
 
     size_type find_edge(const word_type& word) const
@@ -680,6 +684,8 @@ namespace cicada
 
     cache_root_type cache_root;
 
+  public:
+    int max_span;
     int debug;
   };
 
@@ -1034,6 +1040,10 @@ namespace cicada
       read_keyed_text(parameter);
     else
       read_text(parameter);
+    
+    parameter_type::const_iterator siter = param.find("max-span");
+    if (siter != param.end())
+      max_span = utils::lexical_cast<int>(siter->second);
     
     parameter_type::const_iterator piter = param.find("populate");
     if (piter != param.end() && utils::lexical_cast<bool>(piter->second))
@@ -2181,6 +2191,13 @@ namespace cicada
     return transducer_ptr_type(new TreeGrammarStatic(*this));
   }
   
+  bool TreeGrammarStatic::valid_span(int first, int last, int distance) const
+  {
+    // max-span checking + distance checking
+    // we need this last - first == 1 when intersecting with lattice...
+    return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
+  }
+
   TreeGrammarStatic::edge_type TreeGrammarStatic::edge(const symbol_type& symbol) const
   {
     const id_type node = pimpl->find_edge(symbol.non_terminal(), 0);

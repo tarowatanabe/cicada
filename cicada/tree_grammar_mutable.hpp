@@ -44,7 +44,7 @@ namespace cicada
     //
     // if not supplied we will use rule-table-0, rule-table-1 etc.
     
-    TreeGrammarMutable();
+    TreeGrammarMutable(const int __max_span=0);
     TreeGrammarMutable(const std::string& parameter);
     ~TreeGrammarMutable();
     
@@ -56,6 +56,8 @@ namespace cicada
   public:
     // virtual members
     transducer_ptr_type clone() const;
+    
+    bool valid_span(int first, int last, int distance) const;
     
     edge_type edge(const symbol_type& symbol) const;
     edge_type edge(const symbol_set_type& symbols) const;

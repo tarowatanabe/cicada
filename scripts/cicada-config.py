@@ -117,7 +117,7 @@ class TreeGrammar(UserList.UserList):
         if not os.path.exists(path):
             raise ValueError, "no path to grammar: %s" %(path)
         
-        UserList.UserList.append(self, "tree-grammar = " + escape_path(path))
+        UserList.UserList.append(self, "tree-grammar = " + escape_path(path) + ":max-span=%s" %(self.max_span))
 
 def non_terminal(x, index=0):
     if not x:

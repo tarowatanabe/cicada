@@ -562,7 +562,7 @@ namespace cicada
 	  	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
-	  extend_actives(first, last, lattice, tree_grammar, actives_tree, passives, VerifyNone());
+	  extend_actives(first, last, lattice, tree_grammar, actives_tree, passives, VerifySpan());
 	  extend_actives(first, last, lattice, grammar,      actives_rule, passives, VerifySpan());
 	  
 	  // complete active items if possible... The active items may be created from child span due to the

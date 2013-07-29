@@ -375,7 +375,7 @@ namespace cicada
 	  node_map.clear();
 	  
 	  extend_actives(first, last, lattice, grammar,      actives_rule, VerifySpan());
-	  extend_actives(first, last, lattice, tree_grammar, actives_tree, VerifyNone());
+	  extend_actives(first, last, lattice, tree_grammar, actives_tree, VerifySpan());
 	  
 	  complete_actives(first, last, grammar,      actives_rule, graph, ExtractRuleLHS());
 	  complete_actives(first, last, tree_grammar, actives_tree, graph, ExtractTreeLHS());

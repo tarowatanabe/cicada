@@ -93,6 +93,9 @@ namespace cicada
     virtual ~TreeTransducer() {}
     virtual transducer_ptr_type clone() const = 0;
 
+    // valid span
+    virtual bool valid_span(int first, int last, int distance) const = 0;
+
     // operation over edges...
     virtual edge_type edge(const symbol_type& symbol) const = 0;
     virtual edge_type edge(const symbol_set_type& symbols) const = 0;

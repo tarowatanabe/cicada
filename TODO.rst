@@ -247,3 +247,17 @@ Revise the merge features in cicada_mpi for large # of features
 
 Revise the ngram language model handling:
   -  Use better ngram state representation
+
+Glue rules for the synchronous tree substitution grammar:
+  - Under the tree-to-tree setting, (compose-tree or
+    parse-tree), there exists no glue-rule like abstraction.
+    There exists TreeGrammarFallback for tree-to-string which simply
+    use the source side trees tructure as-is by using the label or by
+    replacing the labels to [x]. However, this strategy does not work
+    especially when the two languages do not share the labels
+    (i.e. Japanese dependency labels and English constituency labels).
+  - What is a good way to implemen this?
+    * Add an option to compose-tree and/or parse-tree to automatically
+      add glue-rules?
+    * Add a grammar which represents "glues"
+    
