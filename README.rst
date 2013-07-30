@@ -84,7 +84,7 @@ This sample means:
     binary version of `samples/scfg/ngram.bz2`.
   - A word penalty feature which penalize by the number of words in
     the target side of a derivation.
-  - A rule penalty feature which penaltize by the number of rules in a
+  - A rule penalty feature which penalize by the number of rules in a
     derivation.
   - In addition, there exist features already defined for each
     hierarchical phrase pair. For example, see `samples/scfg/grammar.bz2`.
@@ -113,10 +113,10 @@ Descriptions
 Basically, we have four distinct structures:
 
 - lattice: a representation of graph implemented as a
-  two-dimentional array (see `doc/lattice.rst`).
+  two-dimensional array (see `doc/lattice.rst`).
 - grammar: a collection of WFST implemented as a trie structure
   (see `doc/grammar.rst`).
-- tree-grammar: a collectin of WFSTT (tree-transducer) implemented
+- tree-grammar: a collection of WFSTT (tree-transducer) implemented
   as a (nested) trie structure (see `doc/tree-grammar.rst`).
 - hypergraph: a compact representation of set of trees (or forest)
   (see `doc/hypergraph.rst`).
@@ -138,7 +138,7 @@ Alignment can be carried out by:
 
 - A lattice is composed with dictionary, generating alignment
   hypergraph, or
-- A hypergraph is composed with dictinary, generating alignment
+- A hypergraph is composed with dictionary, generating alignment
   hypergraph [20]_.
 - In order to support word alignment training, we can learn
   Model1/HMM/Model4 by symmetized learning [22]_ or
@@ -159,13 +159,13 @@ Dependency parsing can be carried out by:
   which generates derivation hypergraph.
 - Forests are rescored by dependency features (TODO).
   We support dependency projection [32]_ with Model1/HMM posterior
-  probabilies so that we can train arbitrary dependency parses
+  probabilities so that we can train arbitrary dependency parses
   after projections.
 
 After the hypergraph generation, you can:
 
 - Additional features are evaluated to generate another hypergraph [4]_.
-  cicada implementes cube-pruning [4]_, cube-growing [4]_,
+  cicada implements cube-pruning [4]_, cube-growing [4]_,
   incremental [18]_ and exact (and stateless-inside-algorithm)
   methods.
 
@@ -180,7 +180,7 @@ After the hypergraph generation, you can:
 
 Or, you can combine outputs from multiple systems by [29]_:
 
-- Perform parsing over nbests (use your favorite parser, such as
+- Perform parsing over n-bests (use your favorite parser, such as
   Berkeley parser/Stanford parser etc.)
 - Generate context-free confusion forest by combining trees (not confusion network!)
   It is performed by collecting rules from parse trees, and
@@ -197,16 +197,16 @@ Monolingual grammar learning is implemented:
 
 - A simple PCFG by simply extracting rules.
 - Learn latent annotated PCFG by split/merge process with an EM
-  algorihtm [25]_.
+  algorithm [25]_.
 - Also, learn coarse grammars from the latent annotated PCFG for
   coarse-to-fine parsing [26]_.
 
-Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
+Phrase/synchronous-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
 
 - A conventional phrase extract algorithm in Moses.
 - A conventional hierarchical phrase extraction algorithm in Hiero
   with or without syntax augmentation [15]_.
-- Tree-to-string/strint-to-tree extractin from forest [16]_ [27]_.
+- Tree-to-string/string-to-tree extraction from forest [16]_ [27]_.
 - Tree-to-tree rule extraction from forest [17]_ (experimental).
 - max-scope constraints to limit the grammar size [34]_.
 - After count extraction, you can perform map/reduce to compute

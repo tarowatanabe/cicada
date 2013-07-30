@@ -12,7 +12,7 @@ Preprocessing
 
 In this example, the Japanese data in `samples/kftt.30k/data/{train,tune,dev}.ja`
 are segmented by Mecab (https://code.google.com/p/mecab/). Their
-English parts are tokenized by a tokenizer in Moses (http://statmt.org/moses/)
+English parts are tokenized by the tokenizer in Moses (http://statmt.org/moses/)
 with additional postprocessing to match the Penntreebank standard.
 
 Word alignment
@@ -35,8 +35,8 @@ can perform word alignment without relying on other tools.
 In this example, by default, we run 5 of IBM Model 1, 5 of HMM, 5 of
 IBM Model 4 exploiting 4 threads (**--threads 4**). During the training,
 posteriors are constrained (**--posterior**) so that bilingual words
-are symmetized (**--symmetric**), and the parameters are smoothe by
-a naive variational Bayes estiamte (**--variational**). By default,
+are symmetized (**--symmetric**), and the parameters are smoothed by
+a naive variational Bayes estimate (**--variational**). By default,
 the word alignment data is found at `samples/kftt.30k/aignment/model/aligned.posterior-itg`
 which is word alignment constrained by ITG. For details, see
 `doc/alignment.rst`.
@@ -71,7 +71,7 @@ Extraction
 In this example, the SCFG model (**--scfg**) is output at the current
 directory (**--model-dir .**), and lexicon model is also estimated
 with a naive variational Bayes estimate (**--lexicon-variational**).
-The rules are exhaustively extracted (**--exhaustive**) by usign all
+The rules are exhaustively extracted (**--exhaustive**) by using all
 the phrase pairs as holes. Extracted counts are stored at
 `samples/kftt.30k/scfg/model/scfg-counts`.
 Since we exploited 4 threads (**--threads 4**), 4 model files
@@ -123,7 +123,7 @@ toolkit available from http://www2.nict.go.jp/univ-com/multi_trans/expgram.
     --output ngram.5.en.lm \
     --shard 4
 
-Here, we use 4 threads to estimate an ngrma language model by, first,
+Here, we use 4 threads to estimate an ngram language model by, first,
 collecting counts (**expgram_counts_extract**), then, by estimating
 the model (**expgram_counts_estimate**). An alternative is to use a
 script included in the expgram:
@@ -178,13 +178,13 @@ Reference translations
 ``````````````````````
 
 During tuning, we need reference translations a set of high quality
-translations for each input sentence. In cicada, multiple refernce
+translations for each input sentence. In cicada, multiple reference
 translations are summarized in a single file as follows:
 
 ::
 
    0 ||| first reference
-   0 ||| second refernece
+   0 ||| second reference
    1 ||| first reference for the second input
    1 ||| second reference for the second input
 
@@ -200,7 +200,7 @@ the file from multiple translations:
 Tune parameters
 ```````````````
 
-Now, we are ready to perfom tuning:
+Now, we are ready to perform tuning:
 
 .. code:: bash
 
@@ -214,8 +214,8 @@ Now, we are ready to perfom tuning:
 
 We use `tune.ja` as a source set (**--srcset**) and `tune.en.ref` as
 its reference translations (**--refset**) with `cicada.config` as a
-configuratin template (**--config**). The training is performed by
-k-best merging batch style learning with 1,000 best transaltions
+configuration template (**--config**). The training is performed by
+k-best merging batch style learning with 1,000 best translations
 generated in each round (**--kbest**). By default, training objective
 is xBLEU, which is superior to other objectives, like pair-wise
 ranking (PRO) or direct error minimization (MERT).
@@ -227,8 +227,12 @@ files ``learn.<iteration>.*``. The tuned parameters have suffix of
 Testing
 -------
 
-After tuning, we can perform actual translation for test data. First,
-we will generate a configuration file from the template:
+After tuning, we can perform actual translation for test data.
+
+Configuration
+`````````````
+
+First, we will generate a configuration file from the template:
 
 .. code:: bash
 
@@ -241,7 +245,7 @@ we will generate a configuration file from the template:
     --file "file=-"
 
 In this example, we use exactly the same template employed for tuning
-(**--input**), and use the parameters learned after the last iteartion
+(**--input**), and use the parameters learned after the last iteration
 (**--weights**). The single-best (**--kbest 1**) is output to stdout
 (**--file**).
 
@@ -256,8 +260,8 @@ Then, we translate the development data `dev.ja` and output as `dev.ja-en`:
 	  --config cicada.config \
 	  --threads 4  < ../../data/dev.ja > dev.ja-en
 
-Evalluation
-```````````
+Evaluation
+``````````
 
 Finally, we will evaluate the translation:
 

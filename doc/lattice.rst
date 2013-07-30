@@ -26,18 +26,18 @@ point "." is included, or not.
 
 Each arc consists of label, features and distance field with optional
 attributes. We allow arcs with ``<epsilon>`` label which allows us to
-directly handle abitrary confusion nework.
+directly handle arbitrary confusion network.
 In JLF, we can easily add extra features encoded in the lattice, such as
 
 .. code:: json
 
-  {"lattice-cost": 0.5, "accoustic": -5000.9}
+  {"lattice-cost": 0.5, "acoustic": -5000.9}
 
 Remark, the costs are interpreted as logarithmic value so that we can
 compute score by "weight \cdot feature-function".
 The optional attributes is a list of key-value pair of JSON string and
 attribute value.
-The attribute value can take either 64bit integer, floaring point
+The attribute value can take either 64bit integer, floating point
 value (double precision) or JSON string.
 
 PLF Format
@@ -93,5 +93,5 @@ Tools
 `cicada_unite_sentence`
 
   Merge multiple sentences into one confusion-network via TER alignment.
-  Support incrementat merging by confusion-network-TER. (`--merge` flag)
-  TER-conputation by lower-cased word (`--lower` flag)
+  Support incremental merging by confusion-network-TER. (`--merge` flag)
+  TER-computation by lower-cased word (`--lower` flag)
