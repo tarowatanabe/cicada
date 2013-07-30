@@ -9,6 +9,7 @@ EXTRA_DIST = \
 BUILD.rst \
 COPYING.GPL \
 COPYING.LGPL \
+FAQ \
 LICENSE \
 NEWS.rst \
 README.rst \

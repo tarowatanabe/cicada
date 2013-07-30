@@ -2,16 +2,19 @@
  cicada
 ========
 
-A statistical machine translation toolkit based on a semiring parsing
-framework [1]_. Based on the generic framework, we can
+`cicada` is a statistical machine translation toolkit based on a
+semiring parsing framework [1]_. Based on the generic framework, we
+can
 
-- Learn model(s): tree-to-string, string-to-tree, string-to-string
-  (with or without latent tree), word alignment, grammar for parsing.
-- Translate sentence, lattice and/or parsed tree.
+- Learn model(s): tree-to-string, string-to-tree, string-to-string,
+  tree-to-tree grammars/models, word alignment models, parsing
+  grammar/models.
+- Translate sentence, lattice and/or parsed tree using
+  {string,tree}-to-{string,tree} models.
 - Align between {hypergraph,lattice}-to-lattice (currently, we assume
   penn-treebank style hypergraph and sentence-like lattice).
 - Align bilingual sentences using symmetized IBM Model1/HMM/IBM Model4.
-- (dependency) parse lattices (or sentences).
+- (dependency) parse lattices (or sentences) (However, under the state of the art).
 - Analyze forest/tree/lattice.
 
 The cicada toolkit is mainly developed by
@@ -87,7 +90,7 @@ This sample means:
   - In addition, there exist features already defined for each
     hierarchical phrase pair. For example, see `samples/scfg/grammar.bz2`.
 
-- Actual operation:
+- Actual operation(s):
 
   1. Input is composed by CKY algorithm (compose-cky) which result
      in a hypergraph.
@@ -213,33 +216,31 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
 
 Various learning components are implemented:
 
-- Large feature set from input lattice/hypergraph on large training
-  data via MaxEnt (optimized by LBFGS) [3]_
-- Large/small featuer set from kbests on large/small traning data
-  via MaxEnt (LBFGS)/liblinear [30]_
-- Large feature set on small devset with MIRA [6]_ [7]_, but with
-  hypergraph
-- Small feature set on small devset learned by hypergraph-MERT [8]_
-- Small/large feature set on small devset learned by
-  hypergraph-MaxEnt (optimized by LBFGS or SGD) + softmax-margin [9]_
-- Small/large feature set learned by iteratively construncting
-  training samples with rank-learning.
+- k-best merging batch learning
 
-  * optimization by LBFGS/liblinear etc. (similar to [33]_, but differ in kbest handling).
-  * larger batching with optimized updates [37]_.
-  * We have a script-based implementation + single-binary implementation for efficiency
+  * MERT on hypergraphs or sentences [8]_
+  * batch algorithms (L-BFGS, SMO, liblinear [30]_) with various
+    objectives, including ranking (AKA PRO) [33]_, softmax,
+    softmax-margin [9]_, margin, hinge or xBLEU [35]_.
+  * online algorithms (SGD, PA) with various objectives, including
+    margin (AKA MIRA) [6]_ [7]_, hinge, ranking or softmax.
 
-- xBLEU objective learned either by L-BFGS or SGD, which directly
-  maximize expected-BLEU (not BLEU expectaiton) [35]_.
-  Now, this is a recommended optimization method (either kbest or hypergraph learning)
-- We support feature selection by kbest-feature merging [36]_
-- Asynchronous online learning employed in [6]_.
+- online learning
+
+  * mini-batch style synchronous learning with various objectives,
+    including hinge, ranking, softmax or xBLEU [37]_.
+  * When synchronously merging parameters, we can select features by
+    kbest-feature merging [36]_.
+  * mini-batch style asynchronous learning with various objectives,
+    including hinge, ranking, softmax or xBLEU [6]_.
 
 Feature functions:
 
--  The ngram language model feature supports both of
-   `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
-   `kenlm <http://kheafield.com/code/kenlm/>`_ [40]_.
+- The ngram language model feature supports both of
+  `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
+  `kenlm <http://kheafield.com/code/kenlm/>`_ [40]_.
+- Sparse features, including rule-identity, source/target ngrams, and
+  word pairs.
 
 References
 ----------
