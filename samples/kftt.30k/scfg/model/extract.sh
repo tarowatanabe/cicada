@@ -7,7 +7,6 @@ exec $cicada/scripts/cicada-extract.py \
 	--e ../../data/train.en.bz2 \
 	--a ../../alignment/model/aligned.posterior-itg \
 	\
-	--root-dir . \
 	--model-dir . \
 	\
 	--lexicon-variational \
@@ -15,6 +14,5 @@ exec $cicada/scripts/cicada-extract.py \
 	--scfg \
 	--exhaustive \
 	\
-	--threads 4 \
-	--max-malloc 32
+	--threads 4
 

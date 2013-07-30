@@ -10,7 +10,7 @@ fi
 
 ### generate config file
 
-$cicada/progs/cicada_filter_config\
+$cicada/progs/cicada_filter_config \
   --input ../tune/cicada.config \
   --output cicada.config \
   --weights "weights=$weights" \

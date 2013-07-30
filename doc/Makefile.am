@@ -26,4 +26,5 @@ parameter.rst \
 parsing.rst \
 pyp.rst \
 training.rst \
+training-stsg.rst \
 tree-grammar.rst

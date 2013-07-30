@@ -64,8 +64,7 @@ shell's newline).
       --feature-function rule-penalty \
       --operation compose-cky \
       --operation apply:prune=true,size=100,weights=samples/scfg/weights \
-      --operation output:file=-,kbest=10,weights=samples/scfg/weights \
-      --debug
+      --operation output:file=-,kbest=10,weights=samples/scfg/weights
 
 This sample means:
 

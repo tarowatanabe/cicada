@@ -3,7 +3,6 @@
 cicada=../../../..
 
 exec $cicada/scripts/cicada-index.py \
-	--root-dir . \
 	--model-dir . \
 	\
 	--scfg \
