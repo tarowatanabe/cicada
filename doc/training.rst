@@ -33,10 +33,10 @@ can perform word alignment without relying on other tools.
 	--threads 4
 
 In this example, by default, we run 5 of IBM Model 1, 5 of HMM, 5 of
-IBM Model 4 exploiting 4 threads (**--threads 4**). During the training,
-posteriors are constrained (**--posterior**) so that bilingual words
-are symmetized (**--symmetric**), and the parameters are smoothed by
-a naive variational Bayes estimate (**--variational**). By default,
+IBM Model 4 exploiting 4 threads (``--threads 4``). During the training,
+posteriors are constrained (``--posterior``) so that bilingual words
+are symmetized (``--symmetric``), and the parameters are smoothed by
+a naive variational Bayes estimate (``--variational``). By default,
 the word alignment data is found at `samples/kftt.30k/aignment/model/aligned.posterior-itg`
 which is word alignment constrained by ITG. For details, see
 `doc/alignment.rst`.
@@ -68,13 +68,13 @@ Extraction
 	--exhaustive \
 	--threads 4
 
-In this example, the SCFG model (**--scfg**) is output at the current
-directory (**--model-dir .**), and lexicon model is also estimated
-with a naive variational Bayes estimate (**--lexicon-variational**).
-The rules are exhaustively extracted (**--exhaustive**) by using all
+In this example, the SCFG model (``--scfg``) is output at the current
+directory (``--model-dir .``), and lexicon model is also estimated
+with a naive variational Bayes estimate (``--lexicon-variational``).
+The rules are exhaustively extracted (``--exhaustive``) by using all
 the phrase pairs as holes. Extracted counts are stored at
 `samples/kftt.30k/scfg/model/scfg-counts`.
-Since we exploited 4 threads (**--threads 4**), 4 model files
+Since we exploited 4 threads (``--threads 4``), 4 model files
 ``[0-3].gz`` are created at `samples/kftt.30k/scfg/model/scfg-score`.
 For details, see `doc/extract.rst`.
 
@@ -95,11 +95,11 @@ contain only count information, and should be interpreted as features.
 
 This is an example to generate 4 models ``[0-3].gz`` and corresponding
 indexed binary models ``[0-3].bin`` at `samples/kftt.30k/scfg/model/scfg-index`
-using 4 threads (**--threads 4**). We exclude synchronous rules which
+using 4 threads (``--threads 4``). We exclude synchronous rules which
 are less significant measured by Fisher's exact test, but preserves rare
-rules (**--sigtest-inclusive**). By default, we use 2 features, which
+rules (``--sigtest-inclusive``). By default, we use 2 features, which
 are :math:`\log p(source | target)` and :math:`\log p(target | source)`
-estimated by the relative frequencies. **--feature-lexicon** option
+estimated by the relative frequencies. ``--feature-lexicon`` option
 includes lexical weight features in two directions.
 
 Language Model
@@ -124,8 +124,8 @@ toolkit available from http://www2.nict.go.jp/univ-com/multi_trans/expgram.
     --shard 4
 
 Here, we use 4 threads to estimate an ngram language model by, first,
-collecting counts (**expgram_counts_extract**), then, by estimating
-the model (**expgram_counts_estimate**). An alternative is to use a
+collecting counts (``expgram_counts_extract``), then, by estimating
+the model (``expgram_counts_estimate``). An alternative is to use a
 script included in the expgram:
 
 .. code:: bash
@@ -161,12 +161,12 @@ First, we need to create a configuration file to run decoder.
 	--beam 200 > cicada.config
 
 In this example, we use the grammar in `..model/scfg-index` with
-maximum span set to 15 (**--max-span 15**). As glue rules, we employ
-monotone rule (**--straight**) and use insertion grammar to copy the
-input string into output string (**--insertion**). We use additional
-ngram language model feature (**--feature-ngram**) in the
-model. Translation is carried out by SCFG decoding (**--scfg**) with
-beam size of 200 (**--beam 200**) for cube pruning.
+maximum span set to 15 (``--max-span 15``). As glue rules, we employ
+monotone rule (``--straight``) and use insertion grammar to copy the
+input string into output string (``--insertion``). We use additional
+ngram language model feature (``--feature-ngram``) in the
+model. Translation is carried out by SCFG decoding (``--scfg``) with
+beam size of 200 (``--beam 200``) for cube pruning.
 
 The configuration file consists of 3 parts, grammars, features and
 operations. For details, see `doc/grammar.rst`, `doc/features.rst` and
@@ -212,11 +212,11 @@ Now, we are ready to perform tuning:
 	--kbest 1000 \
 	--threads 4
 
-We use `tune.ja` as a source set (**--srcset**) and `tune.en.ref` as
-its reference translations (**--refset**) with `cicada.config` as a
-configuration template (**--config**). The training is performed by
+We use `tune.ja` as a source set (``--srcset``) and `tune.en.ref` as
+its reference translations (``--refset``) with `cicada.config` as a
+configuration template (``--config``). The training is performed by
 k-best merging batch style learning with 1,000 best translations
-generated in each round (**--kbest**). By default, training objective
+generated in each round (``--kbest``). By default, training objective
 is xBLEU, which is superior to other objectives, like pair-wise
 ranking (PRO) or direct error minimization (MERT).
 
@@ -245,9 +245,9 @@ First, we will generate a configuration file from the template:
     --file "file=-"
 
 In this example, we use exactly the same template employed for tuning
-(**--input**), and use the parameters learned after the last iteration
-(**--weights**). The single-best (**--kbest 1**) is output to stdout
-(**--file**).
+(``--input``), and use the parameters learned after the last iteration
+(``--weights``). The single-best (``--kbest 1``) is output to stdout
+(``--file``).
 
 Decoding
 ````````

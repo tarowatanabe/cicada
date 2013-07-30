@@ -103,9 +103,13 @@ This sample means:
 In depth
 ````````
 
-In order to train a model, see `doc/training.rst` which describes how
-to create your own {tree,string}-to-{tree,string} models, tune
-parameters, and run decoder.
+The above example can be found at `samples/scfg/sample.sh`. If you
+want to try tree-to-string or string-to-tree models, see
+`samples/t2s/sample.sh` and `samples/s2t/sample.sh`.
+In order to train a model, see `doc/training.rst` and
+`doc/training-stsg.rst` which describe how to create your own
+{tree,string}-to-{tree,string} models, tune parameters, and run
+decoder.
 
 Descriptions
 ------------

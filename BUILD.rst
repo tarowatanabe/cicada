@@ -49,7 +49,7 @@ Requirements
 
 - expgram: http://www2.nict.go.jp/univ-com/multi_trans/expgram
 
-  This is our ngram toolkit for ngram langauge model training/indexing.
+  This is our ngram toolkit for ngram language model training/indexing.
   Although we support `kenlm` which can estimate ngram language model
   and perform indexing, expgram is smaller and performs better rest-cost
   estimation for CKY-style decoding, but at the cost of slower speed.

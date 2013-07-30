@@ -1,5 +1,5 @@
-Traiing Sample
-==============
+Training Sample
+===============
 
 The sample data comes from the 30K sentences from Kyoto Free
 Translation Task (http://www.phontron.com/kftt/), which was derived
@@ -11,4 +11,6 @@ segmented by Mecab (https://code.google.com/p/mecab/).
 Then, training data with more than 30 words are removed, and took only
 the first 30k sentences.
 
+The scripts in the subdirectories are described in
+`doc/training.rst` and `doc/traiing-stsg.rst`.
 
