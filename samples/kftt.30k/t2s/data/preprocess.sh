@@ -31,18 +31,17 @@ for data in train dev tune; do
   # cicada_fiter_dependency to generate the dependency in hypergraph
   # cicada to binarize the forest via CYK-binarization
   $cat | \
-  gawk '{for (i=1;i<=NF;++i) {printf "%s\t*\n", $i } print "EOS";}' | \
+  awk '{for (i=1;i<=NF;++i) {printf "%s\t*\n", $i } print "EOS";}' | \
   $mecab -p | \
   $cabocha -f1 -I 1 | \
   $cicada/progs/cicada_filter_dependency \
-	--input ../../data/$data.parsed.ja \
 	--cabocha \
 	--func \
 	--forest \
 	--head | \
   $cicada/progs/cicada \
 	--input-forest \
-	--threads 8 \
+	--threads 4 \
 	--operation binarize:direction=cyk,order=1 \
 	--operation output:no-id=true,file=$data.forest.ja.gz
 done

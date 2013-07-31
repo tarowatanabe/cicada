@@ -39,6 +39,7 @@ file-name: indexed tree grammar or plain text tree grammar\n\
 \tattribute1=[attribute-name]\n\
 \t...\n\
 fallback: fallback source-to-target, tree-to-string transfer rule\n\
+\tgoal=[default goal label] target side goal\n\
 \tnon-terminal=[defaut non-terminal] target side non-terminal\n\
 ";
     return desc;
@@ -71,18 +72,28 @@ fallback: fallback source-to-target, tree-to-string transfer rule\n\
     const parameter_type param(parameter);
     
     if (utils::ipiece(param.name()) == "fallback") {
+      symbol_type goal;
       symbol_type non_terminal;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "non-terminal")
+	if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "non-terminal")
 	  non_terminal = piter->second;
 	else
 	  throw std::runtime_error("unsupported parameter for fallback grammar: " + piter->first + "=" + piter->second);
       }
       
+      if (! goal.empty() && ! goal.is_non_terminal())
+	throw std::runtime_error("invalid goal for fallback grammar: " + static_cast<const std::string&>(goal));
+      
       if (! non_terminal.empty() && ! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal for fallback grammar: " + static_cast<const std::string&>(non_terminal));
-      
-      return transducer_ptr_type(new TreeGrammarFallback(non_terminal));
+
+      if (! goal.empty() || ! non_terminal.empty())
+	if (goal.empty() || non_terminal.empty())
+	  throw std::runtime_error("fallback grammar should specify both of goal and non-terminal (or nothing)");
+	
+      return transducer_ptr_type(new TreeGrammarFallback(goal, non_terminal));
     } else {
 #ifdef HAVE_TLS
       if (! __tree_transducers_tls) {

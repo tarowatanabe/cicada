@@ -32,22 +32,23 @@ can perform word alignment without relying on other tools.
 	--posterior \
 	--threads 4
 
-In this example, by default, we run 5 of IBM Model 1, 5 of HMM, 5 of
-IBM Model 4 exploiting 4 threads (``--threads 4``). During the training,
-posteriors are constrained (``--posterior``) so that bilingual words
-are symmetized (``--symmetric``), and the parameters are smoothed by
-a naive variational Bayes estimate (``--variational``). By default,
-the word alignment data is found at `samples/kftt.30k/aignment/model/aligned.posterior-itg`
-which is word alignment constrained by ITG. For details, see
-`doc/alignment.rst`.
+In this Japanese-to-English alignment example, by default, we run 5 of
+IBM Model 1, 5 of HMM, 5 of IBM Model 4 exploiting 4 threads
+(``--threads 4``). During the training, posteriors are constrained
+(``--posterior``) so that bilingual words are symmetized
+(``--symmetric``), and the parameters are smoothed by a naive
+variational Bayes estimate (``--variational``). By default, the word
+alignment data is found at `samples/kftt.30k/aignment/model/aligned.posterior-itg`
+which is word alignment constrained by ITG. For details, see `doc/alignment.rst`.
 
 Translation Model
 -----------------
 
 The second step of training is an estimation of translation model. In
 this example, we will construct a synchronous-CFG, SCFG, also known as
-Hiero grammar. If you want to train other models, such as
-tree-to-string or string-to-tree models, see `doc/training-stsg.rst`.
+Hiero grammar for Japanese-to-English translation. If you want to
+train other models, such as tree-to-string or string-to-tree models,
+see `doc/training-stsg.rst`.
 
 The training model is constructed in two steps, firstly, collecting
 synchronous rules, secondly, estimating features for each synchronous
@@ -101,6 +102,7 @@ rules (``--sigtest-inclusive``). By default, we use 2 features, which
 are :math:`\log p(source | target)` and :math:`\log p(target | source)`
 estimated by the relative frequencies. ``--feature-lexicon`` option
 includes lexical weight features in two directions.
+See `doc/indexing.rst` for details.
 
 Language Model
 --------------
@@ -222,7 +224,8 @@ ranking (PRO) or direct error minimization (MERT).
 
 By default, training is performed 10 iterations, and generates several
 files ``learn.<iteration>.*``. The tuned parameters have suffix of
-``.weights``.
+``.weights``. The details of the tuning algorithms is described at
+`doc/learning.rst`.
 
 Testing
 -------

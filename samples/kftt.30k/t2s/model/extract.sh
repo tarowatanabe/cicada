@@ -8,7 +8,6 @@ exec $cicada/scripts/cicada-extract.py \
 	--a ../../alignment/model/aligned.posterior-itg \
 	--ff ../data/train.forest.ja.gz \
 	\
-	--root-dir . \
 	--model-dir . \
 	\
 	--lexicon-variational \
@@ -16,6 +15,5 @@ exec $cicada/scripts/cicada-extract.py \
 	--ghkm \
 	--constrained \
 	\
-	--threads 4 \
-	--max-malloc 16
+	--threads 4 
 

@@ -47,8 +47,8 @@ namespace cicada
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
   public:
 
-    TreeGrammarFallback(const symbol_type& __non_terminal)
-      : non_terminal(__non_terminal),
+    TreeGrammarFallback(const symbol_type& __goal, const symbol_type& __non_terminal)
+      : goal(__goal), non_terminal(__non_terminal),
 	feat_penalty("tree-insertion-penalty"),
 	feat_terminal_penalty("tree-insertion-terminal-penalty")
     {
@@ -56,11 +56,17 @@ namespace cicada
       features_terminal[feat_terminal_penalty] = -1.0;
       features_terminal[feat_penalty] = -1.0;
       
-      attributes["insertion"] = attribute_set_type::int_type(1);
+      attributes["tree-fallback"] = attribute_set_type::int_type(1);
+      attributes_terminal["tree-fallback"] = attribute_set_type::int_type(1);
+      attributes_terminal["insertion"]     = attribute_set_type::int_type(1);
+
+      if (! goal.empty() || ! non_terminal.empty())
+	if (goal.empty() || non_terminal.empty())
+	  throw std::runtime_error("You should specify both of goal and non-terminal or none");
     }
     
     TreeGrammarFallback()
-      : non_terminal(),
+      : goal(), non_terminal(),
 	feat_penalty("tree-insertion-penalty"),
 	feat_terminal_penalty("tree-insertion-terminal-penalty")
     {
@@ -68,7 +74,9 @@ namespace cicada
       features_terminal[feat_terminal_penalty] = -1.0;
       features_terminal[feat_penalty] = -1.0;
       
-      attributes["insertion"] = attribute_set_type::int_type(1);
+      attributes["tree-fallback"] = attribute_set_type::int_type(1);
+      attributes_terminal["tree-fallback"] = attribute_set_type::int_type(1);
+      attributes_terminal["insertion"]     = attribute_set_type::int_type(1);
     }
     
     transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarFallback(*this)); }
@@ -78,11 +86,11 @@ namespace cicada
       if (non_terminal.empty())
 	__assign(graph);
       else
-	__assign(graph, non_terminal);
+	__assign(graph, goal, non_terminal);
     }
     
   private:
-    void __assign(const hypergraph_type& graph, const symbol_type& non_terminal)
+    void __assign(const hypergraph_type& graph, const symbol_type& goal, const symbol_type& non_terminal)
     {
       rules.clear();
       clear();
@@ -100,16 +108,18 @@ namespace cicada
 	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(riter->non_terminal_index()) : *riter);
 	  num_terminal += (! riter->is_non_terminal());
 	}
+
+	const symbol_type lhs(edge.head == graph.goal ? goal : non_terminal);
 	
 	rule_ptr_type rule_source(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
-	rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, non_terminals.begin(), non_terminals.end())));
+	rule_ptr_type rule_target(rule_type::create(rule_type(lhs, non_terminals.begin(), non_terminals.end())));
 	
 	if (num_terminal) {
 	  features_terminal[feat_terminal_penalty] = - num_terminal;
 	  
-	  insert(rule_pair_type(rule_source, rule_target, features_terminal, attributes));
+	  insert(rule_pair_type(rule_source, rule_target, features_terminal, attributes_terminal));
 	} else
-	  insert(rule_pair_type(rule_source, rule_target, features));
+	  insert(rule_pair_type(rule_source, rule_target, features, attributes));
       }
     }
     
@@ -135,13 +145,14 @@ namespace cicada
 	if (num_terminal) {
 	  features_terminal[feat_terminal_penalty] = - num_terminal;
 	  
-	  insert(rule_pair_type(rule, rule, features_terminal, attributes));
+	  insert(rule_pair_type(rule, rule, features_terminal, attributes_terminal));
 	} else
-	  insert(rule_pair_type(rule, rule, features));
+	  insert(rule_pair_type(rule, rule, features, attributes));
       }
     }
     
   private:
+    symbol_type goal;
     symbol_type non_terminal;
     
     feature_type feat_penalty;
@@ -151,6 +162,7 @@ namespace cicada
     feature_set_type        features;
     feature_set_type        features_terminal;
     attribute_set_type      attributes;
+    attribute_set_type      attributes_terminal;
     non_terminal_set_type   non_terminals;
   };
   

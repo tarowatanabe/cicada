@@ -220,13 +220,13 @@ if __name__ == '__main__':
 
     if options.fallback:
         print "# fallback grammar with glue non-terminal for tree-to-{string,tree}"
-        print "# tree-grammar = fallback:non-terminal=%s" %(options.glue)
+        print "# tree-grammar = fallback:goal=%s, non-terminal=%s" %(options.goal, options.glue)
         print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
         print "tree-grammar = fallback"
         print
     elif options.fallback_glue:
         print "# fallback grammar with glue non-terminal for tree-to-{string,tree}"
-        print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
+        print "tree-grammar = fallback:goal=%s, non-terminal=%s" %(options.goal, options.glue)
         print "# or, use this fallback grammar which will not replace source-side non-terminals with %s" %(options.glue)
         print "# tree-grammar = fallback"
         print

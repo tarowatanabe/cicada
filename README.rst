@@ -11,10 +11,10 @@ can
   grammar/models.
 - Translate sentence, lattice and/or parsed tree using
   {string,tree}-to-{string,tree} models.
-- Align between {hypergraph,lattice}-to-lattice (currently, we assume
+- Align {hypergraph,lattice}-to-lattice (currently, we assume
   penn-treebank style hypergraph and sentence-like lattice).
 - Align bilingual sentences using symmetized IBM Model1/HMM/IBM Model4.
-- (dependency) parse lattices (or sentences) (However, under the state of the art).
+- (dependency) parse lattices (or sentences)
 - Analyze forest/tree/lattice.
 
 The cicada toolkit is mainly developed by
@@ -103,8 +103,10 @@ This sample means:
 In depth
 ````````
 
-The above example can be found at `samples/scfg/sample.sh`. If you
-want to try tree-to-string or string-to-tree models, see
+The above example can be found at `samples/scfg/sample.sh`. The
+details of grammars, features and operations are described in
+`doc/grammar.rst`, `doc/features.rst` and `doc/operation.rst`, respectively.
+If you want to try tree-to-string or string-to-tree models, see
 `samples/t2s/sample.sh` and `samples/s2t/sample.sh`.
 In order to train a model, see `doc/training.rst` and
 `doc/training-stsg.rst` which describe how to create your own
