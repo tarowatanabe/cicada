@@ -94,8 +94,8 @@ should be reinterpreted as features as follows:
 
 Here, we encode additional features, ``--feature-lexicon`` for lexical
 weights, ``--feature-root`` for the generative probabilities,
-:math:`\log p(source | root-of-elementary-tree)` and
-:math:`\log p(target | root-of-elementary-tree)`.
+:math:`\log p(source | root(source))` and
+:math:`\log p(target | root(target))`.
 Also, the number of internal nodes and the height of elementary tree
 is used as features (``--feature-internal`` and ``--feature-height``).
 See `doc/indexing.rst` for details.
@@ -106,7 +106,7 @@ Tuning and testing
 During tuning, we use parse forest in hypergraph format as a source
 set, which is preprocessed in the similar way as the source side of
 the training data. Another difference is the configuration file in
-which we use ``--ghkm`` flag:
+which we use ``--tree`` flag:
 
 .. code:: bash
 
@@ -117,7 +117,7 @@ which we use ``--ghkm`` flag:
 	--glue '[x]' \
 	--fallback-glue \
 	--feature-ngram ../../ngram/ngram.5.en.lm \
-	--ghkm \
+	--tree \
 	--beam 1024 > cicada.config
 
 Since the target side is "string", ``[x]`` is the only symbol used in
@@ -250,10 +250,10 @@ which can handle OOVs.
 Tree-to-tree Model
 ------------------
 
-
-
-Preprocessing
-`````````````
+An easy extension to the tree-to-string model is to incorporate target
+side syntax into the synchronous grammar. In this example, we use the
+Japanese trees from the tree-to-string example and the English trees
+from the string-to-tree example and create a model.
 
 Extraction
 ``````````
@@ -273,8 +273,13 @@ Extraction
 	--constrained \
 	--threads 4
 
+Here, we use the ``--tree`` flag to indicate the tree-to-tree model
+extraction using the source and target syntactic trees (``--ff`` and ``--fe``).
+
 Features
 ````````
+
+The extracted model is interpreted using the tree-to-tree model (``--tree``).
 
 .. code:: bash
 
@@ -291,6 +296,11 @@ Features
 
 Tuning and testing
 ``````````````````
+
+Similar to the tree-to-string model we use the same tree composition
+algorithm (``--tree``) but ``[ROOT]`` as a goal symbol which is the
+syntactic label in the target trees. As a glue rules, we use ``[x]``
+as described in the tree-to-string model.
 
 .. code:: bash
 
