@@ -1,4 +1,6 @@
-Indexer for Phrase/Rule/Tree-fragment
+Indexing for Phrase Pair/Synchronous CFG/Synchronous TSG
+========================================================
+
 
 
 Usage: cicada-index.py [options]

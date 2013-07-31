@@ -3,7 +3,7 @@
 #  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 ### a wrapper script (similar to phrase-extract in moses)
-### we support "lexicon construction" and "phrase/rule extraction" meaning only step 4 through 6
+### we support "lexicon construction" and "phraese/rule extraction" (which corresponds to step 4 through 6 in Moses)
 ### TODO: use argparse for command-lines...?
 
 import threading
@@ -68,8 +68,8 @@ opt_parser = OptionParser(
                 help="alignment methods (default: grow-diag-final-and)"),
     
     # steps
-    make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: %default)"),
-    make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: %default)"),
+    make_option("--first-step", default=1, action="store", type="int", metavar='STEP', help="first step (default: %default)"),
+    make_option("--last-step",  default=3, action="store", type="int", metavar='STEP', help="last step  (default: %default)"),
 
     ## option for lexicon
     make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
@@ -404,14 +404,14 @@ class CICADA:
 		bindirs.append(bindir)
 	
         for binprog in ('cicada_alignment',
-                        ## step 4
+                        ## step 1
                         'cicada_lexicon', 
-                        ## step 5
+                        ## step 2
                         'cicada_extract_phrase', 'cicada_extract_phrase_mpi',
                         'cicada_extract_scfg',   'cicada_extract_scfg_mpi',
                         'cicada_extract_ghkm',   'cicada_extract_ghkm_mpi',
                         'cicada_extract_tree',   'cicada_extract_tree_mpi',
-                        ## step6
+                        ## step3
                         'cicada_extract_score', 'cicada_extract_score_mpi',):
 	    
 	    for bindir in bindirs:
@@ -975,12 +975,12 @@ if __name__ == '__main__':
                       threads=options.threads, mpi=mpi, pbs=pbs,
                       debug=options.debug)
 
-    if options.first_step <= 4 and options.last_step >= 4:
-        print "(4) generate lexical translation table started  @", time.ctime()
+    if options.first_step <= 1 and options.last_step >= 1:
+        print "(1) generate lexical translation table started  @", time.ctime()
         lexicon.run()
-        print "(4) generate lexical translation table finished @", time.ctime()
+        print "(1) generate lexical translation table finished @", time.ctime()
 
-    if options.first_step <= 5 and options.last_step >= 5:
+    if options.first_step <= 2 and options.last_step >= 2:
         extract = None
         if options.phrase:
             extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
@@ -1040,11 +1040,11 @@ if __name__ == '__main__':
         else:
             raise ValueError, "no count type?"
 
-        print "(5) extract phrase table started @", time.ctime()
+        print "(2) extract phrase table started @", time.ctime()
         extract.run()
-        print "(5) extract phrase table finished @", time.ctime()
+        print "(2) extract phrase table finished @", time.ctime()
 
-    if options.first_step <= 6 and options.last_step >= 6:
+    if options.first_step <= 3 and options.last_step >= 3:
         score = ExtractScore(cicada=cicada,
                              counts_dir=options.counts_dir,
                              score_dir=options.score_dir,
@@ -1053,6 +1053,6 @@ if __name__ == '__main__':
                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                              debug=options.debug)
     
-        print "(6) score phrase table started @", time.ctime()
+        print "(3) score phrase table started @", time.ctime()
         score.run()
-        print "(6) score phrase table finished @", time.ctime()
+        print "(3) score phrase table finished @", time.ctime()
