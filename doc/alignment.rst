@@ -1,137 +1,127 @@
 Word alignment
 ==============
 
-You can try `cicada-alignment.py` which performs word alignment training in two directions.
+The cicada toolkit can align words given bilingual data. Basically,
+you can perform word alignment by running the script
+`cicada-alignment.py` with ``--f`` for the source side and ``--e`` for
+the target side.
 
-Currently, we implemented:
+.. code:: bash
 
-cicada_lexicon_dice
-	Dice
+  cicada-alignment.py --f <source data> --e <target data>
 
-cicada_alignment_model1
-	IBM Model1[1] + symmetric learning[2] + posterior constrained learning [3]
-	+ naive variational Bayes
-	+ L0 regularization [5]
-	+ ITG constrained posterior alignment
-	+ MaxMatch posterior alignment (using Hungarian algorithm)
+This will result in four directories and files:
 
-cicada_alignment_hmm
-	HMM Model[2] + symmetric learning[2] + posterior constrained learning [3]
-	+ naive variational Bayes
-	+ L0 regularization [5]
-	+ ITG constrained posteriors
-	+ MaxMatch posteriors (using Hungarian algorithm)
+::
 
-cicada_alignment_model4
-	IBM Model4[1] + symmetric learning[2] + posterior constrained learning [3]
-	+ naive variational Bayes
-	+ L0 regularization [5]
-	+ ITG constrained posteriors
-	+ MaxMatch posteriors (using Hungarian algorithm)
+  corpus/
+      src.vcb.classes     (word classes for the source side)
+      trg.vcb.classes     (word classes for the target side)
+  giza.src-trg/         (parameters for P(source | target))
+      src-trg.A3.final.gz         (Viterbi alignment)
+      src-trg.alignment.final.gz  (alignment model)
+      src-trg.distortion.final.gz (distortion model)
+      src-trg.fertility.final.gz  (fertility model)
+      src-trg.lexicon.final.gz    (lexicon model)
+  giza.trg-src/         (parameters for P(target | source))
+  model/
+      aligned.posterior-itg (word alignment)
+      aligner.sh            (word aligner script)
 
-cicada_lexicon_global{,_mpi}
-	Trigger based global lexicon[4]
+the ``model/aligned.posterior-itg`` is the final alignment for the
+given bilingual data. The aligner script, ``model/aligner.sh`` can be
+used to perform word alignment for held-out test data:
 
-cicada_lexicon
-	Learn lexicon model from word aligned data, primarily used for lexical-probabilities for phrase/rule scoring
-	+ naive variational Bayes
-	+ L0 regularization [5]
+.. code:: bash
 
-cicada_alignment
-	Heuristic word alignment combiner (as in Moses grow-diagl-final-and etc.)
-	+ ITG constrained combiner
-	+ MaxMatch combiner (using Hungarian algorithm)
+  model/aligner.sh \
+	  --source <source test data> \
+	  --target <target test data> \
+	  --viterbi-source-target <alignment for source to target> \
+	  --viterbi-target-source <alignment for target to source> \
+	  --itg
 
-	Posterior word alignment matrix combiner
-  	+ ITG constraint
-	+ MaxMatch (using Hungarian algorithm)	
+which computes ITG constrained word alignment.
 
-cicada_pyp_itg_learn
-    Direct ITG word alignment training (Highly exprerimental)
+Details
+-------
 
-We also support alignment visulization by cicada_filter_alignment:
+The supported alignment models are:
 
-cicada_fiter_alignment 
-	--source <source language file>
-	--target <target langauge file>
+- IBM Model 1 [1]_ (``--iteration-model1 5``)
+- HMM [2]_         (``--iteration-hmm 5``)
+- IBM Model 4 [3]_ (``--iteration-model4 5``)
+
+Two directions are integrated during the learning process either by:
+
+- Native symmetric learning [2]_ (``--symmetric``)
+- Posterior constrained learning [3]_ (``--symmetric`` and ``--posterior``, which are recommended)
+
+The parameters are smoothed by:
+
+- Native variational Bayes estimate (``--variational``, which is recommended)
+- L0 regularization [5]_ (``--l0``, probably better than ``--variational`` but slow.)
+
+After the parameter estimation, we can produce the final word
+alignment by specifying ``--alignment`` option:
+
+- Simple heuristics (``grow-diag-final`` etc.)
+- Produce ITG constrained alignment from posteriors (``posterior-itg``, which is the default parameter)
+- Produce one-to-one alignment using the Hungarian algorithm from
+  posteriors (``posterior-max-match``).
+
+Visualization
+-------------
+
+Word alignment can be visualized by `cicada_filter_alignment`:
+
+.. code:: bash
+
+  cicada_fiter_alignment 
+	--source <source file>
+	--target <target file>
 	--alignment  <alignment file>
 	--alignment2 <secondary alignment file> (optional)
 	--inverse (inverse alignment, optional)
 	--visualize (required for visualization!)
 
-blue point indicates "intersection"
-green point indicates word alignment only in the primary alignment
-yello point indicates word alignment only in the secondary alignment
+where: 
+
+- Blue points indicate intersection.
+- Green points indicate word alignment only in the primary alignment.
+- Yello points indicate word alignment only in the secondary alignment.
 
 
-[1]
-@article{Brown:1993:MSM:972470.972474,
- author = {Brown, Peter F. and Pietra, Vincent J. Della and Pietra, Stephen A. Della and Mercer, Robert L.},
- title = {The mathematics of statistical machine translation: parameter estimation},
- journal = {Comput. Linguist.},
- issue_date = {June 1993},
- volume = {19},
- issue = {2},
- month = {June},
- year = {1993},
- issn = {0891-2017},
- pages = {263--311},
- numpages = {49},
- url = {http://portal.acm.org/citation.cfm?id=972470.972474},
- acmid = {972474},
- publisher = {MIT Press},
- address = {Cambridge, MA, USA},
-} 
+References
+----------
 
-[2]
-@InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
-  author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
-  title     = {Alignment by Agreement},
-  booktitle = {Proceedings of the Human Language Technology Conference of the NAACL, Main Conference},
-  month     = {June},
-  year      = {2006},
-  address   = {New York City, USA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {104--111},
-  url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
-}
+.. [1]	 Peter F. Brown, Vincent J. Della Pietra, Stephen A. Della
+	 Pietra, and Robert L. Mercer. The mathematics of statistical
+	 machine translation: parameter estimation. Comput. Linguist.,
+	 19:263-311, June 1993.
 
-[3]
-@InProceedings{ganchev-gracca-taskar:2008:ACLMain,
-  author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
-  title     = {Better Alignments = Better Translations?},
-  booktitle = {Proceedings of ACL-08: HLT},
-  month     = {June},
-  year      = {2008},
-  address   = {Columbus, Ohio},
-  publisher = {Association for Computational Linguistics},
-  pages     = {986--993},
-  url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
-}
+.. [2]	 Percy Liang, Ben Taskar, and Dan Klein. Alignment by
+	 agreement. In Proceedings of the Human Language Technology
+	 Conference of the NAACL, Main Conference, pages 104-111, New
+	 York City, USA, June 2006. Association for Computational
+	 Linguistics.
 
-[4]
-@InProceedings{mauser-hasan-ney:2009:EMNLP,
-  author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
-  title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
-  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
-  month     = {August},
-  year      = {2009},
-  address   = {Singapore},
-  publisher = {Association for Computational Linguistics},
-  pages     = {210--218},
-  url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
-}
+.. [3]	 Kuzman Ganchev, João V. Graça, and Ben Taskar. Better
+	 alignments = better translations? In Proceedings of ACL-08:
+	 HLT, pages 986-993, Columbus, Ohio, June 2008. Association
+	 for Computational Linguistics.
 
-[5]
-@InProceedings{vaswani-huang-chiang:2012:ACL2012,
-  author    = {Vaswani, Ashish  and  Huang, Liang  and  Chiang, David},
-  title     = {Smaller Alignment Models for Better Translations: Unsupervised Word Alignment with the l0-norm},
-  booktitle = {Proceedings of the 50th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
-  month     = {July},
-  year      = {2012},
-  address   = {Jeju Island, Korea},
-  publisher = {Association for Computational Linguistics},
-  pages     = {311--319},
-  url       = {http://www.aclweb.org/anthology/P12-1033}
-}
+.. [4]	 Arne Mauser, Saša Hasan, and Hermann Ney. Extending
+	 statistical machine translation with discriminative and
+	 trigger-based lexicon models. In Proceedings of the 2009
+	 Conference on Empirical Methods in Natural Language
+	 Processing, pages 210-218, Singapore,
+	 August 2009. Association for Computational Linguistics.
+
+.. [5]	 Ashish Vaswani, Liang Huang, and David Chiang. Smaller
+	 alignment models for better translations: Unsupervised word
+	 alignment with the l0-norm. In Proceedings of the 50th Annual
+	 Meeting of the Association for Computational Linguistics
+	 (Volume 1: Long Papers), pages 311-319, Jeju Island, Korea,
+	 July 2012. Association for Computational Linguistics.
 

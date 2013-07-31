@@ -7,13 +7,18 @@ a tool to learn word alignment for bilingual data
 -------------------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
-:Date:   2013-2-28
+:Date:   2013-7-31
 :Manual section: 1
 
 SYNOPSIS
 --------
 
 **cicada-alignment.py** [*options*]
+
+DESCRIPTION
+-----------
+
+
 
 OPTIONS
 -------
@@ -37,7 +42,7 @@ OPTIONS
   --fe=FILE-OR-SUFFIX   target (or 'English') forest file or suffix
   --corpus=CORPUS       bilingual trainging corpus prefix
   --alignment=ALIGNMENT
-                        alignment methods (default: grow-diag-final-and)
+                        alignment methods (default: posterior-itg)
   --first-step=STEP     first step (default: 1)
   --last-step=STEP      last step  (default: 3)
   --iteration-cluster=ITERATION
@@ -86,6 +91,7 @@ OPTIONS
   --pbs-queue=NAME      PBS queue for launching processes (default: ltg)
   --debug=DEBUG         debug level
   -h, --help            show this help message and exit
+
 
 
 EXAMPLES
