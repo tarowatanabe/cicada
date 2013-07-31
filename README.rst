@@ -11,11 +11,9 @@ can
   grammar/models.
 - Translate sentence, lattice and/or parsed tree using
   {string,tree}-to-{string,tree} models.
-- Align {hypergraph,lattice}-to-lattice (currently, we assume
-  penn-treebank style hypergraph and sentence-like lattice).
-- Align bilingual sentences using symmetized IBM Model1/HMM/IBM Model4.
+- Combine translations using forests or lattices.
+- Align {hypergraph,lattice}-to-lattice.
 - (dependency) parse lattices (or sentences)
-- Analyze forest/tree/lattice.
 
 The cicada toolkit is mainly developed by
 `Taro Watanabe <http://www2.nict.go.jp/univ-com/multi_trans/member/t_watana>`_

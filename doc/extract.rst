@@ -1,147 +1,151 @@
 Phrase Pair/Synchronous CFG/Synchronous TSG Extraction
 ======================================================
 
+Phrase table or synchronous grammars, either synchronous context free
+grammar (SCFG) or synchronous tree substitution grammar (STSG), are
+learned by running the `cicada-extract.py` script.
+
+.. code:: bash
+
+  cicada-extract.py \
+	  --f <source data> \
+	  --e <target data> \
+	  --ff <source hypergraph data> \
+	  --fe <target hypergraph data> \
+	  --a <word alignment> \
+	  --{phrase, scfg, ghkm, tree}
+
+``--f`` and ``--e`` options specify the source and target data, and
+``--ff`` and ``--fe`` are their corresponding hypergraph data. The
+format for hypergraph is documented in `doc/hypergraph.rst`.
+Based on the option, you can extract different models:
+
+--phrase  Extract phrase pairs.
+--scfg    Extract synchronous-CFG.
+--ghkm    Extract tree-to-string or string-to-tree model of
+          synchronous-TSG. The model is determined whether we have
+	  ``--ff`` option (tree-to-string) or ``--fe`` option
+	  (string-to-tree).
+--tree    Extract tree-to-tree model of synchronous-TSG. Both of
+          ``--ff`` and ``--fe`` should be specified.
+
+Details
+-------
+
+Model extraction is performed in three steps:
+
+1. Lexical probabilities are estimated from the word aligned bilingual
+   data for feature function computation. You can perform smoothing by
+
+   - Variational Bayes estiamtes (``--lexicon-variational``, which is recommended)
+   - L0 regularization (``lexicon-l0`` which is slower)
+
+   The lexical probabilities `lex.f2n.gz` and `lex.n2f.gz` are dump in
+   the directory `model` specified by the ``--lexical-dir`` options.
+
+2. Extract phrase pairs or synchronous rules.
+   Extracted counts are put on the subdirectory,
+   `model/[grammar]-counts` where ``[grammar]`` is the model name,
+   such as ``scfg`` or ``ghkm``. The `model` directory prefix can be
+   modified by the ``--counts-dir`` option.
+   
+3. Merge extracted phrase pairs and synchronous rules.
+   merged counts are put on the subdirectory,
+   `model/[grammar]-score` where ``[grammar]`` is the model name,
+   such as ``scfg`` or ``ghkm``. The `model` directory prefix can be
+   modified by the ``--score-dir`` option.
+
+Note that the merged model is not directly usable as a model, and the
+extracted grammar should be further interpreted as a model. For
+details, see `doc/indexing.hml`
+
+The second and the third steps are efficiently computed by the
+MapReduce framework using either pthreads or MPI, controlled by:
+
+--threads        # of threads
+--mpi            # of MPI jobs
+--mpi-host       comma delimited list of hosts for MPI jobs
+--mpi-host-file  host file for use with MPI jobs
+--pbs            Run under pBS
+--pbs-queue      PBS queue name
+
+Extraction and final merging requires temporary disk space which can
+be specified by 
+
+--temporary-dir  temporary directory
 
 
-We support various phrase/rule/tree extraction. Basically, we will run in two steps:
-   Collect counts by mapping input sentences/parse trees/alignment etc.
-   Map/Reduce to collect target-side counts
-   Map/Reduce to collect source/target counts and produce various counts
+Options
+-------
 
-   They can operate similarly with underlying extraction specific map/reduce framework.
+There exists a couple of options which affect the phrase-table/grammar extractions.
 
-You can try "cicada-extract.py" which runs like phrase-extract in Moses, but starting from step 4 (and 6).
-It is recommended to specify TMPDIR_SPEC (or TMPDIR) pointing to 
-a large "local" storage for efficient extraction:
+SCFG
+````
 
-export TMPDIR_SPEC=<directory for temporary storage, better located at local disk space, not on NFS>
+The SCFG in Moses can be simulated by the following options:
 
-and/or specify --temporary-dir.
+::
 
-Then, you should run "cicada-index.py" to convert collected counts into a set of feature values, and then,
-into a binary format for use with the cicada toolkit.
-
-Internally, cicada-extract.py calls following binaries:
-
-cicada_extract_phrase{,_mpi}
-	Extract phrase
-	Output scores:
-	       lhs ||| rhs ||| count(lhs, rhs) \
-	       	   count(prev, mono, lhs, rhs) \
-		   count(prev, swap, lhs, rhs) \
-		   count(next, mono, lhs, rhs) \
-		   count(next, swap, lhs, rhs)
-
-cicada_extract_rule{,_mpi}
-	Extract synchronous-CFG + syntax augmentation (aka SAMT) when extracted with "span" data.
-	You can generate span by "cicada_filter_penntreebank"
-	Output scores:
-	       root lhs ||| root rhs ||| count(lhs, rhs)
-
-cicada_extract_ghkm{,_mpi}
-	Extract tree-to-string or string-to-tree rules by GHKM
-	Output scores:
-	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
-
-cicada_extract_tree{,_mpi}
-	Extract tree-to-tree rules by GHKM
-	Output scores:
-	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
-
-After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
-Which will output:
-
-lhs ||| rhs ||| alignments ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) 
-
-In addtion, we will dump root-joint.gz, root-source.gz and root-target.gz. root-joint.gz contains:
-
-root(lhs)root(rhs) ||| counts(root(lhs)root(rsh)) ||| observed(lhs, rhs)
-
-while root-source.gz looks like:
-
-root(lhs) ||| counts(root(lhs)) ||| observed(lhs)
-
-while root-target.gz looks like:
-
-root(rhs) ||| counts(root(rhs)) ||| observed(rhs)
-
-You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
-to perform Dirichlet prior smoothing (default) by running "cicada-index.py".
-The cicada-index.py transforms collected counts into a set of feature values, then, encodes the grammar into a binary format.
-Internally, the indexer calls:
-
-   cicada_filter_extract:
-	extract only nbet of target variation for each source side,
-   	measured by its joint frequency of lhs and rhs.
-
-   cicada_filter_extract_phrase:
-	Dump in moses or cicada format. Also, you can dump
-	lexicalied reordering table.
-   				 
-   cicada_filter_extract_scfg:
-	Dump in cicada format for synchronous-CFG. You can also 
-	add features for lhs given root(lhs) and rhs given root(rhs)
-
-   cicada_filter_extract_ghkm:
-	Dump in cicada format for tree-to-string, string-to-tree, tree-to-tree.
-
-and calls
-    cicada_index_grammar
-	for indexing phrase/scfg
-    
-    or
-
-    cicada_index_tree_grammar
-	for indexing tree-to-string, string-to-tree, tree-to-tree rules
-
-    
-Remarks on SCFG: (I don't know the default for Joshua... any clues?)
-	If you want to simulate the Moses-style hierarchical rule, you can use "cicada-extract.py" with options:
-	
 	--max-span-source 15
 	--max-span-target 15
 	--min-hole-source 2
 	--min-hole-target 1
 	--max-length 5
 	--max-fertility 0
-	--exhaustive // exhaustively extract from all-possible phrases
+	--exhaustive 
 
-	The Hiero-style extraction from Chiang (2007) will be:
+The Hiero-style extraction from Chiang (2007) will be:
+
+::
 
 	--max-span-source 10
 	--max-span-target 0
 	--min-hole-source 2
 	--min-hole-target 1
-	--max-length 5(?)
+	--max-length 5
 	--max-fertility 0
-	--constrained // extract only from minimal phrases
+	--constrained
 
-	Our default:
+The ``--max-span-source`` and ``--max-span-target`` constrained the
+length of the phrase pairs from which we will punch "holes" to
+instantiate non-terminals. 0 implies no limits. ``--max-length`` is
+the maximum number of terminals in the extracted synchronous
+rules. Similarly, ``--max-fertility`` limits the maximum length ratio.
+By default, we will extract all the phrase pairs, but uses minimum
+sub-phrases to punch holes. This is adjusted by ``--exhaustive``
+which uses all the sub-phrases as holes. The ``--constrained`` option
+limits so that only minimum phrases are extracted from which we will
+use sub-phrases to punch holes.
 
-	--max-span-source 15
-	--max-span-target 15
-	--min-hole-source 1
-	--min-hole-target 1
-	--max-length 7
-	--max-fertility 4
-	//
-	// no --exhaustive, and no --constrained imply:
-	//   extract from all-possible phrases, but uses minimal phrases as "holes"
-	//
+GHKM and Tree
+`````````````
 
-Remarks on GHKM:
-	--max-nodes 15
+Here is a default setting in cicada:
+
+::
+
+	--max-nodes 7
 	--max-height 4
-	--max-compose 0 // no constraint for composition from minimal rules
-	--max-scope 0   // no constriant for maximum scopes
-	
-	// other options...	
-	--constrained  // even minimum rules should satisfy above max-constraints.
-	               // RECOMMENDED when extracting rules from "forest"
-	--exhaustive   // consider all possible attachment of unaligned words to any rules... NOT RECOMMENDED.
-	               // default will attach unaligned words to rules "closer to root"
+	--max-compose 4
 
-	--collapse-source
-	--collapse-target
-	               // treat source/target side as a "flat" rule. Recommended for string-to-x variant.
-	--project      // project non-terminals symbols from tree-side to string-side.
+in which the maximum number of nodes in an elementary tree is 7
+(``--max-nodes``), maximum height is 4 (``--max-height``) and the
+number of minimum rules to compose a larger rule is limited to 4
+(``--max-compose``).
+There exist other options which greatly affect the extracted grammar:
+
+--constrained  By default, all the minimum rules are extracted from
+               the bilingual data, even if the minimum rules do not
+	       satisfy other constraints, such as maximum number of
+	       nodes or maximum height. This option force the minimum
+	       rules to satisfy such constraints.
+--exhaustive   By default, the non-aligned words are attached to the
+               hyperedges, which are closer to the goal node. This
+	       option try attach non-aligned words exhaustively, and
+	       extract spuriously many rules.
+--project      In tree-to-string or string-to-tree models, the string
+               side does not contain any linguistic labels. This
+	       option project the non-terminal symbols from the
+	       syntactic tree so that the string side rule contains
+	       syntactic information. This is usually RECOMMENDED.

@@ -103,6 +103,83 @@ OPTIONS
   --debug=DEBUG         debug level
   -h, --help            show this help message and exit
 
+DESCRIPTIONS
+------------
+
+Internally, cicada-extract.py calls following binaries:
+
+cicada_extract_phrase{,_mpi}
+	Extract phrase
+	Output scores:
+	       lhs ||| rhs ||| count(lhs, rhs) \
+	       	   count(prev, mono, lhs, rhs) \
+		   count(prev, swap, lhs, rhs) \
+		   count(next, mono, lhs, rhs) \
+		   count(next, swap, lhs, rhs)
+
+cicada_extract_rule{,_mpi}
+	Extract synchronous-CFG + syntax augmentation (aka SAMT) when extracted with "span" data.
+	You can generate span by "cicada_filter_penntreebank"
+	Output scores:
+	       root lhs ||| root rhs ||| count(lhs, rhs)
+
+cicada_extract_ghkm{,_mpi}
+	Extract tree-to-string or string-to-tree rules by GHKM
+	Output scores:
+	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
+
+cicada_extract_tree{,_mpi}
+	Extract tree-to-tree rules by GHKM
+	Output scores:
+	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
+
+After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
+Which will output:
+
+lhs ||| rhs ||| alignments ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) 
+
+In addtion, we will dump root-joint.gz, root-source.gz and root-target.gz. root-joint.gz contains:
+
+root(lhs)root(rhs) ||| counts(root(lhs)root(rsh)) ||| observed(lhs, rhs)
+
+while root-source.gz looks like:
+
+root(lhs) ||| counts(root(lhs)) ||| observed(lhs)
+
+while root-target.gz looks like:
+
+root(rhs) ||| counts(root(rhs)) ||| observed(rhs)
+
+You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
+to perform Dirichlet prior smoothing (default) by running "cicada-index.py".
+The cicada-index.py transforms collected counts into a set of feature values, then, encodes the grammar into a binary format.
+Internally, the indexer calls:
+
+   cicada_filter_extract:
+	extract only nbet of target variation for each source side,
+   	measured by its joint frequency of lhs and rhs.
+
+   cicada_filter_extract_phrase:
+	Dump in moses or cicada format. Also, you can dump
+	lexicalied reordering table.
+   				 
+   cicada_filter_extract_scfg:
+	Dump in cicada format for synchronous-CFG. You can also 
+	add features for lhs given root(lhs) and rhs given root(rhs)
+
+   cicada_filter_extract_ghkm:
+	Dump in cicada format for tree-to-string, string-to-tree, tree-to-tree.
+
+and calls
+    cicada_index_grammar
+	for indexing phrase/scfg
+    
+    or
+
+    cicada_index_tree_grammar
+	for indexing tree-to-string, string-to-tree, tree-to-tree rules
+
+
 EXAMPLES
 --------
 

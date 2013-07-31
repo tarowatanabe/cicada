@@ -28,9 +28,21 @@ This will result in four directories and files:
       aligned.posterior-itg (word alignment)
       aligner.sh            (word aligner script)
 
-the ``model/aligned.posterior-itg`` is the final alignment for the
-given bilingual data. The aligner script, ``model/aligner.sh`` can be
-used to perform word alignment for held-out test data:
+Word alignment training is performed in three steps:
+
+1. Source and target words are clustered, and clustering
+   results are placed in the `corpus` directory (or specified by
+   ``--corpus-dir`` option).
+2. Word alignment models are learned and Viterbi alignment is
+   computed, then, all the parameters are put on two directories,
+   `giza.src-trg`  and `giza.trg-src` directories (or specified by
+   ``--giza-f2e`` and ``--giza-e2f`` options).
+3. Two models in opposite directions are combined, and put in `model`
+   directory (or specified by ``--model-dir``).
+
+The file ``model/aligned.posterior-itg`` is the final alignment for
+the given bilingual data. The aligner script, ``model/aligner.sh`` can
+be used to perform word alignment for held-out test data:
 
 .. code:: bash
 

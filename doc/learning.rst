@@ -1,4 +1,7 @@
-Learning component in cicada:
+Learning
+========
+
+
 
 Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE (may change in the future)
 
