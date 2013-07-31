@@ -239,7 +239,9 @@ namespace cicada
 	frontier_attribute(__frontier),
 	attr_internal_node("internal-node"),
 	attr_source_root("source-root"),
+	attr_tree_fallback("tree-fallback"),
 	attr_glue_tree(__grammar.empty() ? "" : "glue-tree"),
+	attr_glue_tree_fallback("glue-tree-fallback"),
 	attr_frontier_source(__frontier ? "frontier-source" : ""),
         attr_frontier_target(__frontier ? "frontier-target" : "")
     {  
@@ -904,7 +906,9 @@ namespace cicada
     
     const attribute_type attr_internal_node;
     const attribute_type attr_source_root;
+    const attribute_type attr_tree_fallback;
     const attribute_type attr_glue_tree;
+    const attribute_type attr_glue_tree_fallback;
     const attribute_type attr_frontier_source;
     const attribute_type attr_frontier_target;
 

@@ -190,7 +190,12 @@ namespace cicada
     class GlueTreePenalty : public FeatureFunction
     {
     public:
-      GlueTreePenalty() : FeatureFunction(0, "glue-tree-penalty"), attr_glue_tree("glue-tree") { }
+      GlueTreePenalty()
+	: FeatureFunction(0, "glue-tree-penalty"),
+	  feat_glue_tree("glue-tree-penalty"),
+	  feat_glue_tree_fallback("glue-tree-fallback-penalty"),
+	  attr_glue_tree("glue-tree"),
+	  attr_glue_tree_fallback("glue-tree-fallback") { }
       
       void apply(state_ptr_type& state,
 		 const state_ptr_set_type& states,
@@ -247,12 +252,22 @@ namespace cicada
       {
 	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_glue_tree);
 	if (aiter != edge.attributes.end() && boost::apply_visitor(__glue_tree(), aiter->second))
-	  features[feature_name()] = -1;
+	  features[feat_glue_tree] = -1;
 	else
-	  features.erase(feature_name());
+	  features.erase(feat_glue_tree);
+	
+	attribute_set_type::const_iterator fiter = edge.attributes.find(attr_glue_tree_fallback);
+	if (fiter != edge.attributes.end() && boost::apply_visitor(__glue_tree(), fiter->second))
+	  features[feat_glue_tree_fallback] = -1;
+	else
+	  features.erase(feat_glue_tree_fallback);
       }
 
+      feature_set_type::feature_type feat_glue_tree;
+      feature_set_type::feature_type feat_glue_tree_fallback;
+
       attribute_set_type::attribute_type attr_glue_tree;
+      attribute_set_type::attribute_type attr_glue_tree_fallback;
     };
 
     class NonLatinPenalty : public FeatureFunction
