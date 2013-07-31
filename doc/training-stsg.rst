@@ -129,19 +129,28 @@ the syntactic labels into ``[x]``.
 String-to-tree Model
 --------------------
 
-
+In a string-to-tree model, input is a string, or a sentence, which is
+parsed by the source side of synchronous-TSG. Translation forest is
+constructed by the projected elementary trees.  Note that
+the string-to-tree model is very slow in practice since we need to
+parse inputs using the source side of the synchronous grammar. In
+addition, it may consume large memory especially when the synchronous
+grammar is ambiguous.
 
 Preprocessing
 `````````````
 
+In this example, we use the Stanford Parser (http://nlp.stanford.edu/software/lex-parser.shtml), 
+for parsing the English side of bilingual data, but any parser will work.
+
 .. code:: bash
 
   cd samples/kftt.30k/s2t/data
-  export stanford=[directory for stanford parser]
+  SP=[directory for stanford parser]
   bzcat ../../data/train.en.bz2 | \
   java \
 	-mx12g \
-	-cp $stanford/stanford-parser.jar:$stanford/stanford-parser-3.2.0-models.jar \
+	-cp $SP/stanford-parser.jar:$SP/stanford-parser-3.2.0-models.jar \
 	-tLPP edu.stanford.nlp.parser.lexparser.EnglishTreebankParserParams \
 	-tokenized -sentences newline \
 	-escaper edu.stanford.nlp.process.PTBEscapingProcessor \
@@ -158,9 +167,21 @@ Preprocessing
 	--operation binarize:direction=left,order=2 \
 	--operation output:no-id=true,file=train.tree.en.gz
 
+Here, we assume that English sentences are tokenized, but further
+escaped to match with the Penntreebank standard, like ``(`` into
+``-LRB-`` etc. (see ``edu.stanford.nlp.process.PTBEscapingProcessor``).
+Thus, the penntreebank to hypergraph converter, ``cicada_filter_penntreebank``
+re-map the escaped terminal symbols again via ``--map`` argument.
+The constituency labels are also normalized (``--normalize``) so that
+we can use ``COMMA`` as a label for ``,``. The hypergraph is further
+binarized in a left-heavy direction (``binarize:direction=left,order=2``)
+and preserves only 2 non-terminal history for the binarized symbols.
 
 Extraction
 ``````````
+
+We use the word alignment extracted in `samples/kftt.30k/alignment`
+and extract synchronous rules:
 
 .. code:: bash
 
@@ -176,8 +197,18 @@ Extraction
 	--max-scope 2 \
 	--threads 4 
 
+In stead of using the source side forest in the above tree-to-string
+model, we use a tree in the target side (``--fe``). Since the tree
+structure is not exhaustively binarized, we do not constrained as in
+the previous example, but constrained the extracted grammar so that
+the maximum scope is 2 (``--max-scope 2``) which greatly affect the
+parsing speed.
+
 Features
 ````````
+
+The extracted grammar at `samples/kftt.30k/st2/model/ghkm-score`
+should be reinterpreted as features as follows:
 
 .. code:: bash
 
@@ -193,9 +224,16 @@ Features
 	--feature-height \
 	--threads 4
 
+Note that we have ``--cky`` flag which indicates that the indexed
+model is suitable for parsing a string by the CKY algorithm.
 
 Tuning and testing
 ``````````````````
+
+For tuning and testing, input is a sentence, as in SCFG. We use
+``--tree-cky`` as an algorithm to parse inputs with the learned
+synchronous grammar. In addition, we add insertion grammar as in SCFG
+which can handle OOVs.
 
 .. code:: bash
 
@@ -211,6 +249,8 @@ Tuning and testing
 
 Tree-to-tree Model
 ------------------
+
+
 
 Preprocessing
 `````````````
