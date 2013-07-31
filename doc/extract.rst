@@ -57,7 +57,9 @@ Model extraction is performed in three steps:
 
 Note that the merged model is not directly usable as a model, and the
 extracted grammar should be further interpreted as a model. For
-details, see `doc/indexing.hml`
+details, see `doc/indexing.hml`.
+The format for the extracted and merged counts are summarized in
+`man/cicada-extract.rst`.
 
 The second and the third steps are efficiently computed by the
 MapReduce framework using either pthreads or MPI, controlled by:
@@ -73,7 +75,6 @@ Extraction and final merging requires temporary disk space which can
 be specified by 
 
 --temporary-dir  temporary directory
-
 
 Options
 -------

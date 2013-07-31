@@ -19,9 +19,9 @@ indexing.rst \
 lattice.rst \
 learning.rst \
 linguistic.rst \
-mpi.rst \
 non-terminals.rst \
 operation.rst \
+parallel.rst \
 parameter.rst \
 parsing.rst \
 pyp.rst \
