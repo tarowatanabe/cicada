@@ -38,7 +38,7 @@ file-name: indexed tree grammar or plain text tree grammar\n\
 \tattribute0=[attribute-name]\n\
 \tattribute1=[attribute-name]\n\
 \t...\n\
-fallback: fallback source-to-target, tree-to-string transfer rule\n\
+fallback: fallback source-to-target, tree-to-{string,tree} transfer rule\n\
 \tgoal=[default goal label] target side goal\n\
 \tnon-terminal=[defaut non-terminal] target side non-terminal\n\
 ";
