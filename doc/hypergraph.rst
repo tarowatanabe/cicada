@@ -139,6 +139,19 @@ is represented in the hypergraph format as follows:
 	   [{"tail":[20],"rule":22}]],
     "goal": 21}
 
+Visualization
+-------------
+
+You can convert a hypergrpah as a `dot` file and use graphviz to
+visualize it.
+
+.. code:: bash
+
+  cat hypergraph.txt | cicada --input-forest --operation output:graphviz=true
+
+Currently, the hypergraph should be in one-line, and should not span
+into multiple lines.
+
 
 Tools
 -----

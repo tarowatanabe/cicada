@@ -17,7 +17,7 @@ grammar.rst \
 hypergraph.rst \
 indexing.rst \
 lattice.rst \
-learn.rst \
+learning.rst \
 linguistic.rst \
 mpi.rst \
 non-terminals.rst \

@@ -83,6 +83,18 @@ is equivalently represented by PLF as follows:
    (('preissturz',0.5,2), ('preis',0.5,1),),
    (('sturz',1.0,1),),)
 
+Visualization
+-------------
+
+You can convert a lattice as a `dot` file and use graphviz to
+visualize it.
+
+.. code:: bash
+
+  cat lattice.txt | cicada --input-lattice --operation output:graphviz=true,lattice=true
+
+Currently, the lattice should be in one-line, and should not span into multiple lines.
+
 Tools
 -----
 

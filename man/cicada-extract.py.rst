@@ -7,7 +7,7 @@ a tool to extract grammar from bilingual data
 ---------------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
-:Date:   2013-2-28
+:Date:   2013-7-31
 :Manual section: 1
 
 SYNOPSIS

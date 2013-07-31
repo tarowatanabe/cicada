@@ -1,4 +1,8 @@
-Phrase/Rule/Tree-fragment extraction and indexing
+Phrase Pair/Synchronous CFG/Synchronous TSG Extraction
+======================================================
+
+
+
 
 We support various phrase/rule/tree extraction. Basically, we will run in two steps:
    Collect counts by mapping input sentences/parse trees/alignment etc.
