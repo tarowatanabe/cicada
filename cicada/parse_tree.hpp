@@ -228,6 +228,8 @@ namespace cicada
 			       std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
 
+    typedef std::vector<bool, std::allocator<bool> > connected_type;
+
     typedef Semiring semiring_type;
     typedef Semiring score_type;
     
@@ -416,6 +418,12 @@ namespace cicada
       node_map_phrase.clear();
       node_map_phrase.reserve(graph_in.nodes.size());
       node_map_phrase.resize(graph_in.nodes.size());
+
+      node_map_fallback.clear();
+      node_map_fallback.reserve(graph_in.nodes.size());
+      node_map_fallback.resize(graph_in.nodes.size());
+
+      connected.clear();
       
       phrases.clear();
 
@@ -503,6 +511,34 @@ namespace cicada
 	
 	// connect!
 	graph_out.connect_edge(edge.id, graph_out.goal);
+
+	if (niter->second >= connected.size())
+	  connected.resize(niter->second + 1, false);
+	
+	connected[niter->second] = true;
+	
+	// final patch work....!
+	for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
+	  if (! node_map_fallback[id].empty() && ! node_map[id].empty()) {
+	    const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
+	    
+	    typename node_map_type::const_iterator piter_end = node_map_fallback[id].end();
+	    for (typename node_map_type::const_iterator piter = node_map_fallback[id].begin(); piter != piter_end; ++ piter)
+	      if (connected[piter->second]) {
+		typename node_map_type::const_iterator citer_end = node_map[id].end();
+		for (typename node_map_type::const_iterator citer = node_map[id].begin(); citer != citer_end; ++ citer)
+		  if (! connected[citer->second] && node_map_fallback[id].find(citer->first) == node_map_fallback[id].end()) {
+		    hypergraph_type::edge_type& edge = graph_out.add_edge(&citer->second, (&citer->second) + 1);
+		    
+		    edge.rule = rule_type::create(rule_type(piter->first, rule_type::symbol_set_type(1, citer->first)));
+		    
+		    edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
+		    edge.attributes[attr_glue_tree_fallback] = attribute_set_type::int_type(1);
+		    
+		    graph_out.connect_edge(edge.id, piter->second);
+		  }
+	      }
+	  }
       }
       
       node_map.clear();
@@ -853,6 +889,9 @@ namespace cicada
       if (result.second)
 	result.first->second = graph_out.add_node().id;
       
+      if (is_tree_fallback(attributes))
+	node_map_fallback[root_in].insert(*result.first);
+      
       int non_terminal_pos = 0;
       hypergraph_type::id_type node_prev = hypergraph_type::invalid;
       int relative_pos = 0;
@@ -942,6 +981,15 @@ namespace cicada
 	    graph.connect_edge(edge_id, root);
 	    
 	    result.first->second = edge_id;
+
+	    tails_type::const_iterator titer_end = tails.end();
+	    for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
+
 	  } else {
 	    edge_id = result.first->second;
 	    root = graph.edges[edge_id].head;
@@ -981,6 +1029,14 @@ namespace cicada
 	
 	graph.edges[edge_id].rule = construct_rule(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
+	
+	tails_type::const_iterator titer_end = tails.end();
+	for (tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	  if (*titer >= connected.size())
+	    connected.resize(*titer + 1, false);
+	  
+	  connected[*titer] = true;
+	}
       }
       
       return edge_id;
@@ -1132,11 +1188,28 @@ namespace cicada
 
       return riter->second;
     }
+
+    struct __tree_fallback : public boost::static_visitor<bool>
+    {
+      bool operator()(const attribute_set_type::int_type& x) const { return x; }
+      template <typename Tp>
+      bool operator()(const Tp& x) const { return false; }
+    };
     
+    bool is_tree_fallback(const attribute_set_type& attrs) const
+    {
+      attribute_set_type::const_iterator aiter = attrs.find(attr_tree_fallback);
+      
+      return aiter != attrs.end() && boost::apply_visitor(__tree_fallback(), aiter->second);
+    }
+
   private:
 
     node_map_set_type node_map;
     node_map_set_type node_map_phrase;
+    node_map_set_type node_map_fallback;
+
+    connected_type connected;
     
     phrase_unique_type phrases;
     phrase_map_type    phrase_map;
