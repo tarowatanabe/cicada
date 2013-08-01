@@ -10,6 +10,7 @@ cicada-learn-online.py.man \
 cicada-mert.py.man \
 cicada.man \
 cicada_mpi.man \
+cicada_alignment.man \
 cicada_alignment_hmm.man \
 cicada_alignment_model1.man \
 cicada_alignment_model4.man \
@@ -44,6 +45,7 @@ cicada-learn-online.py.rst \
 cicada-mert.py.rst \
 cicada.rst \
 cicada_mpi.rst \
+cicada_alignment.rst \
 cicada_alignment_hmm.rst \
 cicada_alignment_model1.rst \
 cicada_alignment_model4.rst \
