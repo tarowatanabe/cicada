@@ -15,8 +15,15 @@ SYNOPSIS
 
 **cicada-index.py** [*options*]
 
+
+DESCRIPTIONS
+------------
+
 OPTIONS
 -------
+
+Input/output
+````````````
 
   --root-dir=DIRECTORY  root directory for outputs
   --model-dir=DIRECTORY
@@ -38,6 +45,10 @@ OPTIONS
   --lexicon-target-source=LEXICON
                         lexicon for P(source | target) (default:
                         ${lexical_dir}/lex.n2f)
+
+Models
+``````
+
   --prior=PRIOR         model prior (default: 0.1)
   --feature=FEATURE     feature definitions
   --attribute=ATTRIBUTE
@@ -48,6 +59,10 @@ OPTIONS
   --tree                index tree-to-tree grammar
   --cky                 CKY mode indexing for tree-grammar
   --reordering          reordering for phrase grammar
+
+Additional features
+```````````````````
+
   --feature-root        generative probability
   --feature-fisher      Fisher's exact test
   --feature-type        observation probability
@@ -70,6 +85,11 @@ OPTIONS
   --threshold-deletion=THRESHOLD_DELETION
                         threshold for deletion (default: 0.5)
   --quantize            perform quantization
+
+
+Pruning
+```````
+
   --kbest=KBEST         kbest max count of rules (default: 0)
   --kbest-count         kbest option: use count for sorting
   --kbest-joint         kbest option: use joint probability for sorting
@@ -87,6 +107,10 @@ OPTIONS
                         (this will assign --sigtest -0.001)
   --sigtest-exclusive   significance testing which excludes 1-1-1-N event
                         (this will assign --sigtest +0.001)
+
+Others
+``````
+
   --max-malloc=MALLOC   maximum memory in GB (default: 8)
   --cicada-dir=DIRECTORY
                         cicada directory

@@ -15,8 +15,15 @@ SYNOPSIS
 
 **cicada-extract.py** [*options*]
 
+
+DESCRIPTIONS
+------------
+
 OPTIONS
 -------
+
+Input/output
+````````````
 
   --root-dir=DIRECTORY  root directory for outputs
   --corpus-dir=PREFIX   corpus directory (default: ${root_dir}/corpus)
@@ -42,9 +49,17 @@ OPTIONS
   --fe=FILE-OR-SUFFIX   target (or 'English') forest file or suffix
   --corpus=CORPUS       bilingual trainging corpus prefix
   --alignment=ALIGNMENT
-                        alignment methods (default: grow-diag-final-and)
-  --first-step=STEP     first step (default: 4)
-  --last-step=STEP      last step  (default: 6)
+                        alignment methods (default: posterior-itg)
+
+Extraction steps
+````````````````
+
+  --first-step=STEP     first step (default: 1)
+  --last-step=STEP      last step  (default: 3)
+
+Lexicon
+```````
+
   --lexicon-inverse     use inverse alignment
   --lexicon-prior=PRIOR
                         lexicon model prior (default: 0.1)
@@ -55,12 +70,18 @@ OPTIONS
                         L0 regularization parameter (default: 100)
   --lexicon-l0-beta=LEXICON_L0_BETA
                         L0 regularization parameter (default: 0.01)
+
+Models
+``````
+
   --phrase              extract phrase
   --scfg                extract SCFG
   --ghkm                extract GHKM (tree-to-string)
   --tree                extract tree-to-tree
   --non-terminal=NON_TERMINAL
                         default non-terminal for GHKM rule (default: [x])
+
+
   --max-sentence-length=LENGTH
                         maximum sentence size (default: 0 == no limit)
   --max-span-source=LENGTH
@@ -87,6 +108,10 @@ OPTIONS
   --constrained         constrained extraction in SCFG, GHKM and Tree
   --project             project non-terminal symbols in GHKM
   --sentential          extract sentential rule
+
+Others
+``````
+
   --max-malloc=MALLOC   maximum memory in GB (default: 8)
   --cicada-dir=DIRECTORY
                         cicada directory
@@ -103,8 +128,8 @@ OPTIONS
   --debug=DEBUG         debug level
   -h, --help            show this help message and exit
 
-DESCRIPTIONS
-------------
+DETAILS
+-------
 
 Internally, cicada-extract.py calls following binaries:
 
