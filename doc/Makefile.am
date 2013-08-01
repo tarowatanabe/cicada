@@ -22,7 +22,7 @@ linguistic.rst \
 non-terminals.rst \
 operation.rst \
 parallel.rst \
-parameter.rst \
+option.rst \
 parsing.rst \
 pyp.rst \
 training.rst \

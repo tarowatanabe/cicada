@@ -112,7 +112,7 @@ line may consists of various components split by a delimiter "|||":
 
 ::
 
-[id |||] [latttice or sentence] [||| forest] [||| span] [||| alignment] [||| dependency] [||| sentence]*
+  [id |||] [lattice or sentence] [||| forest] [||| span] [||| alignment] [||| dependency] [||| sentence]*
 
 The id is optional, and if an id is not supplied here, cicada assumes
 a numerical order starting from 0.
