@@ -7,7 +7,7 @@ a hypergraph toolkit for machine translation
 ---------------------------------------------
 
 :Author: Taro Watanabe <taro.watanabe@nict.go.jp>
-:Date:   2013-2-27
+:Date:   2013-8-1
 :Manual section: 1
 
 SYNOPSIS
@@ -157,4 +157,4 @@ EXAMPLES
 SEE ALSO
 --------
 
-cicada(1)
+`cicada(1)`
