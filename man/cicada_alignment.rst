@@ -6,6 +6,11 @@ cicada_alignment
 :Date: 2013-8-1
 :Manual section: 1
 
+SYNOPSIS
+--------
+
+**cicada_alignment** [*options*]
+
 OPTIONS
 -------
 

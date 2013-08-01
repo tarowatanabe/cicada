@@ -31,6 +31,13 @@ is performed in three steps:
 3. Two models in opposite directions are combined, and put in `model`
    directory (or specified by ``--model-dir``).
 
+Internally, it calls `cicada_alignment_model1(1)`,
+`cicada_alignment_hmm(1)` or `cicada_alignment_model4(1)` for word
+alignment learning and Viterbi alignment computation depending on the
+final word alignment model. In addition, `cicada_alignment(1)` may be
+used when combining word alignment using a heuristic,
+i.e. "grow-diag-final-and".
+
 OPTIONS
 -------
 
@@ -136,7 +143,6 @@ Others
   --pbs-queue=NAME      PBS queue for launching processes (default: ltg)
   --debug=DEBUG         debug level
   -h, --help            show this help message and exit
-
 
 
 EXAMPLES

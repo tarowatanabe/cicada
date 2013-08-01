@@ -6,6 +6,11 @@ cicada_learn
 :Date: 2013-8-1
 :Manual section: 1
 
+SYNOPSIS
+--------
+
+**cicada_learn** [*options*]
+
 OPTIONS
 -------
 
