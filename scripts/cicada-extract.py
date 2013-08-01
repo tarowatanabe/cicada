@@ -64,8 +64,8 @@ opt_parser = OptionParser(
                 help="bilingual trainging corpus prefix"),
 
     # alignment method
-    make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
-                help="alignment methods (default: grow-diag-final-and)"),
+    make_option("--alignment", default="posterior-irg", action="store", type="string",
+                help="alignment methods (default: %default)"),
     
     # steps
     make_option("--first-step", default=1, action="store", type="int", metavar='STEP', help="first step (default: %default)"),
