@@ -64,7 +64,7 @@ opt_parser = OptionParser(
                 help="bilingual trainging corpus prefix"),
 
     # alignment method
-    make_option("--alignment", default="posterior-irg", action="store", type="string",
+    make_option("--alignment", default="posterior-itg", action="store", type="string",
                 help="alignment methods (default: %default)"),
     
     # steps
