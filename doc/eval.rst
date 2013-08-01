@@ -1,168 +1,140 @@
-MT evaluations especially for MERT purpose
+Evaluation
+==========
 
-Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
+Following metrics are implemented:
 
-BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?) [3]
-BLEUS: smoothed BLEU metric[8]
-CDER: CDer (wer + shift in one side) [9]
-WER: word error rate [4]
-InvWER: Inversion word error rate [10]
-PER: position independent word error rate [5]
-TER: translation error rate [6]
-RIBES: RIBES [7]
-SB: skip bigram (by default, skip size is clipped to 4) [8]
-WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?) [8]
-SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
+- BLEU: IBM BLEU [1]_
+- BLEUS: smoothed BLEU+1 metric [6]_
+- CDER: CDer (wer + shift in one side) [7]_
+- WER: word error rate [2]_
+- InvWER: Inversion word error rate [8]_
+- PER: position independent word error rate [3]_
+- TER: translation error rate [4]_
+- RIBES: RIBES [5]_
+- SB: skip bigram  [6]_
+- WLCS: (weighted) longest common subsequence  [6]_
+- SK: string kernel
 
-cicada_eval [options]
+For the details of available options, see ``cicada --scorer-list``.
 
-configuration options:
-  --tstset arg                 test set file(s)
-  --tstset2 arg                test set file(s)   (required for sign test)
-  --refset arg                 reference set file(s)
-  --output arg (=-)            output file
-  --scorer arg (=bleu:order=4) error metric
-  --scorer-list                list of error metric
-  --signtest                   sign test
-  --bootstrap                  bootstrap resampling
-  --samples arg                # of samples
+Evaluator
+---------
+
+You can use `cicada_eval` to score your translations:
+
+.. code:: bash
+
+  cicada_eval \
+	  --tstset <decoder k-best output> \
+	  --refset <reference data>
+
+The ``--tstset`` can be either plain text or directory which contains
+k-best translations. Bootstrap resampling [9]_ (``--bootstrap``) and
+sign test [10]_ (``--sign``) are also implemented to measure the
+significance.
+
+The scorer can be set by ``--scorer`` option. For instance, BLEU can
+be measured by:
+
+.. code:: bash
+
+  --scorer bleu:order=4
+
+If you want to use RIBES, then:
+
+.. code:: bash
+
+  --scorer ribes
+
+Two or more metrics can be linearly combined:
+
+.. code:: bash
+
+  --scorer 'combined:metric="bleu:order=4",weight=0.5,metric=ribes,weight=0.5'
+
+The combination assume **reward** score, not loss score. Thus, if you
+want to integrate error metrics, such as TER, the weights should be
+negatives. Optionally, you can specify simple `tokenizer` option in
+each evaluation metric. For the list of tokenizers, see ``cicada --tokenizer-list``.
+
+
+Test and Reference Data
+-----------------------
 
 reference/test set format is as follows:
 
-segment-id |||  sentence (||| .... some information, such as features etc. ...)
+::
 
-Thus, you can directly feed k-best output from cicada(or cicada_mpi).
+  segment-id |||  sentence (||| .... some information, such as features etc. ...)
 
-Also, you can compute oracle-BLEU from hypergraph(s) by cicada_oracle{,_mpi}
+which may look like followings:
 
-Tips: cicada_oracle{,_mpi} assumes "forests" as a input. If you want to compute
- oracle score for k-bests, you can use cicada_oracle_kbest{,_mpi}.
+::
 
-encode/decode API for scorer:
+   0 ||| first reference
+   0 ||| second reference
+   1 ||| first reference for the second input
+   1 ||| second reference for the second input
 
-std::string score.encode();
-score_ptr score::decode(std::string);
 
-Evaluator score JSON format:
-{"eval":"bleu", "matched":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "norm":[...]}
-{"eval":"bleus", "bleu":"base64", "norm":"base64"}
-{"eval":"ter", "edits": ["base64", ... (insertion,deletion,substitution,shift,reference)]}
-{"eval":"wer", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
-{"eval":"inv-wer", "edits": ["base64", ... (insertion,deletion,substitution,inversion,reference)]}
-{"eval":"cder", "edits": ["base64", ... (insertion,deletion,substitution,jump,reference)]}
-{"eval":"per", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
-{"eval":"ribes", "distance": "base64", "penalty": "base64"}
-{"eval":"sk", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
-{"eval":"sb", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
-{"eval":"wlcs", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
-{"eval":"combined", "score":[{"eval":"bleu", ...}, {"eval":"ter", ...}], "weight":["base64", "base64",.... list of weights]}
-and doubles are encoded as base64 (string!). We can insert spaces, but encoder will generate a string w/o spaces.
 
-References:
+References
+----------
 
-[1]
-@inproceedings{koehn:2004:EMNLP,
-  author    = {Koehn, Philipp},
-  title     = {Statistical Significance Tests for Machine Translation Evaluation },
-  booktitle = {Proceedings of EMNLP 2004},
-  editor = {Dekang Lin and Dekai Wu},
-  year      = 2004,
-  month     = {July},
-  address   = {Barcelona, Spain},
-  publisher = {Association for Computational Linguistics},
-  pages     = {388--395}
-}
+.. [1]	 Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing
+	 Zhu. Bleu: a method for automatic evaluation of machine
+	 translation. In Proceedings of 40th Annual Meeting of the
+	 Association for Computational Linguistics, pages 311-318,
+	 Philadelphia, Pennsylvania, USA, July 2002. Association for
+	 Computational Linguistics.
 
-[2]
-@inproceedings{1219906,
- author = {Collins, Michael and Koehn, Philipp and Ku\v{c}erov\'{a}, Ivona},
- title = {Clause restructuring for statistical machine translation},
- booktitle = {ACL '05: Proceedings of the 43rd Annual Meeting on Association for Computational Linguistics},
- year = {2005},
- pages = {531--540},
- location = {Ann Arbor, Michigan},
- doi = {http://dx.doi.org/10.3115/1219840.1219906},
- publisher = {Association for Computational Linguistics},
- address = {Morristown, NJ, USA},
- }
+.. [2]	 Sonja Nießen, Franz Josef Och, Gregor Leusch, and Hermann
+	 Ney. An evaluation tool for machine translation: Fast
+	 evaluation for mt research. In Proceedings of the Second
+	 International Conference on Language Resources and Evaluation
+	 (LREC 2000), Athens, Greece, 2000.
 
-[3]
-@InProceedings{papineni-EtAl:2002:ACL,
-  author    = {Kishore Papineni  and  Salim Roukos  and  Todd Ward  and  Wei-Jing Zhu},
-  title     = {Bleu: a Method for Automatic Evaluation of Machine Translation},
-  booktitle = {Proceedings of 40th Annual Meeting of the Association for Computational Linguistics},
-  month     = {July},
-  year      = {2002},
-  address   = {Philadelphia, Pennsylvania, USA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {311--318},
-  url       = {http://www.aclweb.org/anthology/P02-1040},
-  doi       = {10.3115/1073083.1073135}
-}
+.. [3]	 C. Tillmann, S. Vogel, H. Ney, A. Zubiaga,
+	 and H. Sawaf. Accelerated dp based search for statistical
+	 translation. In In European Conf. on Speech Communication and
+	 Technology, pages 2667-2670, 1997.
 
-[4]
-Sonja Nießn, Franz Josef Och, Gregor Leusch, Hermann Ney
-"An Evaluation Tool for Machine Translation: Fast Evaluation for MT Research".
-In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 39-45, Athens, Greece, May-June 2000
+.. [4]	 Matthew Snover, Bonnie Dorr, Richard Schwartz, Linnea
+	 Micciulla, and John Makhoul. A study of translation edit rate
+	 with targeted human annotation. In In Proceedings of
+	 Association for Machine Translation in the Americas, pages
+	 223-231, 2006.
 
-[5]
-@INPROCEEDINGS{Tillmann97accelerateddp,
-    author = {C. Tillmann and S. Vogel and H. Ney and A. Zubiaga and H. Sawaf},
-    title = {Accelerated Dp Based Search For Statistical Translation},
-    booktitle = {In European Conf. on Speech Communication and Technology},
-    year = {1997},
-    pages = {2667--2670}
-}
+.. [5]	 Hideki Isozaki, Tsutomu Hirao, Kevin Duh, Katsuhito Sudoh,
+	 and Hajime Tsukada. Automatic evaluation of translation
+	 quality for distant language pairs. In Proceedings of the
+	 2010 Conference on Empirical Methods in Natural Language
+	 Processing, pages 944-952, Cambridge, MA,
+	 October 2010. Association for Computational Linguistics.
 
-[6]
-@INPROCEEDINGS{Snover06astudy,
-    author = {Matthew Snover and Bonnie Dorr and Richard Schwartz and Linnea Micciulla and John Makhoul},
-    title = {A study of translation edit rate with targeted human annotation},
-    booktitle = {In Proceedings of Association for Machine Translation in the Americas},
-    year = {2006},
-    pages = {223--231}
-}
+.. [6]	 Chin-Yew Lin and Franz Josef Och. Automatic evaluation of
+	 machine translation quality using longest common subsequence
+	 and skip-bigram statistics. In Proceedings of the 42nd
+	 Meeting of the Association for Computational Linguistics
+	 (ACL'04), Main Volume, pages 605-612, Barcelona, Spain,
+	 July 2004.
 
-[7]
-@InProceedings{isozaki-EtAl:2010:EMNLP,
-  author    = {Isozaki, Hideki  and  Hirao, Tsutomu  and  Duh, Kevin  and  Sudoh, Katsuhito  and  Tsukada, Hajime},
-  title     = {Automatic Evaluation of Translation Quality for Distant Language Pairs},
-  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
-  month     = {October},
-  year      = {2010},
-  address   = {Cambridge, MA},
-  publisher = {Association for Computational Linguistics},
-  pages     = {944--952},
-  url       = {http://www.aclweb.org/anthology/D10-1092}
-}
+.. [7]	 Gregor Leusch, Nicola Ueffing, and Hermann Ney. Cder:
+	 Efficient mt evaluation using block movements. In In
+	 Proceedings of EACL, pages 241-248, 2006.
 
-[8]
-@inproceedings{lin-och:2004:ACL,
-  author    = {Lin, Chin-Yew  and  Och, Franz Josef},
-  title     = {Automatic Evaluation of Machine Translation Quality Using Longest Common Subsequence and Skip-Bigram Statistics},
-  booktitle = {Proceedings of the 42nd Meeting of the Association for Computational Linguistics (ACL'04), Main Volume},
-  year      = 2004,
-  month     = {July},
-  address   = {Barcelona, Spain},
-  pages     = {605--612},
-  url       = {http://www.aclweb.org/anthology/P04-1077},
-  doi       = {10.3115/1218955.1219032}
-}
+.. [8]	 Gregor Leusch, Nicola Ueffing, Hermann Ney. A novel
+	 string-to-string distance measure with applications to
+	 machine translation evaluation. In Proceedings of MT
+	 Summit IX, pages 240-247, 2003.
 
-[9]
-@INPROCEEDINGS{Leusch06cder:efficient,
-    author = {Gregor Leusch and Nicola Ueffing and Hermann Ney},
-    title = {CDER: Efficient MT Evaluation Using Block Movements},
-    booktitle = {In Proceedings of EACL},
-    year = {2006},
-    pages = {241--248}
-}
+.. [9]	 Philipp Koehn. Statistical significance tests for machine
+	 translation evaluation. In Dekang Lin and Dekai Wu, editors,
+	 Proceedings of EMNLP 2004, pages 388-395, Barcelona, Spain,
+	 July 2004. Association for Computational Linguistics.
 
-[10]
-@INPROCEEDINGS{Evaluation03anovel,
-    author = {Machine Translation Evaluation and Gregor Leusch and Nicola Ueffing and Hermann Ney and Lehrstuhl Fﾃｼr Informatik},
-    title = {A Novel String-to-String Distance Measure With Applications to},
-    booktitle = {In Proceedings of MT Summit IX},
-    year = {2003},
-    pages = {240--247}
-}
+.. [10]	 Michael Collins, Philipp Koehn, and Ivona Kučerová. Clause
+	 restructuring for statistical machine translation. In ACL
+	 '05: Proceedings of the 43rd Annual Meeting on Association
+	 for Computational Linguistics, pages 531-540, Morristown, NJ,
+	 USA, 2005. Association for Computational Linguistics.

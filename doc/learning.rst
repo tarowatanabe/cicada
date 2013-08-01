@@ -125,8 +125,9 @@ Batch learning
 --------------
 
 There will be a situation when no non-local features, such as ngram
-language models, are not integrated in the model. In this case, you
-can use a simple batch learning:
+language models, are not integrated in the model, and uses the
+features defined in a synchronous grammar. In this case, you can use a
+simple batch learning:
 
 .. code:: bash
 
@@ -169,7 +170,7 @@ controlled by:
 --mpi            # of MPI jobs
 --mpi-host       comma delimited list of hosts for MPI jobs
 --mpi-host-file  host file for use with MPI jobs
---pbs            Run under pBS
+--pbs            Run under PBS
 --pbs-queue      PBS queue name
 
 Remark that some objectives are implemented only by MPI or by

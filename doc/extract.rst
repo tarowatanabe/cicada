@@ -68,7 +68,7 @@ MapReduce framework using either pthreads or MPI, controlled by:
 --mpi            # of MPI jobs
 --mpi-host       comma delimited list of hosts for MPI jobs
 --mpi-host-file  host file for use with MPI jobs
---pbs            Run under pBS
+--pbs            Run under PBS
 --pbs-queue      PBS queue name
 
 Extraction and final merging requires temporary disk space which can
