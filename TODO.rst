@@ -229,9 +229,6 @@ Implement LBFGS/CG by templates since this may conflict with float/double based 
 
 Unify the liblbfgs and cg_descent code...?
 
-Documentation:
-  - Use MD or RST...??
-
 Lua integration:
   - Any use...????
 
