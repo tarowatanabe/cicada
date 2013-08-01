@@ -1,4 +1,4 @@
-2013-x-x
+2013-8-2
 --------
  - INCOMPATIBLE: ngram language model code is completely written, and
    follows the latest "expgram" codebase.
