@@ -56,11 +56,11 @@ OPTIONS
   --feature-unaligned   unaligned features
   --feature-internal    internal features
   --feature-height      height features
-  --feature-lexicon     compute Model1 features
-  --feature-model1      compute Model1 features
-  --feature-noisy-or    compute noisy-or features
+  --feature-lexicon     Lexical features
+  --feature-model1      Model1 features
+  --feature-noisy-or    noisy-or features
   --feature-insertion-deletion
-                        compute insertion/deletion features
+                        insertion/deletion features
   --prefix-feature=PREFIX_FEATURE
                         feature name prefix (default: )
   --prefix-attribute=PREFIX_ATTRIBUTE

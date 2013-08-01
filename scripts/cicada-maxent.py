@@ -29,6 +29,8 @@ opt_parser = OptionParser(
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
+    make_option("--oracle", default="", action="store", type="string",
+                metavar="FILE", help="oracle translations"),
 
     make_option("--config", default="", action="store", type="string",
                 metavar="CONFIG", help="cicada config file"),
@@ -386,6 +388,10 @@ if __name__ == '__main__':
         if not os.path.exists(options.root_dir):
             os.makedirs(options.root_dir)
 
+    if options.oracle:
+        if not os.path.exists(options.oracle):
+            raise ValueError, "no oracle forests: %s" %(options.oracle)
+
     ### regularizer
     regularizer = "--regularize-l2"
     if options.regularize_l1 and options.regularize_l2:
@@ -433,6 +439,9 @@ if __name__ == '__main__':
     config  = os.path.join(options.root_dir, options.prefix + '.config')
     forest  = os.path.join(options.root_dir, options.prefix + '.forest')
     oracle  = os.path.join(options.root_dir, options.prefix + '.oracle')
+    if options.oracle:
+        oracle = options.oracle
+
     weights = os.path.join(options.root_dir, options.prefix + '.weights')
     
     ### step 1:
@@ -477,37 +486,38 @@ if __name__ == '__main__':
                  logfile=Quoted(forest+'.log'))
 
     ### step 3:
-    print "oracle forest %s @ %s" %(oracle, time.ctime())
+    if not options.oracle:
+        print "oracle forest %s @ %s" %(oracle, time.ctime())
 
-    if mpi:
-        qsub.mpirun(Program(cicada.cicada_oracle_mpi,
-                            Option('--refset', Quoted(options.refset)),
-                            Option('--tstset', Quoted(forest)),
-                            Option('--output', Quoted(oracle)),
-                            Option('--scorer', options.scorer),
-                            Option('--scorer-cube', options.scorer_cube),
-                            Option('--directory'),
-                            Option('--forest'),
-                            Option('--debug')),
+        if mpi:
+            qsub.mpirun(Program(cicada.cicada_oracle_mpi,
+                                Option('--refset', Quoted(options.refset)),
+                                Option('--tstset', Quoted(forest)),
+                                Option('--output', Quoted(oracle)),
+                                Option('--scorer', options.scorer),
+                                Option('--scorer-cube', options.scorer_cube),
+                                Option('--directory'),
+                                Option('--forest'),
+                                Option('--debug')),
+                        name="oracle",
+                        memory=options.max_malloc,
+                        threads=options.threads,
+                        logfile=Quoted(oracle+'.log'))
+        else:
+            qsub.run(Program(cicada.cicada_oracle,
+                             Option('--refset', Quoted(options.refset)),
+                             Option('--tstset', Quoted(forest)),
+                             Option('--output', Quoted(oracle)),
+                             Option('--scorer', options.scorer),
+                             Option('--scorer-cube', options.scorer_cube),
+                             Option('--directory'),
+                             Option('--forest'),
+                             Option('--threads', options.threads),
+                             Option('--debug'),),
                     name="oracle",
-                    memory=options.max_malloc,
-                    threads=options.threads,
-                    logfile=Quoted(oracle+'.log'))
-    else:
-        qsub.run(Program(cicada.cicada_oracle,
-                         Option('--refset', Quoted(options.refset)),
-                         Option('--tstset', Quoted(forest)),
-                         Option('--output', Quoted(oracle)),
-                         Option('--scorer', options.scorer),
-                         Option('--scorer-cube', options.scorer_cube),
-                         Option('--directory'),
-                         Option('--forest'),
-                         Option('--threads', options.threads),
-                         Option('--debug'),),
-                 name="oracle",
-                 memory=options.max_malloc,
-                 threads=options.threads,
-                 logfile=Quoted(oracle+'.log'))
+                     memory=options.max_malloc,
+                     threads=options.threads,
+                     logfile=Quoted(oracle+'.log'))
     
     ### step 3:
     print "learn %s @ %s" %(weights, time.ctime())

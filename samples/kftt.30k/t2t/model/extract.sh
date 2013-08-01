@@ -15,6 +15,7 @@ exec $cicada/scripts/cicada-extract.py \
 	\
 	--tree \
 	--constrained \
+        --exhaustive \
 	\
 	--threads 4
 

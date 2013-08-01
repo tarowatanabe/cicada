@@ -143,8 +143,9 @@ There exist other options which greatly affect the extracted grammar:
 	       rules to satisfy such constraints.
 --exhaustive   By default, the non-aligned words are attached to the
                hyperedges, which are closer to the goal node. This
-	       option try attach non-aligned words exhaustively, and
-	       extract spuriously many rules.
+	       option try to attach non-aligned words exhaustively to
+	       any possible hyperedges, and extract spuriously many
+	       rules.
 --project      In tree-to-string or string-to-tree models, the string
                side does not contain any linguistic labels. This
 	       option project the non-terminal symbols from the

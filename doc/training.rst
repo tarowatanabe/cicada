@@ -181,7 +181,8 @@ Reference translations
 
 During tuning, we need reference translations a set of high quality
 translations for each input sentence. In cicada, multiple reference
-translations are summarized in a single file as follows:
+translations are summarized in a single file as follows (see
+`doc/eval.rst` for details):
 
 ::
 
@@ -212,15 +213,18 @@ Now, we are ready to perform tuning:
 	--refset ../../data/tune.en.ref \
 	--config cicada.config \
 	--kbest 1000 \
+	--merge \
 	--threads 4
 
 We use `tune.ja` as a source set (``--srcset``) and `tune.en.ref` as
 its reference translations (``--refset``) with `cicada.config` as a
 configuration template (``--config``). The training is performed by
-k-best merging batch style learning with 1,000 best translations
-generated in each round (``--kbest``). By default, training objective
-is xBLEU, which is superior to other objectives, like pair-wise
-ranking (PRO) or direct error minimization (MERT).
+k-best merging batch style learning (``--merge``) with 1,000 best
+translations generated in each round (``--kbest``). By default,
+training objective is xBLEU, which is superior to other objectives,
+like pair-wise ranking (PRO) or direct error minimization (MERT).
+Without the ``--merge`` flag, k-bests generated in each iteration are
+treated separately.
 
 By default, training is performed 10 iterations, and generates several
 files ``learn.<iteration>.*``. The tuned parameters have suffix of

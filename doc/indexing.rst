@@ -13,7 +13,8 @@ script.
 The option corresponds to the extracted model by the
 `cicada-extract.py`. When you translate using a string-to-tree model,
 you need an additional flag ``--cky`` to perform indexing suitable for
-the CKY algorithm.
+the CKY algorithm. Note that tree-to-{tree,string} models can be
+indexed by ``--cky`` when composing with strings, not trees.
 All the counts in `model/[grammar]-counts` and `model/[grammar]-score`
 are reinterpreted and dump into `model/[grammar]-index` in both of
 plain gzip file and a binary format.
@@ -42,16 +43,36 @@ By default, only two features are encoded in the model:
 :math:`\log p(source|target)` and :math:`\log p(target|source)`.
 Additional features are included by the following options:
 
---feature-root        generative probability
+--feature-root        Generative probabilities: :math:`\log p(source|root(source))` and :math:`\log p(target|root(target))`.
 --feature-fisher      Fisher's exact test
 --feature-type        observation probability
---feature-singleton   singleton features
---feature-cross       cross features
---feature-unaligned   unaligned features
---feature-internal    internal features
---feature-height      height features
---feature-lexicon     compute Model1 features
---feature-model1      compute Model1 features
---feature-noisy-or    compute noisy-or features
+--feature-singleton   Singleton features: true if this is pair occurs 
+                      only once in bilingual data.
+--feature-cross       Cross features: the number of crossing in word alignment.
+--feature-unaligned   Unaligned features: the number of words which
+                      are not aligned with each other.
+--feature-internal    Internal features (STSG only). The number of
+                      internal nodes in an elementary tree.
+--feature-height      Height features: the height of elementary trees.
+--feature-lexicon     Lexical features
+--feature-model1      Model1 features
+--feature-noisy-or    Noisy-or features
 --feature-insertion-deletion  Insertion deletion features
 
+Parallel Indexing
+-----------------
+
+Similar to model extraction procedure, we support parallel indexing
+using either pthreads or MPI, controlled by:
+
+--threads        # of threads
+--mpi            # of MPI jobs
+--mpi-host       comma delimited list of hosts for MPI jobs
+--mpi-host-file  host file for use with MPI jobs
+--pbs            Run under pBS
+--pbs-queue      PBS queue name
+
+Indexing requires temporary space which can be specified by the
+option:
+
+--temporary-dir  temporary directory

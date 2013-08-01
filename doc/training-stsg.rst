@@ -271,10 +271,13 @@ Extraction
 	--lexicon-variational \
 	--tree \
 	--constrained \
+	--exhaustive \
 	--threads 4
 
 Here, we use the ``--tree`` flag to indicate the tree-to-tree model
-extraction using the source and target syntactic trees (``--ff`` and ``--fe``).
+extraction using the source and target syntactic trees (``--ff`` and
+``--fe``). Also, we extract rules exhaustively (``--exhaustive`` flag)
+by considering all possible attachments of non aligned words.
 
 Features
 ````````

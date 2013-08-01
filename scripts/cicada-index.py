@@ -74,10 +74,10 @@ opt_parser = OptionParser(
     make_option("--feature-internal",           default=None, action="store_true", help="internal features"),
     make_option("--feature-height",             default=None, action="store_true", help="height features"),
 
-    make_option("--feature-lexicon",            default=None, action="store_true", help="compute Model1 features"),
-    make_option("--feature-model1",             default=None, action="store_true", help="compute Model1 features"),
-    make_option("--feature-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
-    make_option("--feature-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
+    make_option("--feature-lexicon",            default=None, action="store_true", help="Lexical features"),
+    make_option("--feature-model1",             default=None, action="store_true", help="Model1 features"),
+    make_option("--feature-noisy-or",           default=None, action="store_true", help="noisy-or features"),
+    make_option("--feature-insertion-deletion", default=None, action="store_true", help="insertion/deletion features"),
 
     make_option("--prefix-feature",   default="", action="store", type="string", help="feature name prefix (default: %default)"),
     make_option("--prefix-attribute", default="", action="store", type="string", help="attribute name prefix (default: %default)"),

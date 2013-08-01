@@ -1,55 +1,178 @@
 Learning
 ========
 
+One of the important procedures in machine translation is to fit
+parameters toward a given tuning data, which is very close to the
+actual test data. Basically we supports three kinds of parameter
+learning strategies:
 
+k-best merging batch learning:
+   In MERT, PRO or batch-MIRA learning, k-bests or pruned forests are
+   generated in each iteration, and k-bests (or forests) are merged
+   across iterations. The merged k-bests (or forests) are used as a
+   training data for parameter optimization. We support MERT by
+   ``cicada-mert.py``, and other objectives, like PRO or xBLEU by
+   ``cicada-learn.py``.
 
-Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE (may change in the future)
+Online learning: 
+   In ``cicada-learn-online.py``, training data is split into
+   mini-batch, and the mini-batch local k-best translations (or
+   forests) are generated. Parameters are optimized using the local
+   translations as a training data, and perform updates to the
+   previously learned parameters.
 
-MERT: cicada_mert{,_kbest}{,_mpi}
+Batch learning: 
+   If non-local features, such as ngram language models, are not
+   integrated in the model, we do not have to perform decoding in each
+   iteration. ``cicada-maxent.py`` constructs forests, computes oracle
+   forests (or uses gold-standard forests), and optimizes toward the
+   oracles.
 
-MAXLIKE: cicada_maxlike{,_mpi} (this is probably deprecated by cicada_learn...)
+Reference Translations
+----------------------
 
-LEARN: ciada_learn{,_kbest}{,_mpi}
-       Generic learner which simply differentate correct translations to incorrect tranlsations by forest or kbests.
-       The hyperparameter C is independent of data size, and is used as a scaling for L_{1,2} regularizer.
+During learning, we need a set of reference translations which looks
+like following:
 
-LEARN_ONLINE: cicada_learn_online{,_mpi}
-       This is a variant of cicada-learn.sh, or cicada-learn-linear.sh in that it works in an online fashion.
-       Oracle translations are not computed globally, but only locally inside "block."
+::
 
-We can easily tune weights by using tree scripts:
+   0 ||| first reference
+   0 ||| second reference
+   1 ||| first reference for the second input
+   1 ||| second reference for the second input
 
-cicada-maxent.py
-   Learn parameters which is "local" to supplied grammar.
-   We need to specify:
-      development data
-      corresponding reference translations
-      cicada.config file listing grammar(s)
-      composition algorithm   (default to compose-cky)
-      hyperparameter constant (default to 1e-3)
+See `doc/eval.rst` for details.
 
-cicada-mert.py
-   MERT script. We need to specify
-      development data
-      corresponding reference translations
-      cicada.config file listing grammar(s), feature functions and operations
-      
-   ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
-   (kbest will be always zero, since we will run hypergraph-MERT)
+k-best merging batch learning
+-----------------------------
 
-cicada-learn.py
-   Learning script. We need to specify
-      development data
-      corresponding reference translations
-      cicada.config file listing grammar(s), feature functions and operations
-      hyperparameter constant (default to 1e-3)
-      
-   ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
-   When run in hypergraph-learning mode, kbest will be always set to zero.
-   For learn-linear trainig we can run only in kbest mode, which will be set to 1000 by default.
+In the k-best merging batch learning approach, k-bests are generated
+in each iteration. This is managed by providing a template
+configuration file. The training script, ``cicada-mert.py`` and
+``cicada-learn.py`` replace following strings:
 
-cicada-mert-moses.py
-   MERT for moses!
+- ``${weights}``: Parameters for decoding.
+- ``${kbest}``: k-best size for decoding. 0 implies forest output, not k-best.
+- ``${file}``: Output file or directory.
 
-cicada-learn-moses.py
-   Learning for moses!
+MERT
+````
+
+MERT was a standard but not actively maintained.
+
+.. code:: bash
+
+  cicada-mert.py \
+	  --srcset <source data> \
+	  --refset <reference transaltion data> \
+	  --config <configuration file>
+
+By default, forest-MERT is performed. If the forest is too large, the
+you can prune forests by appropriate operations or tweak beam
+size. For details, see `doc/operation.rst`. If you prefer k-best MERT,
+then, use ``--kbest <k-best-size>`` option. One of the benefits of
+MERT is that it can use any evaluation metrics. You can use
+``--scorer`` option to change the criterion. See `doc/eval.rst` for
+details.
+
+Others (Recommended)
+````````````````````
+
+Alternatively, following non-MERT is better in practice:
+
+.. code:: bash
+
+  cicada-learn.py \
+	  --srcset <source data> \
+	  --refset <reference transaltion data> \
+	  --config <configuration file> \
+	  --merge 
+
+By default, we use xBLEU as our objective, which can be modified by
+``--learn`` option. ``--merge`` implies k-best merging learning, and
+without this option, the k-best translations generated in each
+iteration is treated as a separate data set. Another important option
+is ``--C`` which specify the strength of optimization. Larger value
+implies less-overfit to training data, but smaller ``--C`` implies
+fitting to the training data. By default, we use L2 regularization
+(``--regularize-l2``) with ``--C 1e-5`` which prefers overfitting.
+
+Online learning
+---------------
+
+When tuning data is very large, you can try online-learning which is
+very fast in practice:
+
+.. code:: bash
+
+  cicada-learn-online.py \
+	  --srcset <source data> \
+	  --refset <reference transaltion data> \
+	  --config <configuration file>
+
+One of the major difference for setting online learning is the
+configuration parameters. Since we do not interchange decoding and
+optimization step, the configuration file should not contain any
+variables, such as ``${weights}``, and remove ``output``
+operation. The parameters for each operation, such as ``apply`` or
+``prune`` are automatically set by decoder when no weights are
+provided. By default, we use forests-based optimization if no
+``--kbest`` options is provided. The use of ``--asynchronous`` flag
+implies asynchronous parameter merging across workers which performed
+the best in our internal studies.
+
+Batch learning
+--------------
+
+There will be a situation when no non-local features, such as ngram
+language models, are not integrated in the model. In this case, you
+can use a simple batch learning:
+
+.. code:: bash
+
+  cicada-maxent.py \
+	  --srcset <source data> \
+	  --refset <reference transaltion data> \
+	  --config <configuration file> \
+	  --compose compose-cky
+
+Which computes forest based from the source data using the
+``compose-cky`` operation using the grammar specified in the given
+configuration file. By default, we use `softmax` as an objective.
+
+Precompute Forests
+------------------
+
+One of the resource demanding operations, both in terms of time and
+memory, is "composition" operation. Since this composition step is not
+affected by the parameters which are optimized during tuning, the
+composed forests can be precomputed given a tuning data using the
+following configuration, for instance, for SCFG:
+
+::
+
+   operation = compose-cky
+   operation = output:directory=[output directory],forest=true
+
+Then, the configuration file for tuning can avoid ``operation =
+compose-cky`` and use ``input-forest =  true``  to load the
+pre-composed forests. The ``--srcset`` option for tuning script can
+use the ``[output directory]``.
+
+Parallel Learning
+-----------------
+
+We support learning in parallel using either pthreads or MPI,
+controlled by:
+
+--threads        # of threads
+--mpi            # of MPI jobs
+--mpi-host       comma delimited list of hosts for MPI jobs
+--mpi-host-file  host file for use with MPI jobs
+--pbs            Run under pBS
+--pbs-queue      PBS queue name
+
+Remark that some objectives are implemented only by MPI or by
+threads (sorry for this inconvenience!). If you see an error
+message like "... is not supported by ...", you can try different
+parallel learning strategies.
