@@ -8,7 +8,6 @@ endif WITH_RST2HTML
 
 EXTRA_DIST = \
 alignment.rst \
-attributes.rst \
 concepts.rst \
 eval.rst \
 extract.rst \
