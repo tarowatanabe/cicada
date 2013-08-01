@@ -9,8 +9,8 @@ Following metrics are implemented:
 - WER: word error rate [2]_
 - InvWER: Inversion word error rate [8]_
 - PER: position independent word error rate [3]_
-- TER: translation error rate [4]_
-- RIBES: RIBES [5]_
+- TER: translation edit rate [4]_
+- RIBES: Rank-based Intuitive Bilingual Evaluation Score [5]_
 - SB: skip bigram  [6]_
 - WLCS: (weighted) longest common subsequence  [6]_
 - SK: string kernel

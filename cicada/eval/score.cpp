@@ -147,7 +147,7 @@ cder: CD error rate\n\
 \tdeletion=deletion cost (default 1)\n\
 \tjump=jump cost (default 1)\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
-ter: translation error rate\n\
+ter: translation edit rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tmatcher=[matcher spec] approximate matching\n\
 \tmatch=approximated match cost (default 0.2)\n\
