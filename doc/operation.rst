@@ -36,7 +36,7 @@ one line of an input, and id specifies the id of the input.
 Output
 ------
 
-``output`` is a part of operations, 
+``output`` is a part of operations.
 
 
 Operations

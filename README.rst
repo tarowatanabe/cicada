@@ -205,7 +205,9 @@ Monolingual grammar learning is implemented:
 - Also, learn coarse grammars from the latent annotated PCFG for
   coarse-to-fine parsing [26]_.
 
-Phrase/synchronous-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
+Phrase/synchronous-rule/tree-to-string/string-to-tree
+extraction/scoring are implemented (see `doc/extraction.rst` and
+`doc/indexing.rst` for details):
 
 - A conventional phrase extract algorithm in Moses.
 - A conventional hierarchical phrase extraction algorithm in Hiero
@@ -217,7 +219,8 @@ Phrase/synchronous-rule/tree-to-string/string-to-tree extraction/scoring are imp
   model scores [19]_.
 - Then, prune your model based on Fisher's exact test [38]_.
 
-Various learning components are implemented:
+Various learning components are implemented (see `doc/learning.rst`
+for details):
 
 - k-best merging batch learning
 
@@ -237,7 +240,7 @@ Various learning components are implemented:
   * mini-batch style asynchronous learning with various objectives,
     including hinge, ranking, softmax or xBLEU [6]_.
 
-Feature functions:
+Feature functions (see `doc/features.rst` for details):
 
 - The ngram language model feature supports both of
   `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
