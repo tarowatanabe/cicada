@@ -358,7 +358,7 @@ namespace cicada
 	for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
 	  if (! node_map_fallback[id].empty() && ! node_map[id].empty()) {
 	    const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
-	    
+
 	    node_map_type::const_iterator piter_end = node_map_fallback[id].end();
 	    for (node_map_type::const_iterator piter = node_map_fallback[id].begin(); piter != piter_end; ++ piter)
 	      if (connected[piter->second]) {

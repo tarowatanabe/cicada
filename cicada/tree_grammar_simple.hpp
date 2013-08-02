@@ -15,6 +15,99 @@
 
 namespace cicada
 {
+  class TreeGrammarGlue : public TreeGrammarMutable
+  {
+    
+  public:
+    TreeGrammarGlue(const symbol_type& goal_source,
+		    const symbol_type& goal_target,
+		    const symbol_type& non_terminal_source,
+		    const symbol_type& non_terminal_target,
+		    const bool __straight,
+		    const bool __inverted)
+      : TreeGrammarMutable(true),
+	straight(__straight),
+	inverted(__inverted)
+    {
+      construct(goal_source, goal_target, non_terminal_source, non_terminal_target);
+    }
+    
+    transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarGlue(*this)); }
+
+    bool valid_span(int first, int last, int distance) const
+    {
+      return (straight && inverted ? true : first == 0);
+    }
+
+  private:
+    void construct(const symbol_type& goal_source,
+		   const symbol_type& goal_target,
+		   const symbol_type& non_terminal_source,
+		   const symbol_type& non_terminal_target)
+    {
+      if (! goal_source.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(goal_source));
+      if (! goal_target.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(goal_target));
+      
+      if (! non_terminal_source.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal_source));
+      if (! non_terminal_target.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal_target));
+      
+      attribute_set_type attributes;
+      attributes["tree-fallback"] = attribute_set_type::int_type(1);
+      
+      // unary rule...
+      insert(rule_pair_type(rule_type::create(rule_type(goal_source, &non_terminal_source, (&non_terminal_source) + 1)),
+			    rule_type::create(rule_type(goal_target, &non_terminal_target, (&non_terminal_target) + 1)),
+			    feature_set_type(),
+			    attributes));
+
+      if (straight) {
+	std::vector<symbol_type, std::allocator<symbol_type> > source(2);
+	std::vector<symbol_type, std::allocator<symbol_type> > target(2);
+	
+	source.front() = goal_source.non_terminal(1);
+	source.back()  = non_terminal_source.non_terminal(2);
+
+	target.front() = goal_target.non_terminal(1);
+	target.back()  = non_terminal_target.non_terminal(2);
+	
+	feature_set_type features;
+	features["tree-glue-straight-penalty"] = -1;
+
+	insert(rule_pair_type(rule_type::create(rule_type(goal_source, source.begin(), source.end())),
+			      rule_type::create(rule_type(goal_target, target.begin(), target.end())),
+			      features,
+			      attributes));
+      }
+      
+      if (inverted) {
+	std::vector<symbol_type, std::allocator<symbol_type> > source(2);
+	std::vector<symbol_type, std::allocator<symbol_type> > target(2);
+	
+	source.front() = goal_source.non_terminal(1);
+	source.back()  = non_terminal_source.non_terminal(2);
+	
+	target.front() = non_terminal_target.non_terminal(2);
+	target.back()  = goal_target.non_terminal(1);
+	
+	feature_set_type features;
+	features["tree-glue-inverted-penalty"] = -1;
+
+	insert(rule_pair_type(rule_type::create(rule_type(goal_source, source.begin(), source.end())),
+			      rule_type::create(rule_type(goal_target, target.begin(), target.end())),
+			      features,
+			      attributes));	
+      }
+    }
+    
+  private:
+    bool straight;
+    bool inverted;
+  };
+
   class TreeGrammarFallback : public TreeGrammarMutable
   {
   public:

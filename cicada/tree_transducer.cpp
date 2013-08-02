@@ -38,6 +38,13 @@ file-name: indexed tree grammar or plain text tree grammar\n\
 \tattribute0=[attribute-name]\n\
 \tattribute1=[attribute-name]\n\
 \t...\n\
+glue: glue rules for cyk algorithm\n\
+\tgoal-source=[goal non-terminal for the source side]\n\
+\tgoal-target=[goal non-terminal for the target side]\n\
+\tnon-terminal-source=[default non-terminal for the source side]\n\
+\tnon-terminal-target=[default non-terminal for the target side]\n\
+\tstraight=[true|false] straight glue-rule\n\
+\tinverted=[true|false] inverted glue-rule\n\
 fallback: fallback source-to-target, tree-to-{string,tree} transfer rule\n\
 \tgoal=[default goal label] target side goal\n\
 \tnon-terminal=[defaut non-terminal] target side non-terminal\n\
@@ -70,8 +77,52 @@ fallback: fallback source-to-target, tree-to-{string,tree} transfer rule\n\
     typedef boost::filesystem::path path_type;
     
     const parameter_type param(parameter);
-    
-    if (utils::ipiece(param.name()) == "fallback") {
+
+    if (utils::ipiece(param.name()) == "glue") {
+      symbol_type goal_source;
+      symbol_type goal_target;
+      symbol_type non_terminal_source;
+      symbol_type non_terminal_target;
+      bool straight = false;
+      bool inverted = false;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "goal-source")
+	  goal_source = piter->second;
+	else if (utils::ipiece(piter->first) == "goal-target")
+	  goal_target = piter->second;
+	else if (utils::ipiece(piter->first) == "non-terminal-source")
+	  non_terminal_source = piter->second;
+	else if (utils::ipiece(piter->first) == "non-terminal-target")
+	  non_terminal_target = piter->second;
+	else if (utils::ipiece(piter->first) == "straight")
+	  straight = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "inverted" || utils::ipiece(piter->first) == "invert")
+	  inverted = utils::lexical_cast<bool>(piter->second);
+	else
+	  throw std::runtime_error("unsupported parameter for glue grammar: " + piter->first + "=" + piter->second);
+      }
+      
+      if (int(inverted) + straight == 0)
+	throw std::runtime_error("no insetion or straight glue rules?");
+      
+      if (goal_source.empty() || ! goal_source.is_non_terminal())
+	throw std::runtime_error("invalid goal for glue rules? " + static_cast<const std::string&>(goal_source));
+      if (goal_target.empty() || ! goal_target.is_non_terminal())
+	throw std::runtime_error("invalid goal for glue rules? " + static_cast<const std::string&>(goal_target));
+      
+      if (! non_terminal_source.empty() && ! non_terminal_source.is_non_terminal())
+	throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal_source));
+      if (! non_terminal_target.empty() && ! non_terminal_target.is_non_terminal())
+	throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal_target));
+      
+      return transducer_ptr_type(new TreeGrammarGlue(goal_source,
+						     goal_target,
+						     non_terminal_source,
+						     non_terminal_target,
+						     straight,
+						     inverted));
+    } else if (utils::ipiece(param.name()) == "fallback") {
       symbol_type goal;
       symbol_type non_terminal;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {

@@ -104,7 +104,9 @@ namespace cicada
 	attr_internal_node("internal-node"),
 	attr_span_first("span-first"),
 	attr_span_last("span-last"),
+        attr_tree_fallback("tree-fallback"),
         attr_glue_tree(__grammar.empty() ? "" : "glue-tree"),
+        attr_glue_tree_fallback("glue-tree-fallback"),
         attr_frontier_source(__frontier ? "frontier-source" : ""),
         attr_frontier_target(__frontier ? "frontier-target" : "")
     {
@@ -495,8 +497,9 @@ namespace cicada
       actives_tree.clear();
       passives.clear();
       
-      node_graph_rule.clear();
       node_graph_tree.clear();
+      node_graph_rule.clear();
+      node_graph_glue.clear();
       non_terminals.clear();
       scores.clear();
       
@@ -938,6 +941,11 @@ namespace cicada
 		throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(ref[i]));
 	      
 	      graph.goal = giter->second;
+	      
+	      if (giter->second >= connected.size())
+		connected.resize(giter->second + 1, false);
+	      
+	      connected[giter->second] = true;
 	    }
 	  }
 	}
@@ -966,12 +974,42 @@ namespace cicada
 	    
 	    graph.connect_edge(edge.id, graph.goal);
 	    
-	    //++ goals;
+	    if (giter->second >= connected.size())
+	      connected.resize(giter->second + 1, false);
+	    
+	    connected[giter->second] = true;
 	  }
 	}
 
 	//std::cerr << "connected to goals: " << goals << std::endl;
       }
+
+      // final glue work!
+      if (graph.is_valid())
+	for (size_t node_id = 0; node_id != node_graph_tree.size(); ++ node_id) {
+	  const node_set_type& node_set_tree = node_graph_tree[node_id];
+	  const node_set_type& node_set_glue = node_graph_glue[node_id];
+	  
+	  if (node_set_tree.empty() || node_set_glue.empty()) continue;
+
+	  typename node_set_type::const_iterator citer_begin = node_set_tree.begin();
+	  typename node_set_type::const_iterator citer_end   = node_set_tree.end();
+	  
+	  typename node_set_type::const_iterator piter_begin = node_set_glue.begin();
+	  typename node_set_type::const_iterator piter_end   = node_set_glue.end();
+	  
+	  for (node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter)
+	    if (connected[piter->second]) 
+	      for (node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer)
+		if (! connected[citer->second] && node_set_glue.find(citer->first) == piter_end) {
+		  hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
+		  
+		  edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
+		  edge.attributes[attr_glue_tree_fallback] = attribute_set_type::int_type(1);
+		  
+		  graph.connect_edge(edge.id, piter->second);
+		}
+	}      
       
       // we will sort to remove unreachable nodes......
       if (graph.is_valid())
@@ -1118,6 +1156,7 @@ namespace cicada
 	
 	node_graph_tree.resize(node_graph_tree.size() + 1);
 	node_graph_rule.resize(node_graph_rule.size() + 1);
+	node_graph_glue.resize(node_graph_glue.size() + 1);
 	
 	unary_next = true;
       } else
@@ -1169,6 +1208,7 @@ namespace cicada
 	
 	node_graph_tree.resize(node_graph_tree.size() + 1);
 	node_graph_rule.resize(node_graph_rule.size() + 1);
+	node_graph_glue.resize(node_graph_glue.size() + 1);
 
 	unary_next = true;
       } else
@@ -1180,6 +1220,9 @@ namespace cicada
       std::pair<typename node_set_type::iterator, bool> result_mapped = node_graph_tree[result.first->second].insert(std::make_pair(rule->label, 0));
       if (result_mapped.second)
 	result_mapped.first->second = graph.add_node().id;
+      
+      if (is_tree_fallback(attributes))
+	node_graph_glue[result.first->second].insert(*result_mapped.first);
       
       const hypergraph_type::id_type root_id = result_mapped.first->second;
       
@@ -1274,6 +1317,14 @@ namespace cicada
 	    graph.connect_edge(edge_id, root);
 	      
 	    result.first->second = edge_id;
+
+	    typename tails_type::const_iterator titer_end = tails.end();
+	    for (typename tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	      if (*titer >= connected.size())
+		connected.resize(*titer + 1, false);
+	      
+	      connected[*titer] = true;
+	    }
 	  } else {
 	    edge_id = result.first->second;
 	    root = graph.edges[edge_id].head;
@@ -1312,6 +1363,14 @@ namespace cicada
 	
 	graph.edges[edge_id].rule = construct_rule(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
+
+	typename tails_type::const_iterator titer_end = tails.end();
+	for (typename tails_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer) {
+	  if (*titer >= connected.size())
+	    connected.resize(*titer + 1, false);
+	  
+	  connected[*titer] = true;
+	}
       }
       
       return edge_id;
@@ -1562,6 +1621,20 @@ namespace cicada
       return riter->second;
     }
   
+    struct __tree_fallback : public boost::static_visitor<bool>
+    {
+      bool operator()(const attribute_set_type::int_type& x) const { return x; }
+      template <typename Tp>
+      bool operator()(const Tp& x) const { return false; }
+    };
+
+    bool is_tree_fallback(const attribute_set_type& attrs) const
+    {
+      attribute_set_type::const_iterator aiter = attrs.find(attr_tree_fallback);
+      
+      return aiter != attrs.end() && boost::apply_visitor(__tree_fallback(), aiter->second);
+    }
+
   private:
     const symbol_type goal;
     const tree_grammar_type& tree_grammar;
@@ -1577,7 +1650,9 @@ namespace cicada
     const attribute_type attr_internal_node;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
+    const attribute_type attr_tree_fallback;
     const attribute_type attr_glue_tree;
+    const attribute_type attr_glue_tree_fallback;
     const attribute_type attr_frontier_source;
     const attribute_type attr_frontier_target;
     
@@ -1605,6 +1680,7 @@ namespace cicada
     node_map_type         node_map;
     node_graph_type       node_graph_tree;
     node_graph_type       node_graph_rule;
+    node_graph_type       node_graph_glue;
     non_terminal_set_type non_terminals;
     score_set_type        scores;
 

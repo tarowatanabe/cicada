@@ -59,6 +59,8 @@ namespace cicada
     
     void construct(const symbol_type& goal, const symbol_type& non_terminal)
     {
+      if (! goal.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(goal));
       if (! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal));
       

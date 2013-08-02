@@ -512,7 +512,7 @@ namespace cicada
     typedef Trie trie_type;
     typedef typename trie_type::id_type id_type;
     
-    MutableFrontierIterator(trie_type& __trie) : trie(__trie), id(__trie.root()) {}
+    MutableFrontierIterator(trie_type& __trie, id_type& __id) : trie(__trie), id(__id) {}
     
     template <typename Value>
     MutableFrontierIterator& operator=(const Value& value)
@@ -525,16 +525,17 @@ namespace cicada
     MutableFrontierIterator& operator++() { return *this; }
     
     trie_type& trie;
-    id_type id;
+    id_type& id;
   };
 
   void TreeGrammarMutableImpl::insert(const rule_pair_type& rule_pair)
   {
     if (cky) {
-      MutableFrontierIterator<trie_type> iter(trie);
+      id_type id = trie.root();
+      MutableFrontierIterator<trie_type> iter(trie, id);
       rule_pair.source->frontier(iter);
       
-      trie[iter.id].push_back(rule_pair);
+      trie[id].push_back(rule_pair);
     } else {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > node_type;
       typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
