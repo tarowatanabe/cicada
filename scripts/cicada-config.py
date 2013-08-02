@@ -228,15 +228,15 @@ if __name__ == '__main__':
             invert = "true"
             
         print "# glue rules for string-to-tree"
-        print "# straight glue rule: %s(%s %s) ||| %s(%s %s)" %(options.goal,
-                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+        print "# straight glue rule: %s(%s %s) ||| %s(%s %s)" %(options.glue,
+                                                                non_terminal(options.glue, 1), non_terminal(options.glue, 2),
                                                                 options.goal,
                                                                 non_terminal(options.goal, 1), non_terminal(options.glue, 2))
-        print "# inverted glue rule: %s(%s %s) ||| %s(%s %s)" %(options.goal,
-                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+        print "# inverted glue rule: %s(%s %s) ||| %s(%s %s)" %(options.glue,
+                                                                non_terminal(options.glue, 1), non_terminal(options.glue, 2),
                                                                 options.goal,
                                                                 non_terminal(options.glue, 2), non_terminal(options.goal, 1))
-        print "tree-grammar = glue:goal-source=%s,goal-target=%s,non-terminal-source=%s,non-terminal-target=%s,straight=%s,invert=%s" %(options.goal, options.goal, options.glue, options.glue, straight, invert)
+        print "tree-grammar = glue:goal-source=%s,goal-target=%s,non-terminal-source=%s,non-terminal-target=%s,straight=%s,invert=%s" %(options.glue, options.goal, options.glue, options.glue, straight, invert)
         print
 
     if options.fallback and options.fallback_glue:
