@@ -607,7 +607,7 @@ namespace cicada
 	  if (citer->second >= connected.size())
 	    connected.resize(citer->second + 1, false);
 	  
-	  if (connected[citer->second]) continue;
+	  //if (connected[citer->second]) continue;
 	  
 	  for (node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
