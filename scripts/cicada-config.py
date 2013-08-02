@@ -34,8 +34,10 @@ opt_parser = OptionParser(
     make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: %default)"),
     make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: %default)"),
     
-    make_option("--straight", default=None, action="store_true", help="straight gulue rule for string-to-{string,tree}"),
-    make_option("--invert",   default=None, action="store_true", help="invert gulue rule for string-to-{string,tree}"),
+    make_option("--straight", default=None, action="store_true", help="straight gulue rule for string-to-string"),
+    make_option("--invert",   default=None, action="store_true", help="invert gulue rule for string-to-string"),
+    make_option("--tree-straight", default=None, action="store_true", help="straight gulue rule for string-to-tree"),
+    make_option("--tree-invert",   default=None, action="store_true", help="invert gulue rule for string-to-tree"),
     
     make_option("--insertion", default=None, action="store_true", help="insertion grammar for string-to-{string,tree}"),
     make_option("--deletion",  default=None, action="store_true", help="deletion grammar for string-to-{string,tree}"),
@@ -185,7 +187,7 @@ if __name__ == '__main__':
         if options.invert:
             invert = "true"
             
-        print "# glue rules for string-to-{string,tree}"
+        print "# glue rules for string-to-string"
         print "# straight glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2))
@@ -213,6 +215,28 @@ if __name__ == '__main__':
     
             for transducer in grammar:
                 print transducer
+        print
+
+    if options.tree_straight or options.tree_invert:
+    
+        straight = "false"
+        invert = "false"
+
+        if options.tree_straight:
+            straight = "true"
+        if options.tree_invert:
+            invert = "true"
+            
+        print "# glue rules for string-to-tree"
+        print "# straight glue rule: %s(%s %s) ||| %s(%s %s)" %(options.goal,
+                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                                options.goal,
+                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2))
+        print "# inverted glue rule: %s(%s %s) ||| %s(%s %s)" %(options.goal,
+                                                                non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                                options.goal,
+                                                                non_terminal(options.glue, 2), non_terminal(options.goal, 1))
+        print "tree-grammar = glue:goal-source=%s,goal-target=%s,non-terminal-source=%s,non-terminal-target=%s,straight=%s,invert=%s" %(options.goal, options.goal, options.glue, options.glue, straight, invert)
         print
 
     if options.fallback and options.fallback_glue:
