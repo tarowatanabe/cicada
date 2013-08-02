@@ -609,15 +609,16 @@ namespace cicada
 	  
 	  //if (connected[citer->second]) continue;
 	  
-	  for (node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
-	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
-	    
-	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
-	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
-	    
-	    graph.connect_edge(edge.id, piter->second);
-	  }
-
+	  for (node_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) 
+	    if (piter->second != citer->second) {
+	      hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
+	      
+	      edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
+	      edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
+	      
+	      graph.connect_edge(edge.id, piter->second);
+	    }
+	  
 	  connected[citer->second] = true;
 	}
       }
