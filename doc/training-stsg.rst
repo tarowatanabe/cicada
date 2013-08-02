@@ -240,12 +240,17 @@ which can handle OOVs.
   cd samples/kftt.30k/s2t/tune
   ../../../../scripts/cicada-config.py \
 	--tree-grammar ../model/ghkm-index \
-	--max-span 0 \
+	--max-span 10 \
 	--goal '[ROOT]' \
+	--tree-straight \
 	--insertion \
 	--feature-ngram ../../ngram/ngram.5.en.lm \
 	--tree-cky \
-	--beam 200 > cicada.config
+	--beam 100 > cicada.config
+
+In this example, we add straight glue rules as in SCFG, but using the
+STSG (``--tree-straight``), but limit the maximum span to 10 and beam
+size to 100 for practical reason.
 
 Tree-to-tree Model
 ------------------

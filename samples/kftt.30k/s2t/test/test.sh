@@ -18,11 +18,9 @@ $cicada/progs/cicada_filter_config \
   --file "file=-"
 
 ### perform translation
-### Here, fro practical reason, we do not translate all the dev data, but 
-### translation only its subset....
-$cicada/progs/cicada --config cicada.config --threads 4 --debug < ../data/dev.ja > dev.ja-en
+$cicada/progs/cicada --config cicada.config --threads 4 --debug < ../../data/dev.ja > dev.ja-en
 
 ### evaluation
-$cicada/progs/cicada_eval --tstset dev.ja-en --refset ../data/dev.en.ref
+$cicada/progs/cicada_eval --tstset dev.ja-en --refset ../../data/dev.en.ref
 
 

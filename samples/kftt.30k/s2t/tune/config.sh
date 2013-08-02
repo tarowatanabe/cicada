@@ -4,10 +4,11 @@ cicada=../../../..
 
 exec $cicada/scripts/cicada-config.py \
 	--tree-grammar ../model/ghkm-index \
-	--max-span 20 \
+	--max-span 10 \
 	--goal '[ROOT]' \
+        --tree-straight \
 	--insertion \
 	--feature-ngram ../../ngram/ngram.5.en.lm \
 	--tree-cky \
-	--beam 200 > cicada.config
+	--beam 100 > cicada.config
 	
