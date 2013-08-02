@@ -10,6 +10,8 @@ tron.cpp
 if HAVE_BLAS
 else
 liblinear_la_SOURCES += \
+blas/blas.h \
+blas/blasp.h \
 blas/daxpy.c \
 blas/ddot.c \
 blas/dnrm2.c \
