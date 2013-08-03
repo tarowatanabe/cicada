@@ -275,6 +275,10 @@ namespace cicada
 	statistics(false),
 	lattice_mode(false),
 	forest_mode(false),
+        span_mode(false),
+        alignment_mode(false),
+        dependency_mode(false),
+        bitext_mode(false),
 	no_id(false),
 	debug(__debug)
     {
@@ -303,6 +307,14 @@ namespace cicada
 	  lattice_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "forest")
 	  forest_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "span")
+	  span_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "alignment")
+	  alignment_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "dependency")
+	  dependency_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "bitext")
+	  bitext_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-id")
 	  no_id = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "file")
@@ -368,7 +380,7 @@ namespace cicada
       if (lattice_mode && forest_mode && graphviz)
 	throw std::runtime_error("only one of lattice or forest can be dumped");
       
-      if (int(lattice_mode) + forest_mode == 0)
+      if (int(lattice_mode) + forest_mode + span_mode + alignment_mode + dependency_mode + bitext_mode == 0)
 	forest_mode = true;
     }
 
@@ -511,15 +523,50 @@ namespace cicada
 	else
 	  cicada::graphviz(os, hypergraph);
 	os << '\n';
-      } else if (kbest_size <= 0) {	
+      } else if (kbest_size <= 0) {
+	
+	bool need_separator = false;
 	if (! no_id)
 	  os << id << " ||| ";
-	if (lattice_mode && forest_mode)
+	
+	if (lattice_mode && forest_mode) {
 	  os << data.lattice << " ||| " << hypergraph;
-	else if (lattice_mode)
+	  need_separator = true;
+	} else if (lattice_mode) {
 	  os << data.lattice;
-	else 
+	  need_separator = true;
+	} else {
 	  os << hypergraph;
+	  need_separator = true;
+	}
+	
+	if (span_mode) {
+	  if (need_separator)
+	    os << " ||| ";
+	  os << data.spans;
+	  need_separator = true;
+	}
+	
+	if (alignment_mode) {
+	  if (need_separator)
+	    os << " ||| ";
+	  os << data.alignment;
+	  need_separator = true;
+	}
+	
+	if (dependency_mode) {
+	  if (need_separator)
+	    os << " ||| ";
+	  os << data.dependency;
+	  need_separator = true;
+	}
+	
+	if (bitext_mode) {
+	  if (need_separator)
+	    os << " ||| ";
+	  os << data.targets;
+	  need_separator = true;
+	}
 	
 	os << '\n';
       } else {

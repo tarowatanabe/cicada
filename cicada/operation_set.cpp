@@ -162,6 +162,10 @@ output: kbest or hypergraph output\n\
 \tstatistics=[true|false] dump various statistics (size etc.)\n\
 \tlattice=[true|false] dump lattice\n\
 \tforest=[true|false] dump forest\n\
+\tspan=[true|false] dump spans\n\
+\talignment=[true|false] dump alignment\n\
+\tdependency=[true|false] dump dependency\n\
+\tbitext=[true|false] dump bitext\n\
 \tno-id=[true|false] do not output id\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\

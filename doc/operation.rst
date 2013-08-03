@@ -36,7 +36,41 @@ one line of an input, and id specifies the id of the input.
 Output
 ------
 
-``output`` is a part of operations.
+``output`` is a part of operations, and multiple ``output`` instances
+are supported, but we do not support output to different directories
+or different files, but they are output to the same directory or file
+pointed to by the ``directory`` or ``file`` options.
+``kbest`` specifies the k-best derivations using the ``weights`` or
+``weights-one``. Different types of yields are supported by the
+``yield`` option. ``unique`` option controls whether to output unique
+k-bests or allow duplicates. When ``kbest`` is not set or set to zero,
+we will output forest by default, but you can out put both or either
+of ``forest`` and/or ``lattice``. Other outputs, like alignment is
+also supported by ``alignment`` option. The ``graphviz`` output ouput
+forest or lattice in a dot format for visualization by graphviz.
+
+:: 
+
+  output: kbest or hypergraph output
+        kbest=<kbest size> zero for hypergraph output (default)
+        insertion-prefix=<prefix attatched to inserted word>
+        unique=[true|false] unique translation
+        weights=weight file for feature
+        weights-one=[true|false] one initialize weight
+        yield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span]
+	yield  for kbest
+        graphviz=[true|false] dump in graphviz format
+        debinarize=[true|false] debinarize k-best trees
+        statistics=[true|false] dump various statistics (size etc.)
+        lattice=[true|false] dump lattice
+        forest=[true|false] dump forest
+	span=[true|false] dump spans
+        alignment=[true|false] dump alignment
+        dependency=[true|false] dump dependency
+        bitext=[true|false] dump bitext
+        no-id=[true|false] do not output id
+        directory=directory for output
+        file=file for output
 
 
 Operations

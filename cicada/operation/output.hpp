@@ -56,6 +56,10 @@ namespace cicada
       bool statistics;
       bool lattice_mode;
       bool forest_mode;
+      bool span_mode;
+      bool alignment_mode;
+      bool dependency_mode;
+      bool bitext_mode;
       bool no_id;
   
       int debug;
