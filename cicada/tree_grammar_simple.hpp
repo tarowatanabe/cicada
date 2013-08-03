@@ -56,7 +56,7 @@ namespace cicada
 	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal_target));
       
       feature_set_type features;
-      features["tree-unary-straight-penalty"] = -1;
+      features["tree-glue-unary-penalty"] = -1;
 
       attribute_set_type attributes;
       attributes["tree-fallback"] = attribute_set_type::int_type(1);
