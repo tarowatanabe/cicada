@@ -25,6 +25,14 @@ file-name: indexed tree grammar or plain text tree grammar
 	attribute1=[attribute-name]
 	...
 
+glue: glue rules for cyk algorithm
+	goal-source=[goal non-terminal for the source side]
+	goal-target=[goal non-terminal for the target side]
+	non-terminal-source=[default non-terminal for the source side]
+	non-terminal-target=[default non-terminal for the target side]
+	straight=[true|false] straight glue-rule
+	inverted=[true|false] inverted glue-rule
+
 fallback: fallback source-to-target, tree-to-{string,tree} transfer rule
 	goal=[default goal label] target side goal
 	non-terminal=[defaut non-terminal] target side non-terminal
