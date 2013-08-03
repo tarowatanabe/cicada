@@ -21,7 +21,8 @@ cicada=../..
 exec $cicada/progs/cicada \
       --input $cicada/samples/scfg/input.txt \
       --goal '[ROOT]' \
-      --tree-grammar $cicada/samples/s2t/grammar.bin \
+      --tree-grammar $cicada/samples/s2t/grammar.bin:max-span=10 \
+      --tree-grammar "glue:goal-source=[ROOT],goal-target=[ROOT],non-terminal-source=[x],non-terminal-target=[x],straight=true,invert=false" \
       --grammar "insertion:non-terminal=[x]" \
       --feature-function "ngram:file=$cicada/samples/scfg/ngram.bin" \
       --feature-function word-penalty \
