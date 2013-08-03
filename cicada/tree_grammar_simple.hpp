@@ -55,13 +55,16 @@ namespace cicada
       if (! non_terminal_target.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal_target));
       
+      feature_set_type features;
+      features["tree-unary-straight-penalty"] = -1;
+
       attribute_set_type attributes;
       attributes["tree-fallback"] = attribute_set_type::int_type(1);
       
       // unary rule...
       insert(rule_pair_type(rule_type::create(rule_type(goal_source, &non_terminal_source, (&non_terminal_source) + 1)),
 			    rule_type::create(rule_type(goal_target, &non_terminal_target, (&non_terminal_target) + 1)),
-			    feature_set_type(),
+			    features,
 			    attributes));
 
       if (straight) {

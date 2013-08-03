@@ -779,14 +779,13 @@ namespace cicada
       if (result.second)
 	result.first->second = graph_out.add_node().id;
       
-      if (is_tree_fallback(attributes))
-	node_map_fallback[root_in].insert(*result.first);
+      const bool is_fallback = is_tree_fallback(attributes);
       
       int non_terminal_pos = 0;
       hypergraph_type::id_type node_prev = hypergraph_type::invalid;
       int relative_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos, node_prev, relative_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_out, non_terminal_pos, node_prev, relative_pos, is_fallback);
       
       graph_out.edges[edge_id].features   = features;
       graph_out.edges[edge_id].attributes = attributes;
@@ -804,7 +803,8 @@ namespace cicada
 					     hypergraph_type& graph,
 					     int& non_terminal_pos,
 					     hypergraph_type::id_type& node_prev,
-					     int& relative_pos)
+					     int& relative_pos,
+					     const bool is_fallback)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
@@ -829,6 +829,9 @@ namespace cicada
 	    if (result.second)
 	      result.first->second = graph.add_node().id;
 	    
+	    if (is_fallback)
+	      node_map_fallback[node].insert(*result.first);
+	    
 	    tails.push_back(result.first->second);
 	    
 	    node_prev = tails.back();
@@ -840,7 +843,8 @@ namespace cicada
 								     graph,
 								     non_terminal_pos,
 								     node_prev,
-								     relative_pos);
+								     relative_pos,
+								     is_fallback);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);

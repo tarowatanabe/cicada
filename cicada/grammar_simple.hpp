@@ -64,9 +64,12 @@ namespace cicada
       if (! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal: " + static_cast<const std::string&>(non_terminal));
       
+      feature_set_type features;
+      features["glue-unary-penalty"] = -1;
+
       rule_ptr_type rule_unary(rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, non_terminal.non_terminal(1)))));
       
-      insert(rule_unary, rule_unary);
+      insert(rule_unary, rule_unary, features);
 
       if (straight) {
 	std::vector<symbol_type, std::allocator<symbol_type> > phrase(2);

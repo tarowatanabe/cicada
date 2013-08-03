@@ -1222,8 +1222,7 @@ namespace cicada
       if (result_mapped.second)
 	result_mapped.first->second = graph.add_node().id;
       
-      if (is_tree_fallback(attributes))
-	node_graph_glue[result.first->second].insert(*result_mapped.first);
+      const bool is_fallback = is_tree_fallback(attributes);
       
       const hypergraph_type::id_type root_id = result_mapped.first->second;
       
@@ -1231,7 +1230,7 @@ namespace cicada
       hypergraph_type::id_type node_prev = hypergraph_type::invalid;
       int relative_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos, node_prev, relative_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos, node_prev, relative_pos, is_fallback);
       
       graph.edges[edge_id].features   = features;
       graph.edges[edge_id].attributes = attributes;
@@ -1249,7 +1248,8 @@ namespace cicada
 					     hypergraph_type& graph,
 					     int& non_terminal_pos,
 					     hypergraph_type::id_type& node_prev,
-					     int& relative_pos)
+					     int& relative_pos,
+					     const bool is_fallback)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
@@ -1273,6 +1273,9 @@ namespace cicada
 	    if (result.second)
 	      result.first->second = graph.add_node().id;
 	    
+	    if (is_fallback)
+	      node_graph_glue[frontiers[non_terminal_index]].insert(*result.first);
+	    
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
 	    
@@ -1285,7 +1288,8 @@ namespace cicada
 								     graph,
 								     non_terminal_pos,
 								     node_prev,
-								     relative_pos);
+								     relative_pos,
+								     is_fallback);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
