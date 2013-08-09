@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I.. -I../eigen -I../kenlm $(KEMLM_CPPFLAGS) $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(MSGPACK_CPPFLAGS)
+AM_CPPFLAGS = -I.. -I../eigen $(BOOST_CPPFLAGS) $(ICU_CPPFLAGS) $(PTHREAD_FLAGS) $(MSGPACK_CPPFLAGS)
 
 LIBUTILS=$(top_builddir)/utils/libutils.la
 LIBKENLM=$(top_builddir)/kenlm/lm/libkenlm.la
@@ -201,7 +201,7 @@ feature/sparse_ngram.cpp \
 feature/variational.cpp \
 feature/vocabulary.cpp
 
-libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
+libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS) -I../kenlm $(KEMLM_CPPFLAGS) 
 
 dist_signature_HEADERS = \
 signature/chinese.hpp  \
