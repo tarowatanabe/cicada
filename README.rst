@@ -28,7 +28,7 @@ Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pron
 Quick Start
 -----------
 
-The stable version is: `0.2.0 <http://www2.nict.go.jp/univ-com/multi_trans/cicada/cicada-0.2.0.tar.gz>`_.
+The stable version is: `0.2.1 <http://www2.nict.go.jp/univ-com/multi_trans/cicada/cicada-0.2.1.tar.gz>`_.
 The latest code is also available from `github.com <http://github.com/tarowatanabe/cicada>`_.
 
 Compile
