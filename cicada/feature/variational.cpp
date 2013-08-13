@@ -65,7 +65,7 @@ namespace cicada
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)
-	  feature_names[n] = "variational" + utils::lexical_cast<std::string>(n + 1);
+	  feature_names[n] = "variational:" + utils::lexical_cast<std::string>(n + 1);
       }
       
     public:
