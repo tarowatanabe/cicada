@@ -1,15 +1,19 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__NGRAM_COUNT_SET__HPP__
 #define __CICADA__NGRAM_COUNT_SET__HPP__ 1
 
+#include <iostream>
+#include <string>
+
 #include <cicada/symbol.hpp>
 #include <cicada/symbol_vector.hpp>
 
 #include <utils/unordered_map.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -25,7 +29,7 @@ namespace cicada
     typedef utils::unordered_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
 				 std::allocator<std::pair<const ngram_type, count_type> > >::type ngram_set_type;
     
-public:
+  public:
     typedef ngram_set_type::size_type        size_type;
     typedef ngram_set_type::difference_type  difference_type;
     
@@ -68,6 +72,15 @@ public:
     const_iterator end() const { return ngrams.end(); }
     iterator end() { return ngrams.end(); }
 
+  public:
+    void assign(const utils::piece& x);
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    
+    friend
+    std::ostream& operator<<(std::ostream& os, const NGramCountSet& x);
+    friend
+    std::istream& operator>>(std::istream& is, NGramCountSet& x);
+
   public:    
     friend
     bool operator==(const NGramCountSet& x, const NGramCountSet& y)
@@ -89,8 +102,9 @@ public:
     {
       return !(x == y);
     }
+    
 private:
-  ngram_set_type ngrams;
+    ngram_set_type ngrams;
   };
   
 };

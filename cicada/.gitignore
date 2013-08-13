@@ -40,6 +40,7 @@ lattice_main
 lexicon_main
 matcher_main
 neuron_main
+ngram_count_set_main
 ngram_pyp_main
 optimize_qp_main
 parameter_main

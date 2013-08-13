@@ -44,13 +44,13 @@ namespace msgpack
   {
     o.pack_map(v.size());
     
-    typename cicada::NGramCountSet::const_iterator it_end = v.end();
-    for (typename cicada::NGramCountSet::const_iterator it(v.begin()); it != it_end; ++ it) {
+    cicada::NGramCountSet::const_iterator it_end = v.end();
+    for (cicada::NGramCountSet::const_iterator it(v.begin()); it != it_end; ++ it) {
       o.pack(it->first);
       o.pack(it->second);
     }
       
-    return o;      
+    return o;
   }
     
   inline
@@ -68,7 +68,7 @@ namespace msgpack
       o.via.map.ptr  = p;
       o.via.map.size = v.size();
 	
-      for (typename cicada::NGramCountSet::const_iterator it(v.begin()); p != pend; ++ p, ++ it) {
+      for (cicada::NGramCountSet::const_iterator it(v.begin()); p != pend; ++ p, ++ it) {
 	p->key = msgpack::object(it->first, o.zone);
 	p->val = msgpack::object(it->second, o.zone);
       }

@@ -592,6 +592,7 @@ lexicon.cpp \
 matcher.cpp \
 model.cpp \
 ngram.cpp \
+ngram_count_set.cpp \
 ngram_index.cpp \
 ngram_pyp.cpp \
 operation.cpp \
@@ -660,6 +661,7 @@ lattice_main \
 lexicon_main \
 matcher_main \
 neuron_main \
+ngram_count_set_main \
 ngram_pyp_main \
 optimize_qp_main \
 parameter_main \
@@ -731,6 +733,9 @@ matcher_main_LDADD = libcicada.la
 
 neuron_main_SOURCES = neuron_main.cpp
 neuron_main_LDADD = libcicada.la
+
+ngram_count_set_main_SOURCES = ngram_count_set_main.cpp
+ngram_count_set_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 
 ngram_pyp_main_SOURCES = ngram_pyp_main.cpp
 ngram_pyp_main_LDADD = libcicada.la
