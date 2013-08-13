@@ -43,6 +43,7 @@ namespace cicada
   public:
     NGramCountSet() : ngrams() {}
     NGramCountSet(size_type hint) : ngrams(hint) {}
+    NGramCountSet(const utils::piece& x) : ngrams() { assign(x); }
 
   public:
     size_type size() const { return ngrams.size(); }
@@ -64,6 +65,19 @@ namespace cicada
     count_type& operator[](const ngram_type& ngram) { return ngrams[ngram]; }
     
     void clear() { ngrams.clear(); }
+
+    template <typename Iterator>
+    Iterator insert(const value_type& x) { return ngrams.insert(x); }
+    template <typename Iterator>
+    Iterator insert(Iterator iter, const value_type& x) { return ngrams.insert(iter, x); }
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last) { ngrams.insert(first, last); }
+    
+    size_type erase(const key_type& key) { return ngrams.erase(key); }
+    template <typename Iterator>
+    Iterator erase(Iterator iter) { return ngrams.erase(iter); }
+    template <typename Iterator>
+    Iterator erase(Iterator first, Iterator last) { return ngrams.erase(first, last); }
     
   public:
     const_iterator begin() const { return ngrams.begin(); }
