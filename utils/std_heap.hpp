@@ -31,7 +31,6 @@ namespace utils
   protected:
     _Sequence c;
     
-    
   public:
     std_heap(size_type x) : c(x) { clear(); }
     std_heap() {  }
@@ -73,9 +72,10 @@ namespace utils
       std::make_heap(c.begin(), c.end(), static_cast<_Compare&>(*this));
     }
     
-    
     const_iterator begin() const { return c.begin(); }
+    iterator begin() { return c.begin(); }
     const_iterator end() const { return c.end(); }
+    iterator end() { return c.end(); }
     
     void swap(std_heap& x)
     {
