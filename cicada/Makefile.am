@@ -423,6 +423,7 @@ apply.hpp \
 apply_cube_grow.hpp \
 apply_cube_grow_coarse.hpp \
 apply_cube_prune.hpp \
+apply_cube_prune_diverse.hpp \
 apply_exact.hpp \
 apply_incremental.hpp \
 apply_state_less.hpp \
@@ -484,6 +485,7 @@ hypergraph.hpp \
 inside_outside.hpp \
 intersect.hpp \
 kbest.hpp \
+kbest_diverse.hpp \
 lattice.hpp \
 lexicon.hpp \
 matcher.hpp \

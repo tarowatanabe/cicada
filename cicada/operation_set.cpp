@@ -61,6 +61,7 @@ namespace cicada
     static const char* desc = "\
 apply: feature application\n\
 \tsize=<cube size>\n\
+\tdiversity=<diversity> diversity for cube pruning (zero for none, positive for more diverse)\n\
 \texact=[true|false]  no pruning feature application\n\
 \tprune=[true|false]         cube-pruning for feature application\n\
 \tgrow=[true|false]          cube-growing for feature application\n\
@@ -152,6 +153,7 @@ normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
+\tdiversity=<diversity> diversity of kbest (zero for none, positive for more diverse)\n\
 \tinsertion-prefix=<prefix attatched to inserted word>\n\
 \tunique=[true|false] unique translation\n\
 \tweights=weight file for feature\n\

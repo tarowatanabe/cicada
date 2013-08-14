@@ -39,6 +39,7 @@ namespace cicada
       
       int  kbest_size;
       bool kbest_unique;
+      double diversity;
       
       std::string insertion_prefix;
 

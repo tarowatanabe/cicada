@@ -7,6 +7,7 @@
 #define __CICADA__APPLY__HPP__ 1
 
 #include <cicada/apply_cube_prune.hpp>
+#include <cicada/apply_cube_prune_diverse.hpp>
 #include <cicada/apply_cube_grow.hpp>
 #include <cicada/apply_cube_grow_coarse.hpp>
 #include <cicada/apply_exact.hpp>
