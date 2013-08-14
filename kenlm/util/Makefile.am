@@ -88,3 +88,14 @@ usage.hh
 
 EXTRA_DIST = \
 Jamfile
+
+noinst_DATA = .gitignore
+
+.gitignore: Makefile.am
+	cat $(top_builddir)/.gitignore > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
