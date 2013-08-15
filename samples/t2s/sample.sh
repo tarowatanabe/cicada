@@ -36,4 +36,4 @@ $cicada/progs/cicada \
       --operation binarize:direction=cyk,order=1 \
       --operation compose-tree \
       --operation apply:prune=true,size=1000,weights=$cicada/samples/t2s/weights \
-      --operation output:file=-,kbest=10,weights=$cicada/samples/t2s/weights,sample=true
+      --operation output:file=-,kbest=10,weights=$cicada/samples/t2s/weights
