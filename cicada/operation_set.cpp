@@ -155,7 +155,8 @@ output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tdiversity=<diversity> diversity of kbest (zero for none, positive for more diverse)\n\
 \tinsertion-prefix=<prefix attatched to inserted word>\n\
-\tunique=[true|false] unique translation\n\
+\tunique=[true|false] unique kbest output\n\
+\tsample=[true|false] ksample output\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
 \tyield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\

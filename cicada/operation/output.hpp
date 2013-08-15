@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__OUTPUT__HPP__
@@ -10,14 +10,17 @@
 
 #include <cicada/operation.hpp>
 
+#include <utils/sampler.hpp>
+
 namespace cicada
 {
   namespace operation
   {
-
-
     class Output : public Operation
     {
+    private:
+      typedef utils::sampler<boost::mt19937> sampler_type;
+
     public:
       Output(const std::string& parameter, output_data_type& __output_data, const int __debug);
 
@@ -39,7 +42,9 @@ namespace cicada
       
       int  kbest_size;
       bool kbest_unique;
+      bool kbest_sample;
       double diversity;
+      sampler_type sampler;
       
       std::string insertion_prefix;
 

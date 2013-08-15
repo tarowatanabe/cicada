@@ -538,6 +538,7 @@ remove_sgml_tag.hpp \
 remove_symbol.hpp \
 remove_unary.hpp \
 rule.hpp \
+sample.hpp \
 semiring.hpp \
 sentence.hpp \
 sentence_vector.hpp \
