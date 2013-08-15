@@ -133,41 +133,48 @@ namespace cicada
 	
 	const node_type& node = graph.nodes[node_id];
 
+	// this is an error!
 	if (node.edges.empty()) return false;
-
-	weight_type sum;
 	
-	scores.clear();
-	probs.clear();
-	
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const edge_type& edge = graph.edges[*eiter];
-
-	  weight_type prob = function(edge);
+	size_type pos_sampled = 0;
+	if (node.edges.size() == 1)
+	  weight *= function(graph.edges[node.edges.front()]);
+	else {
+	  weight_type sum;
 	  
-	  scores.push_back(prob);
-
-	  edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    prob *= insides[*titer];
+	  scores.clear();
+	  probs.clear();
 	  
-	  sum += prob;
-	  probs.push_back(prob);
+	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const edge_type& edge = graph.edges[*eiter];
+	    
+	    weight_type prob = function(edge);
+	    
+	    scores.push_back(prob);
+	    
+	    edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	    for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	      prob *= insides[*titer];
+	    
+	    sum += prob;
+	    probs.push_back(prob);
+	  }
+	  
+	  // normalize... if summation is zero, then, use uniform distribution!
+	  if (sum != cicada::semiring::traits<weight_type>::zero())
+	    std::transform(probs.begin(), probs.end(), probs.begin(), std::bind2nd(std::multiplies<weight_type>(), 1.0 / sum));
+	  else
+	    std::fill(probs.begin(), probs.end(), weight_type(1.0 / probs.size()));
+	  
+	  pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
+	  
+	  // updated weight...
+	  weight *= scores[pos_sampled];
 	}
 	
-	// normalize... if summation is zero, then, use uniform distribution!
-	if (sum != cicada::semiring::traits<weight_type>::zero())
-	  std::transform(probs.begin(), probs.end(), probs.begin(), std::bind2nd(std::multiplies<weight_type>(), 1.0 / sum));
-	else
-	  std::fill(probs.begin(), probs.end(), weight_type(1.0 / probs.size()));
-	
-	const size_type pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
-	
+	// sampled edge-id
 	const id_type edge_id_sampled = node.edges[pos_sampled];
-	
-	// updated weight...
-	weight *= scores[pos_sampled];
 	
 	// update stack...
 	const edge_type& edge_sampled = graph.edges[edge_id_sampled];
