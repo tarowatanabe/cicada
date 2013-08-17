@@ -13,3 +13,17 @@ for file in `find Eigen -type f`; do
   /bin/echo -n "$file"
 done
 echo
+echo
+
+echo "dist_noinst_SCRIPTS = \\"
+echo "makefile.sh"
+echo 
+
+/bin/echo -n "EXTRA_DIST ="
+for file in `ls COPYING.*`; do
+  /bin/echo " \\"
+  /bin/echo -n "$file"
+done
+echo
+
+

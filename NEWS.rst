@@ -1,3 +1,9 @@
+2013-x-x
+--------
+ - Added k-sampler which shares the interface as kbest.
+ - Added read/write for ngram counts (TODO: allow reading and dumping)
+ - A small bug fix for posterior operation.
+
 2013-8-2
 --------
  - INCOMPATIBLE: ngram language model code is completely written, and

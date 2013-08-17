@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -19,9 +19,7 @@ namespace cicada
   namespace operation
   {
     Posterior::Posterior(const std::string& parameter, const int __debug)
-      :  base_type("posterior"),
-	 name(),
-	 weights(0), weights_assigned(0), scale(1.0),
+      :  weights(0), weights_assigned(0), scale(1.0),
 	 weights_one(false), weights_fixed(false),
 	 semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	 debug(__debug)
@@ -73,7 +71,9 @@ namespace cicada
 
       if (name.empty())
 	name = "posterior";
-
+      
+      // assign feature-name!
+      feature_name = static_cast<const std::string&>(name);
     }
 
     void Posterior::assign(const weight_set_type& __weights)
@@ -99,18 +99,18 @@ namespace cicada
 
       if (weights_one) {
 	if (semiring_tropical)
-	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), feature_name);
 	else if (semiring_logprob)
-	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), feature_name);
 	else
-	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), feature_name);
       } else {
 	if (semiring_tropical)
-	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_posterior, scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_posterior, scale), feature_name);
 	else if (semiring_logprob)
-	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_posterior, scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_posterior, scale), feature_name);
 	else
-	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Log<double> >(*weights_posterior, scale), name);
+	  cicada::posterior(hypergraph, computed, weight_scaled_function<cicada::semiring::Log<double> >(*weights_posterior, scale), feature_name);
       }
       
       utils::resource end;

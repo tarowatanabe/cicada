@@ -245,5 +245,6 @@ Revise the merge features in cicada_mpi for large # of features
 Revise the ngram language model handling:
   -  Use better ngram state representation
 
-Glue rules for the synchronous tree substitution grammar:
-  - Under the string-to-tree, is there a good way?    
+Implement PCFG language model with arbitrary order
+
+Diversified kbest/feature application + Sampled kbest/feature application

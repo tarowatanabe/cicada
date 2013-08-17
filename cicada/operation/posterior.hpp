@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__POSTERIOR__HPP__
@@ -24,11 +24,11 @@ namespace cicada
 
       void assign(const weight_set_type& __weights);
       
-      std::string name;
-
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
-      
+
+      feature_function_type::feature_type feature_name;
+
       double scale;
 
       bool weights_one;
