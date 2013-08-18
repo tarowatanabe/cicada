@@ -317,25 +317,25 @@ if __name__ == '__main__':
     print "#"
     if options.scfg:
         print "# SCFG translation"
-        print "operation = compose-cky:frontier=false"
+        print "operation = compose-cky"
         print "# Alternatively, you can use parse-cky to perform beam search during composition"
         print "# Here, we use the features found only in the grammar"
-        print "# operation = parse-cky:frontier=false,size=%d,${weights}" %(options.beam)
+        print "# operation = parse-cky:size=%d,${weights}" %(options.beam)
     elif options.phrase:
         print "# phrase translation"
-        print "operation = compose-phrase:frontier=false"
+        print "operation = compose-phrase"
     elif options.tree or options.ghkm:
         print "# tree-to-{string,tree} translation"
-        print "operation = compose-tree:frontier=false"
+        print "operation = compose-tree"
         print "# Alternatively, you can use parse-tree to perform beam search during composition"
         print "# Here, we use the features found only in the grammar"
-        print "# operation = parse-tree:frontier=false,size=%d,${weights}" %(options.beam)
+        print "# operation = parse-tree:size=%d,${weights}" %(options.beam)
     elif options.tree_cky:
         print "# string-to-{string,tree} translation"
-        print "operation = compose-tree-cky:frontier=false"
+        print "operation = compose-tree-cky"
         print "# Alternatively, you can use parse-tree-cky to perform beam search during composition"
         print "# Here, we use the features found only in the grammar"
-        print "# operation = parse-tree-cky:frontier=false,size=%d,${weights}" %(options.beam)
+        print "# operation = parse-tree-cky:size=%d,${weights}" %(options.beam)
     print
 
     print "# annotate <s> and </s> to the forest, so that we can compute ngram LM scores with no-bos-eos=true"
