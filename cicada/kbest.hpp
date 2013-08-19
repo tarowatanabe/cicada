@@ -153,7 +153,6 @@ namespace cicada
 			       derivation_unassigned, derivation_unassigned,
 			       derivation_hash_type, derivation_equal_type,
 			       std::allocator<const derivation_type*> > derivation_set_unique_type;
-
     
     struct State
     {
