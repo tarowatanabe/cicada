@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include <iostream>
@@ -23,7 +23,7 @@ namespace cicada
 		 const model_type& __model,
 		 const int __debug)
       : model(__model), weights(0), weights_assigned(0), size(200), diversity(0.0),
-	weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
+	weights_one(false), weights_fixed(false), rejection(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -36,6 +36,8 @@ namespace cicada
 	  size = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "diversity")
 	  diversity = utils::lexical_cast<double>(piter->second);
+	else if (utils::ipiece(piter->first) == "rejection")
+	  rejection = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "prune")
@@ -83,6 +85,13 @@ namespace cicada
       
       if (state_full && state_less)
 	throw std::runtime_error("either state-full| state-less");
+
+      if (rejection && diversity != 0.0)
+	throw std::runtime_error("either rejection or diversified pruning");
+      
+      if (rejection || diversity != 0.0)
+	if (! prune)
+	  throw std::runtime_error("rejection or diversified can be only combined with cube-pruning");
       
       // construct sparse or dense
       if (sparse) {
@@ -163,7 +172,11 @@ namespace cicada
 				  ? "grow-coarse"
 				  : (grow
 				     ? "grow"
-				     : (diversity == 0.0 ? "prune" : "prune-diverse")))))
+				     : (diversity != 0.0
+					? "prune-diverse"
+					: (rejection
+					   ? "prune-rejection"
+					   : "prune"))))))
 	      + std::string(sparse ? "-sparse" : (dense ? "-dense" : ""))
 	      + std::string(state_full ? "-statefull" : (state_less ? "-stateless" : "")));
     }
@@ -213,14 +226,20 @@ namespace cicada
       } else {
 	if (diversity != 0.0) {
 	  if (weights_one)
-	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
-	  else
-	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
-	} else {
-	  if (weights_one)
 	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_one<weight_type>(), size, diversity);
 	  else
 	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, diversity);
+	} else if (rejection) {
+	  if (weights_one)
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_one<weight_type>(), const_cast<sampler_type&>(sampler), size);
+	  else
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), const_cast<sampler_type&>(sampler), size);
+	  
+	} else {
+	  if (weights_one)
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	  else
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
 	}
       }
     

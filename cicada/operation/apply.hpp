@@ -1,12 +1,14 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__APPLY__HPP__
 #define __CICADA__OPERATION__APPLY__HPP__ 1
 
 #include <cicada/operation.hpp>
+
+#include <utils/sampler.hpp>
 
 namespace cicada
 {
@@ -15,6 +17,9 @@ namespace cicada
 
     class Apply : public Operation
     {
+    private:
+      typedef utils::sampler<boost::mt19937> sampler_type;
+
     public:
       Apply(const std::string& parameter,
 	    const model_type& __model,
@@ -33,7 +38,9 @@ namespace cicada
       double diversity;
       bool weights_one;
       bool weights_fixed;
-  
+      
+      bool rejection;
+      
       bool exact;
       bool prune;
       bool grow;
@@ -46,6 +53,8 @@ namespace cicada
       
       bool state_less;
       bool state_full;
+
+      sampler_type sampler;
   
       int debug;
     };

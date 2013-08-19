@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__APPLY__HPP__
@@ -8,6 +8,7 @@
 
 #include <cicada/apply_cube_prune.hpp>
 #include <cicada/apply_cube_prune_diverse.hpp>
+#include <cicada/apply_cube_prune_rejection.hpp>
 #include <cicada/apply_cube_grow.hpp>
 #include <cicada/apply_cube_grow_coarse.hpp>
 #include <cicada/apply_exact.hpp>
