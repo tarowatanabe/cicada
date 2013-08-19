@@ -18,11 +18,11 @@ path_type tee_file;
 int options(int argc, char** argv);
 
 int main(int argc, char** argv)
-{
-  if (options(argc, argv) != 0)
-    return 1;
-  
+{  
   try {
+    if (options(argc, argv) != 0)
+      return 1;
+    
     if (tee_file.empty())
       throw std::runtime_error("no path for tee output?");
     
@@ -50,12 +50,16 @@ int options(int argc, char** argv)
 {
   namespace po = boost::program_options;
 
+  po::options_description desc("options");
+  desc.add_options()
+    ("help", "help message");
+
   po::options_description hidden;
   hidden.add_options()
     ("tee", po::value<path_type>(&tee_file), "tee file");
   
   po::options_description cmdline_options;
-  cmdline_options.add(hidden);
+  cmdline_options.add(desc).add(hidden);
 
   po::positional_options_description pos;
   pos.add("tee", 1); // only one...
@@ -65,7 +69,7 @@ int options(int argc, char** argv)
   po::notify(vm);
   
   if (vm.count("help")) {
-    std::cout << argv[0] << " output-file" << '\n';
+    std::cout << argv[0] << " output-file" << '\n' << desc << '\n';
     return 1;
   }
   
