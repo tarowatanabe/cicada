@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__VITERBI__HPP__
@@ -93,6 +93,7 @@ namespace cicada
 	    score *= weights[*niter];
 	    yields.push_back(&derivations[*niter]);
 	  }
+	  
 	  // +=
 	  if (score > weights[node.id]) {
 	    weights[node.id] = score;
