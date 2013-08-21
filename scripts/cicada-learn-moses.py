@@ -644,9 +644,13 @@ if __name__ == '__main__':
         if len(weiset) > 1:
             learn_weights = Option('--weights', Quoted(weiset[-2]))
             
+        do_interpolate = None
+        if interpolate and len(weiset) > 1:
+            do_interpolate = 1
+
         # if we interpolate, first, generate weights_learn then, dump...
         learn_output = Option('--output', Quoted(weights))
-        if (interpolate or options.postprocess) and len(weiset) > 1:
+        if do_interpolate or options.postprocess::
             learn_output = Option('--output', Quoted(weights_learn))
 
         learn_algorithm = Option('--learn-' + options.learn)
@@ -689,12 +693,12 @@ if __name__ == '__main__':
                      threads=options.threads,
                      logfile=Quoted(weights+'.log'))
             
-        if interpolate and options.postprocess:
+        if do_interpolate and options.postprocess:
             print "interpolate+postprocess %s @ %s" %(weights, time.ctime())
             
             qsub.run(Program(cicada.cicada_filter_weights,
                              Option(weiset[-2] + ":scale=%g" %(1.0 - options.interpolate)),
-                             Option(weights_learn + ":scale=%g" %(options.interpolate))
+                             Option(weights_learn + ":scale=%g" %(options.interpolate)),
                              Pipe(),
                              options.postprocess,
                              Redirect(weights)),
@@ -710,7 +714,7 @@ if __name__ == '__main__':
                              Redirect(weights)),
                      name="postprocess")
             
-        elif interpolate:
+        elif do_interpolate:
             print "interpolate %s @ %s" %(weights, time.ctime())
             
             qsub.run(Program(cicada.cicada_filter_weights,
