@@ -64,6 +64,8 @@ opt_parser = OptionParser(
                 help="perform kbest merging"),
     make_option("--interpolate", default=0.0, action="store", type="float",
                 help="perform weights interpolation"),
+    make_option("--postprocess", default="", action="store", type="string",
+                help="post-processing script after learning: \"cat learned-weight-file | postprocess > post-processed-weight-file\""),
         
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
@@ -146,6 +148,17 @@ class Option:
             else:
                 option += " %s" %(str(self.value))
         return option
+
+class Pipe:
+    def __str__(self,):
+        return '|'
+
+class Redirect:
+    def __init__(self, arg):
+        self.arg = arg
+    
+    def __str__(self,):
+        return '> ' + '"' + self.arg + '"'
 
 class Program:
     def __init__(self, *args):
@@ -682,7 +695,7 @@ if __name__ == '__main__':
             
         # if we interpolate, first, generate weights_learn then, dump...
         learn_output = Option('--output', Quoted(weights))
-        if interpolate and len(weiset) > 1:
+        if (interpolate or options.postprocess) and len(weiset) > 1:
             learn_output = Option('--output', Quoted(weights_learn))
 
         learn_algorithm = Option('--learn-' + options.learn)
@@ -725,7 +738,28 @@ if __name__ == '__main__':
                      threads=options.threads,
                      logfile=Quoted(weights+'.log'))
             
-        if interpolate:
+        if interpolate and options.postprocess:
+            print "interpolate+postprocess %s @ %s" %(weights, time.ctime())
+            
+            qsub.run(Program(cicada.cicada_filter_weights,
+                             Option(weiset[-2] + ":scale=%g" %(1.0 - options.interpolate)),
+                             Option(weights_learn + ":scale=%g" %(options.interpolate))
+                             Pipe(),
+                             options.postprocess,
+                             Redirect(weights)),
+                     name="interpolate")
+            
+        elif options.postprocess:
+            print "postprocess %s @ %s" %(weights, time.ctime())
+            
+            qsub.run(Program('cat',
+                             Quoted(weights_learn),
+                             Pipe(),
+                             options.postprocess,
+                             Redirect(weights)),
+                     name="postprocess")
+            
+        elif interpolate:
             print "interpolate %s @ %s" %(weights, time.ctime())
             
             qsub.run(Program(cicada.cicada_filter_weights,
