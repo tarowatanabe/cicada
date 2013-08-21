@@ -145,7 +145,7 @@ namespace cicada
       {
 	bool operator()(const symbol_type& word) const
 	{
-	  return word == vocab_type::EPSILON;
+	  return word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS;
 	}
       };
 
@@ -153,7 +153,7 @@ namespace cicada
       {
 	bool operator()(const symbol_type& word) const
 	{
-	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
+	  return word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS || word.is_sgml_tag());
 	}
       };
       
