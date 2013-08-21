@@ -19,6 +19,7 @@
 #include <iterator>
 
 #include "cicada/weight_vector.hpp"
+#include "cicada/feature_vector.hpp"
 #include "cicada/dot_product.hpp"
 #include "cicada/parameter.hpp"
 
@@ -32,14 +33,24 @@
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/fusion/adapted.hpp>
+
+
 typedef boost::filesystem::path path_type;
 typedef std::vector<std::string, std::allocator<std::string> > path_set_type;
 
+typedef std::vector<std::string, std::allocator<std::string> > features_type;
+
 typedef cicada::Parameter parameter_type;
 typedef cicada::WeightVector<double> weight_set_type;
+typedef cicada::FeatureVector<double> feature_set_type;
 
 path_set_type input_files;
 path_type     output_file = "-";
+
+features_type features;
 
 path_type bound_lower_file;
 path_type bound_upper_file;
@@ -77,6 +88,7 @@ struct greater_fabs_second
   }
 };
 
+void read_features(const features_type& features, feature_set_type& feats);
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -90,6 +102,11 @@ int main(int argc, char** argv)
       throw std::runtime_error("You cannnot perform both normalize-l1 and normalize-l2");
     if (sort_mode && sort_abs_mode)
       throw std::runtime_error("You cannnot perform both sort and sort-abs");
+
+
+    feature_set_type feats;
+    if (! features.empty())
+      read_features(features, feats);
 
     if (int(sum_mode) + average_mode + distance_mode + norm_mode == 0)
       sum_mode = true;
@@ -289,6 +306,11 @@ int main(int argc, char** argv)
       }
     }
 
+    if (! feats.empty()) {
+      feature_set_type::const_iterator fiter_end = feats.end();
+      for (feature_set_type::const_iterator fiter = feats.begin(); fiter != fiter_end; ++ fiter)
+	weights[fiter->first] = fiter->second;
+    }
     
     if (sort_mode || sort_abs_mode) {
       typedef std::pair<weight_set_type::feature_type, double> value_type;
@@ -329,6 +351,33 @@ int main(int argc, char** argv)
   return 0;
 }
 
+void read_features(const features_type& features, feature_set_type& feats)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+
+  features_type::const_iterator fiter_end = features.end();
+  for (features_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+
+    std::string key;
+    double value;
+    
+    std::string::const_iterator iter = fiter->begin();
+    std::string::const_iterator iter_end = fiter->end();
+    
+    if (! qi::phrase_parse(iter, iter_end,
+			   qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					>> (standard::char_ - standard::space))]
+			   >> '='
+			   >> qi::double_,
+			   standard::blank,
+			   key, value) || iter != iter_end)
+      throw std::runtime_error("feature-value parsing failed: " + *fiter);
+    
+    feats[key] = value;
+  }
+}
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -337,6 +386,8 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",     po::value<path_set_type>(&input_files)->multitoken(),           "input files")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+
+    ("feature", po::value<features_type>(&features)->multitoken(), "feature/parameter(s) specified by feature=parameter")
 
     ("bound-lower", po::value<path_type>(&bound_lower_file), "lower bound file")
     ("bound-upper", po::value<path_type>(&bound_upper_file), "upper bound file")
