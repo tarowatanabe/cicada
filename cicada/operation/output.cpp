@@ -184,7 +184,7 @@ namespace cicada
 	    os << graph_kbest;
 	  
 	  typename Removes::const_iterator riter_end = removes.end();
-	  for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ ++riter)
+	  for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ riter)
 	    boost::get<1>(derivation).erase(*riter);
 	  
 	  karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
@@ -279,7 +279,7 @@ namespace cicada
 	os << boost::get<0>(derivation);
 	
 	typename Removes::const_iterator riter_end = removes.end();
-	for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ ++riter)
+	for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ riter)
 	  boost::get<1>(derivation).erase(*riter);
 
 	karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
