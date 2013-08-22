@@ -7,6 +7,7 @@
 #define __CICADA__OPERATION__OUTPUT__HPP__ 1
 
 #include <iostream>
+#include <vector>
 
 #include <cicada/operation.hpp>
 
@@ -20,6 +21,8 @@ namespace cicada
     {
     private:
       typedef utils::sampler<boost::mt19937> sampler_type;
+      typedef weight_set_type::feature_type feature_type;
+      typedef std::vector<feature_type, std::allocator<feature_type> > remove_set_type;
 
     public:
       Output(const std::string& parameter, output_data_type& __output_data, const int __debug);
@@ -67,6 +70,8 @@ namespace cicada
       bool dependency_mode;
       bool bitext_mode;
       bool no_id;
+
+      remove_set_type removes;
   
       int debug;
     };

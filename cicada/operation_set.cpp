@@ -173,6 +173,7 @@ output: kbest or hypergraph output\n\
 \tno-id=[true|false] do not output id\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\
+\tremove-feature=feature-name remove feature in the kbest-output\n\
 parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\

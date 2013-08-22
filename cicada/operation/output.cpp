@@ -436,6 +436,8 @@ namespace cicada
 	  directory = piter->second;
 	else if (utils::ipiece(piter->first) == "insertion-prefix")
 	  insertion_prefix = piter->second;
+	else if (utils::ipiece(piter->first) == "remove-feature")
+	  removes.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "yield") {
 	  const utils::ipiece value = piter->second;
 	
