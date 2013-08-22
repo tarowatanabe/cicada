@@ -71,11 +71,12 @@ namespace cicada
       boost::spirit::karma::rule<Iterator, HyperGraph::feature_set_type()> features;
     };
 
-    template <typename Hypergraph, typename Derivations>
+    template <typename Hypergraph, typename Derivations, typename Removes>
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
 			   const Hypergraph& graph,
 			   Derivations& derivations,
+			   const Removes& removes,
 			   const int kbest_size,
 			   const bool no_id,
 			   const bool graphviz_mode,
@@ -182,6 +183,10 @@ namespace cicada
 	  else
 	    os << graph_kbest;
 	  
+	  typename Removes::const_iterator riter_end = removes.end();
+	  for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ ++riter)
+	    boost::get<1>(derivation).erase(*riter);
+	  
 	  karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
 	  
 	  os << weight << '\n';
@@ -189,7 +194,7 @@ namespace cicada
       }
     }
     
-    template <typename Hypergraph, typename Function, typename Sampler>
+    template <typename Hypergraph, typename Function, typename Sampler, typename Removes>
     inline
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
@@ -199,6 +204,7 @@ namespace cicada
 			   const double diversity,
 			   const Function& function,
 			   const Sampler& sampler,
+			   const Removes& removes,
 			   const bool no_id,
 			   const bool graphviz_mode,
 			   const bool treebank_mode,
@@ -228,24 +234,25 @@ namespace cicada
       if (kbest_sample) {
 	cicada::Sample<edge_feature_traversal, Function, Sampler> derivations(graph, edge_feature_traversal(), function, const_cast<Sampler&>(sampler));
 	
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
       } else if (diversity != 0.0) {
 	cicada::KBestDiverse<edge_feature_traversal, Function, kbest_sentence_filter> derivations(graph, kbest_size, edge_feature_traversal(), function, kbest_sentence_filter(), diversity);
 
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
       } else {
 	cicada::KBest<edge_feature_traversal, Function, kbest_sentence_filter> derivations(graph, kbest_size, edge_feature_traversal(), function, kbest_sentence_filter());
 	
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
       }
     }
     
-    template <typename Hypergraph, typename Derivations>
+    template <typename Hypergraph, typename Derivations, typename Removes>
     inline
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
 			   const Hypergraph& graph,
 			   Derivations& derivations,
+			   const Removes& removes,
 			   const int kbest_size,
 			   const bool no_id)
     {
@@ -271,13 +278,17 @@ namespace cicada
 	  os << id << " ||| ";
 	os << boost::get<0>(derivation);
 	
+	typename Removes::const_iterator riter_end = removes.end();
+	for (typename Removes::const_iterator riter = removes.begin(); riter != riter_end; ++ ++riter)
+	  boost::get<1>(derivation).erase(*riter);
+
 	karma::generate(iterator_type(os), " ||| " << features << " ||| ", boost::get<1>(derivation));
 	
 	os << weight << '\n';
       }
     }
 
-    template <typename Hypergraph, typename Traversal, typename Function, typename Filter, typename Sampler>
+    template <typename Hypergraph, typename Traversal, typename Function, typename Filter, typename Sampler, typename Removes>
     inline
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
@@ -289,6 +300,7 @@ namespace cicada
 			   const Function& function,
 			   const Filter& filter,
 			   const Sampler& sampler,
+			   const Removes& removes,
 			   const bool no_id)
     {
       namespace karma = boost::spirit::karma;
@@ -308,19 +320,19 @@ namespace cicada
       if (kbest_sample) {
 	cicada::Sample<Traversal, Function, Sampler> derivations(graph, traversal, function, const_cast<Sampler&>(sampler));
 	
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id);
       } else if (diversity != 0.0) {
 	cicada::KBestDiverse<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter, diversity);
 
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id);
       } else {
 	cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
 	
-	kbest_derivations(os, id, graph, derivations, kbest_size, no_id);
+	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id);
       }
     }
 
-    template <typename Hypergraph, typename Sampler>
+    template <typename Hypergraph, typename Sampler, typename Removes>
     inline
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
@@ -330,6 +342,7 @@ namespace cicada
 			   const double diversity,
 			   const Operation::weight_set_type* weights,
 			   const Sampler& sampler,
+			   const Removes& removes,
 			   const bool no_id,
 			   const bool graphviz_mode,
 			   const bool treebank_mode,
@@ -338,12 +351,12 @@ namespace cicada
       typedef cicada::semiring::Logprob<double> weight_type;
       
       if (weights)
-	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, weight_function<weight_type>(*weights), sampler, no_id, graphviz_mode, treebank_mode, debinarize);
+	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, weight_function<weight_type>(*weights), sampler, removes, no_id, graphviz_mode, treebank_mode, debinarize);
       else
-	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, weight_function_one<weight_type>(), sampler, no_id, graphviz_mode, treebank_mode, debinarize);
+	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, weight_function_one<weight_type>(), sampler, removes, no_id, graphviz_mode, treebank_mode, debinarize);
     }
 
-    template <typename Hypergraph, typename Traversal, typename Filter, typename Sampler>
+    template <typename Hypergraph, typename Traversal, typename Filter, typename Sampler, typename Removes>
     inline
     void kbest_derivations(std::ostream& os,
 			   const Operation::id_type id,
@@ -355,14 +368,15 @@ namespace cicada
 			   const Filter& filter,
 			   const Operation::weight_set_type* weights,
 			   const Sampler& sampler,
+			   const Removes& removes,
 			   const bool no_id)
     {
       typedef cicada::semiring::Logprob<double> weight_type;
       
       if (weights)
-	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, traversal, weight_function<weight_type>(*weights), filter, sampler, no_id);
+	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, traversal, weight_function<weight_type>(*weights), filter, sampler, removes, no_id);
       else
-	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, traversal, weight_function_one<weight_type>(), filter, sampler, no_id);
+	kbest_derivations(os, id, graph, kbest_size, kbest_sample, diversity, traversal, weight_function_one<weight_type>(), filter, sampler, removes, no_id);
     }
 
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
@@ -698,6 +712,7 @@ namespace cicada
 			      kbest_alignment_filter_unique(hypergraph),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_dependency)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -705,6 +720,7 @@ namespace cicada
 			      kbest_dependency_filter_unique(hypergraph),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_span)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -712,6 +728,7 @@ namespace cicada
 			      kbest_span_filter_unique(hypergraph),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_string)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -719,6 +736,7 @@ namespace cicada
 			      kbest_sentence_filter_unique(hypergraph),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_terminal_pos)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -726,11 +744,13 @@ namespace cicada
 			      kbest_sentence_filter_unique(hypergraph),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id,
 			      yield_graphviz,
 			      yield_treebank,
@@ -742,6 +762,7 @@ namespace cicada
 			      kbest_alignment_filter(),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_dependency)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -749,6 +770,7 @@ namespace cicada
 			      kbest_dependency_filter(),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_span)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -756,6 +778,7 @@ namespace cicada
 			      kbest_span_filter(),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_string)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -763,6 +786,7 @@ namespace cicada
 			      kbest_sentence_filter(),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else if (yield_terminal_pos)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
@@ -770,11 +794,13 @@ namespace cicada
 			      kbest_sentence_filter(),
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id);
 	  else
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_sample, diversity,
 			      weights_kbest,
 			      sampler,
+			      removes,
 			      no_id,
 			      yield_graphviz,
 			      yield_treebank,
