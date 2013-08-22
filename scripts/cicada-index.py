@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 ###
 ### a wrapper script for indexing models, such as grammar, rule-grammar, word-clusters and global-lexicon
@@ -21,6 +21,9 @@ import shutil
 import UserList
 import UserString
 import cStringIO
+
+### for find_executable!
+import distutils.spawn
 
 from optparse import OptionParser, make_option
 
@@ -215,6 +218,9 @@ class PBS:
         self.qsub = 'qsub'
 
         self.workers = []
+
+        if not distutils.spawn.find_executable('qsub'):
+            raise ValueError, "no qsub in your executable path?"
 
     def __del__(self):
         for worker in self.workers:

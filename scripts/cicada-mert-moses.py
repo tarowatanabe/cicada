@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-#  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+#  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
 import threading
@@ -12,6 +12,9 @@ import os, os.path
 import string
 import re
 import subprocess
+
+### for find_executable!
+import distutils.spawn
 
 from optparse import OptionParser, make_option
 
@@ -174,6 +177,8 @@ class PBS:
         self.qsub = 'qsub'
         
         # how to find binary location...?
+        if not distutils.spawn.find_executable('qsub'):
+            raise ValueError, "no qsub in your executable path?"
 
     def run(self, command="", name="name", memory=0.0, mpi=None, threads=1, logfile=None):
 

@@ -16,6 +16,9 @@ import string
 import re
 import subprocess
 
+### for find_executable!
+import distutils.spawn
+
 from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
@@ -227,6 +230,9 @@ class PBS:
     def __init__(self, queue=""):
         self.queue = queue
         self.pbs = 'pbs'
+
+        if not distutils.spawn.find_executable('qsub'):
+            raise ValueError, "no qsub in your executable path?"
 
     def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
