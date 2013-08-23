@@ -349,7 +349,7 @@ word-pair: word pair feature\n\
     else if (param_name == "sparse-ngram")
       return feature_function_ptr_type(new feature::SparseNGram(parameter));
     else
-      throw std::runtime_error("unknown featuer: " + parameter);
+      throw std::runtime_error("unknown feature: " + parameter);
     
   }
   
