@@ -31,6 +31,8 @@ namespace cicada
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     typedef std::vector<yield_type, std::allocator<yield_type> >   derivation_set_type;
     
+    typedef Viterbi<Traversal, Function> self_type;
+
     Viterbi(const hypergraph_type& __graph,
 	    const traversal_type& __traversal,
 	    const function_type& __function)
@@ -43,6 +45,71 @@ namespace cicada
       if (graph.goal == hypergraph_type::invalid)
 	throw std::runtime_error("invalid hypergraph...");
     }
+    
+    friend struct Iterator;
+    
+    struct Iterator
+    {
+    private:
+      typedef Viterbi<Traversal, Function> viterbi_type;
+
+    public:
+      typedef std::pair<weight_type, yield_type> value_type;
+      typedef value_type* pointer;
+
+    public:
+      Iterator() : value(), viterbi(0) {}
+      Iterator(const viterbi_type& __viterbi)
+	: value(), viterbi(&const_cast<viterbi_type&>(__viterbi))
+      {
+	if (! viterbi->operator()(0, value.second, value.first)) {
+	  value = value_type();
+	  viterbi = 0;
+	}
+      }
+      
+    public:
+      const value_type& operator*() const { return value; }
+      const value_type* operator->() const { return &value; }
+      
+      Iterator& operator++()
+      {
+	if (viterbi) {
+	  value = value_type();
+	  viterbi = 0;
+	}
+	
+	return *this;
+      }
+
+      Iterator operator++(int)
+      {
+	Iterator tmp = *this;
+	++ *this;
+	return tmp;
+      }
+
+      friend
+      bool operator==(const Iterator& x, const Iterator& y)
+      {
+	return x.viterbi == y.viterbi;
+      }
+
+      friend
+      bool operator!=(const Iterator& x, const Iterator& y)
+      {
+	return x.viterbi != y.viterbi;
+      }
+
+    private:
+      value_type    value;
+      viterbi_type* viterbi;
+    };
+
+    typedef Iterator iterator;
+    typedef Iterator const_iterator;
+
+  private:
     
     typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
     
@@ -69,6 +136,15 @@ namespace cicada
       }
     };
 
+  public:
+    const_iterator begin() const { return const_iterator(*this); }
+    iterator       begin() { return const_iterator(*this); }
+    
+    const_iterator end() const { return const_iterator(); }
+    iterator       end() { return const_iterator(); }
+
+  public:
+    
     // k-best interface!
     bool operator()(int k, yield_type& yield, weight_type& weight)
     {
@@ -127,55 +203,6 @@ namespace cicada
 	       const Function function)
   {
     Viterbi<Traversal, Function>(graph, traversal, function)(0, yield, weight);
-    
-#if 0
-    typedef HyperGraph hypergraph_type;
-
-    typedef typename Traversal::value_type yield_type;
-    typedef typename Function::value_type  weight_type;
-    
-    typedef std::vector<yield_type, std::allocator<yield_type> >   yield_set_type;
-    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
-
-    typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_antecedent_type;
-
-    yield_set_type yields(graph.nodes.size());
-    weight_set_type weights(graph.nodes.size());
-
-    yield_antecedent_type antecedents;
-    
-    hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
-    for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
-      const hypergraph_type::node_type& node = *niter;
-      
-      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	
-	weight_type score = function(edge);
-	
-	antecedents.clear();
-	
-	// *=
-	hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter) {
-	  score *= weights[*niter];
-	  antecedents.push_back(&yields[*niter]);
-	}
-
-	typedef typename Viterbi<Traversal, Function>::yield_iterator yield_iterator;
-	
-	// +=
-	if (score > weights[node.id]) {
-	  weights[node.id] = score;
-	  traversal(edge, yields[node.id], yield_iterator(antecedents.begin()), yield_iterator(antecedents.end()));
-	}
-      }
-    }
-    
-    yield = yields.back();
-    weight = weights.back();
-#endif
   }
   
 };

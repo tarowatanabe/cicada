@@ -99,6 +99,12 @@ namespace cicada
       
       kbest_derivations_type derivations(source, kbest_size, traversal(posterior), function, kbest_filter());
       
+      size_type k = 0;
+      typename kbest_derivations_type::const_iterator diter_end = derivations.end();
+      for (typename kbest_derivations_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter, ++ k)
+	weight = std::min(weight, diter->first);
+      
+#if 0
       typename traversal::value_type derivation;
       size_type   k = 0;
       for (/**/; k != kbest_size; ++ k) {
@@ -109,6 +115,7 @@ namespace cicada
 	
 	weight = std::min(weight, derivation);
       }
+#endif
       
       if (k != kbest_size) {
 	target = source;

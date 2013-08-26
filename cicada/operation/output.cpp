@@ -106,17 +106,22 @@ namespace cicada
       
       feature_generator<iterator_type> features;
       
-      derivation_type derivation;
-      weight_type     weight;
+      //derivation_type derivation;
+      //weight_type     weight;
       node_map_type   node_maps;
       head_set_type   heads;
       hypergraph_type graph_kbest;
       
       edge_set_type tails;
-  
-      for (int k = 0; k < kbest_size; ++ k) {
-	if (! derivations(k, derivation, weight))
-	  break;
+
+      typename Derivations::const_iterator diter_end = derivations.end();
+      for (typename Derivations::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
+	//for (int k = 0; k < kbest_size; ++ k) {
+	//  if (! derivations(k, derivation, weight))
+	//    break;
+	
+	const weight_type& weight     = diter->first;
+	derivation_type&   derivation = const_cast<derivation_type&>(diter->second);
     
 	const edge_set_type& edges = boost::get<0>(derivation);
 	
@@ -232,7 +237,7 @@ namespace cicada
       }
 
       if (kbest_sample) {
-	cicada::Sample<edge_feature_traversal, Function, Sampler> derivations(graph, edge_feature_traversal(), function, const_cast<Sampler&>(sampler));
+	cicada::Sample<edge_feature_traversal, Function, Sampler> derivations(graph, kbest_size, edge_feature_traversal(), function, const_cast<Sampler&>(sampler));
 	
 	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id, graphviz_mode, treebank_mode, debinarize);
       } else if (diversity != 0.0) {
@@ -267,12 +272,17 @@ namespace cicada
 	
       feature_generator<iterator_type> features;
       
-      typename Derivations::traversal_type::value_type derivation;
-      typename Derivations::function_type::value_type  weight;
+      typedef typename Derivations::traversal_type::value_type derivation_type;
+      typedef typename Derivations::function_type::value_type  weight_type;
       
-      for (int k = 0; k < kbest_size; ++ k) {
-	if (! derivations(k, derivation, weight))
-	  break;
+      typename Derivations::const_iterator diter_end = derivations.end();
+      for (typename Derivations::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
+	// for (int k = 0; k < kbest_size; ++ k) {
+	//   if (! derivations(k, derivation, weight))
+	//    break;
+	
+	const weight_type&  weight  = diter->first;
+	derivation_type& derivation = const_cast<derivation_type&>(diter->second);
 	
 	if (! no_id)
 	  os << id << " ||| ";
@@ -318,7 +328,7 @@ namespace cicada
       }
       
       if (kbest_sample) {
-	cicada::Sample<Traversal, Function, Sampler> derivations(graph, traversal, function, const_cast<Sampler&>(sampler));
+	cicada::Sample<Traversal, Function, Sampler> derivations(graph, kbest_size, traversal, function, const_cast<Sampler&>(sampler));
 	
 	kbest_derivations(os, id, graph, derivations, removes, kbest_size, no_id);
       } else if (diversity != 0.0) {

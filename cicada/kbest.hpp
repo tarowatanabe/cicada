@@ -65,6 +65,8 @@ namespace cicada
     typedef typename traversal_type::value_type yield_type;
     typedef typename function_type::value_type  semiring_type;
     typedef typename function_type::value_type  weight_type;
+
+    typedef KBest<Traversal, Function, Filter> self_type;
     
     KBest(const hypergraph_type& __graph,
 	  const size_type& __k_prime,
@@ -81,6 +83,82 @@ namespace cicada
       if (graph.goal == hypergraph_type::invalid)
 	throw std::runtime_error("invalid hypergraph...");
     }
+
+  public:
+    struct Iterator;
+    friend struct Iterator;
+
+  public:
+    struct Iterator
+    {
+    private:
+      typedef KBest<Traversal, Function, Filter> kbest_type;
+
+    public:
+      typedef std::pair<weight_type, yield_type> value_type;
+      typedef value_type* pointer;
+
+    public:
+      Iterator() : value(), kbest(0), k(0) {}
+      Iterator(const kbest_type& __kbest)
+	: value(), kbest(&const_cast<kbest_type&>(__kbest)), k(0) { ++ *this; }
+      
+    public:
+      const value_type& operator*() const { return value; }
+      const value_type* operator->() const { return &value; }
+      
+      Iterator& operator++()
+      {
+	if (kbest) {
+	  if (k == kbest->k_prime) {
+	    value = value_type();
+	    kbest = 0;
+	    k = 0;
+	  } else {
+	    const bool result = kbest->operator()(k, value.second, value.first);
+	    
+	    if (result)
+	      ++ k;
+	    else {
+	      value = value_type();
+	      kbest = 0;
+	      k = 0;
+	    }
+	  }
+	}
+	
+	return *this;
+      }
+
+      Iterator operator++(int)
+      {
+	Iterator tmp = *this;
+	++ *this;
+	return tmp;
+      }
+
+      friend
+      bool operator==(const Iterator& x, const Iterator& y)
+      {
+	return x.kbest == y.kbest && x.k == y.k;
+      }
+
+      friend
+      bool operator!=(const Iterator& x, const Iterator& y)
+      {
+	return x.kbest != y.kbest || x.k != y.k;
+      }
+
+    private:
+      value_type  value;
+      kbest_type* kbest;
+      size_type k;
+    };
+
+    typedef Iterator iterator;
+    typedef Iterator const_iterator;
+
+  private:
     
     typedef utils::small_vector<int, std::allocator<int> > index_set_type;
     
@@ -166,7 +244,17 @@ namespace cicada
     typedef State state_type;
     typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
 
-    bool operator()(int k, yield_type& yield, weight_type& weight)
+
+  public:
+    const_iterator begin() const { return const_iterator(*this); }
+    iterator       begin() { return const_iterator(*this); }
+    
+    const_iterator end() const { return const_iterator(); }
+    iterator       end() { return const_iterator(); }
+
+  public:
+    
+    bool operator()(size_type k, yield_type& yield, weight_type& weight)
     {
       const derivation_type* derivation = lazy_kth_best(graph.goal, k);
       if (derivation) {
@@ -209,7 +297,7 @@ namespace cicada
     };
     
   private:
-    const derivation_type* lazy_kth_best(int v, int k)
+    const derivation_type* lazy_kth_best(int v, size_type k)
     {
       //std::cerr << "lazy-kth-best: node: " <<  v << " kbest: " << k << std::endl;
 
@@ -219,7 +307,7 @@ namespace cicada
       
       yield_set_type yields;
       
-      while (static_cast<int>(D.size()) <= k) {
+      while (D.size() <= k) {
 	
 	// lazy-next for the last of the derivation, D
 	if (! D.empty())
@@ -261,7 +349,7 @@ namespace cicada
 	if (! incremented) break;
       }
       
-      return (k < static_cast<int>(D.size()) ? D[k] : 0);
+      return (k < D.size() ? D[k] : 0);
     }
     
     void lazy_next(const derivation_type& derivation, state_type& state)

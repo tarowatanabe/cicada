@@ -41,8 +41,11 @@ namespace cicada
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
 
     typedef std::vector<yield_type, std::allocator<yield_type> > derivation_set_type;
+
+    typedef Sample<Traversal, Function, Sampler> self_type;
     
     Sample(const hypergraph_type& __graph,
+	   const size_type& __k_prime,
 	   const traversal_type& __traversal,
 	   const function_type& __function,
 	   sampler_type& __sampler,
@@ -53,6 +56,7 @@ namespace cicada
 	graph(__graph),
 	insides(__graph.nodes.size()),
 	derivations(__graph.nodes.size()),
+	k_prime(__k_prime),
 	temperature(__temperature)
     {
       if (graph.goal == hypergraph_type::invalid)
@@ -61,7 +65,87 @@ namespace cicada
       cicada::inside(graph, insides, function);
     }
 
+  public:
+    struct Iterator;
+    friend struct Iterator;
+
+    struct Iterator
+    {
+    private:
+      typedef Sample<Traversal, Function, Sampler> kbest_type;
+
+    public:
+      typedef std::pair<weight_type, yield_type> value_type;
+      typedef value_type* pointer;
+
+    public:
+      Iterator() : value(), kbest(0), k(0) {}
+      Iterator(const kbest_type& __kbest)
+	: value(), kbest(&const_cast<kbest_type&>(__kbest)), k(0) { ++ *this; }
+      
+    public:
+      const value_type& operator*() const { return value; }
+      const value_type* operator->() const { return &value; }
+      
+      Iterator& operator++()
+      {
+	if (kbest) {
+	  if (k == kbest->k_prime) {
+	    value = value_type();
+	    kbest = 0;
+	    k = 0;
+	  } else {
+	    const bool result = kbest->operator()(k, value.second, value.first);
+	    
+	    if (result)
+	      ++ k;
+	    else {
+	      value = value_type();
+	      kbest = 0;
+	      k = 0;
+	    }
+	  }
+	}
+	
+	return *this;
+      }
+
+      Iterator operator++(int)
+      {
+	Iterator tmp = *this;
+	++ *this;
+	return tmp;
+      }
+
+      friend
+      bool operator==(const Iterator& x, const Iterator& y)
+      {
+	return x.kbest == y.kbest && x.k == y.k;
+      }
+
+      friend
+      bool operator!=(const Iterator& x, const Iterator& y)
+      {
+	return x.kbest != y.kbest || x.k != y.k;
+      }
+
+    private:
+      value_type  value;
+      kbest_type* kbest;
+      size_type k;
+    };
+
+    typedef Iterator iterator;
+    typedef Iterator const_iterator;
+
+  public:
+    const_iterator begin() const { return const_iterator(*this); }
+    iterator       begin() { return const_iterator(*this); }
     
+    const_iterator end() const { return const_iterator(); }
+    iterator       end() { return const_iterator(); }
+
+  public:    
     bool operator()(int k, yield_type& yield, weight_type& weight)
     {
       //
@@ -224,6 +308,7 @@ namespace cicada
     weight_set_type     insides;
     derivation_set_type derivations;
     
+    const size_type k_prime;
     const double temperature;
   };
 };
