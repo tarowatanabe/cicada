@@ -62,7 +62,7 @@ namespace cicada
 	yield = posterior[edge.id];
 	
 	for (/**/; first != last; ++ first)
-	  yield = std::min(yield, posterior[*first]);
+	  yield = std::min(yield, *first);
       }
     };
     
@@ -102,14 +102,14 @@ namespace cicada
       size_type k = 0;
       typename kbest_derivations_type::const_iterator diter_end = derivations.end();
       for (typename kbest_derivations_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter, ++ k)
-	weight = std::min(weight, diter->first);
-      
+	weight = std::min(weight, diter->second);
+ 
 #if 0
       typename traversal::value_type derivation;
       size_type   k = 0;
       for (/**/; k != kbest_size; ++ k) {
 	weight_type weight_kbest;
-	
+
 	if (! derivations(k, derivation, weight_kbest))
 	  break;
 	
@@ -117,7 +117,7 @@ namespace cicada
       }
 #endif
       
-      if (k != kbest_size) {
+      if (k < kbest_size) {
 	target = source;
 	return;
       }

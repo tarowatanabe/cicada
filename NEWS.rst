@@ -1,5 +1,6 @@
 2013-x-x
 --------
+ - BUGFIX: prune-kbest core dump.
  - Added k-sampler which shares the interface as kbest.
  - Added read/write for ngram counts (TODO: allow reading and dumping)
  - A small bug fix for posterior operation.
