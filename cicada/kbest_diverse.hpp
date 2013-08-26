@@ -19,7 +19,6 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/compact_set.hpp>
-#include <utils/compact_map.hpp>
 
 namespace cicada
 {
@@ -78,6 +77,7 @@ namespace cicada
 	filter(__filter),
 	graph(__graph),
 	states(__graph.nodes.size()),
+	counts(__graph.edges.size(), 0),
 	k_prime(__k_prime),
 	diversity(__diversity)
     {
@@ -157,15 +157,7 @@ namespace cicada
 			       derivation_hash_type, derivation_equal_type,
 			       std::allocator<const derivation_type*> > derivation_set_unique_type;
 
-    struct id_unassigned
-    {
-      id_type operator()() const { return id_type(-1); }
-    };
-    
-    typedef utils::compact_map<id_type, id_type,
-			       id_unassigned, id_unassigned,
-			       boost::hash<id_type>, std::equal_to<id_type>,
-			       std::allocator<std::pair<const id_type, id_type> > > edge_count_type;
+    typedef std::vector<size_type, std::allocator<size_type> > edge_count_type;
     
     struct State
     {
@@ -174,7 +166,6 @@ namespace cicada
       derivation_heap_type cand;
       derivation_list_type D;
       derivation_set_unique_type uniques;
-      edge_count_type counts;
     };
     
     typedef State state_type;
@@ -265,7 +256,7 @@ namespace cicada
 	    D.push_back(derivation);
 	    
 	    // increment the edge count...
-	    ++ state.counts[derivation->edge->id];
+	    ++ counts[derivation->edge->id];
 
 	    // update the score in the heap which shares the same current derivation...
 	    bool updated = false;
@@ -299,7 +290,7 @@ namespace cicada
       derivation_type query(derivation.j);
       index_set_type& j = query.j;
       
-      const size_type count = state.counts[derivation.edge->id];
+      const size_type count = counts[derivation.edge->id];
       
       for (size_t i = 0; i != j.size(); ++ i) {
 	++ j[i];
@@ -381,6 +372,7 @@ namespace cicada
     
     derivation_set_type derivations;
     state_set_type      states;
+    edge_count_type     counts;
     
     const size_type k_prime;
     const double    diversity;

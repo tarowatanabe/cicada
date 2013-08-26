@@ -163,15 +163,7 @@ namespace cicada
 			       model_type::state_hash, model_type::state_equal,
 			       std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
     
-    struct id_unassigned
-    {
-      id_type operator()() const { return id_type(-1); }
-    };
-    
-    typedef utils::compact_map<id_type, id_type,
-			       id_unassigned, id_unassigned,
-			       boost::hash<id_type>, std::equal_to<id_type>,
-			       std::allocator<std::pair<const id_type, id_type> > > edge_count_type;
+    typedef std::vector<size_type, std::allocator<size_type> > edge_count_type;
 
     ApplyCubePruneDiverse(const model_type& _model,
 			  const function_type& _function,
@@ -200,6 +192,10 @@ namespace cicada
 	D.clear();
 	D.reserve(graph_in.nodes.size());
 	D.resize(graph_in.nodes.size());
+
+	counts.clear();
+	counts.reserve(graph_in.edges.size());
+	counts.resize(graph_in.edges.size(), 0);
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
@@ -232,9 +228,6 @@ namespace cicada
       
       cand.clear();
       cand.reserve(node.edges.size() * cube_size_max);
-      
-      // clear counts...
-      counts.clear();
       
       // we don't need this for alg. 2
       //cand_unique.clear();
