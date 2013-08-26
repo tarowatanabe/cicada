@@ -2614,15 +2614,6 @@ struct KBestSentence
       for (derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter)
 	kbests.push_back(hypothesis_type(boost::get<0>(diter->second).begin(), boost::get<0>(diter->second).end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
-      
-#if 0
-      derivation_type derivation;
-      weight_type     weight;
-      
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k)
-	kbests.push_back(hypothesis_type(boost::get<0>(derivation).begin(), boost::get<0>(derivation).end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-#endif
     } else {
       derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
       
@@ -2630,15 +2621,6 @@ struct KBestSentence
       for (derivation_unique_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter)
 	kbests.push_back(hypothesis_type(boost::get<0>(diter->second).begin(), boost::get<0>(diter->second).end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
-      
-#if 0
-      derivation_type derivation;
-      weight_type     weight;
-      
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k)
-	kbests.push_back(hypothesis_type(boost::get<0>(derivation).begin(), boost::get<0>(derivation).end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-#endif
     }
   }
 };
@@ -2686,21 +2668,6 @@ struct KBestAlignment
 	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
       }
-      
-#if 0
-      sentence_type   sentence;
-      derivation_type derivation;
-      weight_type     weight;
-      
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k) {
-	std::ostringstream os;
-	os << boost::get<0>(derivation);
-	sentence.assign(os.str());
-	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-      }
-#endif
     } else {
       derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
       
@@ -2715,21 +2682,6 @@ struct KBestAlignment
 	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
       }
-      
-#if 0      
-      sentence_type   sentence;
-      derivation_type derivation;
-      weight_type     weight;
-      
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k) {
-	std::ostringstream os;
-	os << boost::get<0>(derivation);
-	sentence.assign(os.str());
-	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-      }
-#endif
     }
   }
 };
@@ -2777,21 +2729,6 @@ struct KBestDependency
 	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
       }
-      
-#if 0      
-      sentence_type   sentence;
-      derivation_type derivation;
-      weight_type     weight;
-    
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k) {
-	std::ostringstream os;
-	os << boost::get<0>(derivation);
-	sentence.assign(os.str());
-      
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-      }
-#endif
     } else {
       derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
 
@@ -2806,20 +2743,6 @@ struct KBestDependency
 	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
 					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
       }
-#if 0    
-      sentence_type   sentence;
-      derivation_type derivation;
-      weight_type     weight;
-    
-      for (int k = 0; k != kbest_size && derivations(k, derivation, weight); ++ k) {
-	std::ostringstream os;
-	os << boost::get<0>(derivation);
-	sentence.assign(os.str());
-      
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(derivation).begin(), boost::get<1>(derivation).end()));
-      }
-#endif
     }
   }
 };

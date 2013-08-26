@@ -116,10 +116,6 @@ namespace cicada
 
       typename Derivations::const_iterator diter_end = derivations.end();
       for (typename Derivations::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	//for (int k = 0; k < kbest_size; ++ k) {
-	//  if (! derivations(k, derivation, weight))
-	//    break;
-	
 	const weight_type& weight     = diter->first;
 	derivation_type&   derivation = const_cast<derivation_type&>(diter->second);
     
@@ -277,10 +273,6 @@ namespace cicada
       
       typename Derivations::const_iterator diter_end = derivations.end();
       for (typename Derivations::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	// for (int k = 0; k < kbest_size; ++ k) {
-	//   if (! derivations(k, derivation, weight))
-	//    break;
-	
 	const weight_type&  weight  = diter->first;
 	derivation_type& derivation = const_cast<derivation_type&>(diter->second);
 	
