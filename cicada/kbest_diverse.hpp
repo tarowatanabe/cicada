@@ -258,7 +258,7 @@ namespace cicada
 
   public:
 
-    bool operator()(int k, yield_type& yield, weight_type& weight)
+    bool operator()(size_type k, yield_type& yield, weight_type& weight)
     {
       const derivation_type* derivation = lazy_kth_best(graph.goal, k);
       if (derivation) {
@@ -301,7 +301,7 @@ namespace cicada
     };
     
   private:
-    const derivation_type* lazy_kth_best(int v, int k)
+    const derivation_type* lazy_kth_best(int v, size_type k)
     {
       //std::cerr << "lazy-kth-best: node: " <<  v << " kbest: " << k << std::endl;
 
@@ -311,7 +311,7 @@ namespace cicada
       
       yield_set_type yields;
       
-      while (static_cast<int>(D.size()) <= k) {
+      while (D.size() <= k) {
 	
 	// lazy-next for the last of the derivation, D
 	if (! D.empty())
@@ -369,7 +369,7 @@ namespace cicada
 	if (! incremented) break;
       }
       
-      return (k < static_cast<int>(D.size()) ? D[k] : 0);
+      return (k < D.size() ? D[k] : 0);
     }
     
     void lazy_next(const derivation_type& derivation, state_type& state)
