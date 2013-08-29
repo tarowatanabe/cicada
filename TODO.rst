@@ -250,3 +250,5 @@ Implement PCFG language model with arbitrary order
 Diversified kbest/feature application + Sampled kbest/feature application
 
 Port for other batch-queue systems, such as Torque.
+
+Implement random sampling, not sampling from posteriors.
