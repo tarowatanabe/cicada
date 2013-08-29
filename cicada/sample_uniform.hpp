@@ -16,6 +16,8 @@
 
 #include <utils/bithack.hpp>
 
+#include <boost/random/uniform_int_distribution.hpp>
+
 namespace cicada
 {
   template <typename Traversal, typename Function, typename Sampler>
