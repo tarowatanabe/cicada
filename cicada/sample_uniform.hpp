@@ -199,8 +199,6 @@ namespace cicada
     {
       // perform top-down traversal for samling a tree
 
-      weight = cicada::semiring::traits<weight_type>::one();
-      
       stack.clear();
       stack.push_back(graph.goal);
       
@@ -221,8 +219,6 @@ namespace cicada
 	
 	const id_type edge_id_sampled = node.edges[pos_sampled];
 	
-	weight *= function(graph.edges[edge_id_sampled]);
-	
 	// update stack...
 	const edge_type& edge_sampled = graph.edges[edge_id_sampled];
 	edge_type::node_set_type::const_iterator titer_end = edge_sampled.tails.end();
@@ -240,12 +236,16 @@ namespace cicada
       std::sort(edges.begin(), edges.end(), compare_node_edge());
       
       // Second, collect yields via traversals
+      weight = cicada::semiring::traits<weight_type>::one();
+      
       yield_set_type yields;
       
       typename node_edge_set_type::const_iterator eiter_end = edges.end();
       for (typename node_edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[eiter->second];
-
+	
+	weight *= function(edge);
+	
 	yields.clear();
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
@@ -256,7 +256,7 @@ namespace cicada
       
       // final yield!
       yield = derivations[graph.goal];
-
+      
       return true;
     }
 
