@@ -385,7 +385,7 @@ namespace cicada
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
       : base_type("output"),
 	output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
-	kbest_size(0), kbest_unique(false), kbest_sample(false), diversity(0.0),
+	kbest_size(0), kbest_unique(false), kbest_sample(false), kbest_uniform(false), diversity(0.0),
 	insertion_prefix(),
 	yield_string(false),
 	yield_terminal_pos(false),
@@ -423,6 +423,8 @@ namespace cicada
 	  kbest_unique = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "sample")
 	  kbest_sample = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "uniform")
+	  kbest_uniform = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -462,7 +464,7 @@ namespace cicada
 	    yield_string = true;
 	  else if (value == "sentence-pos" || value == "terminal-pos")
 	    yield_terminal_pos = true;
-	  else if (value == "derivation" || value == "tree")
+	  else if (value == "derivation" || value == "tree" || value == "hypergraph")
 	    yield_tree = true;
 	  else if (value == "graphviz")
 	    yield_graphviz = true;
@@ -504,8 +506,8 @@ namespace cicada
 	yield_string = true;
 
       if (kbest_size > 0)
-	if (diversity != 0.0 && kbest_sample)
-	  throw std::runtime_error("when kbest, only one of sample or diversity can be specified");
+	if (int(kbest_sample) + kbest_uniform + (diversity != 0.0) > 1)
+	  throw std::runtime_error("when kbest, only one of sample or uniform, diversity can be specified");
 	
       if (graphviz && statistics)
 	throw std::runtime_error("only one of graphviz or statistics can be specified...");
@@ -712,7 +714,7 @@ namespace cicada
 	KBestParam param;
 	param.kbest_size      = kbest_size;
 	param.kbest_sample    = kbest_sample;
-	param.kbest_uniform   = false;
+	param.kbest_uniform   = kbest_uniform;
 	param.kbest_diversity = diversity;
 	param.no_id      = no_id;
 	param.graphviz   = yield_graphviz;

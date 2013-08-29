@@ -46,6 +46,7 @@ namespace cicada
       int  kbest_size;
       bool kbest_unique;
       bool kbest_sample;
+      bool kbest_uniform;
       double diversity;
       sampler_type sampler;
       
