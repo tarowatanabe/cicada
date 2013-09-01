@@ -143,6 +143,13 @@ namespace cicada
 	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
 	    else
 	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	  } else if (uniform) {
+	    if (semiring_tropical)
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	    else
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
 	  } else {
 	    if (semiring_tropical)
 	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), kbest);
@@ -183,6 +190,13 @@ namespace cicada
 	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
 	    else
 	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	  } else if (uniform) {
+	    if (semiring_tropical)
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	    else
+	      cicada::prune_uniform(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
 	  } else {
 	    if (semiring_tropical)
 	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);

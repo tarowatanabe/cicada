@@ -520,6 +520,7 @@ prune_density.hpp \
 prune_edge.hpp \
 prune_kbest.hpp \
 prune_sample.hpp \
+prune_uniform.hpp \
 push_bos_eos.hpp \
 push_head.hpp \
 push_weights.hpp \

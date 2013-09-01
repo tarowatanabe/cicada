@@ -11,5 +11,6 @@
 #include <cicada/prune_edge.hpp>
 #include <cicada/prune_kbest.hpp>
 #include <cicada/prune_sample.hpp>
+#include <cicada/prune_uniform.hpp>
 
 #endif
