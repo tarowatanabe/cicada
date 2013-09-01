@@ -39,6 +39,7 @@ namespace cicada
     typedef typename function_type::value_type  weight_type;
 
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weight_map_type;
 
     typedef std::vector<yield_type, std::allocator<yield_type> > derivation_set_type;
 
@@ -55,6 +56,8 @@ namespace cicada
 	sampler(__sampler),
 	graph(__graph),
 	insides(__graph.nodes.size()),
+	probs(__graph.nodes.size()),
+	scores(__graph.nodes.size()),
 	derivations(__graph.nodes.size()),
 	k_prime(__k_prime),
 	temperature(__temperature)
@@ -197,8 +200,6 @@ namespace cicada
 
     stack_type         stack;
     node_edge_set_type edges;
-    weight_set_type    scores;
-    weight_set_type    probs;
     
     bool sample_derivation(yield_type& yield, weight_type& weight)
     {
@@ -224,37 +225,37 @@ namespace cicada
 	if (node.edges.size() == 1)
 	  weight *= function(graph.edges[node.edges.front()]);
 	else {
-	  weight_type sum;
 	  
-	  scores.clear();
-	  probs.clear();
-	  
-	  node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	  for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    const edge_type& edge = graph.edges[*eiter];
+	  if (probs[node_id].empty()) {
+	    weight_type sum;
 	    
-	    weight_type prob = function(edge);
+	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const edge_type& edge = graph.edges[*eiter];
+	      
+	      weight_type prob = function(edge);
+	      
+	      scores[node_id].push_back(prob);
+	      
+	      edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	      for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		prob *= insides[*titer];
+	      
+	      sum += prob;
+	      probs[node_id].push_back(prob);
+	    }
 	    
-	    scores.push_back(prob);
-	    
-	    edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	    for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	      prob *= insides[*titer];
-	    
-	    sum += prob;
-	    probs.push_back(prob);
+	    // normalize... if summation is zero, then, use uniform distribution!
+	    if (sum != cicada::semiring::traits<weight_type>::zero())
+	      std::transform(probs[node_id].begin(), probs[node_id].end(), probs[node_id].begin(), std::bind2nd(std::multiplies<weight_type>(), 1.0 / sum));
+	    else
+	      std::fill(probs[node_id].begin(), probs[node_id].end(), weight_type(1.0 / probs[node_id].size()));
 	  }
 	  
-	  // normalize... if summation is zero, then, use uniform distribution!
-	  if (sum != cicada::semiring::traits<weight_type>::zero())
-	    std::transform(probs.begin(), probs.end(), probs.begin(), std::bind2nd(std::multiplies<weight_type>(), 1.0 / sum));
-	  else
-	    std::fill(probs.begin(), probs.end(), weight_type(1.0 / probs.size()));
-	  
-	  pos_sampled = sampler.draw(probs.begin(), probs.end(), temperature) - probs.begin();
+	  pos_sampled = sampler.draw(probs[node_id].begin(), probs[node_id].end(), temperature) - probs[node_id].begin();
 	  
 	  // updated weight...
-	  weight *= scores[pos_sampled];
+	  weight *= scores[node_id][pos_sampled];
 	}
 	
 	// sampled edge-id
@@ -306,6 +307,8 @@ namespace cicada
     const hypergraph_type& graph;
     
     weight_set_type     insides;
+    weight_map_type     probs;
+    weight_map_type     scores;
     derivation_set_type derivations;
     
     const size_type k_prime;
