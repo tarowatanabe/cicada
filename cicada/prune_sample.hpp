@@ -52,10 +52,10 @@ namespace cicada
       }
     };
     
-    PruneKBest(const function_type& __function,
-	       sampler_type& __sampler,
-	       const size_type __kbest_size,
-	       const bool __validate=true)
+    PruneSample(const function_type& __function,
+		sampler_type& __sampler,
+		const size_type __kbest_size,
+		const bool __validate=true)
       : function(__function),
 	sampler(__sampler),
 	kbest_size(__kbest_size),
@@ -74,7 +74,7 @@ namespace cicada
       
       removed_type removed(source.edges.size(), true);
       
-      // perform sampling here...
+      // perform k-sampling here...
       stack_type      stack;
       weight_map_type weights(source.nodes.size());
       
@@ -149,12 +149,12 @@ namespace cicada
   inline
   void prune_sample(const HyperGraph& source, HyperGraph& target, const Function& func, Sampler& sampler, const size_t kbest_size, const bool validate=true)
   {
-    PruneSample<Function, Sample> __prune(func, sampler, kbest_size, validate);
+    PruneSample<Function, Sampler> __prune(func, sampler, kbest_size, validate);
     
     __prune(source, target);
   }
   
-  template <typename Function, typename Sample>
+  template <typename Function, typename Sampler>
   inline
   void prune_sample(HyperGraph& source, const Function& func, Sampler& sampler, const size_t kbest_size, const bool validate=true)
   {

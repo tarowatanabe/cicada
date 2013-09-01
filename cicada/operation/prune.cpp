@@ -19,7 +19,9 @@ namespace cicada
   namespace operation
   {
     Prune::Prune(const std::string& parameter, const int __debug)
-      : weights(0), weights_assigned(0), kbest(0), edge(0), beam(-1), density(0.0), scale(1.0), weights_one(false), weights_fixed(false),
+      : weights(0), weights_assigned(0), kbest(0), edge(0), beam(-1), density(0.0), scale(1.0),
+	sample(false), uniform(false),
+	weights_one(false), weights_fixed(false),
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -40,6 +42,10 @@ namespace cicada
 	  density = utils::lexical_cast<double>(piter->second);
 	else if (utils::ipiece(piter->first) == "scale")
 	  scale = utils::lexical_cast<double>(piter->second);
+	else if (utils::ipiece(piter->first) == "sample")
+	  sample = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "uniform")
+	  uniform = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -71,6 +77,14 @@ namespace cicada
       if (int(beam_mode) + density_mode + kbest_mode + edge_mode == 0)
 	throw std::runtime_error("you may want to specify either kbest, beam or density pruning");
       
+      if (sample || uniform) {
+	if (sample && uniform)
+	  throw std::runtime_error("you cannnot perform both of posterior sampling and uniform sampling");
+	
+	if (! kbest_mode)
+	  throw std::runtime_error("sample or uniform requires kbest size");
+      }
+      
       if (int(semiring_tropical) + semiring_logprob + semiring_log > 1)
 	throw std::runtime_error("you can specify one of tropical, logprob, log");
 
@@ -86,7 +100,11 @@ namespace cicada
       if (! weights)
 	weights = &base_type::weights();
       
-      name = std::string("prune-") + (edge_mode ? "edge" : (kbest_mode ? "kbest" : (beam_mode ? "beam" : "density")));
+      name = std::string("prune-") + (edge_mode
+				      ? "edge"
+				      : (kbest_mode
+					 ? (sample ? "sample" : (uniform ? "uniform" : "kbest"))
+					 : (beam_mode ? "beam" : "density")));
     }
     
     void Prune::operator()(data_type& data) const
@@ -117,12 +135,22 @@ namespace cicada
 	  else
 	    cicada::prune_edge(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), edge);
 	} else if (kbest_mode) {
-	  if (semiring_tropical)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), kbest);
-	  else if (semiring_logprob)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), kbest);
-	  else
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), kbest);
+	  
+	  if (sample) {
+	    if (semiring_tropical)
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	    else
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), const_cast<sampler_type&>(sampler), kbest);
+	  } else {
+	    if (semiring_tropical)
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Logprob<double> >(scale), kbest);
+	    else
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Log<double> >(scale), kbest);
+	  }
 	} else if (beam_mode) {
 	  if (semiring_tropical)
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function_one<cicada::semiring::Tropical<double> >(scale), beam);
@@ -148,12 +176,21 @@ namespace cicada
 	  else
 	    cicada::prune_edge(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), edge);
 	} else if (kbest_mode) {
-	  if (semiring_tropical)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);
-	  else if (semiring_logprob)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
-	  else
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
+	  if (sample) {
+	    if (semiring_tropical)
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	    else
+	      cicada::prune_sample(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), const_cast<sampler_type&>(sampler), kbest);
+	  } else {
+	    if (semiring_tropical)
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);
+	    else if (semiring_logprob)
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
+	    else
+	      cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
+	  }
 	} else if (beam_mode) {
 	  if (semiring_tropical)
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);

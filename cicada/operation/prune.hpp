@@ -1,13 +1,14 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__PRUNE__HPP__
 #define __CICADA__OPERATION__PRUNE__HPP__ 1
 
-
 #include <cicada/operation.hpp>
+
+#include <utils/sampler.hpp>
 
 namespace cicada
 {
@@ -15,6 +16,9 @@ namespace cicada
   {
     class Prune : public Operation
     {
+    private:
+      typedef utils::sampler<boost::mt19937> sampler_type;
+      
     public:
       Prune(const std::string& parameter, const int __debug);
 
@@ -30,6 +34,10 @@ namespace cicada
       double beam;
       double density;
       double scale;
+      bool   sample;
+      bool   uniform;
+
+      sampler_type sampler;
   
       bool weights_one;
       bool weights_fixed;

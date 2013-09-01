@@ -257,6 +257,7 @@ prune: pruning\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
 \tedge=edge pruning thresholded by # of edges per node > 0\n\
 \tkbest=kbest pruning thershold in kbest > 0\n\
+\tsample=[true|false] pruning by sampling (requires kbest > 0)\n\
 \tscale=scaling for score\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
