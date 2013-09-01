@@ -247,7 +247,7 @@ namespace cicada
 	    
 	    // normalize... if summation is zero, then, use uniform distribution!
 	    if (sum != cicada::semiring::traits<weight_type>::zero())
-	      std::transform(probs[node_id].begin(), probs[node_id].end(), probs[node_id].begin(), std::bind2nd(std::multiplies<weight_type>(), 1.0 / sum));
+	      std::transform(probs[node_id].begin(), probs[node_id].end(), probs[node_id].begin(), std::bind2nd(std::multiplies<weight_type>(), weight_type(1.0) / sum));
 	    else
 	      std::fill(probs[node_id].begin(), probs[node_id].end(), weight_type(1.0 / probs[node_id].size()));
 	  }
