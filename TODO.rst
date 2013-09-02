@@ -9,7 +9,7 @@ Do we allow state-less features applied during composition???
       - We have "parse" variant of "compose". Do we allow stateless features during "parsing" ????
 
 Systematic symbols:
-    - So forth, we have abused many symbols, such as :code:`|:;+` for
+    - So forth, we have abused many symbols, such as ``|:;+`` for
       binarization, permutation, parent, etc.
     - I think it's time to systemacically define symbols so that we
       can de-binarize, de-parentize etc.
@@ -218,12 +218,9 @@ Use of "float" not "double" for better integration with GPUs
 Use of eigen for weight vector maintenance... (for potentially faster computation...)
 
 Revise the neuron modules to support computation with more dimensions (not assuming single dimension...)
-
-Add "embedding" structure to hold word-embedding features (a float-vector!)
-
-Do we add "loss" module to compute losses?
-
-Do we add "training" module?
+  - Add "embedding" structure to hold word-embedding features (a float-vector!)
+  - Do we add "loss" module to compute losses?
+  - Do we add "training" module?e
 
 Implement LBFGS/CG by templates since this may conflict with float/double based implementation of liblbfgs
 
@@ -235,20 +232,17 @@ Lua integration:
 Correctly implement alignment/distortion model estimation in lexicon_hmm/model4
   - Currenlty, it is very hacky, and gives non-optimal parameters...
 
-Revise and test restaurtna implementation:
-  - Currently, we use a vector-based implementation, but hash-based
-    implementation is potentially faster, especially when decrementing
-    counts.
-
-Revise the merge features in cicada_mpi for large # of features
-
-Revise the ngram language model handling:
-  -  Use better ngram state representation
-
 Implement PCFG language model with arbitrary order
+  - Format: a hyperedge is compactly represented following the
+    tree-rule format(?) [lhs]([rhs],word,\,,word2,\))
+  - Or, use `|||` as a separator?
+  - Use of the tree-grammar way to encode tree structure
+    * LHS is represented as a single node
+    * A vector of children is represented as a single node
 
 Diversified kbest/feature application + Sampled kbest/feature application
 
 Port for other batch-queue systems, such as Torque.
 
-Implement random sampling, not sampling from posteriors.
+Implement rejection sampling
+  - How to approximately sample during non-local feature application?
