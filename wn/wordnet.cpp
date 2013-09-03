@@ -138,15 +138,19 @@ namespace wn
     morphs.clear();
     buffer_type buffer(word.size() + 1, 0);
     std::copy(EscapeIterator(word.begin()), EscapeIterator(word.end()), buffer.begin());
-    
+
     for (int pos = 1; pos <= NUMPARTS; ++ pos) {
       lock_type lock(__wordnet_mutex);
       
-      char* morphword = 0;
-      if (morphword = morphstr(&(*buffer.begin()), pos))
-	do {
-	  morphs.push_back(std::string(UnescapeIterator(morphword), UnescapeIterator(morphword + std::strlen(morphword))));
-	} while (morphword = morphstr(0, pos));
+      char* morphword = morphstr(&(*buffer.begin()), pos);
+      size_t morphlen = (morphword ? std::strlen(morphword) : 0);
+      
+      while (morphword && morphlen) {
+	morphs.push_back(std::string(UnescapeIterator(morphword), UnescapeIterator(morphword + morphlen)));
+	morphword = morphstr(0, pos);
+	if (morphword)
+	  morphlen = std::strlen(morphword);
+      }
     }
   }
   
@@ -164,13 +168,16 @@ namespace wn
       __wordnet_autoptr<SynsetPtr> synset_ptr(findtheinfo_ds(&(*buffer.begin()), pos, 0, ALLSENSES));
       __wordnet_synset(synset_ptr.get(), synsets);
       
-      char* morphword = 0;
-      if (morphword = morphstr(&(*buffer.begin()), pos))
-	do {
-	  __wordnet_autoptr<SynsetPtr> synset_ptr(findtheinfo_ds(morphword, pos, 0, ALLSENSES));
-	  __wordnet_synset(synset_ptr.get(), synsets);
-	  
-	} while (morphword = morphstr(0, pos));
+      char* morphword = morphstr(&(*buffer.begin()), pos);
+      size_t morphlen = (morphword ? std::strlen(morphword) : 0);
+      
+      while (morphword && morphlen) {
+	__wordnet_autoptr<SynsetPtr> synset_ptr(findtheinfo_ds(morphword, pos, 0, ALLSENSES));
+	__wordnet_synset(synset_ptr.get(), synsets);
+	
+	morphword = morphstr(0, pos);
+	morphlen  = (morphword ? std::strlen(morphword) : 0);
+      }
     }
   }
   

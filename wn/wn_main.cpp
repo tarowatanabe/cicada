@@ -23,7 +23,8 @@ int main(int argc, char** argv)
 	wn::WordNet::morph_set_type::const_iterator miter_end = morphs.end();
 	for (wn::WordNet::morph_set_type::const_iterator miter = morphs.begin(); miter != miter_end; ++ miter)
 	  std::cout << "morph: " << *miter << std::endl;
-      }
+      } else
+	std::cout << "no morph: " << word << std::endl;
       
       wordnet(word, synsets);
       if (! synsets.empty()) {
