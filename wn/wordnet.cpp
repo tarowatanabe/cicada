@@ -147,9 +147,9 @@ namespace wn
       
       while (morphword && morphlen) {
 	morphs.push_back(std::string(UnescapeIterator(morphword), UnescapeIterator(morphword + morphlen)));
+	
 	morphword = morphstr(0, pos);
-	if (morphword)
-	  morphlen = std::strlen(morphword);
+	morphlen = (morphword ? std::strlen(morphword) : 0);
       }
     }
   }
