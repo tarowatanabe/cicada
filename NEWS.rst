@@ -1,6 +1,7 @@
 2013-x-x
 --------
  - BUGFIX: prune-kbest core dump.
+ - BUGFIX: check length of morphemes for wordnet
  - Added k-sampler which shares the interface as kbest.
  - Added iterator-based interface for kbest/viterbi/sample
  - Added read/write for ngram counts (TODO: allow reading and dumping)
