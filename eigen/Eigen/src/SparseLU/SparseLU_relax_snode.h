@@ -27,23 +27,29 @@
 
 #ifndef SPARSELU_RELAX_SNODE_H
 #define SPARSELU_RELAX_SNODE_H
+
+namespace Eigen {
+
+namespace internal {
+ 
 /** 
  * \brief Identify the initial relaxed supernodes
  * 
  * This routine is applied to a column elimination tree. 
  * It assumes that the matrix has been reordered according to the postorder of the etree
+ * \param n  the number of columns
  * \param et elimination tree 
  * \param relax_columns Maximum number of columns allowed in a relaxed snode 
  * \param descendants Number of descendants of each node in the etree
  * \param relax_end last column in a supernode
  */
 template <typename Scalar, typename Index>
-void SparseLUBase<Scalar,Index>::LU_relax_snode (const int n, IndexVector& et, const int relax_columns, IndexVector& descendants, IndexVector& relax_end)
+void SparseLUImpl<Scalar,Index>::relax_snode (const Index n, IndexVector& et, const Index relax_columns, IndexVector& descendants, IndexVector& relax_end)
 {
   
   // compute the number of descendants of each node in the etree
-  int j, parent; 
-  relax_end.setConstant(IND_EMPTY);
+  Index j, parent; 
+  relax_end.setConstant(emptyIdxLU);
   descendants.setZero();
   for (j = 0; j < n; j++) 
   {
@@ -52,7 +58,7 @@ void SparseLUBase<Scalar,Index>::LU_relax_snode (const int n, IndexVector& et, c
       descendants(parent) += descendants(j) + 1;
   }
   // Identify the relaxed supernodes by postorder traversal of the etree
-  int snode_start; // beginning of a snode 
+  Index snode_start; // beginning of a snode 
   for (j = 0; j < n; )
   {
     parent = et(j);
@@ -70,4 +76,8 @@ void SparseLUBase<Scalar,Index>::LU_relax_snode (const int n, IndexVector& et, c
   } // End postorder traversal of the etree
   
 }
+
+} // end namespace internal
+
+} // end namespace Eigen
 #endif

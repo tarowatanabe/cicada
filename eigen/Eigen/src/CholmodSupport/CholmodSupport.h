@@ -51,7 +51,6 @@ void cholmod_configure_matrix(CholmodType& mat)
 template<typename _Scalar, int _Options, typename _Index>
 cholmod_sparse viewAsCholmod(SparseMatrix<_Scalar,_Options,_Index>& mat)
 {
-  typedef SparseMatrix<_Scalar,_Options,_Index> MatrixType;
   cholmod_sparse res;
   res.nzmax   = mat.nonZeros();
   res.nrow    = mat.rows();;
@@ -127,7 +126,7 @@ cholmod_dense viewAsCholmod(MatrixBase<Derived>& mat)
   res.ncol   = mat.cols();
   res.nzmax  = res.nrow * res.ncol;
   res.d      = Derived::IsVectorAtCompileTime ? mat.derived().size() : mat.derived().outerStride();
-  res.x      = mat.derived().data();
+  res.x      = (void*)(mat.derived().data());
   res.z      = 0;
 
   internal::cholmod_configure_matrix<Scalar>(res);
@@ -296,7 +295,8 @@ class CholmodBase : internal::noncopyable
       eigen_assert(size==b.rows());
 
       // note: cd stands for Cholmod Dense
-      cholmod_dense b_cd = viewAsCholmod(b.const_cast_derived());
+      Rhs& b_ref(b.const_cast_derived());
+      cholmod_dense b_cd = viewAsCholmod(b_ref);
       cholmod_dense* x_cd = cholmod_solve(CHOLMOD_A, m_cholmodFactor, &b_cd, &m_cholmod);
       if(!x_cd)
       {
@@ -313,6 +313,7 @@ class CholmodBase : internal::noncopyable
     {
       eigen_assert(m_factorizationIsOk && "The decomposition is not in a valid state for solving, you must first call either compute() or symbolic()/numeric()");
       const Index size = m_cholmodFactor->n;
+      EIGEN_UNUSED_VARIABLE(size);
       eigen_assert(size==b.rows());
 
       // note: cs stands for Cholmod Sparse
@@ -345,7 +346,7 @@ class CholmodBase : internal::noncopyable
     }
     
     template<typename Stream>
-    void dumpMemory(Stream& s)
+    void dumpMemory(Stream& /*s*/)
     {}
     
   protected:

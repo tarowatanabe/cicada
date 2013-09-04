@@ -163,8 +163,8 @@ template<typename Derived> class MatrixBase
     template<typename ProductDerived, typename Lhs, typename Rhs>
     Derived& lazyAssign(const ProductBase<ProductDerived, Lhs,Rhs>& other);
 
-    template<typename ProductDerived, typename Lhs, typename Rhs>
-    Derived& lazyAssign(const MatrixPowerProductBase<ProductDerived, Lhs,Rhs>& other);
+    template<typename MatrixPower, typename Lhs, typename Rhs>
+    Derived& lazyAssign(const MatrixPowerProduct<MatrixPower, Lhs,Rhs>& other);
 #endif // not EIGEN_PARSED_BY_DOXYGEN
 
     template<typename OtherDerived>
@@ -215,8 +215,8 @@ template<typename Derived> class MatrixBase
 
     typedef Diagonal<Derived> DiagonalReturnType;
     DiagonalReturnType diagonal();
-    typedef const Diagonal<const Derived> ConstDiagonalReturnType;
-    const ConstDiagonalReturnType diagonal() const;
+	typedef typename internal::add_const<Diagonal<const Derived> >::type ConstDiagonalReturnType;
+    ConstDiagonalReturnType diagonal() const;
 
     template<int Index> struct DiagonalIndexReturnType { typedef Diagonal<Derived,Index> Type; };
     template<int Index> struct ConstDiagonalIndexReturnType { typedef const Diagonal<const Derived,Index> Type; };
@@ -317,7 +317,7 @@ template<typename Derived> class MatrixBase
     MatrixBase<Derived>& matrix() { return *this; }
     const MatrixBase<Derived>& matrix() const { return *this; }
 
-    /** \returns an \link ArrayBase Array \endlink expression of this matrix
+    /** \returns an \link Eigen::ArrayBase Array \endlink expression of this matrix
       * \sa ArrayBase::matrix() */
     ArrayWrapper<Derived> array() { return derived(); }
     const ArrayWrapper<const Derived> array() const { return derived(); }
@@ -457,7 +457,7 @@ template<typename Derived> class MatrixBase
     const MatrixFunctionReturnValue<Derived> sin() const;
     const MatrixSquareRootReturnValue<Derived> sqrt() const;
     const MatrixLogarithmReturnValue<Derived> log() const;
-    const MatrixPowerReturnValue<Derived> pow(RealScalar p) const;
+    const MatrixPowerReturnValue<Derived> pow(const RealScalar& p) const;
 
 #ifdef EIGEN2_SUPPORT
     template<typename ProductDerived, typename Lhs, typename Rhs>

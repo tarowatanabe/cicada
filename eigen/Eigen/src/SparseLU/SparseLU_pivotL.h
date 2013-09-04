@@ -29,6 +29,10 @@
  */
 #ifndef SPARSELU_PIVOTL_H
 #define SPARSELU_PIVOTL_H
+
+namespace Eigen {
+namespace internal {
+  
 /**
  * \brief Performs the numerical pivotin on the current column of L, and the CDIV operation.
  * 
@@ -44,16 +48,16 @@
  *   Note: If you absolutely want to use a given pivot order, then set u=0.0.
  * 
  * \param jcol The current column of L
- * \param u diagonal pivoting threshold
- * \param [in,out]perm_r Row permutation (threshold pivoting)
- * \param [in] iperm_c column permutation - used to finf diagonal of Pc*A*Pc'
- * \param [out]pivrow  The pivot row
+ * \param diagpivotthresh diagonal pivoting threshold
+ * \param[in,out] perm_r Row permutation (threshold pivoting)
+ * \param[in] iperm_c column permutation - used to finf diagonal of Pc*A*Pc'
+ * \param[out] pivrow  The pivot row
  * \param glu Global LU data
  * \return 0 if success, i > 0 if U(i,i) is exactly zero 
  * 
  */
 template <typename Scalar, typename Index>
-int SparseLUBase<Scalar,Index>::LU_pivotL(const int jcol, const RealScalar diagpivotthresh, IndexVector& perm_r, IndexVector& iperm_c, int& pivrow, GlobalLU_t& glu)
+Index SparseLUImpl<Scalar,Index>::pivotL(const Index jcol, const RealScalar& diagpivotthresh, IndexVector& perm_r, IndexVector& iperm_c, Index& pivrow, GlobalLU_t& glu)
 {
   
   Index fsupc = (glu.xsup)((glu.supno)(jcol)); // First column in the supernode containing the column jcol
@@ -69,7 +73,7 @@ int SparseLUBase<Scalar,Index>::LU_pivotL(const int jcol, const RealScalar diagp
   Index diagind = iperm_c(jcol); // diagonal index 
   RealScalar pivmax = 0.0; 
   Index pivptr = nsupc; 
-  Index diag = IND_EMPTY; 
+  Index diag = emptyIdxLU; 
   RealScalar rtemp;
   Index isub, icol, itemp, k; 
   for (isub = nsupc; isub < nsupr; ++isub) {
@@ -123,4 +127,8 @@ int SparseLUBase<Scalar,Index>::LU_pivotL(const int jcol, const RealScalar diagp
     lu_col_ptr[k] *= temp; 
   return 0;
 }
-#endif
+
+} // end namespace internal
+} // end namespace Eigen
+
+#endif // SPARSELU_PIVOTL_H

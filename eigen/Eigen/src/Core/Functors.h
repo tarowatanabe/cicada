@@ -154,6 +154,7 @@ template<typename Scalar> struct scalar_hypot_op {
   {
     using std::max;
     using std::min;
+    using std::sqrt;
     Scalar p = (max)(_x, _y);
     Scalar q = (min)(_x, _y);
     Scalar qp = q/p;
@@ -170,7 +171,7 @@ struct functor_traits<scalar_hypot_op<Scalar> > {
   */
 template<typename Scalar, typename OtherScalar> struct scalar_binary_pow_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_binary_pow_op)
-  inline Scalar operator() (const Scalar& a, const OtherScalar& b) const { return internal::pow(a, b); }
+  inline Scalar operator() (const Scalar& a, const OtherScalar& b) const { return numext::pow(a, b); }
 };
 template<typename Scalar, typename OtherScalar>
 struct functor_traits<scalar_binary_pow_op<Scalar,OtherScalar> > {
@@ -309,7 +310,7 @@ struct functor_traits<scalar_abs_op<Scalar> >
 template<typename Scalar> struct scalar_abs2_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_abs2_op)
   typedef typename NumTraits<Scalar>::Real result_type;
-  EIGEN_STRONG_INLINE const result_type operator() (const Scalar& a) const { return internal::abs2(a); }
+  EIGEN_STRONG_INLINE const result_type operator() (const Scalar& a) const { return numext::abs2(a); }
   template<typename Packet>
   EIGEN_STRONG_INLINE const Packet packetOp(const Packet& a) const
   { return internal::pmul(a,a); }
@@ -325,7 +326,7 @@ struct functor_traits<scalar_abs2_op<Scalar> >
   */
 template<typename Scalar> struct scalar_conjugate_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_conjugate_op)
-  EIGEN_STRONG_INLINE const Scalar operator() (const Scalar& a) const { using internal::conj; return conj(a); }
+  EIGEN_STRONG_INLINE const Scalar operator() (const Scalar& a) const { using numext::conj; return conj(a); }
   template<typename Packet>
   EIGEN_STRONG_INLINE const Packet packetOp(const Packet& a) const { return internal::pconj(a); }
 };
@@ -362,7 +363,7 @@ template<typename Scalar>
 struct scalar_real_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_real_op)
   typedef typename NumTraits<Scalar>::Real result_type;
-  EIGEN_STRONG_INLINE result_type operator() (const Scalar& a) const { return internal::real(a); }
+  EIGEN_STRONG_INLINE result_type operator() (const Scalar& a) const { return numext::real(a); }
 };
 template<typename Scalar>
 struct functor_traits<scalar_real_op<Scalar> >
@@ -377,7 +378,7 @@ template<typename Scalar>
 struct scalar_imag_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_imag_op)
   typedef typename NumTraits<Scalar>::Real result_type;
-  EIGEN_STRONG_INLINE result_type operator() (const Scalar& a) const { return internal::imag(a); }
+  EIGEN_STRONG_INLINE result_type operator() (const Scalar& a) const { return numext::imag(a); }
 };
 template<typename Scalar>
 struct functor_traits<scalar_imag_op<Scalar> >
@@ -392,7 +393,7 @@ template<typename Scalar>
 struct scalar_real_ref_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_real_ref_op)
   typedef typename NumTraits<Scalar>::Real result_type;
-  EIGEN_STRONG_INLINE result_type& operator() (const Scalar& a) const { return internal::real_ref(*const_cast<Scalar*>(&a)); }
+  EIGEN_STRONG_INLINE result_type& operator() (const Scalar& a) const { return numext::real_ref(*const_cast<Scalar*>(&a)); }
 };
 template<typename Scalar>
 struct functor_traits<scalar_real_ref_op<Scalar> >
@@ -407,7 +408,7 @@ template<typename Scalar>
 struct scalar_imag_ref_op {
   EIGEN_EMPTY_STRUCT_CTOR(scalar_imag_ref_op)
   typedef typename NumTraits<Scalar>::Real result_type;
-  EIGEN_STRONG_INLINE result_type& operator() (const Scalar& a) const { return internal::imag_ref(*const_cast<Scalar*>(&a)); }
+  EIGEN_STRONG_INLINE result_type& operator() (const Scalar& a) const { return numext::imag_ref(*const_cast<Scalar*>(&a)); }
 };
 template<typename Scalar>
 struct functor_traits<scalar_imag_ref_op<Scalar> >
@@ -540,20 +541,28 @@ template <typename Scalar, bool RandomAccess> struct linspaced_op_impl;
 // linear access for packet ops:
 // 1) initialization
 //   base = [low, ..., low] + ([step, ..., step] * [-size, ..., 0])
-// 2) each step
+// 2) each step (where size is 1 for coeff access or PacketSize for packet access)
 //   base += [size*step, ..., size*step]
+//
+// TODO: Perhaps it's better to initialize lazily (so not in the constructor but in packetOp)
+//       in order to avoid the padd() in operator() ?
 template <typename Scalar>
 struct linspaced_op_impl<Scalar,false>
 {
   typedef typename packet_traits<Scalar>::type Packet;
 
-  linspaced_op_impl(Scalar low, Scalar step) :
+  linspaced_op_impl(const Scalar& low, const Scalar& step) :
   m_low(low), m_step(step),
   m_packetStep(pset1<Packet>(packet_traits<Scalar>::size*step)),
-  m_base(padd(pset1<Packet>(low),pmul(pset1<Packet>(step),plset<Scalar>(-packet_traits<Scalar>::size)))) {}
+  m_base(padd(pset1<Packet>(low), pmul(pset1<Packet>(step),plset<Scalar>(-packet_traits<Scalar>::size)))) {}
 
   template<typename Index>
-  EIGEN_STRONG_INLINE const Scalar operator() (Index i) const { return m_low+i*m_step; }
+  EIGEN_STRONG_INLINE const Scalar operator() (Index i) const 
+  { 
+    m_base = padd(m_base, pset1<Packet>(m_step));
+    return m_low+Scalar(i)*m_step; 
+  }
+
   template<typename Index>
   EIGEN_STRONG_INLINE const Packet packetOp(Index) const { return m_base = padd(m_base,m_packetStep); }
 
@@ -571,7 +580,7 @@ struct linspaced_op_impl<Scalar,true>
 {
   typedef typename packet_traits<Scalar>::type Packet;
 
-  linspaced_op_impl(Scalar low, Scalar step) :
+  linspaced_op_impl(const Scalar& low, const Scalar& step) :
   m_low(low), m_step(step),
   m_lowPacket(pset1<Packet>(m_low)), m_stepPacket(pset1<Packet>(m_step)), m_interPacket(plset<Scalar>(0)) {}
 
@@ -600,7 +609,7 @@ template <typename Scalar, bool RandomAccess> struct functor_traits< linspaced_o
 template <typename Scalar, bool RandomAccess> struct linspaced_op
 {
   typedef typename packet_traits<Scalar>::type Packet;
-  linspaced_op(Scalar low, Scalar high, int num_steps) : impl((num_steps==1 ? high : low), (num_steps==1 ? Scalar() : (high-low)/(num_steps-1))) {}
+  linspaced_op(const Scalar& low, const Scalar& high, DenseIndex num_steps) : impl((num_steps==1 ? high : low), (num_steps==1 ? Scalar() : (high-low)/(num_steps-1))) {}
 
   template<typename Index>
   EIGEN_STRONG_INLINE const Scalar operator() (Index i) const { return impl(i); }
@@ -639,13 +648,14 @@ template <typename Scalar, bool RandomAccess> struct linspaced_op
 template<typename Functor> struct functor_has_linear_access { enum { ret = 1 }; };
 template<typename Scalar> struct functor_has_linear_access<scalar_identity_op<Scalar> > { enum { ret = 0 }; };
 
-// in CwiseBinaryOp, we require the Lhs and Rhs to have the same scalar type, except for multiplication
-// where we only require them to have the same _real_ scalar type so one may multiply, say, float by complex<float>.
+// In Eigen, any binary op (Product, CwiseBinaryOp) require the Lhs and Rhs to have the same scalar type, except for multiplication
+// where the mixing of different types is handled by scalar_product_traits
+// In particular, real * complex<real> is allowed.
 // FIXME move this to functor_traits adding a functor_default
-template<typename Functor> struct functor_allows_mixing_real_and_complex { enum { ret = 0 }; };
-template<typename LhsScalar,typename RhsScalar> struct functor_allows_mixing_real_and_complex<scalar_product_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
-template<typename LhsScalar,typename RhsScalar> struct functor_allows_mixing_real_and_complex<scalar_conj_product_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
-template<typename LhsScalar,typename RhsScalar> struct functor_allows_mixing_real_and_complex<scalar_quotient_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
+template<typename Functor> struct functor_is_product_like { enum { ret = 0 }; };
+template<typename LhsScalar,typename RhsScalar> struct functor_is_product_like<scalar_product_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
+template<typename LhsScalar,typename RhsScalar> struct functor_is_product_like<scalar_conj_product_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
+template<typename LhsScalar,typename RhsScalar> struct functor_is_product_like<scalar_quotient_op<LhsScalar,RhsScalar> > { enum { ret = 1 }; };
 
 
 /** \internal
@@ -791,7 +801,7 @@ struct scalar_pow_op {
   // FIXME default copy constructors seems bugged with std::complex<>
   inline scalar_pow_op(const scalar_pow_op& other) : m_exponent(other.m_exponent) { }
   inline scalar_pow_op(const Scalar& exponent) : m_exponent(exponent) {}
-  inline Scalar operator() (const Scalar& a) const { return internal::pow(a, m_exponent); }
+  inline Scalar operator() (const Scalar& a) const { return numext::pow(a, m_exponent); }
   const Scalar m_exponent;
 };
 template<typename Scalar>

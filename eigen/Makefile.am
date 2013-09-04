@@ -25,6 +25,7 @@ Eigen/Sparse \
 Eigen/SparseCholesky \
 Eigen/SparseCore \
 Eigen/SparseLU \
+Eigen/SparseQR \
 Eigen/SPQRSupport \
 Eigen/src/Cholesky/LDLT.h \
 Eigen/src/Cholesky/LLT.h \
@@ -49,6 +50,7 @@ Eigen/src/Core/Block.h \
 Eigen/src/Core/BooleanRedux.h \
 Eigen/src/Core/CommaInitializer.h \
 Eigen/src/Core/CoreEvaluators.h \
+Eigen/src/Core/CoreIterators.h \
 Eigen/src/Core/CwiseBinaryOp.h \
 Eigen/src/Core/CwiseNullaryOp.h \
 Eigen/src/Core/CwiseUnaryOp.h \
@@ -229,6 +231,7 @@ Eigen/src/QR/FullPivHouseholderQR.h \
 Eigen/src/QR/HouseholderQR.h \
 Eigen/src/QR/HouseholderQR_MKL.h \
 Eigen/src/SparseCholesky/SimplicialCholesky.h \
+Eigen/src/SparseCholesky/SimplicialCholesky_impl.h \
 Eigen/src/SparseCore/AmbiVector.h \
 Eigen/src/SparseCore/CompressedStorage.h \
 Eigen/src/SparseCore/ConservativeSparseSparseProduct.h \
@@ -236,6 +239,7 @@ Eigen/src/SparseCore/CoreIterators.h \
 Eigen/src/SparseCore/MappedSparseMatrix.h \
 Eigen/src/SparseCore/SparseAssign.h \
 Eigen/src/SparseCore/SparseBlock.h \
+Eigen/src/SparseCore/SparseColEtree.h \
 Eigen/src/SparseCore/SparseCwiseBinaryOp.h \
 Eigen/src/SparseCore/SparseCwiseUnaryOp.h \
 Eigen/src/SparseCore/SparseDenseProduct.h \
@@ -271,8 +275,11 @@ Eigen/src/SparseLU/SparseLU_pivotL.h \
 Eigen/src/SparseLU/SparseLU_pruneL.h \
 Eigen/src/SparseLU/SparseLU_relax_snode.h \
 Eigen/src/SparseLU/SparseLU_Structs.h \
+Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h \
 Eigen/src/SparseLU/SparseLU_Utils.h \
 Eigen/src/SparseLU/SparseLUBase.h \
+Eigen/src/SparseLU/SparseLUImpl.h \
+Eigen/src/SparseQR/SparseQR.h \
 Eigen/src/SPQRSupport/SuiteSparseQRSupport.h \
 Eigen/src/StlSupport/details.h \
 Eigen/src/StlSupport/StdDeque.h \

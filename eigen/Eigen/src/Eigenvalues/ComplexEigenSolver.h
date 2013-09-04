@@ -242,7 +242,7 @@ template<typename _MatrixType> class ComplexEigenSolver
     EigenvectorType m_matX;
 
   private:
-    void doComputeEigenvectors(RealScalar matrixnorm);
+    void doComputeEigenvectors(const RealScalar& matrixnorm);
     void sortEigenvalues(bool computeEigenvectors);
 };
 
@@ -252,7 +252,7 @@ ComplexEigenSolver<MatrixType>&
 ComplexEigenSolver<MatrixType>::compute(const MatrixType& matrix, bool computeEigenvectors)
 {
   // this code is inspired from Jampack
-  assert(matrix.cols() == matrix.rows());
+  eigen_assert(matrix.cols() == matrix.rows());
 
   // Do a complex Schur decomposition, A = U T U^*
   // The eigenvalues are on the diagonal of T.
@@ -273,7 +273,7 @@ ComplexEigenSolver<MatrixType>::compute(const MatrixType& matrix, bool computeEi
 
 
 template<typename MatrixType>
-void ComplexEigenSolver<MatrixType>::doComputeEigenvectors(RealScalar matrixnorm)
+void ComplexEigenSolver<MatrixType>::doComputeEigenvectors(const RealScalar& matrixnorm)
 {
   const Index n = m_eivalues.size();
 
@@ -294,7 +294,7 @@ void ComplexEigenSolver<MatrixType>::doComputeEigenvectors(RealScalar matrixnorm
       {
         // If the i-th and k-th eigenvalue are equal, then z equals 0.
         // Use a small value instead, to prevent division by zero.
-        internal::real_ref(z) = NumTraits<RealScalar>::epsilon() * matrixnorm;
+        numext::real_ref(z) = NumTraits<RealScalar>::epsilon() * matrixnorm;
       }
       m_matX.coeffRef(i,k) = m_matX.coeff(i,k) / z;
     }

@@ -154,7 +154,7 @@ public:
     * \a t in [0;1]
     * see http://en.wikipedia.org/wiki/Slerp
     */
-  template<class OtherDerived> Quaternion<Scalar> slerp(Scalar t, const QuaternionBase<OtherDerived>& other) const;
+  template<class OtherDerived> Quaternion<Scalar> slerp(const Scalar& t, const QuaternionBase<OtherDerived>& other) const;
 
   /** \returns \c true if \c *this is approximately equal to \a other, within the precision
     * determined by \a prec.
@@ -193,7 +193,8 @@ public:
   *
   * \brief The quaternion class used to represent 3D orientations and rotations
   *
-  * \param _Scalar the scalar type, i.e., the type of the coefficients
+  * \tparam _Scalar the scalar type, i.e., the type of the coefficients
+  * \tparam _Options controls the memory alignement of the coeffecients. Can be \# AutoAlign or \# DontAlign. Default is AutoAlign.
   *
   * This class represents a quaternion \f$ w+xi+yj+zk \f$ that is a convenient representation of
   * orientations and rotations of objects in three dimensions. Compared to other representations
@@ -304,41 +305,29 @@ typedef Quaternion<double> Quaterniond;
 
 namespace internal {
   template<typename _Scalar, int _Options>
-  struct traits<Map<Quaternion<_Scalar>, _Options> >:
-  traits<Quaternion<_Scalar, _Options> >
+  struct traits<Map<Quaternion<_Scalar>, _Options> > : traits<Quaternion<_Scalar, (int(_Options)&Aligned)==Aligned ? AutoAlign : DontAlign> >
   {
-    typedef _Scalar Scalar;
     typedef Map<Matrix<_Scalar,4,1>, _Options> Coefficients;
-
-    typedef traits<Quaternion<_Scalar, _Options> > TraitsBase;
-    enum {
-      IsAligned = TraitsBase::IsAligned,
-
-      Flags = TraitsBase::Flags
-    };
   };
 }
 
 namespace internal {
   template<typename _Scalar, int _Options>
-  struct traits<Map<const Quaternion<_Scalar>, _Options> >:
-  traits<Quaternion<_Scalar> >
+  struct traits<Map<const Quaternion<_Scalar>, _Options> > : traits<Quaternion<_Scalar, (int(_Options)&Aligned)==Aligned ? AutoAlign : DontAlign> >
   {
-    typedef _Scalar Scalar;
     typedef Map<const Matrix<_Scalar,4,1>, _Options> Coefficients;
-
-    typedef traits<Quaternion<_Scalar, _Options> > TraitsBase;
+    typedef traits<Quaternion<_Scalar, (int(_Options)&Aligned)==Aligned ? AutoAlign : DontAlign> > TraitsBase;
     enum {
-      IsAligned = TraitsBase::IsAligned,
       Flags = TraitsBase::Flags & ~LvalueBit
     };
   };
 }
 
-/** \brief Quaternion expression mapping a constant memory buffer
+/** \ingroup Geometry_Module
+  * \brief Quaternion expression mapping a constant memory buffer
   *
-  * \param _Scalar the type of the Quaternion coefficients
-  * \param _Options see class Map
+  * \tparam _Scalar the type of the Quaternion coefficients
+  * \tparam _Options see class Map
   *
   * This is a specialization of class Map for Quaternion. This class allows to view
   * a 4 scalar memory buffer as an Eigen's Quaternion object.
@@ -371,10 +360,11 @@ class Map<const Quaternion<_Scalar>, _Options >
     const Coefficients m_coeffs;
 };
 
-/** \brief Expression of a quaternion from a memory buffer
+/** \ingroup Geometry_Module
+  * \brief Expression of a quaternion from a memory buffer
   *
-  * \param _Scalar the type of the Quaternion coefficients
-  * \param _Options see class Map
+  * \tparam _Scalar the type of the Quaternion coefficients
+  * \tparam _Options see class Map
   *
   * This is a specialization of class Map for Quaternion. This class allows to view
   * a 4 scalar memory buffer as an Eigen's  Quaternion object.
@@ -693,7 +683,7 @@ QuaternionBase<Derived>::angularDistance(const QuaternionBase<OtherDerived>& oth
 template <class Derived>
 template <class OtherDerived>
 Quaternion<typename internal::traits<Derived>::Scalar>
-QuaternionBase<Derived>::slerp(Scalar t, const QuaternionBase<OtherDerived>& other) const
+QuaternionBase<Derived>::slerp(const Scalar& t, const QuaternionBase<OtherDerived>& other) const
 {
   using std::acos;
   using std::sin;

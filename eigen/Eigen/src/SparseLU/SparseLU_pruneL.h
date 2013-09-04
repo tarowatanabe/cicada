@@ -30,6 +30,9 @@
 #ifndef SPARSELU_PRUNEL_H
 #define SPARSELU_PRUNEL_H
 
+namespace Eigen {
+namespace internal {
+
 /**
  * \brief Prunes the L-structure.
  *
@@ -37,23 +40,23 @@
  * 
  * 
  * \param jcol The current column of L
- * \param [in]perm_r Row permutation
- * \param [out]pivrow  The pivot row
+ * \param[in] perm_r Row permutation
+ * \param[out] pivrow  The pivot row
  * \param nseg Number of segments
  * \param segrep 
  * \param repfnz
- * \param [out]xprune 
+ * \param[out] xprune 
  * \param glu Global LU data
  * 
  */
 template <typename Scalar, typename Index>
-void SparseLUBase<Scalar,Index>::LU_pruneL(const int jcol, const IndexVector& perm_r, const int pivrow, const int nseg, const IndexVector& segrep, BlockIndexVector repfnz, IndexVector& xprune, GlobalLU_t& glu)
+void SparseLUImpl<Scalar,Index>::pruneL(const Index jcol, const IndexVector& perm_r, const Index pivrow, const Index nseg, const IndexVector& segrep, BlockIndexVector repfnz, IndexVector& xprune, GlobalLU_t& glu)
 {
   // For each supernode-rep irep in U(*,j]
-  int jsupno = glu.supno(jcol); 
-  int i,irep,irep1; 
+  Index jsupno = glu.supno(jcol); 
+  Index i,irep,irep1; 
   bool movnum, do_prune = false; 
-  Index kmin, kmax, minloc, maxloc,krow; 
+  Index kmin = 0, kmax = 0, minloc, maxloc,krow; 
   for (i = 0; i < nseg; i++)
   {
     irep = segrep(i); 
@@ -61,7 +64,7 @@ void SparseLUBase<Scalar,Index>::LU_pruneL(const int jcol, const IndexVector& pe
     do_prune = false; 
     
     // Don't prune with a zero U-segment 
-    if (repfnz(irep) == IND_EMPTY) continue; 
+    if (repfnz(irep) == emptyIdxLU) continue; 
     
     // If a snode overlaps with the next panel, then the U-segment
     // is fragmented into two parts -- irep and irep1. We should let 
@@ -95,9 +98,9 @@ void SparseLUBase<Scalar,Index>::LU_pruneL(const int jcol, const IndexVector& pe
         
         while (kmin <= kmax)
         {
-          if (perm_r(glu.lsub(kmax)) == IND_EMPTY)
+          if (perm_r(glu.lsub(kmax)) == emptyIdxLU)
             kmax--; 
-          else if ( perm_r(glu.lsub(kmin)) != IND_EMPTY)
+          else if ( perm_r(glu.lsub(kmin)) != emptyIdxLU)
             kmin++;
           else 
           {
@@ -126,4 +129,7 @@ void SparseLUBase<Scalar,Index>::LU_pruneL(const int jcol, const IndexVector& pe
   } // End for each U-segment
 }
 
-#endif
+} // end namespace internal
+} // end namespace Eigen
+
+#endif // SPARSELU_PRUNEL_H

@@ -187,6 +187,26 @@ template<typename _MatrixType> class ComplexSchur
       * \sa compute(const MatrixType&, bool, Index)
       */
     ComplexSchur& compute(const MatrixType& matrix, bool computeU = true);
+    
+    /** \brief Compute Schur decomposition from a given Hessenberg matrix
+     *  \param[in] matrixH Matrix in Hessenberg form H
+     *  \param[in] matrixQ orthogonal matrix Q that transform a matrix A to H : A = Q H Q^T
+     *  \param computeU Computes the matriX U of the Schur vectors
+     * \return Reference to \c *this
+     * 
+     *  This routine assumes that the matrix is already reduced in Hessenberg form matrixH
+     *  using either the class HessenbergDecomposition or another mean. 
+     *  It computes the upper quasi-triangular matrix T of the Schur decomposition of H
+     *  When computeU is true, this routine computes the matrix U such that 
+     *  A = U T U^T =  (QZ) T (QZ)^T = Q H Q^T where A is the initial matrix
+     * 
+     * NOTE Q is referenced if computeU is true; so, if the initial orthogonal matrix
+     * is not available, the user should give an identity matrix (Q.setIdentity())
+     * 
+     * \sa compute(const MatrixType&, bool)
+     */
+    template<typename HessMatrixType, typename OrthMatrixType>
+    ComplexSchur& computeFromHessenberg(const HessMatrixType& matrixH, const OrthMatrixType& matrixQ,  bool computeU=true);
 
     /** \brief Reports whether previous computation was successful.
       *
@@ -243,8 +263,8 @@ template<typename _MatrixType> class ComplexSchur
 template<typename MatrixType>
 inline bool ComplexSchur<MatrixType>::subdiagonalEntryIsNeglegible(Index i)
 {
-  RealScalar d = internal::norm1(m_matT.coeff(i,i)) + internal::norm1(m_matT.coeff(i+1,i+1));
-  RealScalar sd = internal::norm1(m_matT.coeff(i+1,i));
+  RealScalar d = numext::norm1(m_matT.coeff(i,i)) + numext::norm1(m_matT.coeff(i+1,i+1));
+  RealScalar sd = numext::norm1(m_matT.coeff(i+1,i));
   if (internal::isMuchSmallerThan(sd, d, NumTraits<RealScalar>::epsilon()))
   {
     m_matT.coeffRef(i+1,i) = ComplexScalar(0);
@@ -262,7 +282,7 @@ typename ComplexSchur<MatrixType>::ComplexScalar ComplexSchur<MatrixType>::compu
   if (iter == 10 || iter == 20) 
   {
     // exceptional shift, taken from http://www.netlib.org/eispack/comqr.f
-    return abs(internal::real(m_matT.coeff(iu,iu-1))) + abs(internal::real(m_matT.coeff(iu-1,iu-2)));
+    return abs(numext::real(m_matT.coeff(iu,iu-1))) + abs(numext::real(m_matT.coeff(iu-1,iu-2)));
   }
 
   // compute the shift as one of the eigenvalues of t, the 2x2
@@ -279,13 +299,13 @@ typename ComplexSchur<MatrixType>::ComplexScalar ComplexSchur<MatrixType>::compu
   ComplexScalar eival1 = (trace + disc) / RealScalar(2);
   ComplexScalar eival2 = (trace - disc) / RealScalar(2);
 
-  if(internal::norm1(eival1) > internal::norm1(eival2))
+  if(numext::norm1(eival1) > numext::norm1(eival2))
     eival2 = det / eival1;
   else
     eival1 = det / eival2;
 
   // choose the eigenvalue closest to the bottom entry of the diagonal
-  if(internal::norm1(eival1-t.coeff(1,1)) < internal::norm1(eival2-t.coeff(1,1)))
+  if(numext::norm1(eival1-t.coeff(1,1)) < numext::norm1(eival2-t.coeff(1,1)))
     return normt * eival1;
   else
     return normt * eival2;
@@ -309,10 +329,20 @@ ComplexSchur<MatrixType>& ComplexSchur<MatrixType>::compute(const MatrixType& ma
   }
 
   internal::complex_schur_reduce_to_hessenberg<MatrixType, NumTraits<Scalar>::IsComplex>::run(*this, matrix, computeU);
-  reduceToTriangularForm(computeU);
+  computeFromHessenberg(m_matT, m_matU, computeU);
   return *this;
 }
 
+template<typename MatrixType>
+template<typename HessMatrixType, typename OrthMatrixType>
+ComplexSchur<MatrixType>& ComplexSchur<MatrixType>::computeFromHessenberg(const HessMatrixType& matrixH, const OrthMatrixType& matrixQ, bool computeU)
+{
+  m_matT = matrixH;
+  if(computeU)
+    m_matU = matrixQ;
+  reduceToTriangularForm(computeU);
+  return *this;
+}
 namespace internal {
 
 /* Reduce given matrix to Hessenberg form */
@@ -334,7 +364,6 @@ struct complex_schur_reduce_to_hessenberg<MatrixType, false>
   static void run(ComplexSchur<MatrixType>& _this, const MatrixType& matrix, bool computeU)
   {
     typedef typename ComplexSchur<MatrixType>::ComplexScalar ComplexScalar;
-    typedef typename ComplexSchur<MatrixType>::ComplexMatrixType ComplexMatrixType;
 
     // Note: m_hess is over RealScalar; m_matT and m_matU is over ComplexScalar
     _this.m_hess.compute(matrix);

@@ -31,6 +31,9 @@
 #ifndef SPARSELU_PANEL_BMOD_H
 #define SPARSELU_PANEL_BMOD_H
 
+namespace Eigen {
+namespace internal {
+
 /**
  * \brief Performs numeric block updates (sup-panel) in topological order.
  * 
@@ -50,18 +53,19 @@
  * 
  */
 template <typename Scalar, typename Index>
-void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const int jcol, const int nseg, ScalarVector& dense, ScalarVector& tempv,
-                                               IndexVector& segrep, IndexVector& repfnz, LU_perfvalues& perfv, GlobalLU_t& glu)
+void SparseLUImpl<Scalar,Index>::panel_bmod(const Index m, const Index w, const Index jcol, 
+                                            const Index nseg, ScalarVector& dense, ScalarVector& tempv,
+                                            IndexVector& segrep, IndexVector& repfnz, GlobalLU_t& glu)
 {
   
-  int ksub,jj,nextl_col; 
-  int fsupc, nsupc, nsupr, nrow; 
-  int krep, kfnz; 
-  int lptr; // points to the row subscripts of a supernode 
-  int luptr; // ...
-  int segsize,no_zeros ; 
+  Index ksub,jj,nextl_col; 
+  Index fsupc, nsupc, nsupr, nrow; 
+  Index krep, kfnz; 
+  Index lptr; // points to the row subscripts of a supernode 
+  Index luptr; // ...
+  Index segsize,no_zeros ; 
   // For each nonz supernode segment of U[*,j] in topological order
-  int k = nseg - 1; 
+  Index k = nseg - 1; 
   const Index PacketSize = internal::packet_traits<Scalar>::size;
   
   for (ksub = 0; ksub < nseg; ksub++)
@@ -79,15 +83,15 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
     lptr = glu.xlsub(fsupc); 
     
     // loop over the panel columns to detect the actual number of columns and rows
-    int u_rows = 0;
-    int u_cols = 0;
+    Index u_rows = 0;
+    Index u_cols = 0;
     for (jj = jcol; jj < jcol + w; jj++)
     {
       nextl_col = (jj-jcol) * m; 
       VectorBlock<IndexVector> repfnz_col(repfnz, nextl_col, m); // First nonzero column index for each row
       
       kfnz = repfnz_col(krep); 
-      if ( kfnz == IND_EMPTY ) 
+      if ( kfnz == emptyIdxLU ) 
         continue; // skip any zero segment
       
       segsize = krep - kfnz + 1;
@@ -97,11 +101,11 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
     
     if(nsupc >= 2)
     { 
-      int ldu = internal::first_multiple<Index>(u_rows, PacketSize);
+      Index ldu = internal::first_multiple<Index>(u_rows, PacketSize);
       Map<Matrix<Scalar,Dynamic,Dynamic>, Aligned,  OuterStride<> > U(tempv.data(), u_rows, u_cols, OuterStride<>(ldu));
       
       // gather U
-      int u_col = 0;
+      Index u_col = 0;
       for (jj = jcol; jj < jcol + w; jj++)
       {
         nextl_col = (jj-jcol) * m; 
@@ -109,19 +113,19 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
         VectorBlock<ScalarVector> dense_col(dense, nextl_col, m); // Scatter/gather entire matrix column from/to here
         
         kfnz = repfnz_col(krep); 
-        if ( kfnz == IND_EMPTY ) 
+        if ( kfnz == emptyIdxLU ) 
           continue; // skip any zero segment
         
         segsize = krep - kfnz + 1;
         luptr = glu.xlusup(fsupc);    
         no_zeros = kfnz - fsupc; 
         
-        int isub = lptr + no_zeros;
-        int off = u_rows-segsize;
-        for (int i = 0; i < off; i++) U(i,u_col) = 0;
-        for (int i = 0; i < segsize; i++)
+        Index isub = lptr + no_zeros;
+        Index off = u_rows-segsize;
+        for (Index i = 0; i < off; i++) U(i,u_col) = 0;
+        for (Index i = 0; i < segsize; i++)
         {
-          int irow = glu.lsub(isub); 
+          Index irow = glu.lsub(isub); 
           U(i+off,u_col) = dense_col(irow); 
           ++isub; 
         }
@@ -129,7 +133,7 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
       }
       // solve U = A^-1 U
       luptr = glu.xlusup(fsupc);
-      int lda = glu.xlusup(fsupc+1) - glu.xlusup(fsupc);
+      Index lda = glu.xlusup(fsupc+1) - glu.xlusup(fsupc);
       no_zeros = (krep - u_rows + 1) - fsupc;
       luptr += lda * no_zeros + no_zeros;
       Map<Matrix<Scalar,Dynamic,Dynamic>, 0, OuterStride<> > A(glu.lusup.data()+luptr, u_rows, u_rows, OuterStride<>(lda) );
@@ -140,8 +144,8 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
       Map<Matrix<Scalar,Dynamic,Dynamic>, 0, OuterStride<> > B(glu.lusup.data()+luptr, nrow, u_rows, OuterStride<>(lda) );
       eigen_assert(tempv.size()>w*ldu + nrow*w + 1);
       
-      int ldl = internal::first_multiple<Index>(nrow, PacketSize);
-      int offset = (PacketSize-internal::first_aligned(B.data(), PacketSize)) % PacketSize;
+      Index ldl = internal::first_multiple<Index>(nrow, PacketSize);
+      Index offset = (PacketSize-internal::first_aligned(B.data(), PacketSize)) % PacketSize;
       Map<Matrix<Scalar,Dynamic,Dynamic>, 0, OuterStride<> > L(tempv.data()+w*ldu+offset, nrow, u_cols, OuterStride<>(ldl));
       
       L.setZero();
@@ -156,25 +160,25 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
         VectorBlock<ScalarVector> dense_col(dense, nextl_col, m); // Scatter/gather entire matrix column from/to here
         
         kfnz = repfnz_col(krep); 
-        if ( kfnz == IND_EMPTY ) 
+        if ( kfnz == emptyIdxLU ) 
           continue; // skip any zero segment
         
         segsize = krep - kfnz + 1;
         no_zeros = kfnz - fsupc; 
-        int isub = lptr + no_zeros;
+        Index isub = lptr + no_zeros;
         
-        int off = u_rows-segsize;
-        for (int i = 0; i < segsize; i++)
+        Index off = u_rows-segsize;
+        for (Index i = 0; i < segsize; i++)
         {
-          int irow = glu.lsub(isub++); 
+          Index irow = glu.lsub(isub++); 
           dense_col(irow) = U.coeff(i+off,u_col);
           U.coeffRef(i+off,u_col) = 0;
         }
         
         // Scatter l into SPA dense[]
-        for (int i = 0; i < nrow; i++)
+        for (Index i = 0; i < nrow; i++)
         {
-          int irow = glu.lsub(isub++); 
+          Index irow = glu.lsub(isub++); 
           dense_col(irow) -= L.coeff(i,u_col);
           L.coeffRef(i,u_col) = 0;
         }
@@ -191,13 +195,13 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
         VectorBlock<ScalarVector> dense_col(dense, nextl_col, m); // Scatter/gather entire matrix column from/to here
         
         kfnz = repfnz_col(krep); 
-        if ( kfnz == IND_EMPTY ) 
+        if ( kfnz == emptyIdxLU ) 
           continue; // skip any zero segment
         
         segsize = krep - kfnz + 1;
         luptr = glu.xlusup(fsupc);
         
-        int lda = glu.xlusup(fsupc+1)-glu.xlusup(fsupc);// nsupr
+        Index lda = glu.xlusup(fsupc+1)-glu.xlusup(fsupc);// nsupr
         
         // Perform a trianglar solve and block update, 
         // then scatter the result of sup-col update to dense[]
@@ -210,5 +214,10 @@ void SparseLUBase<Scalar,Index>::LU_panel_bmod(const int m, const int w, const i
     }
     
   } // End for each updating supernode
-}
-#endif
+} // end panel bmod
+
+} // end namespace internal
+
+} // end namespace Eigen
+
+#endif // SPARSELU_PANEL_BMOD_H

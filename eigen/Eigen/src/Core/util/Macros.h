@@ -12,8 +12,8 @@
 #define EIGEN_MACROS_H
 
 #define EIGEN_WORLD_VERSION 3
-#define EIGEN_MAJOR_VERSION 1
-#define EIGEN_MINOR_VERSION 90
+#define EIGEN_MAJOR_VERSION 2
+#define EIGEN_MINOR_VERSION 0
 
 #define EIGEN_VERSION_AT_LEAST(x,y,z) (EIGEN_WORLD_VERSION>x || (EIGEN_WORLD_VERSION>=x && \
                                       (EIGEN_MAJOR_VERSION>y || (EIGEN_MAJOR_VERSION>=y && \
@@ -145,6 +145,12 @@
 #define EIGEN_DONT_INLINE
 #endif
 
+#if (defined __GNUC__)
+#define EIGEN_PERMISSIVE_EXPR __extension__
+#else
+#define EIGEN_PERMISSIVE_EXPR
+#endif
+
 // this macro allows to get rid of linking errors about multiply defined functions.
 //  - static is not very good because it prevents definitions from different object files to be merged.
 //           So static causes the resulting linked executable to be bloated with multiple copies of the same function.
@@ -234,10 +240,12 @@
 // Suppresses 'unused variable' warnings.
 #define EIGEN_UNUSED_VARIABLE(var) (void)var;
 
-#if !defined(EIGEN_ASM_COMMENT) && (defined __GNUC__)
-#define EIGEN_ASM_COMMENT(X)  asm("#" X)
-#else
-#define EIGEN_ASM_COMMENT(X)
+#if !defined(EIGEN_ASM_COMMENT)
+  #if (defined __GNUC__) && ( defined(__i386__) || defined(__x86_64__) )
+    #define EIGEN_ASM_COMMENT(X)  asm("#" X)
+  #else
+    #define EIGEN_ASM_COMMENT(X)
+  #endif
 #endif
 
 /* EIGEN_ALIGN_TO_BOUNDARY(n) forces data to be n-byte aligned. This is used to satisfy SIMD requirements.
