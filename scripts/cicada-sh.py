@@ -223,7 +223,7 @@ class PBS:
         sys.stderr.write(command+'\n')
         
         # sleep for safety...
-        time.sleep(0.1)
+        #time.sleep(0.1)
 
 class Threads:
     
