@@ -127,8 +127,7 @@ class Program:
         return self
 
 class QSUB:
-    def __init__(self, command="", script=""):
-        self.command = command
+    def __init__(self, script=""):
         self.script = script
 
     def start(self):
@@ -218,7 +217,7 @@ class PBS:
         
         pipe.write(prefix + command + suffix + '\n')
 
-        self.workers.append(QSUB(command, pipe.getvalue()))
+        self.workers.append(QSUB(pipe.getvalue()))
         self.workers[-1].start()
 
         sys.stderr.write(command+'\n')
