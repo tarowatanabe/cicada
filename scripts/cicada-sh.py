@@ -9,7 +9,6 @@
 ###
 
 import threading
-import multiprocessing
 
 import time
 import sys
@@ -127,14 +126,35 @@ class Program:
         self.args.append(other)
         return self
 
-class QSUB(multiprocessing.Process):
-    def __init__(self, command=""):
-        multiprocessing.Process.__init__(self)
+class QSUB:
+    def __init__(self, command="", script=""):
         self.command = command
+        self.script = script
+
+    def start(self):
+        self.run()
+
+    def join(self):
+        self.wait()
         
+    ### actual implementations
     def run(self):
-        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        popen.communicate(self.command)
+        self.popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        
+        ### reader therad
+        self.stdout = threading.Thread(target=self._reader, args=[self.popen.stdout])
+        self.stdout.start()
+        
+        ### feed script
+        self.popen.stdin.write(self.script)
+        self.popen.stdin.close()
+                
+    def wait(self):
+        self.stdout.join()
+        self.popen.wait()
+
+    def _reader(self, fh):
+        fh.read()
         
 class PBS:
     def __init__(self, queue=""):
@@ -198,11 +218,13 @@ class PBS:
         
         pipe.write(prefix + command + suffix + '\n')
 
-        self.workers.append(QSUB(pipe.getvalue()))
+        self.workers.append(QSUB(command, pipe.getvalue()))
         self.workers[-1].start()
+
+        sys.stderr.write(command+'\n')
         
         # sleep for safety...
-        time.sleep(0.5)
+        time.sleep(0.1)
 
 class Threads:
     
