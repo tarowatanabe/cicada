@@ -8,7 +8,6 @@
 ###
 
 import threading
-import multiprocessing
 
 import time
 import sys
@@ -201,18 +200,36 @@ class Program:
         self.args.append(other)
         return self
 
-class QSUB(multiprocessing.Process):
-    def __init__(self, command=""):
+class QSUB:
+    def __init__(self, script=""):
+        self.script = script
+
+    def start(self):
+        self.run()
+
+    def join(self):
+        self.wait()
         
-        multiprocessing.Process.__init__(self)
-        self.command = command
-        
+    ### actual implementations
     def run(self):
-        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        popen.communicate(self.command)
+        self.popen = subprocess.Popen(['qsub', '-S', '/bin/sh'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        
+        ### reader therad
+        self.stdout = threading.Thread(target=self._reader, args=[self.popen.stdout])
+        self.stdout.start()
+        
+        ### feed script
+        self.popen.stdin.write(self.script)
+        self.popen.stdin.close()
+        
+    def wait(self):
+        self.stdout.join()
+        self.popen.wait()
+
+    def _reader(self, fh):
+        fh.read()
         
 class PBS:
-    ### rewrite this by threads!
     def __init__(self, queue=""):
         self.queue = queue
         self.qsub = 'qsub'
@@ -272,11 +289,7 @@ class PBS:
 class Threads:
     
     def __init__(self, cicada=None, threads=1):
-        
-        command = "%s" %(cicada.thrsh)
-        command += " --threads %d" %(threads)
-        
-        self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
+        self.popen = subprocess.Popen([cicada.thrsh, '--threads', str(threads)], stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
         
     def __del__(self):

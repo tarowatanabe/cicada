@@ -195,7 +195,7 @@ class PBS:
 
     def run(self, command="", name="name", memory=0.0, mpi=None, threads=1, logfile=None):
 
-        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
+        popen = subprocess.Popen(['qsub', '-S', '/bin/sh'], stdin=subprocess.PIPE)
         pipe = popen.stdin
         
         pipe.write("#!/bin/sh\n")

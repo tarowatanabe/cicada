@@ -228,13 +228,7 @@ class PBS:
 class Threads:
     
     def __init__(self, cicada=None, threads=1):
-        command = []
-        command += [cicada.thrsh]
-        command += ['--threads', str(threads)]
-        command += ['--debug']
-        
-        self.popen = subprocess.Popen(command, stdin=subprocess.PIPE)
-
+        self.popen = subprocess.Popen([cicada.thrsh, '--threads', str(threads), '--debug'], stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
         
     def __del__(self):
