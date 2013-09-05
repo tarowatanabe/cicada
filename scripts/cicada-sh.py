@@ -138,7 +138,7 @@ class QSUB:
         
     ### actual implementations
     def run(self):
-        self.popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.popen = subprocess.Popen(['qsub', '-S', '/bin/sh'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         
         ### reader therad
         self.stdout = threading.Thread(target=self._reader, args=[self.popen.stdout])
@@ -147,7 +147,7 @@ class QSUB:
         ### feed script
         self.popen.stdin.write(self.script)
         self.popen.stdin.close()
-                
+        
     def wait(self):
         self.stdout.join()
         self.popen.wait()
@@ -228,11 +228,13 @@ class PBS:
 class Threads:
     
     def __init__(self, cicada=None, threads=1):
-        command = "%s" %(cicada.thrsh)
-        command += " --threads %d" %(threads)
-        command += " --debug"
+        command = []
+        command += [cicada.thrsh]
+        command += ['--threads', str(threads)]
+        command += ['--debug']
         
-        self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
+        self.popen = subprocess.Popen(command, stdin=subprocess.PIPE)
+
         self.pipe = self.popen.stdin
         
     def __del__(self):
