@@ -670,6 +670,7 @@ class Index(UserString.UserString):
                 command += feats.options
             if lexicon:
                 command += lexicon.options
+            command += " --debug"
         else:
             
             self.threads = 1
@@ -686,6 +687,7 @@ class Index(UserString.UserString):
             if lexicon:
                 command += lexicon.options
             command += " --input \"%s\"" %(input)
+            command += " --debug"
             
         ### actual indexer...
         command_indexer = indexer.indexer

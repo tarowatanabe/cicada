@@ -189,7 +189,10 @@ void process(std::istream& is,
 	     const Lexicon& lexicon)
 {
   Scorer scorer;
-
+  
+  if (debug)
+    std::cerr << scorer;
+  
   phrase_pair_type phrase_pair;
   PhrasePairParser parser;
   std::string line;
@@ -255,6 +258,67 @@ struct ScorerCICADA
   sentence_type      target;
   alignment_set_type alignments;
   
+  friend
+  std::ostream& operator<<(std::ostream& os, const ScorerCICADA& x) 
+  {
+    os << "log p(target | source)" << '\n';
+    os << "log p(source | target)" << '\n';
+
+    if (feature_root_mode) {
+      os << "log p(source, target | root(source), root(target))" << '\n';
+      os << "log p(source | root(source))" << '\n';
+      os << "log p(target | root(target))" << '\n';
+    }
+    
+    if (feature_fisher_mode)
+      os << "fisher's exact test score" << '\n';
+    
+    if (feature_lexicon_mode) {
+      os << "log lex(target | source)" << '\n';
+      os << "log lex(source | target)" << '\n';
+    }
+
+    if (feature_model1_mode) {
+      os << "log model1(target | source)" << '\n';
+      os << "log model1(source | target)" << '\n';
+    }
+
+    if (feature_noisy_or_mode) {
+      os << "log noisyor(target | source)" << '\n';
+      os << "log noisyor(source | target)" << '\n';
+    }
+
+    if (feature_insertion_deletion_mode) {
+      os << "# of inserted words" << '\n';
+      os << "# of deleted words" << '\n';
+    }
+    
+    if (feature_unaligned_mode) {
+      os << "# of aligned source words" << '\n';
+      os << "# of aligned target words" << '\n';
+      os << "# of unaligned source words" << '\n';
+      os << "# of unaligned target words" << '\n';
+    }
+
+    if (feature_type_mode) {
+      os << "log 1 / type(source)" << '\n';
+      os << "log 1 / type(target)" << '\n';
+    }
+    
+    if (feature_singleton_mode) {
+      os << "singleton for source" << '\n';
+      os << "singleton for target" << '\n';
+      os << "singleton for source/target" << '\n';
+    }
+
+    if (feature_cross_mode) {
+      os << "# of crossed non-terminal alignment" << '\n';
+      os << "# of crossed word alignment" << '\n';
+    }
+    
+    return os;
+  }
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const statistic_type& statistic,
 		  const root_count_set_type& root_count_joint,

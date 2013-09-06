@@ -196,6 +196,9 @@ void process(std::istream& is,
 {
   Scorer scorer;
 
+  if (debug)
+    std::cerr << scorer;
+
   phrase_pair_type phrase_pair;
   PhrasePairParser parser;
   std::string line;
@@ -235,6 +238,92 @@ struct ScorerCICADA
   sentence_type      target;
   alignment_set_type alignments;
   
+  friend
+  std::ostream& operator<<(std::ostream& os, const ScorerCICADA& x) 
+  {
+    os << "log p(target | source)" << '\n';
+    os << "log p(source | target)" << '\n';
+
+    if (feature_root_mode) {
+      os << "log p(source, target)" << '\n';
+      os << "log p(source)" << '\n';
+      os << "log p(target)" << '\n';
+    }
+    
+    if (feature_fisher_mode)
+      os << "fisher's exact test score" << '\n';
+    
+    if (feature_lexicon_mode) {
+      os << "log lex(target | source)" << '\n';
+      os << "log lex(source | target)" << '\n';
+    }
+
+    if (feature_model1_mode) {
+      os << "log model1(target | source)" << '\n';
+      os << "log model1(source | target)" << '\n';
+    }
+
+    if (feature_noisy_or_mode) {
+      os << "log noisyor(target | source)" << '\n';
+      os << "log noisyor(source | target)" << '\n';
+    }
+
+    if (feature_insertion_deletion_mode) {
+      os << "# of inserted words" << '\n';
+      os << "# of deleted words" << '\n';
+    }
+    
+    if (feature_unaligned_mode) {
+      os << "# of aligned source words" << '\n';
+      os << "# of aligned target words" << '\n';
+      os << "# of unaligned source words" << '\n';
+      os << "# of unaligned target words" << '\n';
+    }
+
+    if (feature_type_mode) {
+      os << "log 1 / type(source)" << '\n';
+      os << "log 1 / type(target)" << '\n';
+    }
+    
+    if (feature_singleton_mode) {
+      os << "singleton for source" << '\n';
+      os << "singleton for target" << '\n';
+      os << "singleton for source/target" << '\n';
+    }
+
+    if (feature_cross_mode)
+      os << "# of crossed word alignment" << '\n';
+
+    if (mode_reordering) {
+      if (mode_monotonicity) {
+	if (mode_bidirectional) {
+	  os << "log prob(prev-mono)" << '\n';
+	  os << "log prob(prev-others)" << '\n';
+	  os << "log prob(next-mono)" << '\n';
+	  os << "log prob(next-others)" << '\n';
+	} else {
+	  os << "log prob(prev-mono)" << '\n';
+	  os << "log prob(prev-others)" << '\n';
+	}
+      } else {
+	if (mode_bidirectional) {
+	  os << "log prob(prev-mono)" << '\n';
+	  os << "log prob(prev-swap)" << '\n';
+	  os << "log prob(prev-others)" << '\n';
+	  os << "log prob(next-mono)" << '\n';
+	  os << "log prob(next-swap)" << '\n';
+	  os << "log prob(next-others)" << '\n';
+	} else {
+	  os << "log prob(prev-mono)" << '\n';
+	  os << "log prob(prev-swap)" << '\n';
+	  os << "log prob(prev-others)" << '\n';	  
+	}
+      }
+    }
+    
+    return os;
+  }
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const statistic_type& statistic,
 		  const root_count_type& root_joint,
@@ -466,6 +555,67 @@ struct ScorerMOSES
   sentence_type      target;
   alignment_set_type alignments;
 
+
+  friend
+  std::ostream& operator<<(std::ostream& os, const ScorerMOSES& x) 
+  {
+    os << "p(target | source)" << '\n';
+    os << "p(source | target)" << '\n';
+    os << "exp(1)" << '\n';
+
+    if (feature_root_mode) {
+      os << "p(source, target)" << '\n';
+      os << "p(source)" << '\n';
+      os << "p(target)" << '\n';
+    }
+    
+    if (feature_fisher_mode)
+      os << "exp(fisher's exact test score)" << '\n';
+    
+    if (feature_lexicon_mode) {
+      os << "lex(target | source)" << '\n';
+      os << "lex(source | target)" << '\n';
+    }
+
+    if (feature_model1_mode) {
+      os << "model1(target | source)" << '\n';
+      os << "model1(source | target)" << '\n';
+    }
+
+    if (feature_noisy_or_mode) {
+      os << "noisyor(target | source)" << '\n';
+      os << "noisyor(source | target)" << '\n';
+    }
+
+    if (feature_insertion_deletion_mode) {
+      os << "exp(# of inserted words)" << '\n';
+      os << "exp(# of deleted words)" << '\n';
+    }
+    
+    if (feature_unaligned_mode) {
+      os << "exp(# of aligned source words)" << '\n';
+      os << "exp(# of aligned target words)" << '\n';
+      os << "exp(# of unaligned source words)" << '\n';
+      os << "exp(# of unaligned target words)" << '\n';
+    }
+
+    if (feature_type_mode) {
+      os << "1 / type(source)" << '\n';
+      os << "1 / type(target)" << '\n';
+    }
+    
+    if (feature_singleton_mode) {
+      os << "exp(singleton for source)" << '\n';
+      os << "exp(singleton for target)" << '\n';
+      os << "exp(singleton for source/target)" << '\n';
+    }
+    
+    if (feature_cross_mode)
+      os << "exp(# of crossed word alignment)" << '\n';
+    
+    return os;
+  }
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const statistic_type& statistic,
 		  const root_count_type& root_joint,
@@ -621,6 +771,37 @@ struct ScorerMOSESReordering
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
 
+  friend
+  std::ostream& operator<<(std::ostream& os, const ScorerMOSESReordering& x) 
+  {
+    if (mode_monotonicity) {
+      if (mode_bidirectional) {
+	os << "prob(prev-mono)" << '\n';
+	os << "prob(prev-others)" << '\n';
+	os << "prob(next-mono)" << '\n';
+	os << "prob(next-others)" << '\n';
+      } else {
+	os << "prob(prev-mono)" << '\n';
+	os << "prob(prev-others)" << '\n';
+      }
+    } else {
+      if (mode_bidirectional) {
+	os << "prob(prev-mono)" << '\n';
+	os << "prob(prev-swap)" << '\n';
+	os << "prob(prev-others)" << '\n';
+	os << "prob(next-mono)" << '\n';
+	os << "prob(next-swap)" << '\n';
+	os << "prob(next-others)" << '\n';
+      } else {
+	os << "prob(prev-mono)" << '\n';
+	os << "prob(prev-swap)" << '\n';
+	os << "prob(prev-others)" << '\n';	  
+      }
+    }
+    
+    return os;
+  }
+  
   void operator()(const phrase_pair_type& phrase_pair,
 		  const statistic_type& statistic,
 		  const root_count_type& root_joint,
