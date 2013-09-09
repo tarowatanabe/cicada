@@ -206,95 +206,95 @@ namespace cicada
       // perform top-down traversal for samling a tree
 
       weight = cicada::semiring::traits<weight_type>::one();
-      
+	
       stack.clear();
       stack.push_back(graph.goal);
-
+	
       edges.clear();
-      
+	
       while (! stack.empty()) {
 	const id_type node_id =  stack.back();
 	stack.pop_back();
-	
+	  
 	const node_type& node = graph.nodes[node_id];
-
+	  
 	// this is an error!
 	if (node.edges.empty()) return false;
-	
+	  
 	size_type pos_sampled = 0;
 	if (node.edges.size() == 1)
 	  weight *= function(graph.edges[node.edges.front()]);
 	else {
-	  
+	    
 	  if (probs[node_id].empty()) {
 	    weight_type sum;
-	    
+	      
 	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	      const edge_type& edge = graph.edges[*eiter];
-	      
+		
 	      weight_type prob = function(edge);
-	      
+		
 	      scores[node_id].push_back(prob);
-	      
+		
 	      edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	      for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 		prob *= insides[*titer];
-	      
+		
 	      sum += prob;
 	      probs[node_id].push_back(prob);
 	    }
-	    
+	      
 	    // normalize... if summation is zero, then, use uniform distribution!
 	    if (sum != cicada::semiring::traits<weight_type>::zero())
 	      std::transform(probs[node_id].begin(), probs[node_id].end(), probs[node_id].begin(), std::bind2nd(std::multiplies<weight_type>(), weight_type(1.0) / sum));
 	    else
 	      std::fill(probs[node_id].begin(), probs[node_id].end(), weight_type(1.0 / probs[node_id].size()));
 	  }
-	  
+	    
 	  pos_sampled = sampler.draw(probs[node_id].begin(), probs[node_id].end(), temperature) - probs[node_id].begin();
-	  
+	    
 	  // updated weight...
 	  weight *= scores[node_id][pos_sampled];
 	}
-	
+	  
 	// sampled edge-id
 	const id_type edge_id_sampled = node.edges[pos_sampled];
-	
+	  
 	// update stack...
 	const edge_type& edge_sampled = graph.edges[edge_id_sampled];
 	edge_type::node_set_type::const_iterator titer_end = edge_sampled.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge_sampled.tails.begin(); titer != titer_end; ++ titer)
 	  stack.push_back(*titer);
-	
+	  
 	// update sampled edges
 	edges.push_back(std::make_pair(node_id, edge_id_sampled));
       }
-
+	
       if (edges.empty()) return false;
-      
+	
       // perform bottom-up to collect yields
       // First, we need to make sure that the edges will be visited in a topilogical order...
       std::sort(edges.begin(), edges.end(), compare_node_edge());
-      
+	
       // Second, collect yields via traversals
       yield_set_type yields;
-      
+	
       typename node_edge_set_type::const_iterator eiter_end = edges.end();
       for (typename node_edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[eiter->second];
-
+	  
 	yields.clear();
 	edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	  yields.push_back(&derivations[*titer]);
-	
+	  
 	traversal(edge, derivations[eiter->first], yield_iterator(yields.begin()), yield_iterator(yields.end()));
       }
-      
+	
       // final yield!
       yield = derivations[graph.goal];
-
+	
       return true;
     }
 

@@ -2802,6 +2802,55 @@ struct TaskReadSync
   TaskReadSync(queue_type& __queue, const scorer_document_type& __scorers)
     : queue(__queue), scorers(__scorers) {}
   
+  template <typename Tp>
+  struct hashp : boost::hash<Tp>
+  {
+    typedef boost::hash<Tp> hasher_type;
+    
+    size_t operator()(const Tp* x) const
+    {
+      return x ? hasher_type::operator()(*x) : size_t(0);
+    }
+  };
+  
+  template <typename Tp>
+  struct equalp : std::equal_to<Tp>
+  {
+    typedef std::equal_to<Tp> equal_type;
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return (x == y) || (x && y && equal_type::operator()(*x, *y));
+    }
+  };
+  
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
+
+  hypothesis_unique_type uniques;
+  
+  
+  void unique_hypotheses(hypothesis_set_type& hypotheses)
+  {
+    uniques.clear();
+    
+    hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
+    for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter)
+      uniques.insert(&(*hiter));
+    
+    hypothesis_set_type merged;
+    merged.reserve(uniques.size());
+    
+    hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+    for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
+      merged.push_back(*(*uiter));
+
+    uniques.clear();
+    
+    hypotheses.swap(merged);
+  }
+
   void operator()()
   {
     typedef boost::spirit::istream_iterator iter_type;
@@ -2848,6 +2897,9 @@ struct TaskReadSync
 	  kbests.back().push_back(hypothesis_type(kbest_feature));
 	}
 	
+	// unique
+	unique_hypotheses(kbests.back());
+	
 	if (! scorers.empty()) {
 	  hypothesis_set_type::iterator kiter_end = kbests.back().end();
 	  for (hypothesis_set_type::iterator kiter = kbests.back().begin(); kiter != kiter_end; ++ kiter) {
@@ -2878,6 +2930,9 @@ struct TaskReadSync
 	  
 	  oracles.back().push_back(hypothesis_type(kbest_feature));
 	}
+
+	// unique
+	unique_hypotheses(oracles.back());
 	
 	if (! scorers.empty()) {
 	  hypothesis_set_type::iterator oiter_end = oracles.back().end();

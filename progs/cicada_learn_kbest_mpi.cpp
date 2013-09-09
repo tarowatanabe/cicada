@@ -4489,6 +4489,30 @@ struct equalp : std::equal_to<Tp>
   }
 };
 
+void unique_kbest(hypothesis_set_type& kbests)
+{
+  typedef const hypothesis_type* value_type;
+  typedef utils::unordered_set<value_type, hashp<hypothesis_type>, equalp<hypothesis_type>,
+			       std::allocator<value_type> >::type hypothesis_unique_type;
+  
+  hypothesis_unique_type uniques;
+  
+  hypothesis_set_type::const_iterator kiter_end = kbests.end();
+  for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
+    uniques.insert(&(*kiter));
+  
+  hypothesis_set_type merged;
+  merged.reserve(uniques.size());
+  
+  hypothesis_unique_type::const_iterator uiter_end = uniques.end();
+  for (hypothesis_unique_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter)
+    merged.push_back(*(*uiter));
+  
+  uniques.clear();
+  
+  kbests.swap(merged);
+}
+
 void unique_kbest(hypothesis_map_type& kbests)
 {
   typedef const hypothesis_type* value_type;
@@ -4641,6 +4665,9 @@ void read_kbest(const scorer_document_type& scorers,
 	  
 	  kbests.back().push_back(hypothesis_type(kbest_feature));
 	}
+
+	// unique...
+	unique_kbest(kbests.back());
 	
 	if (! scorers.empty()) {
 	  if (refset_pos >= scorers.size())
@@ -4853,6 +4880,8 @@ void read_kbest(const scorer_document_type& scorers,
 	    
 	    kbests.back().push_back(hypothesis_type(kbest_feature));
 	  }
+
+	  unique_kbest(kbests.back());
 	}
 
 	{
@@ -4875,6 +4904,8 @@ void read_kbest(const scorer_document_type& scorers,
 	    
 	    oracles.back().push_back(hypothesis_type(kbest_feature));
 	  }
+	  
+	  unique_kbest(oracles.back());
 	}
 	
 	if (! scorers.empty()) {
