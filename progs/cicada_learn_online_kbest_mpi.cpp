@@ -118,8 +118,8 @@ bool kbest_diverse_mode = false;
 
 // solver parameters
 bool learn_xbleu = false;
-bool learn_pegasos = false;
-bool learn_opegasos = false;
+bool learn_hinge = false;
+bool learn_ohinge = false;
 bool learn_pa = false;
 bool learn_cw = false;
 bool learn_arow = false;
@@ -238,9 +238,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
-      throw std::runtime_error("you can specify either --learn-{xbleu,mira,softmax,osoftmax,el,oel,pegasos,opegasos,pa,cw,arow}");
-    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_pegasos + learn_opegasos + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
+    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_hinge + learn_ohinge + learn_pa + learn_cw + learn_arow + learn_nherd > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,mira,softmax,osoftmax,el,oel,hinge,ohinge,pa,cw,arow}");
+    if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_hinge + learn_ohinge + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_softmax = true;
 
     
@@ -250,7 +250,7 @@ int main(int argc, char ** argv)
       regularize_l2 = true;
 
     if (learn_osoftmax && regularize_l1)
-      throw std::runtime_error("no optimized-foftmax with L1");
+      throw std::runtime_error("no optimized-softmax with L1");
     if (learn_oel && regularize_l1)
       throw std::runtime_error("no optimized-ExpectedLoss with L1");
 
@@ -378,10 +378,16 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHingeL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l1)
+	cicada_learn<LearnHingeL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHingeL2, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l1)
+	cicada_learn<LearnOHingeL1, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+	throw std::runtime_error("unsupported learner");
     } else if (yield_alignment) {
       if (learn_pa)
 	cicada_learn<LearnPA, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -409,10 +415,16 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHingeL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l1)
+	cicada_learn<LearnHingeL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHingeL2, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l1)
+	cicada_learn<LearnOHingeL1, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+	throw std::runtime_error("unsupported learner");
     } else if (yield_dependency) {
       if (learn_pa)
 	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -440,10 +452,16 @@ int main(int argc, char ** argv)
 	cicada_learn<LearnExpectedLossL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l2)
 	cicada_learn<LearnOExpectedLoss, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_pegasos)
-	cicada_learn<LearnPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHingeL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l1)
+	cicada_learn<LearnHingeL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHingeL2, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l1)
+	cicada_learn<LearnOHingeL1, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	cicada_learn<LearnOPegasos, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+	throw std::runtime_error("unsupported learner");
     } else
       throw std::runtime_error("invalid yield");
     
@@ -1688,18 +1706,18 @@ void options(int argc, char** argv)
     ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
     ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
     
+    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online SGD with xBLEU loss")
+    ("learn-softmax",  po::bool_switch(&learn_softmax),  "online SGD with softmax loss")
+    ("learn-osoftmax", po::bool_switch(&learn_osoftmax), "online optimized-SGD with softmax loss")
+    ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected loss")
+    ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected loss")    
+    ("learn-hinge",    po::bool_switch(&learn_hinge),    "online SGD with hinge loss (Pegasos)")
+    ("learn-ohinge",   po::bool_switch(&learn_ohinge),   "online optimized-SGD with hinge loss (optimized-Pegasos)")
     ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
-    ("learn-pegasos",  po::bool_switch(&learn_pegasos),  "online Pegasos algorithm")
-    ("learn-opegasos", po::bool_switch(&learn_opegasos), "online optimized-Pegasos algorithm")
     ("learn-pa",       po::bool_switch(&learn_pa),       "online PA algorithm")
     ("learn-cw",       po::bool_switch(&learn_cw),       "online CW algorithm")
     ("learn-arow",     po::bool_switch(&learn_arow),     "online AROW algorithm")
     ("learn-nherd",    po::bool_switch(&learn_nherd),    "online NHERD algorithm")
-    ("learn-softmax",  po::bool_switch(&learn_softmax),  "online softmax algorithm")
-    ("learn-osoftmax", po::bool_switch(&learn_osoftmax), "online optimized-softmax algorithm")
-    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
-    ("learn-el",       po::bool_switch(&learn_el),       "online SGD with expected-loss")
-    ("learn-oel",      po::bool_switch(&learn_oel),      "online optimized-SGD with expected-loss")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")

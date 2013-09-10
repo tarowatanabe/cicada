@@ -1423,17 +1423,114 @@ struct LearnOnlineMargin : public LearnBase
 };
 
 // Pegasos learner
-struct LearnPegasos : public LearnOnlineMargin
+struct LearnHingeL1 : public LearnOnlineMargin
+{
+  typedef cicada::WeightVector<double> penalty_set_type;
+  
+  LearnHingeL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
+  
+  void initialize(weight_set_type& weights)
+  {
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+  }
+  
+  typedef std::vector<bool, std::allocator<bool> > suffered_set_type;
+  suffered_set_type suffered;
+
+  feature_set_type updates;
+
+  double learn(weight_set_type& weights)
+  {
+    if (features.empty()) return 0.0;
+    
+    size_type k = 0;
+    suffered.clear();
+    suffered.resize(features.size(), false);
+    
+    for (size_t i = 0; i != features.size(); ++ i) {
+      const double loss = losses[i] - cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0);
+      const bool suffer_loss = loss > 0.0;
+      suffered[i] = suffer_loss;
+      k += suffer_loss;
+    }
+    
+    if (! k) {
+      // anyway, clear features!
+      features.clear();
+      losses.clear();
+      
+      return 0.0;
+    }
+    
+    //const double k_norm = 1.0 / (features.size());
+    const double k_norm = 1.0 / k; // it is wrong, but works quite well in practice
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    penalty += eta * lambda;
+    
+    updates.clear();
+    for (size_t i = 0; i != features.size(); ++ i) 
+      if (suffered[i]) {
+	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] += k_norm * fiter->second;
+      }
+    
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter) {
+      double& x = weights[fiter->first];
+      
+      x += (adagrad_mode ? adagrad(fiter->first, eta) : eta) * fiter->second;
+      
+      if (adagrad_mode)
+	adagrad.update(fiter->first, fiter->second);
+      
+      // apply penalty
+      apply(x, penalties[fiter->first], penalty);
+    }
+    
+    features.clear();
+    losses.clear();
+    
+    return 0.0;
+  }
+
+  void apply(double& x, double& penalty, const double& cummulative)
+  {
+    const double x_half = x;
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - cummulative);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + cummulative);
+    penalty += x - x_half;
+  }
+  
+  size_type instances;
+  size_type epoch;
+  double    lambda;
+
+  penalty_set_type penalties;
+  double penalty;
+  
+  RegularizeAdaGrad adagrad;
+};
+
+
+struct LearnHingeL2 : public LearnOnlineMargin
 {
   
-  LearnPegasos(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnHingeL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   void initialize(weight_set_type& weights)
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-    
-    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -1446,6 +1543,8 @@ struct LearnPegasos : public LearnOnlineMargin
   
   typedef std::vector<bool, std::allocator<bool> > suffered_set_type;
   suffered_set_type suffered;
+
+  feature_set_type updates;
 
   double learn(weight_set_type& weights)
   {
@@ -1478,28 +1577,34 @@ struct LearnPegasos : public LearnOnlineMargin
     ++ epoch;
     
     rescale(weights, 1.0 - eta * lambda);
-    // udpate...
     
-    double a_norm = 0.0;
-    double pred = 0.0;
+    updates.clear();
     for (size_t i = 0; i != features.size(); ++ i) 
       if (suffered[i]) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
-	  double& x = weights[fiter->first];
-	  
-	  const double alpha = (adagrad_mode ? adagrad(fiter->first, eta) : eta) * k_norm * fiter->second;
-	  
-	  if (adagrad_mode)
-	    adagrad.update(fiter->first, fiter->second);
-	  
-	  a_norm += alpha * alpha;
-	  pred += 2.0 * x * alpha;
-	  
-	  //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-	  x += alpha / weight_scale;
-	}
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] += k_norm * fiter->second;
       }
+    
+    // udpate...
+    double a_norm = 0.0;
+    double pred = 0.0;
+    
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter) {
+      double& x = weights[fiter->first];
+      
+      const double alpha = (adagrad_mode ? adagrad(fiter->first, eta) : eta) * fiter->second;
+      
+      if (adagrad_mode)
+	adagrad.update(fiter->first, fiter->second);
+      
+      a_norm += alpha * alpha;
+      pred += 2.0 * x * alpha;
+      
+      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
+      x += alpha / weight_scale;
+    }
     
     // avoid numerical instability...
     weight_norm += a_norm + pred * weight_scale;
@@ -1533,13 +1638,180 @@ struct LearnPegasos : public LearnOnlineMargin
   double    weight_scale;
   double    weight_norm;
   
-  weight_set_type weights_peg;
-
   RegularizeAdaGrad adagrad;
 };
 
 // optimized-Pegasos learner
-struct LearnOPegasos : public LearnOnlineMargin
+struct LearnOHingeL1 : public LearnOnlineMargin
+{
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
+  typedef std::vector<int, std::allocator<int> >          index_type;
+
+  typedef cicada::WeightVector<double> penalty_set_type;
+
+  struct HMatrix
+  {
+    typedef LearnBase::sample_set_type sample_set_type;
+    
+    HMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(features[index[i]].begin(), features[index[i]].end(), features[index[j]].begin(), features[index[j]].end(), 0.0);
+    }
+    
+    const sample_set_type& features;
+    const index_type& index;
+  };
+  
+  struct MMatrix
+  {
+    typedef LearnBase::sample_set_type sample_set_type;
+    
+    MMatrix(const sample_set_type& __features, const index_type& __index) : features(__features), index(__index) {}
+    
+    template <typename __W>
+    void operator()(__W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = index.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+	  for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename __W>
+    double operator()(const __W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename __W>
+    void operator()(__W& w, const double& update, const size_t& i) const
+    {
+      sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+      for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const sample_set_type& features;
+    const index_type& index;
+  };
+
+  LearnOHingeL1(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), penalties(), penalty(0.0) {}  
+  
+  void initialize(weight_set_type& weights)
+  {
+    
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
+  double learn(weight_set_type& weights)
+  {
+    if (features.empty()) return 0.0;
+    
+    const size_type k = features.size();
+    const double k_norm = 1.0 / k;
+    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
+    const size_type num_samples = (instances + batch_size - 1) / batch_size;
+    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
+    ++ epoch;
+    
+    penalty += eta * lambda;
+    
+    alpha.clear();
+    f.clear();
+    index.clear();
+    
+    for (size_t i = 0; i != losses.size(); ++ i)
+      f.push_back(cicada::dot_product(features[i].begin(), features[i].end(), weights, 0.0));
+    
+    double objective = 0.0;
+    for (size_t i = 0; i != f.size(); ++ i) {
+      const double loss = losses[i] - f[i];
+      
+      if (loss <= 0.0) continue;
+      
+      f[index.size()] = - (losses[i] - f[i]);
+      index.push_back(i);
+      objective += loss;
+    }
+    objective /= losses.size();
+    
+    f.resize(index.size());
+    alpha.resize(index.size(), 0.0);
+    
+    {
+      HMatrix H(features, index);
+      MMatrix M(features, index);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
+    }
+    
+    size_t actives = 0;
+    size_t negatives = 0;
+    for (size_t i = 0; i != index.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
+	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
+	  double& x = weights[fiter->first];
+	  const double a = alpha[i] * fiter->second;
+	  
+	  x += a;
+	  
+	  // apply penalty
+	  apply(x, penalties[fiter->first], penalty);
+	}
+	
+	++ actives;
+	negatives += f[i] > 0.0;
+      }
+    
+    if (debug >= 2)
+      std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
+    
+    features.clear();
+    losses.clear();
+    
+    return 0.0;
+  }
+
+  void apply(double& x, double& penalty, const double& cummulative)
+  {
+    const double x_half = x;
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - cummulative);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + cummulative);
+    penalty += x - x_half;
+  }  
+  
+  size_type instances;
+  size_type epoch;
+  double    tolerance;
+  double    lambda;
+
+  penalty_set_type penalties;
+  double penalty;
+  
+  alpha_type    alpha;
+  f_type        f;
+  index_type    index;
+};
+
+struct LearnOHingeL2 : public LearnOnlineMargin
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    f_type;
@@ -1601,14 +1873,12 @@ struct LearnOPegasos : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnOPegasos(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
+  LearnOHingeL2(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), lambda(C), weight_scale(1.0), weight_norm(0.0) {}  
   
   void initialize(weight_set_type& weights)
   {
     weight_scale = 1.0;
     weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-    
-    weights_peg = weights;
   }
   
   void finalize(weight_set_type& weights)
@@ -1726,8 +1996,6 @@ struct LearnOPegasos : public LearnOnlineMargin
   alpha_type    alpha;
   f_type        f;
   index_type    index;
-
-  weight_set_type weights_peg;
 };
 
 struct LearnPA : public LearnOnlineMargin
