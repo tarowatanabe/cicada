@@ -243,11 +243,12 @@ int main(int argc, char ** argv)
       throw std::runtime_error("you can specify either --learn-{xbleu,mira,softmax,osoftmax,el,oel,hinge,ohinge,pa,cw,arow}");
     if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_hinge + learn_ohinge + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_softmax = true;
-
     
-    if (int(regularize_l1) + regularize_l2 > 1)
-      throw std::runtime_error("either L1 or L2 regularization");
-    if (int(regularize_l1) + regularize_l2 == 0)
+    const bool regularize_oscar = (oscar > 0.0);
+    
+    if (int(regularize_l1) + regularize_l2 + regularize_oscar > 1)
+      throw std::runtime_error("either L1 or L2, OSCAR regularization");
+    if (int(regularize_l1) + regularize_l2 + regularize_oscar == 0)
       regularize_l2 = true;
 
     if (C <= 0.0)
@@ -367,31 +368,45 @@ int main(int argc, char ** argv)
       else if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osoftmax && regularize_l2)
-	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+	cicada_learn<LearnSoftmax<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_osoftmax && regularize_l1)
 	cicada_learn<LearnOSoftmax<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_oscar)
+	cicada_learn<LearnOSoftmax<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
 	cicada_learn<LearnXBLEU<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLoss<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_oscar)
+	cicada_learn<LearnExpectedLoss<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l1)
 	cicada_learn<LearnOExpectedLoss<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_hinge && regularize_l2)
-	cicada_learn<LearnHinge<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_oscar)
+	cicada_learn<LearnOExpectedLoss<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_hinge && regularize_l1)
 	cicada_learn<LearnHinge<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_ohinge && regularize_l2)
-	cicada_learn<LearnOHinge<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHinge<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_oscar)
+	cicada_learn<LearnHinge<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_ohinge && regularize_l1)
 	cicada_learn<LearnOHinge<RegularizeL1>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHinge<RegularizeL2>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_oscar)
+	cicada_learn<LearnOHinge<RegularizeOSCAR>, KBestSentence, Oracle>(operations, events, events_oracle, scorers, weights);
       else
 	throw std::runtime_error("unsupported learner");
     } else if (yield_alignment) {
@@ -408,33 +423,47 @@ int main(int argc, char ** argv)
       else if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osoftmax && regularize_l2)
-	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+	cicada_learn<LearnSoftmax<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_osoftmax && regularize_l1)
 	cicada_learn<LearnOSoftmax<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_oscar)
+	cicada_learn<LearnOSoftmax<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
 	cicada_learn<LearnXBLEU<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLoss<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_oscar)
+	cicada_learn<LearnExpectedLoss<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l1)
 	cicada_learn<LearnOExpectedLoss<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_hinge && regularize_l2)
-	cicada_learn<LearnHinge<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_oscar)
+	cicada_learn<LearnOExpectedLoss<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_hinge && regularize_l1)
 	cicada_learn<LearnHinge<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_ohinge && regularize_l2)
-	cicada_learn<LearnOHinge<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHinge<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_oscar)
+	cicada_learn<LearnHinge<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_ohinge && regularize_l1)
 	cicada_learn<LearnOHinge<RegularizeL1>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHinge<RegularizeL2>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_oscar)
+	cicada_learn<LearnOHinge<RegularizeOSCAR>, KBestAlignment, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	throw std::runtime_error("unsupported learner");
+	throw std::runtime_error("unsupported learner");      
     } else if (yield_dependency) {
       if (learn_pa)
 	cicada_learn<LearnPA, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
@@ -449,33 +478,47 @@ int main(int argc, char ** argv)
       else if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_osoftmax && regularize_l2)
-	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+	cicada_learn<LearnSoftmax<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_osoftmax && regularize_l1)
 	cicada_learn<LearnOSoftmax<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_l2)
+	cicada_learn<LearnOSoftmax<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_osoftmax && regularize_oscar)
+	cicada_learn<LearnOSoftmax<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_xbleu && regularize_l2)
 	cicada_learn<LearnXBLEU<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
-      else if (learn_el && regularize_l2)
-	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);      
       else if (learn_el && regularize_l1)
 	cicada_learn<LearnExpectedLoss<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_oel && regularize_l2)
-	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_l2)
+	cicada_learn<LearnExpectedLoss<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_el && regularize_oscar)
+	cicada_learn<LearnExpectedLoss<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_oel && regularize_l1)
 	cicada_learn<LearnOExpectedLoss<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_hinge && regularize_l2)
-	cicada_learn<LearnHinge<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_l2)
+	cicada_learn<LearnOExpectedLoss<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_oel && regularize_oscar)
+	cicada_learn<LearnOExpectedLoss<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_hinge && regularize_l1)
 	cicada_learn<LearnHinge<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
-      else if (learn_ohinge && regularize_l2)
-	cicada_learn<LearnOHinge<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_l2)
+	cicada_learn<LearnHinge<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_hinge && regularize_oscar)
+	cicada_learn<LearnHinge<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else if (learn_ohinge && regularize_l1)
 	cicada_learn<LearnOHinge<RegularizeL1>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_l2)
+	cicada_learn<LearnOHinge<RegularizeL2>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
+      else if (learn_ohinge && regularize_oscar)
+	cicada_learn<LearnOHinge<RegularizeOSCAR>, KBestDependency, Oracle>(operations, events, events_oracle, scorers, weights);
       else
-	throw std::runtime_error("unsupported learner");
+	throw std::runtime_error("unsupported learner");      
     } else
       throw std::runtime_error("invalid yield");
     
