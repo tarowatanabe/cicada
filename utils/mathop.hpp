@@ -34,7 +34,7 @@ namespace utils
     template <typename Tp>
     int sgn(Tp val)
     {
-      return (Tp() < val) - (val < Tp());
+      return int(Tp() < val) - int(val < Tp());
     }
     
     template <typename Tp>

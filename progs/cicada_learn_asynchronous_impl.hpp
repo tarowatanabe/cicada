@@ -73,7 +73,6 @@ struct RegularizeL1
   RegularizeL1(const double lambda) : lambda_(lambda), penalties_(), penalty_(0.0) {}
 
   double scale() const { return 1.0; }
-  double lambda() const { return lambda_; }
   
   void initialize(weight_set_type& weights)
   {
@@ -85,7 +84,7 @@ struct RegularizeL1
     
   }
   
-  void preprocess(weight_set_type& weights, const double rate)
+  void preprocess(weight_set_type& weights, const double& rate)
   {
     penalty_ += rate * lambda_;
   }
@@ -109,7 +108,7 @@ struct RegularizeL1
     penalty += x - x_half;
   }
 
-  void postprocess(weight_set_type& weights)
+  void postprocess(weight_set_type& weights, const double& rate)
   {
     
   }
@@ -126,7 +125,6 @@ struct RegularizeL2
   RegularizeL2(const double lambda) : lambda_(lambda), scale_(1.0), norm_(0.0) {}  
   
   double scale() const { return scale_; }
-  double lambda() const { return lambda_; }
   
   void initialize(weight_set_type& weights)
   {
@@ -142,7 +140,7 @@ struct RegularizeL2
     norm_ = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
 
-  void preprocess(weight_set_type& weights, const double rate)
+  void preprocess(weight_set_type& weights, const double& rate)
   {
     rescale(weights, 1.0 - rate * lambda_);
   }
@@ -156,7 +154,7 @@ struct RegularizeL2
     x += amount / scale_;
   }
   
-  void postprocess(weight_set_type& weights)
+  void postprocess(weight_set_type& weights, const double& rate)
   {
     if (norm_ > 1.0 / lambda_)
       rescale(weights, std::sqrt((1.0 / lambda_) * (1.0 / norm_)));
@@ -940,7 +938,7 @@ struct LearnXBLEU : public LearnXBLEUBase
 	adagrad.update(giter->first, giter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
   
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -975,7 +973,7 @@ struct LearnXBLEU : public LearnXBLEUBase
       updates[giter->first] = amount;
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     clear();
     
@@ -1180,7 +1178,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
 	adagrad.update(giter->first, giter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1217,7 +1215,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
       updates[giter->first] = amount;
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     clear();
     

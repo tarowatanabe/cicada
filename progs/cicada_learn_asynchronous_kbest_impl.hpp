@@ -16,6 +16,7 @@
 
 #include <sstream>
 #include <vector>
+#include <deque>
 
 #include "cicada_kbest_impl.hpp"
 #include "cicada_mert_kbest_impl.hpp"
@@ -52,7 +53,6 @@ struct RegularizeL1
   RegularizeL1(const double lambda) : lambda_(lambda), penalties_(), penalty_(0.0) {}
 
   double scale() const { return 1.0; }
-  double lambda() const { return lambda_; }
   
   void initialize(weight_set_type& weights)
   {
@@ -64,7 +64,7 @@ struct RegularizeL1
     
   }
   
-  void preprocess(weight_set_type& weights, const double rate)
+  void preprocess(weight_set_type& weights, const double& rate)
   {
     penalty_ += rate * lambda_;
   }
@@ -88,7 +88,7 @@ struct RegularizeL1
     penalty += x - x_half;
   }
 
-  void postprocess(weight_set_type& weights)
+  void postprocess(weight_set_type& weights, const double& rate)
   {
     
   }
@@ -105,7 +105,6 @@ struct RegularizeL2
   RegularizeL2(const double lambda) : lambda_(lambda), scale_(1.0), norm_(0.0) {}  
   
   double scale() const { return scale_; }
-  double lambda() const { return lambda_; }
   
   void initialize(weight_set_type& weights)
   {
@@ -135,7 +134,7 @@ struct RegularizeL2
     x += amount / scale_;
   }
   
-  void postprocess(weight_set_type& weights)
+  void postprocess(weight_set_type& weights, const double& rate)
   {
     if (norm_ > 1.0 / lambda_)
       rescale(weights, std::sqrt((1.0 / lambda_) * (1.0 / norm_)));
@@ -162,6 +161,119 @@ private:
 
   double scale_;
   double norm_;
+};
+
+struct RegularizeOSCAR
+{
+  RegularizeOSCAR(const double lambda1, const double lambda2) : lambda1_(lambda1), lambda2_(lambda2) {}
+  
+  double scale() const { return 1.0; }
+
+  void initialize(weight_set_type& weights)
+  {
+    
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+
+  void preprocess(weight_set_type& weights, const double rate)
+  {
+    
+  }
+  
+  void update(weight_set_type& weights, const feature_type& feature, const double amount)
+  {
+    weights[feature] += amount;
+  }
+
+private:
+  typedef feature_type::id_type id_type;
+  typedef std::vector<id_type, std::allocator<id_type> > index_set_type;
+
+  typedef std::pair<id_type, id_type> item_type;
+  typedef std::vector<item_type, std::allocator<item_type> > group_type;
+  typedef std::deque<group_type, std::allocator<group_type> > stack_type;
+
+  index_set_type p;
+  stack_type     G;
+
+  struct greater_weights
+  {
+    greater_weights(const weight_set_type& weights) : weights_(weights) {}
+
+    bool operator()(const id_type& x, const id_type& y) const
+    {
+      return std::fabs(weights_[x]) > std::fabs(weights_[y]);
+    }
+    
+    const weight_set_type& weights_;
+  };
+
+  weight_set_type weights_new;
+    
+public:
+  void postprocess(weight_set_type& weights, const double& rate)
+  {
+    p.clear();
+    for (id_type id = 0; id != weights.size(); ++ id)
+      if (weights[id] != 0.0)
+	p.push_back(id);
+    
+    // nothing to do!
+    if (p.empty()) return;
+    
+    // sort...
+    std::sort(p.begin(), p.end(), greater_weights(weights));
+    
+    // initialize stack...
+    G.clear();
+    G.push_back(group_type(1, std::make_pair(1, p.front())));
+    
+    group_type g;
+    
+    // iterate p...
+    for (id_type i = 2; i != p.size() + 1; ++ i) {
+      g.clear();
+      g.push_back(std::make_pair(i, p[i]));
+      
+      while (! G.empty() && objective(weights, g, rate) >= objective(weights, G.back(), rate)) {
+	g.insert(g.end(), G.back().begin(), G.back().end());
+	G.pop_back();
+      }
+      
+      G.push_back(g);
+    }
+    
+    weights_new.clear();
+    
+    stack_type::const_iterator giter_end = G.end();
+    for (stack_type::const_iterator giter = G.begin(); giter != giter_end; ++ giter) {
+      const double value = objective(weights, *giter, rate);
+      
+      group_type::const_iterator iter_end = giter->end();
+      for (group_type::const_iterator iter = giter->begin(); iter != iter_end; ++ iter)
+	weights_new[iter->second] = utils::mathop::sgn(weights[iter->second]) * value;
+    }
+  }
+  
+  double objective(const weight_set_type& weights, const group_type& group, const double& rate) const
+  {
+    double v = 0.0;
+    
+    group_type::const_iterator giter_end = group.end();
+    for (group_type::const_iterator giter = group.begin(); giter != giter_end; ++ giter)
+      v += std::fabs(weights[giter->second]) - 2.0 * rate * (lambda1_ + lambda2_ * (weights.size() - giter->first));
+    
+    return 0.5 * v / group.size();
+  }
+
+private:
+  
+  double lambda1_;
+  double lambda2_;
 };
 
 struct RateAdaGrad
@@ -632,7 +744,7 @@ struct LearnXBLEU : public LearnXBLEUBase
 	adagrad.update(giter->first, giter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
   
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -677,7 +789,7 @@ struct LearnXBLEU : public LearnXBLEUBase
       updates[giter->first] = amount;
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     clear();
     
@@ -758,7 +870,7 @@ struct LearnExpectedLoss : public LearnBase
 	adagrad.update(eiter->first, eiter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -837,7 +949,7 @@ struct LearnExpectedLoss : public LearnBase
       updates[eiter->first] = amount;
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     features.clear();
     losses.clear();
@@ -981,7 +1093,7 @@ struct LearnOExpectedLoss : public LearnBase
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
       regularizer.update(weights, giter->first, giter->second * eta);
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1093,7 +1205,7 @@ struct LearnOExpectedLoss : public LearnBase
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     features.clear();
     losses.clear();
@@ -1246,7 +1358,7 @@ struct LearnHinge : public LearnOnlineMargin
 	adagrad.update(fiter->first, fiter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1391,7 +1503,7 @@ struct LearnOHinge : public LearnOnlineMargin
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
       regularizer.update(weights, giter->first, giter->second * eta);
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -1461,7 +1573,7 @@ struct LearnOHinge : public LearnOnlineMargin
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     features.clear();
     losses.clear();
@@ -1967,7 +2079,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
 	adagrad.update(eiter->first, eiter->second);
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -2011,7 +2123,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
       updates[eiter->first] = amount;
     }
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     // clear current training events..
     samples.clear();
@@ -2134,7 +2246,7 @@ struct LearnOSoftmax : public LearnSoftmaxBase
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
       regularizer.update(weights, giter->first, giter->second * eta);
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
   }
 
   double learn(weight_set_type& weights, feature_set_type& updates)
@@ -2216,7 +2328,7 @@ struct LearnOSoftmax : public LearnSoftmaxBase
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
     
-    regularizer.postprocess(weights);
+    regularizer.postprocess(weights, eta);
     
     // clear current training events..
     samples.clear();
