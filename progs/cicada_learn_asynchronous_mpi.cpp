@@ -347,31 +347,31 @@ int main(int argc, char ** argv)
     // perform learning...
     if (yield_sentence) {
       if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiSentence> >(operations, events, events_oracle, scorers, functions, weights);      
     } else if (yield_alignment) {
       if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiAlignment> >(operations, events, events_oracle, scorers, functions, weights);      
     } else if (yield_dependency) {
       if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmaxL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmaxL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
       else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEUL1, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
+	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEUL2, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiDependency> >(operations, events, events_oracle, scorers, functions, weights);      
     } else
       throw std::runtime_error("invalid yield");
 

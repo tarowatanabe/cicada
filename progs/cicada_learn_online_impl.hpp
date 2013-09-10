@@ -67,6 +67,125 @@ struct LearnBase
   
 };
 
+struct RegularizeL1
+{
+  typedef cicada::WeightVector<double> penalty_set_type;
+
+  RegularizeL1(const double lambda) : lambda_(lambda), penalties_(), penalty_(0.0) {}
+
+  double scale() const { return 1.0; }
+  double lambda() const { return lambda_; }
+  
+  void initialize(weight_set_type& weights)
+  {
+    
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    
+  }
+  
+  void preprocess(weight_set_type& weights, const double rate)
+  {
+    penalty_ += rate * lambda_;
+  }
+
+  void update(weight_set_type& weights, const feature_type& feature, const double amount)
+  {
+    double& x = weights[feature];
+    double& penalty = penalties_[feature];
+    
+    // update...
+    x += amount;
+    
+    // apply penalties...
+    const double x_half = x;
+    
+    if (x > 0.0)
+      x = std::max(0.0, x - penalty - penalty_);
+    else if (x < 0.0)
+      x = std::min(0.0, x - penalty + penalty_);
+    
+    penalty += x - x_half;
+  }
+
+  void postprocess(weight_set_type& weights)
+  {
+    
+  }
+
+private:  
+  double lambda_;
+  
+  penalty_set_type penalties_;
+  double penalty_;
+};
+
+struct RegularizeL2
+{
+  RegularizeL2(const double lambda) : lambda_(lambda), scale_(1.0), norm_(0.0) {}  
+  
+  double scale() const { return scale_; }
+  double lambda() const { return lambda_; }
+  
+  void initialize(weight_set_type& weights)
+  {
+    scale_ = 1.0;
+    norm_ = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    weights *= scale_;
+    
+    scale_ = 1.0;
+    norm_ = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+  }
+
+  void preprocess(weight_set_type& weights, const double rate)
+  {
+    rescale(weights, 1.0 - rate * lambda_);
+  }
+  
+  void update(weight_set_type& weights, const feature_type& feature, const double amount)
+  {
+    double& x = weights[feature];
+    
+    norm_ += 2.0 * x * scale_ * amount  + amount * amount;
+    
+    x += amount / scale_;
+  }
+  
+  void postprocess(weight_set_type& weights)
+  {
+    if (norm_ > 1.0 / lambda_)
+      rescale(weights, std::sqrt((1.0 / lambda_) * (1.0 / norm_)));
+    
+    if (scale_ < 0.001 || 1000 < scale_)
+      finalize(weights);
+  }
+  
+private:
+  void rescale(weight_set_type& weights, const double scaling)
+  {
+    norm_ *= scaling * scaling;
+    
+    if (scaling != 0.0)
+      scale_ *= scaling;
+    else {
+      scale_ = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+  }
+
+private:  
+  double lambda_;
+
+  double scale_;
+  double norm_;
+};
+
 struct RateAdaGrad
 {
   weight_set_type grads2;
@@ -84,7 +203,7 @@ struct RateAdaGrad
   }
 };
 
-struct LearnXBLEU : public LearnBase
+struct LearnXBLEUBase : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
   
@@ -448,7 +567,7 @@ struct LearnXBLEU : public LearnBase
 
   typedef std::vector<entropy_weight_type, std::allocator<entropy_weight_type> > entropy_weights_type;
 
-  LearnXBLEU() { clear(); }
+  LearnXBLEUBase() { clear(); }
 
   void clear()
   {
@@ -706,33 +825,30 @@ struct LearnXBLEU : public LearnBase
   entropy_weights_type entropy_inside;
 };
 
-struct LearnXBLEUL2 : public LearnXBLEU
+template <typename Regularizer>
+struct LearnXBLEU : public LearnXBLEUBase
 {
-  LearnXBLEUL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnXBLEU(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
   
   void initialize(weight_set_type& weights)
   {
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    regularizer.initialize(weights);
   }
   
   void finalize(weight_set_type& weights)
   {
-    weights *= weight_scale;
-    
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    regularizer.finalize(weights);
   }
   
   void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
   {
-    LearnXBLEU::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
+    LearnXBLEUBase::encode(id, weights, forest, oracle, scorer, regularizer.scale(), scale);
   }
   
   double learn(weight_set_type& weights)
   {
     // compute gradient...
-    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
+    const std::pair<double, bool> objective = LearnXBLEUBase::encode(g);
 
     if (! objective.second) {
       clear();
@@ -744,129 +860,24 @@ struct LearnXBLEUL2 : public LearnXBLEU
     const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
     ++ epoch;
     
-    rescale(weights, 1.0 - eta * lambda);
-        
-    double a_norm = 0.0;
-    double pred = 0.0;
-    gradient_xbleu_type::const_iterator giter_end = g.end();
-    for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
-      // we will update "minus" value...
-      
-      double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
-
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
-      
-      a_norm += alpha * alpha;
-      pred += 2.0 * x * alpha;
-      
-      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-      x += alpha / weight_scale;
-    }
-    
-    // avoid numerical instability...
-    weight_norm += a_norm + pred * weight_scale;
-    
-    if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
-
-    if (weight_scale < 0.001 || 1000 < weight_scale)
-      finalize(weights);
-    
-    clear();
-    
-    return objective.first;
-  }
-  
-  void rescale(weight_set_type& weights, const double scaling)
-  {
-    weight_norm *= scaling * scaling;
-    if (scaling != 0.0)
-      weight_scale *= scaling;
-    else {
-      weight_scale = 1.0;
-      std::fill(weights.begin(), weights.end(), 0.0);
-    }
-  }
-
-  gradient_xbleu_type g;
-  
-  size_type instances;
-  
-  size_type epoch;
-  double    lambda;
-  
-  double weight_scale;
-  double weight_norm;
-
-  RateAdaGrad adagrad;
-};
-
-struct LearnXBLEUL1 : public LearnXBLEU
-{
-  typedef cicada::WeightVector<double> penalty_set_type;
-  
-  LearnXBLEUL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
-
-  void initialize(weight_set_type& weights)
-  {
-
-  }
-
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
-
-  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
-  {
-    LearnXBLEU::encode(id, weights, forest, oracle, scorer, 1.0, scale);
-  }
-  double learn(weight_set_type& weights)
-  {
-    // compute gradient...
-    const std::pair<double, bool> objective = LearnXBLEU::encode(g);
-
-    if (! objective.second) {
-      clear();
-      return objective.first;
-    }
-    
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
-    
-    penalty += eta * lambda;
+    regularizer.preprocess(weights, eta);
         
     gradient_xbleu_type::const_iterator giter_end = g.end();
     for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
-      
-      double& x = weights[giter->first];
-      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta);
+      const double amount = - static_cast<double>(giter->second);
+
+      regularizer.update(weights, giter->first, amount * (adagrad_mode ? adagrad(giter->first, eta) : eta));
 
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);
-      
-      // apply penalty
-      apply(x, penalties[giter->first], penalty);
     }
+    
+    regularizer.postprocess(weights);
     
     clear();
     
     return objective.first;
-  }
-
-  void apply(double& x, double& penalty, const double& cummulative)
-  {
-    const double x_half = x;
-    if (x > 0.0)
-      x = std::max(0.0, x - penalty - cummulative);
-    else if (x < 0.0)
-      x = std::min(0.0, x - penalty + cummulative);
-    penalty += x - x_half;
   }
   
   gradient_xbleu_type g;
@@ -874,24 +885,20 @@ struct LearnXBLEUL1 : public LearnXBLEU
   size_type instances;
   
   size_type epoch;
-  double    lambda;
   
-  penalty_set_type penalties;
-  double penalty;
-
+  Regularizer regularizer;
   RateAdaGrad adagrad;
 };
-
 
 // logistic regression base...
-struct LearnSoftmax : public LearnBase
+struct LearnSoftmaxBase : public LearnBase
 {
   typedef cicada::semiring::Log<double> weight_type;
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef cicada::FeatureVector<double, std::allocator<double> > expectation_type;
   
-  LearnSoftmax() { clear(); }
+  LearnSoftmaxBase() { clear(); }
   
   struct weight_function
   {
@@ -1032,28 +1039,25 @@ struct LearnSoftmax : public LearnBase
 };
 
 // SoftmaxL2 learner
-struct LearnSoftmaxL2 : public LearnSoftmax
+template <typename Regularizer>
+struct LearnSoftmax : public LearnSoftmaxBase
 {
-  LearnSoftmaxL2(const size_type __instances) : instances(__instances), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
+  LearnSoftmax(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
   
   
   void initialize(weight_set_type& weights)
   {
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    regularizer.initialize(weights);
   }
   
   void finalize(weight_set_type& weights)
   {
-    weights *= weight_scale;
-    
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    regularizer.finalize(weights);
   }
 
   void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
   {
-    LearnSoftmax::encode(id, weights, forest, oracle, scorer, weight_scale, scale);
+    LearnSoftmaxBase::encode(id, weights, forest, oracle, scorer, regularizer.scale(), scale);
   }
   
   double learn(weight_set_type& weights)
@@ -1072,150 +1076,33 @@ struct LearnSoftmaxL2 : public LearnSoftmax
 
     const double objective_normalized = objective * k_norm;
     
-    // do we really need this...?
-    rescale(weights, 1.0 - eta * lambda);
+    regularizer.preprocess(weights, eta);
     
-    double a_norm = 0.0;
-    double pred = 0.0;
     gradient_type::const_iterator giter_end = gradient.end();
     for (gradient_type::const_iterator giter = gradient.begin(); giter != giter_end; ++ giter) {
       // we will update "minus" value...
+      const double amount = - static_cast<double>(giter->second) * k_norm;
       
-      double& x = weights[giter->first];
-      const double alpha = - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta) * k_norm;
-
+      regularizer.update(weights, giter->first, amount * (adagrad_mode ? adagrad(giter->first, eta) : eta));
+      
       if (adagrad_mode)
 	adagrad.update(giter->first, giter->second);
-      
-      a_norm += alpha * alpha;
-      pred += 2.0 * x * alpha;
-      
-      //weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-      x += alpha / weight_scale;
     }
     
-    // avoid numerical instability...
-    weight_norm += a_norm + pred * weight_scale;
-    
-    if (weight_norm > 1.0 / lambda || project_weight)
-      rescale(weights, std::sqrt((1.0 / lambda) * (1.0 / weight_norm)));
-    
-    if (weight_scale < 0.001 || 1000 < weight_scale)
-      finalize(weights);
+    regularizer.postprocess(weights);
     
     clear();
     
     return objective_normalized;
   }
-
-  void rescale(weight_set_type& weights, const double scaling)
-  {
-    weight_norm *= scaling * scaling;
-    if (scaling != 0.0)
-      weight_scale *= scaling;
-    else {
-      weight_scale = 1.0;
-      std::fill(weights.begin(), weights.end(), 0.0);
-    }
-  }
-
+  
   size_type instances;
   
   size_type epoch;
-  double    lambda;
   
-  double weight_scale;
-  double weight_norm;
-
+  Regularizer regularizer;
   RateAdaGrad adagrad;
 };
-
-
-// SoftmaxL1 learner
-struct LearnSoftmaxL1 : public LearnSoftmax
-{
-  typedef cicada::WeightVector<double> penalty_set_type;
-  
-  // maximize...
-  // L_w =  \sum \log p(y | x) - C |w|
-  // 
-  
-  LearnSoftmaxL1(const size_type __instances) : instances(__instances), epoch(0), lambda(C), penalties(), penalty(0.0) {}
-  
-  
-  void initialize(weight_set_type& weights)
-  {
-
-  }
-
-  void finalize(weight_set_type& weights)
-  {
-    
-  }
-
-  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
-  {
-    LearnSoftmax::encode(id, weights, forest, oracle, scorer, 1.0, scale);
-  }
-  
-  double learn(weight_set_type& weights)
-  {
-    if (! samples) {
-      clear();
-      return 0.0;
-    }
-    
-    const size_type k = samples;
-    const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
-    
-    penalty += eta * lambda;
-
-    const double objective_normalized = objective * k_norm;
-    
-    gradient_type::const_iterator giter_end = gradient.end();
-    for (gradient_type::const_iterator giter = gradient.begin(); giter != giter_end; ++ giter) {
-      double& x = weights[giter->first];
-      
-      // update weight ... we will update "minus" value
-      x += - static_cast<double>(giter->second) * (adagrad_mode ? adagrad(giter->first, eta) : eta) * k_norm;
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
-      
-      // apply penalty
-      apply(x, penalties[giter->first], penalty);
-    }
-    
-    clear();
-    
-    return objective_normalized;
-  }
-
-  void apply(double& x, double& penalty, const double& cummulative)
-  {
-    const double x_half = x;
-    if (x > 0.0)
-      x = std::max(0.0, x - penalty - cummulative);
-    else if (x < 0.0)
-      x = std::min(0.0, x - penalty + cummulative);
-    penalty += x - x_half;
-  }
-
-  size_type instances;
-  
-  size_type epoch;
-  double    lambda;
-  
-  penalty_set_type penalties;
-  double penalty;
-  
-  RateAdaGrad adagrad;
-};
-
 
 struct YieldSentence
 {
