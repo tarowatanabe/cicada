@@ -121,6 +121,7 @@ bool learn_softmax    = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
+double oscar = 0.0;
 double temperature = 0.0;
 double scale = 1.0;
 double eta0 = 0.2;
@@ -231,11 +232,12 @@ int main(int argc, char ** argv)
       throw std::runtime_error("you can specify either --learn-{xbleu,softmax}");
     if (int(learn_xbleu) + learn_softmax == 0)
       learn_xbleu = true;
-
     
-    if (int(regularize_l1) + regularize_l2 > 1)
-      throw std::runtime_error("either L1 or L2 regularization");
-    if (int(regularize_l1) + regularize_l2 == 0)
+    const bool regularize_oscar = (oscar > 0.0);
+    
+    if (int(regularize_l1) + regularize_l2 + regularize_oscar > 1)
+      throw std::runtime_error("either L1 or L2, OSCAR regularization");
+    if (int(regularize_l1) + regularize_l2 + regularize_oscar == 0)
       regularize_l2 = true;
     
     if (C <= 0.0)
@@ -341,29 +343,47 @@ int main(int argc, char ** argv)
       if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
+      else
+	throw std::runtime_error("unsupported learner");
     } else if (yield_alignment) {
       if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
+      else
+	throw std::runtime_error("unsupported learner");
     } else if (yield_dependency) {
       if (learn_softmax && regularize_l1)
 	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_softmax && regularize_oscar)
+	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l1)
 	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
       else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);      
+	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
+      else if (learn_xbleu && regularize_oscar)
+	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
+      else
+	throw std::runtime_error("unsupported learner");
     } else
       throw std::runtime_error("invalid yield");
     
@@ -1545,6 +1565,7 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1),                             "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2),                             "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
+    ("oscar",         po::value<double>(&oscar)->default_value(oscar),             "OSCAR regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
     ("eta0",          po::value<double>(&eta0)->default_value(eta0),               "\\eta_0 for decay")

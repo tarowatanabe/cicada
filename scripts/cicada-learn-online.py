@@ -396,7 +396,7 @@ if __name__ == '__main__':
             os.makedirs(options.root_dir)
 
     ### regularizer
-    regularizer = "--regularize-l2"
+    regularizer = ""
     if options.regularize_l1 and options.regularize_l2:
         raise ValueError, "we do not support both L1 and L2 regularizers"
     if options.regularize_l1:

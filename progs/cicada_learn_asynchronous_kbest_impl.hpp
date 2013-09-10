@@ -165,7 +165,7 @@ private:
 
 struct RegularizeOSCAR
 {
-  RegularizeOSCAR(const double lambda1, const double lambda2) : lambda1_(lambda1), lambda2_(lambda2) {}
+  RegularizeOSCAR(const double lambda1, const double lambda2=oscar) : lambda1_(lambda1), lambda2_(lambda2) {}
   
   double scale() const { return 1.0; }
 

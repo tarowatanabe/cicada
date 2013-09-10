@@ -126,6 +126,7 @@ bool learn_oel     = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1e-3;
+double oscar = 0.0;
 double temperature = 0.0;
 double scale = 1.0;
 double eta0 = 0.2;
@@ -1755,6 +1756,7 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
+    ("oscar",         po::value<double>(&oscar)->default_value(oscar),             "OSCAR regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
     ("eta0",          po::value<double>(&eta0)->default_value(eta0),               "\\eta_0 for decay")
