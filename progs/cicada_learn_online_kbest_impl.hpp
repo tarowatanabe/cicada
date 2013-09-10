@@ -45,7 +45,7 @@
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
-struct RegularizeAdaGrad
+struct RateAdaGrad
 {
   weight_set_type grads2;
   
@@ -585,7 +585,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
   double weight_scale;
   double weight_norm;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 struct LearnXBLEUL1 : public LearnXBLEU
@@ -669,7 +669,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
   penalty_set_type penalties;
   double penalty;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 struct LearnExpectedLoss : public LearnBase
@@ -847,7 +847,7 @@ struct LearnExpectedLoss : public LearnBase
   double weight_scale;
   double weight_norm;
   
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 struct LearnExpectedLossL1 : public LearnBase
@@ -1006,7 +1006,7 @@ struct LearnExpectedLossL1 : public LearnBase
   penalty_set_type penalties;
   double penalty;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 struct LearnOExpectedLoss : public LearnBase
@@ -1518,7 +1518,7 @@ struct LearnHingeL1 : public LearnOnlineMargin
   penalty_set_type penalties;
   double penalty;
   
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 
@@ -1638,7 +1638,7 @@ struct LearnHingeL2 : public LearnOnlineMargin
   double    weight_scale;
   double    weight_norm;
   
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 // optimized-Pegasos learner
@@ -2498,7 +2498,7 @@ struct LearnSoftmaxL1 : public LearnSoftmax
   penalty_set_type penalties;
   double penalty;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 // SoftmaxL2 learner
@@ -2621,7 +2621,7 @@ struct LearnSoftmaxL2 : public LearnSoftmax
   double weight_scale;
   double weight_norm;
   
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 // SoftmaxL2 learner

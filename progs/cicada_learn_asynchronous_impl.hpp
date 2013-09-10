@@ -145,7 +145,7 @@ struct DecayAdaGrad
   }
 };
 
-struct RegularizeAdaGrad
+struct RateAdaGrad
 {
   weight_set_type grads2;
   
@@ -921,7 +921,7 @@ struct LearnXBLEUL2 : public LearnXBLEU
   double weight_scale;
   double weight_norm;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 struct LearnXBLEUL1 : public LearnXBLEU
@@ -1030,7 +1030,7 @@ struct LearnXBLEUL1 : public LearnXBLEU
   penalty_set_type penalties;
   double penalty;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 
@@ -1321,7 +1321,7 @@ struct LearnSoftmaxL2 : public LearnSoftmax
   double weight_scale;
   double weight_norm;
 
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 
@@ -1437,7 +1437,7 @@ struct LearnSoftmaxL1 : public LearnSoftmax
   penalty_set_type penalties;
   double penalty;
   
-  RegularizeAdaGrad adagrad;
+  RateAdaGrad adagrad;
 };
 
 
