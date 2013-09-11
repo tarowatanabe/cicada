@@ -246,7 +246,7 @@ public:
     G.clear();
     G.push_back(group_value_type(g, score(weights, g.front(), eta, num_features)));
     
-    // iterate p...
+    // iterate p and perform grouping...
     for (id_type i = 1; i != p.size(); ++ i) {
       g.clear();
       g.push_back(std::make_pair(i + 1, p[i]));
@@ -263,6 +263,7 @@ public:
       G.push_back(group_value_type(g, value));
     }
     
+    // compute new parameters
     weights_new.clear();
     
     stack_type::const_iterator giter_end = G.end();
