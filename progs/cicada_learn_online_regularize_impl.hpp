@@ -7,7 +7,6 @@
 
 #include <numeric>
 #include <vector>
-#include <deque>
 #include <cmath>
 
 #include <cicada/hypergraph.hpp>
@@ -197,32 +196,34 @@ struct RegularizeOSCAR
 
 private:
   typedef feature_type::id_type id_type;
-  typedef std::vector<id_type, std::allocator<id_type> > index_set_type;
+  typedef std::pair<feature_type, double> index_type;
+  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
 
-  typedef std::pair<id_type, id_type> item_type;
-  typedef std::vector<item_type, std::allocator<item_type> > group_type;
-  typedef std::pair<group_type, double> group_value_type;
+  struct group_type
+  {
+    size_type first_;
+    size_type last_;
+    double    score_;
 
-  typedef std::deque<group_value_type, std::allocator<group_value_type> > stack_type;
-
+    group_type() : first_(), last_(), score_() {}
+    group_type(const size_type& first, const size_type& last, const double& score) : first_(first), last_(last), score_(score) {}
+    
+    size_type size() const { return last_ - first_; }
+  };
+  
+  typedef std::vector<group_type, std::allocator<group_type> > stack_type;
+  
   index_set_type p;
   stack_type     G;
-  group_type     g;
 
   struct greater_weights
   {
-    greater_weights(const weight_set_type& weights) : weights_(weights) {}
-
-    bool operator()(const id_type& x, const id_type& y) const
+    bool operator()(const index_type& x, const index_type& y) const
     {
-      return std::fabs(weights_[x]) > std::fabs(weights_[y]);
+      return std::fabs(x.second) > std::fabs(y.second);
     }
-    
-    const weight_set_type& weights_;
   };
 
-  weight_set_type weights_new;
-    
 public:
   void postprocess(weight_set_type& weights, const double& eta)
   {
@@ -231,57 +232,43 @@ public:
     p.clear();
     for (id_type id = 0; id != weights.size(); ++ id)
       if (weights[id] != 0.0)
-	p.push_back(id);
+	p.push_back(std::make_pair(feature_type(id), weights[id]));
     
     // nothing to do!
     if (p.empty()) return;
     
     // sort...
-    std::sort(p.begin(), p.end(), greater_weights(weights));
-
+    std::sort(p.begin(), p.end(), greater_weights());
+    
     // initialize stack...
-    g.clear();
-    g.push_back(std::make_pair(1, p.front()));
-
     G.clear();
-    G.push_back(group_value_type(g, score(weights, g.front(), eta, num_features)));
+    G.push_back(group_type(0, 1, std::fabs(p.front().second) - eta * (lambda1_ + lambda2_ * (num_features - 1))));
     
     // iterate p and perform grouping...
     for (id_type i = 1; i != p.size(); ++ i) {
-      g.clear();
-      g.push_back(std::make_pair(i + 1, p[i]));
-
-      double value = score(weights, g.front(), eta, num_features);
+      group_type g(i, i + 1, std::fabs(p[i].second) - eta * (lambda1_ + lambda2_ * (num_features - i - 1)));
       
-      while (! G.empty() && (value / g.size()) >= (G.back().second / G.back().first.size())) {
-	g.insert(g.end(), G.back().first.begin(), G.back().first.end());
-	value += G.back().second;
+      while (! G.empty() && (g.score_ / g.size()) >= (G.back().score_ / G.back().size())) {
+	g.first_ = G.back().first_;
+	g.score_ += G.back().score_;
 	
 	G.pop_back();
       }
       
-      G.push_back(group_value_type(g, value));
+      G.push_back(g);
     }
     
     // compute new parameters
-    weights_new.clear();
+    weights.clear();
     
     stack_type::const_iterator giter_end = G.end();
     for (stack_type::const_iterator giter = G.begin(); giter != giter_end; ++ giter) 
-      if (giter->second > 0.0) {
-	const double score = giter->second / giter->first.size();
+      if (giter->score_ > 0.0) {
+	const double score = giter->score_ / giter->size();
 	
-	group_type::const_iterator iter_end = giter->first.end();
-	for (group_type::const_iterator iter = giter->first.begin(); iter != iter_end; ++ iter)
-	  weights_new[iter->second] = utils::mathop::sgn(weights[iter->second]) * score;
+	for (size_type i = giter->first_; i != giter->last_; ++ i)
+	  weights[p[i].first] = utils::mathop::sgn(p[i].second) * score;
       }
-    
-    weights.swap(weights_new);
-  }
-  
-  double score(const weight_set_type& weights, const item_type& pos, const double& eta, const size_type& num_features) const
-  {
-    return std::fabs(weights[pos.second]) - eta * (lambda1_ + lambda2_ * (num_features - pos.first));
   }
 
 private:
