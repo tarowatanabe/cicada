@@ -209,6 +209,7 @@ private:
     group_type(const size_type& first, const size_type& last, const double& score) : first_(first), last_(last), score_(score) {}
     
     size_type size() const { return last_ - first_; }
+    double score() const { return score_ / (last_ - first_); }
   };
   
   typedef std::vector<group_type, std::allocator<group_type> > stack_type;
@@ -248,7 +249,7 @@ public:
     for (id_type i = 1; i != p.size(); ++ i) {
       group_type g(i, i + 1, std::fabs(p[i].second) - eta * (lambda1_ + lambda2_ * (num_features - i - 1)));
       
-      while (! G.empty() && (g.score_ / g.size()) >= (G.back().score_ / G.back().size())) {
+      while (! G.empty() && g.score() >= G.back().score()) {
 	g.first_ = G.back().first_;
 	g.score_ += G.back().score_;
 	
@@ -264,7 +265,7 @@ public:
     stack_type::const_iterator giter_end = G.end();
     for (stack_type::const_iterator giter = G.begin(); giter != giter_end; ++ giter) 
       if (giter->score_ > 0.0) {
-	const double score = giter->score_ / giter->size();
+	const double score = giter->score();
 	
 	for (size_type i = giter->first_; i != giter->last_; ++ i)
 	  weights[p[i].first] = utils::mathop::sgn(p[i].second) * score;
