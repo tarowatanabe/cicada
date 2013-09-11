@@ -18,6 +18,9 @@
 
 struct RegularizeL1
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   typedef cicada::HyperGraph hypergraph_type;
   typedef hypergraph_type::feature_set_type    feature_set_type;
   
@@ -78,6 +81,9 @@ private:
 
 struct RegularizeL2
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   typedef cicada::HyperGraph hypergraph_type;
   typedef hypergraph_type::feature_set_type    feature_set_type;
   
@@ -152,6 +158,9 @@ private:
 // Note that the original OSCAR has factor of two, which can be ignored in the computation.
 struct RegularizeOSCAR
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   typedef cicada::HyperGraph hypergraph_type;
   typedef hypergraph_type::feature_set_type    feature_set_type;
   
@@ -217,6 +226,8 @@ private:
 public:
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    const size_type num_features = feature_type::allocated();
+    
     p.clear();
     for (id_type id = 0; id != weights.size(); ++ id)
       if (weights[id] != 0.0)
@@ -233,14 +244,14 @@ public:
     g.push_back(std::make_pair(1, p.front()));
 
     G.clear();
-    G.push_back(group_value_type(g, score(weights, g.front(), eta)));
+    G.push_back(group_value_type(g, score(weights, g.front(), eta, num_features)));
     
     // iterate p...
     for (id_type i = 1; i != p.size(); ++ i) {
       g.clear();
       g.push_back(std::make_pair(i + 1, p[i]));
 
-      double value = score(weights, g.front(), eta);
+      double value = score(weights, g.front(), eta, num_features);
       
       while (! G.empty() && (value / g.size()) >= (G.back().second / G.back().first.size())) {
 	g.insert(g.end(), G.back().first.begin(), G.back().first.end());
@@ -267,9 +278,9 @@ public:
     weights.swap(weights_new);
   }
   
-  double score(const weight_set_type& weights, const item_type& pos, const double& eta) const
+  double score(const weight_set_type& weights, const item_type& pos, const double& eta, const size_type& num_features) const
   {
-    return std::fabs(weights[pos.second]) - eta * (lambda1_ + lambda2_ * (feature_type::allocated() - pos.first));
+    return std::fabs(weights[pos.second]) - eta * (lambda1_ + lambda2_ * (num_features - pos.first));
   }
 
 private:
