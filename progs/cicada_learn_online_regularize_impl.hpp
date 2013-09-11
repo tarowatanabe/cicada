@@ -215,7 +215,7 @@ private:
   weight_set_type weights_new;
     
 public:
-  void postprocess(weight_set_type& weights, const double& rate)
+  void postprocess(weight_set_type& weights, const double& eta)
   {
     p.clear();
     for (id_type id = 0; id != weights.size(); ++ id)
@@ -233,18 +233,18 @@ public:
     g.push_back(std::make_pair(1, p.front()));
 
     G.clear();
-    G.push_back(group_value_type(g, objective(weights, g, rate)));
+    G.push_back(group_value_type(g, score(weights, g.front(), eta)));
     
     // iterate p...
     for (id_type i = 1; i != p.size(); ++ i) {
       g.clear();
       g.push_back(std::make_pair(i + 1, p[i]));
 
-      double value = objective(weights, g, rate);
+      double value = score(weights, g.front(), eta);
       
-      while (! G.empty() && value >= G.back().second) {
+      while (! G.empty() && (value / g.size()) >= (G.back().second / G.back().first.size())) {
 	g.insert(g.end(), G.back().first.begin(), G.back().first.end());
-	value = objective(weights, g, rate);
+	value += G.back().second;
 	
 	G.pop_back();
       }
@@ -255,26 +255,21 @@ public:
     weights_new.clear();
     
     stack_type::const_iterator giter_end = G.end();
-    for (stack_type::const_iterator giter = G.begin(); giter != giter_end; ++ giter) {
-      const double& value = giter->second;
-      
-      group_type::const_iterator iter_end = giter->first.end();
-      for (group_type::const_iterator iter = giter->first.begin(); iter != iter_end; ++ iter)
-	weights_new[iter->second] = utils::mathop::sgn(weights[iter->second]) * value;
-    }
+    for (stack_type::const_iterator giter = G.begin(); giter != giter_end; ++ giter) 
+      if (giter->second > 0.0) {
+	const double score = giter->second / giter->first.size();
+	
+	group_type::const_iterator iter_end = giter->first.end();
+	for (group_type::const_iterator iter = giter->first.begin(); iter != iter_end; ++ iter)
+	  weights_new[iter->second] = utils::mathop::sgn(weights[iter->second]) * score;
+      }
     
     weights.swap(weights_new);
   }
   
-  double objective(const weight_set_type& weights, const group_type& group, const double& rate) const
+  double score(const weight_set_type& weights, const item_type& pos, const double& eta) const
   {
-    double v = 0.0;
-    
-    group_type::const_iterator giter_end = group.end();
-    for (group_type::const_iterator giter = group.begin(); giter != giter_end; ++ giter)
-      v += std::fabs(weights[giter->second]) - rate * (lambda1_ + lambda2_ * (feature_type::allocated() - giter->first));
-    
-    return v / group.size();
+    return std::fabs(weights[pos.second]) - eta * (lambda1_ + lambda2_ * (feature_type::allocated() - pos.first));
   }
 
 private:
