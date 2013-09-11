@@ -5,6 +5,7 @@
 #ifndef __CICADA_LEARN_ONLINE_RATE_IMPL__HPP__
 #define __CICADA_LEARN_ONLINE_RATE_IMPL__HPP__ 1
 
+#include <cicada/hypergraph.hpp>
 #include <cicada/weight_vector.hpp>
 
 #include <utils/mathop.hpp>
@@ -13,15 +14,18 @@ struct RateSimple
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+ 
+  typedef cicada::HyperGraph hypergraph_type;
+  typedef hypergraph_type::feature_set_type    feature_set_type;
   
-  double alpha0_;
+  typedef feature_set_type::feature_type feature_type;
+ 
   double eta0_;
-  size_type samples0_;
   
   double eta_;
   size_type epoch_;
   
-  RateSimple(const double& alpha0, const double& eta0, const size_type& samples0) : alpha0_(alpha0), eta0_(eta0), samples0_(samples0), epoch_(0) {}
+  RateSimple(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
   double operator()() const
   {
@@ -40,6 +44,11 @@ struct RateExponential
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  typedef cicada::HyperGraph hypergraph_type;
+  typedef hypergraph_type::feature_set_type    feature_set_type;
+  
+  typedef feature_set_type::feature_type feature_type;
   
   double alpha0_;
   double eta0_;
@@ -68,17 +77,20 @@ struct RateAdaGrad
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
+  typedef cicada::HyperGraph hypergraph_type;
+  typedef hypergraph_type::feature_set_type    feature_set_type;
+  
+  typedef feature_set_type::feature_type feature_type;
+  
   typedef cicada::WeightVector<double> weight_set_type;
 
-  double alpha0_;
   double eta0_;
-  size_type samples0_;
 
   weight_set_type grads2_;
   double eta_;
   size_type epoch_;
   
-  RateAdaGrad(const double& alpha0, const double& eta0, const size_type& samples0) : alpha0_(alpha0), eta0_(eta0), samples0_(samples0), epoch_(0) {}
+  RateAdaGrad(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
   double operator()() const
   {

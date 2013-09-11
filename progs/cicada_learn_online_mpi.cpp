@@ -76,7 +76,7 @@ bool input_alignment_mode = false;
 bool input_dependency_mode = false;
 bool input_directory_mode = false;
 
-std::string symbol_goal         = vocab_type::S;
+std::string symbol_goal = vocab_type::S;
 
 grammar_file_set_type grammar_files;
 bool grammar_list = false;
@@ -124,11 +124,15 @@ double C = 1e-3;
 double oscar = 0.0;
 double temperature = 0.0;
 double scale = 1.0;
+double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
 
-// additional misc parameters...
-bool adagrad_mode = false;
+bool rate_simple = false;
+bool rate_exponential = false;
+bool rate_adagrad = false;
+
+// additional misc parameters.
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
@@ -145,13 +149,13 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
-template <typename Learner, typename OracleGenerator, typename YieldGenerator>
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
 		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
 		  const function_document_type& functions,
 		  weight_set_type& weights);
+
 void synchronize();
 void merge_features();
 void merge_statistics(const operation_set_type& operations, operation_set_type::statistics_type& statistics);
@@ -239,6 +243,11 @@ int main(int argc, char ** argv)
       throw std::runtime_error("either L1 or L2, OSCAR regularization");
     if (int(regularize_l1) + regularize_l2 + regularize_oscar == 0)
       regularize_l2 = true;
+    
+    if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
+      throw std::runtime_error("either simple/exponential/adagrad");
+    if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
+      rate_exponential = true;
     
     if (C <= 0.0)
       throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
@@ -338,54 +347,8 @@ int main(int argc, char ** argv)
       }
     }
     
-    // perform learning...
-    if (yield_sentence) {
-      if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_oscar)
-	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_oscar)
-	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiSentence>, YieldSentence>(operations, events, events_oracle, scorers, functions, weights);
-      else
-	throw std::runtime_error("unsupported learner");
-    } else if (yield_alignment) {
-      if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_oscar)
-	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_oscar)
-	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiAlignment>, YieldAlignment>(operations, events, events_oracle, scorers, functions, weights);
-      else
-	throw std::runtime_error("unsupported learner");
-    } else if (yield_dependency) {
-      if (learn_softmax && regularize_l1)
-	cicada_learn<LearnSoftmax<RegularizeL1>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_l2)
-	cicada_learn<LearnSoftmax<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_softmax && regularize_oscar)
-	cicada_learn<LearnSoftmax<RegularizeOSCAR>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l1)
-	cicada_learn<LearnXBLEU<RegularizeL1>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_l2)
-	cicada_learn<LearnXBLEU<RegularizeL2>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else if (learn_xbleu && regularize_oscar)
-	cicada_learn<LearnXBLEU<RegularizeOSCAR>, OracleForest<ViterbiDependency>, YieldDependency>(operations, events, events_oracle, scorers, functions, weights);
-      else
-	throw std::runtime_error("unsupported learner");
-    } else
-      throw std::runtime_error("invalid yield");
+    // perform learning!
+    cicada_learn(operations, events, events_oracle, scorers, functions, weights);
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file, 1024 * 1024);
@@ -824,7 +787,112 @@ void reduce_points(Points& points)
 }
 
 template <typename Learner, typename OracleGenerator, typename YieldGenerator>
+void cicada_learn(Learner& learner,
+		  OracleGenerator& oracle_generator,
+		  YieldGenerator& yield_generator,
+		  operation_set_type& operations,
+		  const event_set_type& events,
+		  const event_set_type& events_oracle,
+		  const scorer_document_type& scorers,
+		  const function_document_type& functions,
+		  weight_set_type& weights);
+
+template <typename Learner>
+void cicada_learn_yield(Learner& learner,
+			operation_set_type& operations,
+			const event_set_type& events,
+			const event_set_type& events_oracle,
+			const scorer_document_type& scorers,
+			const function_document_type& functions,
+			weight_set_type& weights)
+{
+  if (yield_sentence) {
+    OracleForest<ViterbiSentence> oracle_generator(scorer_cube);
+    YieldSentence yield_generator;
+    
+    cicada_learn(learner, oracle_generator, yield_generator, operations, events, events_oracle, scorers, functions, weights);
+  } else if (yield_alignment) {
+    OracleForest<ViterbiAlignment> oracle_generator(scorer_cube);
+    YieldAlignment yield_generator;
+
+    cicada_learn(learner, oracle_generator, yield_generator, operations, events, events_oracle, scorers, functions, weights);
+  } else if (yield_dependency) {
+    OracleForest<ViterbiDependency> oracle_generator(scorer_cube);
+    YieldDependency yield_generator;
+    
+    cicada_learn(learner, oracle_generator, yield_generator, operations, events, events_oracle, scorers, functions, weights);
+  } else
+    throw std::runtime_error("invalid yield");
+}
+
+template <typename Regularizer, typename Rate>
+void cicada_learn_learner(const Regularizer& regularizer,
+			  const Rate& rate,
+			  operation_set_type& operations,
+			  const event_set_type& events,
+			  const event_set_type& events_oracle,
+			  const scorer_document_type& scorers,
+			  const function_document_type& functions,
+			  weight_set_type& weights)
+{
+  if (learn_xbleu) {
+    LearnXBLEU<Regularizer, Rate> learner(regularizer, rate);
+    
+    cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+  } else if (learn_softmax) {
+    LearnSoftmax<Regularizer, Rate> learner(regularizer, rate);
+    
+    cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+  } else
+    throw std::runtime_error("invalid learner");
+}
+
 void cicada_learn(operation_set_type& operations,
+		  const event_set_type& events,
+		  const event_set_type& events_oracle,
+		  const scorer_document_type& scorers,
+		  const function_document_type& functions,
+		  weight_set_type& weights)
+{
+  const bool regularize_oscar = (oscar > 0.0);
+  const size_t samples = (events.size() + batch_size - 1) / batch_size;
+  
+  if (regularize_l1) {
+    if (rate_simple)
+      cicada_learn_learner(RegularizeL1(C), RateSimple(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_exponential)
+      cicada_learn_learner(RegularizeL1(C), RateExponential(alpha0, eta0, samples), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_adagrad)
+      cicada_learn_learner(RegularizeL1(C), RateAdaGrad(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else
+      throw std::runtime_error("unsupported learning rate");
+  } else if (regularize_l2) {
+    if (rate_simple)
+      cicada_learn_learner(RegularizeL2(C), RateSimple(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_exponential)
+      cicada_learn_learner(RegularizeL2(C), RateExponential(alpha0, eta0, samples), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_adagrad)
+      cicada_learn_learner(RegularizeL2(C), RateAdaGrad(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else
+      throw std::runtime_error("unsupported learning rate");
+  } else if (regularize_oscar) {
+    if (rate_simple)
+      cicada_learn_learner(RegularizeOSCAR(C, oscar), RateSimple(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_exponential)
+      cicada_learn_learner(RegularizeOSCAR(C, oscar), RateExponential(alpha0, eta0, samples), operations, events, events_oracle, scorers, functions, weights);
+    else if (rate_adagrad)
+      cicada_learn_learner(RegularizeOSCAR(C, oscar), RateAdaGrad(eta0), operations, events, events_oracle, scorers, functions, weights);
+    else
+      throw std::runtime_error("unsupported learning rate");
+  } else
+    throw std::runtime_error("unsupported regularizer");
+}
+
+template <typename Learner, typename OracleGenerator, typename YieldGenerator>
+void cicada_learn(Learner& learner,
+		  OracleGenerator& oracle_generator,
+		  YieldGenerator& yield_generator,
+		  operation_set_type& operations,
 		  const event_set_type& events,
 		  const event_set_type& events_oracle,
 		  const scorer_document_type& scorers,
@@ -840,10 +908,6 @@ void cicada_learn(operation_set_type& operations,
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  Learner         learner(events.size());
-  OracleGenerator oracle_generator(scorer_cube);
-  YieldGenerator  yield_generator;
   
   segment_set_type segments(events.size());
   for (size_t seg = 0; seg != segments.size(); ++ seg)
@@ -1568,10 +1632,14 @@ void options(int argc, char** argv)
     ("oscar",         po::value<double>(&oscar)->default_value(oscar),             "OSCAR regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
+    ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0),           "\\alpha_0 for decay")
     ("eta0",          po::value<double>(&eta0)->default_value(eta0),               "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),                "ngram order for xBLEU")
     
-    ("adagrad",             po::bool_switch(&adagrad_mode),       "AdaGrad for adaptive gradient")
+    ("rate-exponential", po::bool_switch(&rate_exponential),  "exponential learning rate")
+    ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
+    ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
+    
     ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")

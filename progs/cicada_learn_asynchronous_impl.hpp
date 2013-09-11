@@ -41,6 +41,7 @@
 #include "utils/getline.hpp"
 
 #include "cicada_learn_online_regularize_impl.hpp"
+#include "cicada_learn_online_rate_impl.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -66,103 +67,6 @@ struct LearnBase
   typedef scorer_document_type::scorer_ptr_type scorer_ptr_type;
   typedef scorer_document_type::score_ptr_type  score_ptr_type;
   
-};
-
-
-struct DecaySimple
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  double eta0_;
-  double eta_;
-  size_type epoch_;
-  
-  DecaySimple(const double& eta0) : eta0_(eta0), epoch_(0) {}
-  
-  double operator()() const
-  {
-    const_cast<double&>(eta_) = eta0_ / (epoch_ + 1);
-    ++ const_cast<size_type&>(epoch_);
-    return eta_;
-  }
-  
-  double operator()(const feature_type& feat, const double& grad) const
-  {
-    return eta_ * grad;
-  }  
-};
-
-struct DecayExponential
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  double alpha0_;
-  double eta0_;
-  double eta_;
-  size_type samples_;
-  size_type epoch_;
-  
-  DecayExponential(const double& alpha0, const double& eta0, const size_type& samples) : alpha0_(alpha0), eta0_(eta0), samples_(samples), epoch_(0) {}
-  
-  double operator()() const
-  {
-    const_cast<double&>(eta_) = eta0_ * std::pow(alpha0_, double(epoch_) / samples_);
-    ++ const_cast<size_type&>(epoch_);
-    return eta_;
-  }
-  
-  double operator()(const feature_type& feat, const double& grad) const
-  {
-    return eta_ * grad;
-  }
-};
-
-struct DecayAdaGrad
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  weight_set_type grads2_;
-  double eta0_;
-  size_type epoch_;
-  
-  DecayAdaGrad(const double& eta0, const size_type& samples) : eta0_(eta0), epoch_(0) {}
-  
-  double operator()() const
-  {
-    const double eta = eta0_ / (epoch_ + 1);
-    ++ const_cast<size_type&>(epoch_);
-    return eta;
-  }
-  
-  double operator()(const feature_type& feat, const double& grad) const
-  {
-    double& grad2 = const_cast<weight_set_type&>(grads2_).operator[](feat);
-    const double eta = (grad2 == 0.0 ? eta0_ : eta0_ / utils::mathop::sqrt(grad2));
-    
-    grad2 += grad * grad;
-    
-    return eta * grad;
-  }
-};
-
-struct RateAdaGrad
-{
-  weight_set_type grads2;
-  
-  double operator()(const feature_type& feat, const double& eta) const
-  {
-    const double grad2 = grads2[feat];
-    
-    return (grad2 == 0.0 ? eta0 : eta0 / utils::mathop::sqrt(grad2));
-  }
-  
-  void update(const feature_type& feat, const double& grad)
-  {
-    grads2[feat] += grad * grad;
-  }
 };
 
 struct LearnXBLEUBase : public LearnBase
@@ -787,10 +691,13 @@ struct LearnXBLEUBase : public LearnBase
   entropy_weights_type entropy_inside;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnXBLEU : public LearnXBLEUBase
 {
-  LearnXBLEU(const size_type __instances) : instances(__instances), epoch(0), regularizer(C)  {}
+  LearnXBLEU(const Regularizer& __regularizer,
+	     const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -809,20 +716,13 @@ struct LearnXBLEU : public LearnXBLEUBase
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     feature_set_type::const_iterator giter_end = updates.end();
-    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter) {
-      regularizer.update(weights, giter->first, giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
-    }
+    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
+      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -838,11 +738,8 @@ struct LearnXBLEU : public LearnXBLEUBase
       clear();
       return objective.first;
     }
-
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -851,10 +748,7 @@ struct LearnXBLEU : public LearnXBLEUBase
       // we will update "minus" value...
       const double amount = - static_cast<double>(giter->second);
       
-      regularizer.update(weights, giter->first, amount * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
+      regularizer.update(weights, giter->first, rate(giter->first, amount));
       
       updates[giter->first] = amount;
     }
@@ -868,12 +762,8 @@ struct LearnXBLEU : public LearnXBLEUBase
   
   gradient_xbleu_type g;
   
-  size_type instances;
-  
-  size_type epoch;
-
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
 
@@ -1026,11 +916,13 @@ struct LearnSoftmaxBase : public LearnBase
 };
 
 // SoftmaxL2 learner
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnSoftmax : public LearnSoftmaxBase
 {
-  LearnSoftmax(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
-  
+  LearnSoftmax(const Regularizer& __regularizer,
+	       const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -1049,20 +941,13 @@ struct LearnSoftmax : public LearnSoftmaxBase
   
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     feature_set_type::const_iterator giter_end = updates.end();
-    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter) {
-      regularizer.update(weights, giter->first, giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
-    }
+    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
+      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -1076,13 +961,11 @@ struct LearnSoftmax : public LearnSoftmaxBase
       return 0.0;
     }
     
+    const double eta = rate();
+
     const size_type k = samples;
     const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
-
+    
     const double objective_normalized = objective * k_norm;
     
     regularizer.preprocess(weights, eta);
@@ -1092,10 +975,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
       // we will update "minus" value...
       const double amount = - static_cast<double>(giter->second) * k_norm;
       
-      regularizer.update(weights, giter->first, amount * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
+      regularizer.update(weights, giter->first, rate(giter->first, amount));
       
       // updates!
       updates[giter->first] = amount;
@@ -1108,12 +988,8 @@ struct LearnSoftmax : public LearnSoftmaxBase
     return objective_normalized;
   }
 
-  size_type instances;
-  
-  size_type epoch;
-  
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
 

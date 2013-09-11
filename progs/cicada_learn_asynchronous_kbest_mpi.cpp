@@ -129,6 +129,7 @@ double C = 1e-3;
 double oscar = 0.0;
 double temperature = 0.0;
 double scale = 1.0;
+double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
 
@@ -1802,6 +1803,7 @@ void options(int argc, char** argv)
     ("oscar",         po::value<double>(&oscar)->default_value(oscar),             "OSCAR regularization constant")
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
+    ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0),           "\\alpha_0 for decay")
     ("eta0",          po::value<double>(&eta0)->default_value(eta0),               "\\eta_0 for decay")
     ("order",         po::value<int>(&order)->default_value(order),                "ngram order for xBLEU")
     

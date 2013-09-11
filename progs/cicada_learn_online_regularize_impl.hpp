@@ -232,9 +232,9 @@ public:
     G.push_back(group_value_type(g, objective(weights, g, rate)));
     
     // iterate p...
-    for (id_type i = 2; i != p.size() + 1; ++ i) {
+    for (id_type i = 1; i != p.size(); ++ i) {
       g.clear();
-      g.push_back(std::make_pair(i, p[i]));
+      g.push_back(std::make_pair(i + 1, p[i]));
 
       double value = objective(weights, g, rate);
       
