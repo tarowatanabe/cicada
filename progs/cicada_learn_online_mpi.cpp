@@ -855,7 +855,12 @@ void cicada_learn(operation_set_type& operations,
 		  weight_set_type& weights)
 {
   const bool regularize_oscar = (oscar > 0.0);
-  const size_t samples = (events.size() + batch_size - 1) / batch_size;
+
+  size_t instances_rank = 0;
+  for (size_t seg = 0; seg != events.size(); ++ seg)
+    instances_rank += (! events[seg].empty());
+  
+  const size_t samples = (instances_rank + batch_size - 1) / batch_size;
   
   if (regularize_l1) {
     if (rate_simple)
@@ -909,9 +914,12 @@ void cicada_learn(Learner& learner,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  segment_set_type segments(events.size());
-  for (size_t seg = 0; seg != segments.size(); ++ seg)
-    segments[seg] = seg;
+  segment_set_type segments;
+  for (size_t seg = 0; seg != events.size(); ++ seg)
+    if (! events[seg].empty())
+      segments.push_back(seg);
+
+  segment_set_type(segments).swap(segments);
   
   // random number generator...
   boost::mt19937 generator;

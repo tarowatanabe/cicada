@@ -146,6 +146,10 @@ private:
   double norm_;
 };
 
+//
+// an online version of OSCAR...
+//
+// Note that the original OSCAR has factor of two, which can be ignored in the computation.
 struct RegularizeOSCAR
 {
   typedef cicada::HyperGraph hypergraph_type;
@@ -268,9 +272,9 @@ public:
     
     group_type::const_iterator giter_end = group.end();
     for (group_type::const_iterator giter = group.begin(); giter != giter_end; ++ giter)
-      v += std::fabs(weights[giter->second]) - 2.0 * rate * (lambda1_ + lambda2_ * (weights.size() - giter->first));
+      v += std::fabs(weights[giter->second]) - rate * (lambda1_ + lambda2_ * (feature_type::allocated() - giter->first));
     
-    return 0.5 * v / group.size();
+    return v / group.size();
   }
 
 private:

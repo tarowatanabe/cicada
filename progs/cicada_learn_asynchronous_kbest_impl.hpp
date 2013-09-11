@@ -40,6 +40,7 @@
 #include "utils/getline.hpp"
 
 #include "cicada_learn_online_regularize_impl.hpp"
+#include "cicada_learn_online_rate_impl.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -47,23 +48,6 @@
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
-
-struct RateAdaGrad
-{
-  weight_set_type grads2;
-  
-  double operator()(const feature_type& feat, const double& eta) const
-  {
-    const double grad2 = grads2[feat];
-    
-    return (grad2 == 0.0 ? eta0 : eta0 / utils::mathop::sqrt(grad2));
-  }
-  
-  void update(const feature_type& feat, const double& grad)
-  {
-    grads2[feat] += grad * grad;
-  }
-};
 
 struct LearnBase
 {
@@ -484,10 +468,13 @@ struct LearnXBLEUBase : public LearnBase
   gradient_type expectation;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnXBLEU : public LearnXBLEUBase
 {
-  LearnXBLEU(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
+  LearnXBLEU(const Regularizer& __regularizer,
+	     const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -501,20 +488,13 @@ struct LearnXBLEU : public LearnXBLEUBase
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     feature_set_type::const_iterator giter_end = updates.end();
-    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter) {
-      regularizer.update(weights, giter->first, giter->second * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
-    }
+    for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
+      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -540,10 +520,7 @@ struct LearnXBLEU : public LearnXBLEUBase
       return objective.first;
     }
     
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -552,10 +529,7 @@ struct LearnXBLEU : public LearnXBLEUBase
       // we will update "minus" value...
       const double amount = - static_cast<double>(giter->second);
       
-      regularizer.update(weights, giter->first, amount * (adagrad_mode ? adagrad(giter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(giter->first, giter->second);
+      regularizer.update(weights, giter->first, rate(giter->first, amount));
       
       // updates!
       updates[giter->first] = amount;
@@ -570,15 +544,11 @@ struct LearnXBLEU : public LearnXBLEUBase
   
   gradient_xbleu_type g;
   
-  size_type instances;
-  
-  size_type epoch;
-  
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
@@ -592,8 +562,11 @@ struct LearnExpectedLoss : public LearnBase
   typedef cicada::semiring::traits<weight_type> traits_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
 
-  LearnExpectedLoss(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
-
+  LearnExpectedLoss(const Regularizer& __regularizer,
+		    const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
+  
   void clear()
   {
     features.clear();
@@ -626,25 +599,18 @@ struct LearnExpectedLoss : public LearnBase
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     // update by expectations...
     feature_set_type::const_iterator eiter_end = updates.end();
-    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter) {
-      regularizer.update(weights, eiter->first, eiter->second * (adagrad_mode ? adagrad(eiter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(eiter->first, eiter->second);
-    }
+    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter)
+      regularizer.update(weights, eiter->first, rate(eiter->first, eiter->second));
     
     regularizer.postprocess(weights, eta);
   }
-
+  
   double learn(weight_set_type& weights, feature_set_type& updates)
   {
     updates.clear();
@@ -699,10 +665,8 @@ struct LearnExpectedLoss : public LearnBase
     
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2)); // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SD-L1
-    ++ epoch;
+
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -712,11 +676,8 @@ struct LearnExpectedLoss : public LearnBase
       // we will update "minus" value...
       const double amount = - static_cast<double>(eiter->second) * k_norm;
       
-      regularizer.update(weights, eiter->first, amount * (adagrad_mode ? adagrad(eiter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(eiter->first, eiter->second);
-      
+      regularizer.update(weights, eiter->first, rate(eiter->first, amount));
+			 
       // updates!
       updates[eiter->first] = amount;
     }
@@ -736,15 +697,11 @@ struct LearnExpectedLoss : public LearnBase
 
   loss_map_type losses;
   
-  size_type instances;
-  
-  size_type epoch;
-  
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnOExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
@@ -815,8 +772,12 @@ struct LearnOExpectedLoss : public LearnBase
     const sample_set_type& features;
   };
 
-  LearnOExpectedLoss(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), regularizer(C) {}
-
+  LearnOExpectedLoss(const Regularizer& __regularizer,
+		     const Rate& __rate)
+    : tolerance(0.1),
+      regularizer(__regularizer),
+      rate(__rate) {}
+  
   void clear()
   {
     features.clear();
@@ -854,10 +815,7 @@ struct LearnOExpectedLoss : public LearnBase
   
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -937,9 +895,8 @@ struct LearnOExpectedLoss : public LearnBase
     
     const size_type k = losses.size();
     const double k_norm = 1.0 / k;
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -994,11 +951,8 @@ struct LearnOExpectedLoss : public LearnBase
 
   double tolerance;
   
-  size_type instances;
-  
-  size_type epoch;
-  
   Regularizer regularizer;
+  Rate        rate;
 };
 
 struct LearnOnlineMargin : public LearnBase
@@ -1093,11 +1047,14 @@ struct LearnOnlineMargin : public LearnBase
 };
 
 // Pegasos learner (hinge loss)
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnHinge : public LearnOnlineMargin
 {
   
-  LearnHinge(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
+  LearnHinge(const Regularizer& __regularizer,
+	     const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -1114,21 +1071,14 @@ struct LearnHinge : public LearnOnlineMargin
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     // udpate...
     feature_set_type::const_iterator fiter_end = updates.end();
-    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter) {
-      regularizer.update(weights, fiter->first, fiter->second * (adagrad_mode ? adagrad(fiter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(fiter->first, fiter->second);
-    }
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
+      regularizer.update(weights, fiter->first, rate(fiter->first, fiter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -1179,15 +1129,12 @@ struct LearnHinge : public LearnOnlineMargin
   }
   
   
-  size_type instances;
-  size_type epoch;
-  
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
 // optimized-Pegasos learner
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnOHinge : public LearnOnlineMargin
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
@@ -1250,7 +1197,11 @@ struct LearnOHinge : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnOHinge(const size_type __instances) : instances(__instances), epoch(0), tolerance(0.1), regularizer(C) {}  
+  LearnOHinge(const Regularizer& __regularizer,
+	     const Rate& __rate)
+    : tolerance(0.1),
+      regularizer(__regularizer),
+      rate(__rate) {}
   
   void initialize(weight_set_type& weights)
   {
@@ -1264,10 +1215,7 @@ struct LearnOHinge : public LearnOnlineMargin
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -1284,12 +1232,7 @@ struct LearnOHinge : public LearnOnlineMargin
     
     if (features.empty()) return 0.0;
     
-    //const size_type k = features.size();
-    //const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     alpha.clear();
     f.clear();
@@ -1353,12 +1296,10 @@ struct LearnOHinge : public LearnOnlineMargin
     return 0.0;
   }
   
-  
-  size_type instances;
-  size_type epoch;
   double    tolerance;
 
   Regularizer regularizer;
+  Rate        rate;
   
   alpha_type    alpha;
   f_type        f;
@@ -1367,7 +1308,7 @@ struct LearnOHinge : public LearnOnlineMargin
 
 struct LearnPA : public LearnOnlineMargin
 {
-  LearnPA(const size_type __instances) : lambda(C) {}
+  LearnPA() : lambda(C) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1418,7 +1359,7 @@ struct LearnPA : public LearnOnlineMargin
 
 struct LearnCW : public LearnOnlineMargin
 {
-  LearnCW(const size_type __instances) : lambda(C) {}
+  LearnCW() : lambda(C) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1474,7 +1415,7 @@ struct LearnCW : public LearnOnlineMargin
 
 struct LearnAROW : public LearnOnlineMargin
 {
-  LearnAROW(const size_type __instances) : lambda(C) {}
+  LearnAROW() : lambda(C) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1528,7 +1469,7 @@ struct LearnAROW : public LearnOnlineMargin
 
 struct LearnNHERD : public LearnOnlineMargin
 {
-  LearnNHERD(const size_type __instances) : lambda(1.0 / C) {}
+  LearnNHERD() : lambda(1.0 / C) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1644,7 +1585,7 @@ struct LearnMIRA : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnMIRA(const size_type __instances) : instances(__instances), tolerance(0.1), lambda(C) {}
+  LearnMIRA() : tolerance(0.1), lambda(C) {}
   
   void initialize(weight_set_type& weights) {}
   
@@ -1684,8 +1625,6 @@ struct LearnMIRA : public LearnOnlineMargin
     alpha.resize(index.size(), 0.0);
     
     {
-      //const size_type num_samples = (instances + batch_size - 1) / batch_size;
-      
       HMatrix H(features, index);
       MMatrix M(features, index);
       
@@ -1710,7 +1649,6 @@ struct LearnMIRA : public LearnOnlineMargin
     return objective;
   }
   
-  size_type instances;
   double tolerance;
   double lambda;
 
@@ -1806,13 +1744,15 @@ struct LearnSoftmaxBase : public LearnBase
 
 
 // Softmax learner
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnSoftmax : public LearnSoftmaxBase
 {
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnSoftmax(const size_type __instances) : instances(__instances), epoch(0), regularizer(C) {}
-  
+  LearnSoftmax(const Regularizer& __regularizer,
+	       const Rate& __rate)
+    : regularizer(__regularizer),
+      rate(__rate) {}
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
   {
@@ -1836,20 +1776,13 @@ struct LearnSoftmax : public LearnSoftmaxBase
 
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
     feature_set_type::const_iterator eiter_end = updates.end();
-    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter) {
-      regularizer.update(weights, eiter->first, eiter->second * (adagrad_mode ? adagrad(eiter->first, eta) : eta));
-      
-      if (adagrad_mode)
-	adagrad.update(eiter->first, eiter->second);
-    }
+    for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter)
+      regularizer.update(weights, eiter->first, rate(eiter->first, eiter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -1864,10 +1797,8 @@ struct LearnSoftmax : public LearnSoftmaxBase
     
     const size_type k = samples.size();
     const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -1886,11 +1817,8 @@ struct LearnSoftmax : public LearnSoftmaxBase
       // we will update "minus" value...
       const double amount = - static_cast<double>(eiter->second) * k_norm;
       
-      regularizer.update(weights, eiter->first, amount * (adagrad_mode ? adagrad(eiter->first, eta) : eta));
+      regularizer.update(weights, eiter->first, rate(eiter->first, amount));
       
-      if (adagrad_mode)
-	adagrad.update(eiter->first, eiter->second);
-
       // updates!
       updates[eiter->first] = amount;
     }
@@ -1905,17 +1833,13 @@ struct LearnSoftmax : public LearnSoftmaxBase
   
   sample_pair_set_type samples;
 
-  size_type instances;
-  
-  size_type epoch;
-  
   Regularizer regularizer;
-  RateAdaGrad adagrad;
+  Rate        rate;
 };
 
 // optimized-Softmax learner
 
-template <typename Regularizer>
+template <typename Regularizer, typename Rate>
 struct LearnOSoftmax : public LearnSoftmaxBase
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
@@ -1977,7 +1901,11 @@ struct LearnOSoftmax : public LearnSoftmaxBase
 
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnOSoftmax(const size_type __instances) : tolerance(0.1), instances(__instances), epoch(0), regularizer(C) {}
+  LearnOSoftmax(const Regularizer& __regularizer,
+	     const Rate& __rate)
+    : tolerance(0.1),
+      regularizer(__regularizer),
+      rate(__rate) {}
   
   
   void encode(const size_type id, const hypothesis_set_type& kbests, const hypothesis_set_type& oracles)
@@ -2007,10 +1935,7 @@ struct LearnOSoftmax : public LearnSoftmaxBase
   
   void update(weight_set_type& weights, const feature_set_type& updates)
   {
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     regularizer.preprocess(weights, eta);
     
@@ -2029,12 +1954,7 @@ struct LearnOSoftmax : public LearnSoftmaxBase
     
     if (samples.empty()) return 0.0;
     
-    //const size_type k = samples.size();
-    //const double k_norm = 1.0 / k;
-    //const double eta = 1.0 / (lambda * (epoch + 2));  // this is an eta from pegasos
-    const size_type num_samples = (instances + batch_size - 1) / batch_size;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / num_samples); // eta from SGD-L1
-    ++ epoch;
+    const double eta = rate();
     
     expectation_type expectations;
     
@@ -2112,11 +2032,8 @@ struct LearnOSoftmax : public LearnSoftmaxBase
 
   double tolerance;
 
-  size_type instances;
-  
-  size_type epoch;
-
   Regularizer regularizer;
+  Rate        rate;
 };
 
 struct KBestSentence
