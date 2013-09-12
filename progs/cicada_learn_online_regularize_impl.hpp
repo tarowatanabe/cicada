@@ -167,9 +167,6 @@ struct RegularizeOSCAR
 
   typedef cicada::WeightVector<double> weight_set_type;
   
-  // TODO: fix me!
-  // I hate this constant! 
-  
   RegularizeOSCAR(const double lambda1, const double lambda2) : lambda1_(lambda1), lambda2_(lambda2) {}
   
   double scale() const { return 1.0; }
@@ -206,9 +203,8 @@ private:
     double    score_;
 
     group_type() : first_(), last_(), score_() {}
-    group_type(const size_type& first, const size_type& last, const double& score) : first_(first), last_(last), score_(score) {}
+    group_type(const size_type& first, const double& score) : first_(first), last_(first + 1), score_(score) {}
     
-    size_type size() const { return last_ - first_; }
     double score() const { return score_ / (last_ - first_); }
   };
   
@@ -243,13 +239,14 @@ public:
     
     // initialize stack...
     G.clear();
-    G.push_back(group_type(0, 1, std::fabs(p.front().second) - eta * (lambda1_ + lambda2_ * (num_features - 1))));
+    G.push_back(group_type(0, std::fabs(p.front().second) - eta * (lambda1_ + lambda2_ * (num_features - 1))));
     
     // iterate p and perform grouping...
     for (id_type i = 1; i != p.size(); ++ i) {
-      group_type g(i, i + 1, std::fabs(p[i].second) - eta * (lambda1_ + lambda2_ * (num_features - i - 1)));
+      group_type g(i, std::fabs(p[i].second) - eta * (lambda1_ + lambda2_ * (num_features - i - 1)));
       
       while (! G.empty() && g.score() >= G.back().score()) {
+	// merge group
 	g.first_ = G.back().first_;
 	g.score_ += G.back().score_;
 	
