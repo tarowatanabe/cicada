@@ -178,8 +178,6 @@ namespace cicada
 	  cache.frontier = frontier;
 	  
 	  feature_builder.clear();
-	  bool initial = true;
-	  bool terminal_prev = false;
 	  int non_terminal_pos = 1;
 	  
 	  tokenizer_type::iterator titer_end = tokenizer.end();
@@ -191,23 +189,9 @@ namespace cicada
 	      const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index);
 	      ++ non_terminal_pos;
 	      
-	      if (! initial)
-		feature_builder << "_";
-	      
 	      feature_builder << non_terminal_index;
-	      terminal_prev = false;
-	      initial = false;
-	    } else if (! skipper(word)) {
-
-	      if (! terminal_prev) {
-		if (! initial)
-		  feature_builder << "_";
-		
-		feature_builder << "0";
-	      }
-	      terminal_prev = true;
-	      initial = false;
-	    }
+	    } else if (! skipper(word))
+	      feature_builder << "0";
 	  }
 	  
 	  cache.phrase = feature_builder;

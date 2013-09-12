@@ -246,3 +246,7 @@ Port for other batch-queue systems, such as Torque.
 
 Implement rejection sampling
   - How to approximately sample during non-local feature application?
+
+Merge learning codes
+ - There exists duplicated and experimental codes which I don't even
+   remember.
