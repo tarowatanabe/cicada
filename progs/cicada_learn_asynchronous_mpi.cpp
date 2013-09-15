@@ -1093,20 +1093,20 @@ void cicada_learn_regularizer(const Rate& rate,
 
   if (rda_mode) {
     if (regularize_l1)
-      cicada_learn_learner(RegularizeL1(C), rate, operations, events, events_oracle, scorers, functions, weights);
-    else if (regularize_l2)
-      cicada_learn_learner(RegularizeL2(C), rate, operations, events, events_oracle, scorers, functions, weights);
-    else if (regularize_oscar)
-      cicada_learn_learner(RegularizeOSCAR(C, oscar), rate, operations, events, events_oracle, scorers, functions, weights);
-    else
-      throw std::runtime_error("unsupported regularizer");
-  } else {
-    if (regularize_l1)
       cicada_learn_learner(RegularizeRDAL1(C), rate, operations, events, events_oracle, scorers, functions, weights);
     else if (regularize_l2)
       cicada_learn_learner(RegularizeRDAL2(C), rate, operations, events, events_oracle, scorers, functions, weights);
     else if (regularize_oscar)
       cicada_learn_learner(RegularizeRDAOSCAR(C, oscar), rate, operations, events, events_oracle, scorers, functions, weights);
+    else
+      throw std::runtime_error("unsupported regularizer");
+  } else {
+    if (regularize_l1)
+      cicada_learn_learner(RegularizeL1(C), rate, operations, events, events_oracle, scorers, functions, weights);
+    else if (regularize_l2)
+      cicada_learn_learner(RegularizeL2(C), rate, operations, events, events_oracle, scorers, functions, weights);
+    else if (regularize_oscar)
+      cicada_learn_learner(RegularizeOSCAR(C, oscar), rate, operations, events, events_oracle, scorers, functions, weights);
     else
       throw std::runtime_error("unsupported regularizer");
   }
