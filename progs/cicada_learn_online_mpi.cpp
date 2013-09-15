@@ -133,6 +133,7 @@ bool rate_exponential = false;
 bool rate_adagrad = false;
 
 // additional misc parameters.
+bool rda_mode = false;
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
 bool project_weight = false;
@@ -1648,6 +1649,8 @@ void options(int argc, char** argv)
     ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
     ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
     
+    ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")
+
     ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
     ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
