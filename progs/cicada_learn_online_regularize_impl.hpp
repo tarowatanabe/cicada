@@ -430,7 +430,7 @@ struct RegularizeRDAL1
   {
     weights.clear();
 
-    const double lambda = lambda_ + eta;
+    const double lambda = lambda_;
     
     for (id_type id = 0; id != averaged_.size(); ++ id) {
       const double value = averaged_[id] * scale_;
@@ -500,7 +500,7 @@ struct RegularizeRDAL1L2
   {
     weights.clear();
 
-    const double lambda = lambda1_ + eta;
+    const double lambda = lambda1_;
     
     double norm = 0.0;
 
@@ -709,11 +709,11 @@ public:
     
     // initialize stack...
     G.clear();
-    G.push_back(group_type(0, std::fabs(p.front().second) - (eta + lambda1_ + lambda2_ * (num_features - 1))));
+    G.push_back(group_type(0, std::fabs(p.front().second) - (lambda1_ + lambda2_ * (num_features - 1))));
     
     // iterate p and perform grouping...
     for (id_type i = 1; i != p.size(); ++ i) {
-      group_type g(i, std::fabs(p[i].second) - (eta + lambda1_ + lambda2_ * (num_features - i - 1)));
+      group_type g(i, std::fabs(p[i].second) - (lambda1_ + lambda2_ * (num_features - i - 1)));
       
       while (! G.empty() && g.score() >= G.back().score()) {
 	// merge group
