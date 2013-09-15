@@ -10,6 +10,27 @@
 
 #include <utils/mathop.hpp>
 
+struct RateNone
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+ 
+  typedef cicada::HyperGraph hypergraph_type;
+  typedef hypergraph_type::feature_set_type    feature_set_type;
+  
+  typedef feature_set_type::feature_type feature_type;
+
+  double operator()() const
+  {
+    return 1.0;
+  }
+
+  double operator()(const feature_type& feat, const double& grad) const
+  {
+    return 1.0;
+  }
+};
+
 struct RateSimple
 {
   typedef size_t    size_type;
@@ -36,8 +57,38 @@ struct RateSimple
   
   double operator()(const feature_type& feat, const double& grad) const
   {
-    return eta_ * grad;
+    return eta_;
   }
+};
+
+struct RateSqrt
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+ 
+  typedef cicada::HyperGraph hypergraph_type;
+  typedef hypergraph_type::feature_set_type    feature_set_type;
+  
+  typedef feature_set_type::feature_type feature_type;
+ 
+  double eta0_;
+  
+  double eta_;
+  size_type epoch_;
+  
+  RateSqrt(const double& eta0) : eta0_(eta0), epoch_(0) {}
+  
+  double operator()() const
+  {
+    const_cast<double&>(eta_) = eta0_ / std::sqrt(double(epoch_ + 1));
+    ++ const_cast<size_type&>(epoch_);
+    return eta_;
+  }
+  
+  double operator()(const feature_type& feat, const double& grad) const
+  {
+    return eta_;
+  }  
 };
 
 struct RateExponential
@@ -68,7 +119,7 @@ struct RateExponential
   
   double operator()(const feature_type& feat, const double& grad) const
   {
-    return eta_ * grad;
+    return eta_;
   }
 };
 
@@ -106,7 +157,7 @@ struct RateAdaGrad
     
     grad2 += grad * grad;
     
-    return eta * grad;
+    return eta;
   }
 };
 

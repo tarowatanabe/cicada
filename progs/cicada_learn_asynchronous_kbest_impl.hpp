@@ -494,7 +494,7 @@ struct LearnXBLEU : public LearnXBLEUBase
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
+      regularizer.update(weights, giter->first, giter->second, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -526,10 +526,9 @@ struct LearnXBLEU : public LearnXBLEUBase
     
     gradient_xbleu_type::const_iterator giter_end = g.end();
     for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
-      // we will update "minus" value...
-      const double amount = - static_cast<double>(giter->second);
+      const double amount = static_cast<double>(giter->second);
       
-      regularizer.update(weights, giter->first, rate(giter->first, amount));
+      regularizer.update(weights, giter->first, giter->second, rate(giter->first, amount));
       
       // updates!
       updates[giter->first] = amount;
@@ -606,7 +605,7 @@ struct LearnExpectedLoss : public LearnBase
     // update by expectations...
     feature_set_type::const_iterator eiter_end = updates.end();
     for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter)
-      regularizer.update(weights, eiter->first, rate(eiter->first, eiter->second));
+      regularizer.update(weights, eiter->first, eiter->second, rate(eiter->first, eiter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -673,10 +672,9 @@ struct LearnExpectedLoss : public LearnBase
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
     for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
-      // we will update "minus" value...
-      const double amount = - static_cast<double>(eiter->second) * k_norm;
+      const double amount = static_cast<double>(eiter->second) * k_norm;
       
-      regularizer.update(weights, eiter->first, rate(eiter->first, amount));
+      regularizer.update(weights, eiter->first, amount, rate(eiter->first, amount));
 			 
       // updates!
       updates[eiter->first] = amount;
@@ -821,7 +819,7 @@ struct LearnOExpectedLoss : public LearnBase
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, giter->second * eta);
+      regularizer.update(weights, giter->first, giter->second, eta);
     
     regularizer.postprocess(weights, eta);
   }
@@ -918,18 +916,16 @@ struct LearnOExpectedLoss : public LearnBase
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features_optimize[i].end();
-	for (sample_set_type::value_type::const_iterator fiter = features_optimize[i].begin(); fiter != fiter_end; ++ fiter) {
-	  const double amount = alpha[i] * fiter->second;
-	  
-	  regularizer.update(weights, fiter->first, amount);
-	  
-	  // updates! (but, here, we will rescale it!)
-	  updates[fiter->first] += amount / eta;
-	}
+	for (sample_set_type::value_type::const_iterator fiter = features_optimize[i].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] -= alpha[i] * fiter->second / eta;
 	
 	++ actives;
 	negatives += f[i] > 0.0;
       }
+    
+    feature_set_type::const_iterator uiter_end = updates.end();
+    for (feature_set_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter)
+      regularizer.update(weights, uiter->first, uiter->second, eta);
     
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
@@ -1078,7 +1074,7 @@ struct LearnHinge : public LearnOnlineMargin
     // udpate...
     feature_set_type::const_iterator fiter_end = updates.end();
     for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
-      regularizer.update(weights, fiter->first, rate(fiter->first, fiter->second));
+      regularizer.update(weights, fiter->first, fiter->second, rate(fiter->first, fiter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -1116,7 +1112,7 @@ struct LearnHinge : public LearnOnlineMargin
       if (suffered[i]) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
-	  updates[fiter->first] += k_norm * fiter->second;
+	  updates[fiter->first] -= k_norm * fiter->second;
       }
     
     if (! updates.empty())
@@ -1221,7 +1217,7 @@ struct LearnOHinge : public LearnOnlineMargin
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, giter->second * eta);
+      regularizer.update(weights, giter->first, giter->second, eta);
     
     regularizer.postprocess(weights, eta);
   }
@@ -1272,18 +1268,16 @@ struct LearnOHinge : public LearnOnlineMargin
     for (size_t i = 0; i != index.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
-	  const double amount = alpha[i] * fiter->second;
-	  
-	  regularizer.update(weights, fiter->first, amount);
-	  
-	  // updates! (but, here, we will rescale it!)
-	  updates[fiter->first] += amount / eta;
-	}
+	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] -= alpha[i] * fiter->second / eta;
 	
 	++ actives;
 	negatives += f[i] > 0.0;
       }
+    
+    feature_set_type::const_iterator uiter_end = updates.end();
+    for (feature_set_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter)
+      regularizer.update(weights, uiter->first, uiter->second, eta);
     
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
@@ -1782,7 +1776,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
     
     feature_set_type::const_iterator eiter_end = updates.end();
     for (feature_set_type::const_iterator eiter = updates.begin(); eiter != eiter_end; ++ eiter)
-      regularizer.update(weights, eiter->first, rate(eiter->first, eiter->second));
+      regularizer.update(weights, eiter->first, eiter->second, rate(eiter->first, eiter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -1814,10 +1808,9 @@ struct LearnSoftmax : public LearnSoftmaxBase
     // update by expectations...
     expectation_type::const_iterator eiter_end = expectations.end();
     for (expectation_type::const_iterator eiter = expectations.begin(); eiter != eiter_end; ++ eiter) {
-      // we will update "minus" value...
-      const double amount = - static_cast<double>(eiter->second) * k_norm;
+      const double amount = static_cast<double>(eiter->second) * k_norm;
       
-      regularizer.update(weights, eiter->first, rate(eiter->first, amount));
+      regularizer.update(weights, eiter->first, amount, rate(eiter->first, amount));
       
       // updates!
       updates[eiter->first] = amount;
@@ -1941,7 +1934,7 @@ struct LearnOSoftmax : public LearnSoftmaxBase
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, giter->second * eta);
+      regularizer.update(weights, giter->first, giter->second, eta);
     
     regularizer.postprocess(weights, eta);
   }
@@ -2005,17 +1998,16 @@ struct LearnOSoftmax : public LearnSoftmaxBase
     for (size_t i = 0; i != alpha.size(); ++ i)
       if (alpha[i] > 0.0) {
 	sample_set_type::value_type::const_iterator fiter_end = features[i].end();
-	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
-	  const double amount = alpha[i] * fiter->second;
-	  
-	  regularizer.update(weights, fiter->first, amount);
-	  
-	  updates[fiter->first] += amount / eta;
-	}
+	for (sample_set_type::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] -= alpha[i] * fiter->second / eta;
 	
 	++ actives;
 	negatives += f[i] > 0.0;
       }
+    
+    feature_set_type::const_iterator uiter_end = updates.end();
+    for (feature_set_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter)
+      regularizer.update(weights, uiter->first, uiter->second, eta);
     
     if (debug >= 2)
       std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;

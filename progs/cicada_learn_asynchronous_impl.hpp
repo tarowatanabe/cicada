@@ -722,7 +722,7 @@ struct LearnXBLEU : public LearnXBLEUBase
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
+      regularizer.update(weights, giter->first, giter->second, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -745,10 +745,9 @@ struct LearnXBLEU : public LearnXBLEUBase
     
     gradient_xbleu_type::const_iterator giter_end = g.end();
     for (gradient_xbleu_type::const_iterator giter = g.begin(); giter != giter_end; ++ giter) {
-      // we will update "minus" value...
-      const double amount = - static_cast<double>(giter->second);
+      const double amount = static_cast<double>(giter->second);
       
-      regularizer.update(weights, giter->first, rate(giter->first, amount));
+      regularizer.update(weights, giter->first, amount, rate(giter->first, amount));
       
       updates[giter->first] = amount;
     }
@@ -947,7 +946,7 @@ struct LearnSoftmax : public LearnSoftmaxBase
     
     feature_set_type::const_iterator giter_end = updates.end();
     for (feature_set_type::const_iterator giter = updates.begin(); giter != giter_end; ++ giter)
-      regularizer.update(weights, giter->first, rate(giter->first, giter->second));
+      regularizer.update(weights, giter->first, giter->second, rate(giter->first, giter->second));
     
     regularizer.postprocess(weights, eta);
   }
@@ -972,10 +971,9 @@ struct LearnSoftmax : public LearnSoftmaxBase
     
     gradient_type::const_iterator giter_end = gradient.end();
     for (gradient_type::const_iterator giter = gradient.begin(); giter != giter_end; ++ giter) {
-      // we will update "minus" value...
-      const double amount = - static_cast<double>(giter->second) * k_norm;
+      const double amount = static_cast<double>(giter->second) * k_norm;
       
-      regularizer.update(weights, giter->first, rate(giter->first, amount));
+      regularizer.update(weights, giter->first, amount, rate(giter->first, amount));
       
       // updates!
       updates[giter->first] = amount;
