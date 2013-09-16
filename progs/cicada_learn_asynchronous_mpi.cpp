@@ -111,10 +111,12 @@ int batch_size = 8;
 // solver parameters
 bool learn_xbleu = false;
 bool learn_softmax    = false;
-bool regularize_l1 = false;
-bool regularize_l2 = false;
-double C = 1e-3;
-double oscar = 0.0;
+
+double regularize_l1 = 0.0;
+double regularize_l2 = 0.0;
+double regularize_lambda = 0.0;
+double regularize_oscar = 0.0;
+
 double temperature = 0.0;
 double scale = 1.0;
 double alpha0 = 0.85;
@@ -238,21 +240,19 @@ int main(int argc, char ** argv)
       throw std::runtime_error("you can specify either --learn-{xbleu,softmax}");
     if (int(learn_xbleu) + learn_softmax == 0)
       learn_xbleu = true;
+    
+    if (regularize_oscar > 0.0) {
+      if (regularize_l1 < 0.0)
+	throw std::runtime_error("L1 regularization must be positive or zero");
+      if (regularize_l2 > 0.0)
+	throw std::runtime_error("L2 regularization with OSCAR is not supported");
+    }
 
-    const bool regularize_oscar = (oscar > 0.0);
-    
-    if (int(regularize_l1) + regularize_l2 + regularize_oscar > 1)
-      throw std::runtime_error("either L1 or L2, OSCAR regularization");
-    if (int(regularize_l1) + regularize_l2 + regularize_oscar == 0)
-      regularize_l2 = true;
-    
     if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
       throw std::runtime_error("either simple/exponential/adagrad");
     if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
       rate_exponential = true;
 
-    if (C <= 0.0)
-      throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     if (scale <= 0.0)
       throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
 
@@ -1087,38 +1087,55 @@ void cicada_learn_regularizer(Rate& rate,
 			      const function_document_type& functions,
 			      weight_set_type& weights)
 {
-  const bool regularize_oscar = (oscar > 0.0);
+  const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
+  const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
+  const bool reg_l1    = (regularize_l1 > 0.0);
+  const bool reg_l2    = (regularize_l2 > 0.0);
 
   if (rda_mode) {
-    if (regularize_l1) {
-      RegularizeRDAL1 regularizer(C);
+    if (reg_oscar) {
+      RegularizeRDAOSCAR regularizer(regularize_l1, regularize_oscar);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else if (regularize_l2) {
-      RegularizeRDAL2 regularizer(C);
+    } else if (reg_l1l2) {
+      RegularizeRDAL1L2 regularizer(regularize_l1, regularize_l2);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else if (regularize_oscar) {
-      RegularizeRDAOSCAR regularizer(C, oscar);
+    } else if (reg_l1) {
+      RegularizeRDAL1 regularizer(regularize_l1);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else
-      throw std::runtime_error("unsupported regularizer");
+    } else if (reg_l2) {
+      RegularizeRDAL2 regularizer(regularize_l2);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
+    } else {
+      RegularizeNone regularizer;
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
+    }
   } else {
-    if (regularize_l1) {
-      RegularizeL1 regularizer(C);
+    if (reg_oscar) {
+      RegularizeOSCAR regularizer(regularize_l1, regularize_oscar);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else if (regularize_l2) {
-      RegularizeL2 regularizer(C);
+    } else if (reg_l1l2) {
+      RegularizeL1L2 regularizer(regularize_l1, regularize_l2);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else if (regularize_oscar) {
-      RegularizeOSCAR regularizer(C, oscar);
+    } else if (reg_l1) {
+      RegularizeL1 regularizer(regularize_l1);
       
       cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
-    } else
-      throw std::runtime_error("unsupported regularizer");
+    } else if (reg_l2) {
+      RegularizeL2 regularizer(regularize_l2);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
+    } else {
+      RegularizeNone regularizer;
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, functions, weights);
+    }
   }
 }
 
@@ -1778,10 +1795,12 @@ void options(int argc, char** argv)
     
     ("learn-softmax", po::bool_switch(&learn_softmax),  "online softmax algorithm")
     ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
-    ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
-    ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C",             po::value<double>(&C)->default_value(C),                     "regularization constant")
-    ("oscar",         po::value<double>(&oscar)->default_value(oscar),             "OSCAR regularization constant")
+
+    ("regularize-l1",     po::value<double>(&regularize_l1),       "L1-regularization")
+    ("regularize-l2",     po::value<double>(&regularize_l2),       "L2-regularization")
+    ("regularize-lambda", po::value<double>(&regularize_lambda),   "regularization constant")
+    ("regularize-oscar",  po::value<double>(&regularize_oscar),    "OSCAR regularization constant")
+    
     ("temperature",   po::value<double>(&temperature)->default_value(temperature), "temperature")
     ("scale",         po::value<double>(&scale)->default_value(scale),             "scaling for weight")
     ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0),           "\\alpha_0 for decay")

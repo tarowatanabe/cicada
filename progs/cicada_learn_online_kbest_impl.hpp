@@ -1296,7 +1296,7 @@ struct LearnOHinge : public LearnOnlineMargin
 
 struct LearnPA : public LearnOnlineMargin
 {
-  LearnPA() : lambda(C) {}
+  LearnPA(const double& __lambda) : lambda(__lambda) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1335,7 +1335,7 @@ struct LearnPA : public LearnOnlineMargin
 
 struct LearnCW : public LearnOnlineMargin
 {
-  LearnCW() : lambda(C) {}
+  LearnCW(const double& __lambda) : lambda(__lambda) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1383,7 +1383,7 @@ struct LearnCW : public LearnOnlineMargin
 
 struct LearnAROW : public LearnOnlineMargin
 {
-  LearnAROW() : lambda(C) {}
+  LearnAROW(const double& __lambda) : lambda(__lambda) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1430,7 +1430,7 @@ struct LearnAROW : public LearnOnlineMargin
 
 struct LearnNHERD : public LearnOnlineMargin
 {
-  LearnNHERD() : lambda(1.0 / C) {}
+  LearnNHERD(const double& __lambda) : lambda(1.0 / __lambda) {}
 
   void initialize(weight_set_type& weights) {}
   
@@ -1539,7 +1539,7 @@ struct LearnMIRA : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnMIRA() : tolerance(0.1), lambda(C) {}
+  LearnMIRA(const double& __lambda) : tolerance(0.1), lambda(__lambda) {}
   
   void initialize(weight_set_type& weights) {}
   
