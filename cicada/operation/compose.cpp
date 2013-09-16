@@ -69,6 +69,13 @@ namespace cicada
 	throw std::runtime_error("Tree composer can work either source or target yield");
 	
       yield_source = source;
+
+      const tree_grammar_type& tree_grammar_compose = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+
+      tree_grammar_type::const_iterator giter_end = tree_grammar_compose.end();
+      for (tree_grammar_type::const_iterator giter = tree_grammar_compose.begin(); giter != giter_end; ++ giter)
+	if (! (*giter)->is_cky())
+	  throw std::runtime_error("tree grammar should be indexed with CKY option");
     }
 
     void ComposeTreeCKY::operator()(data_type& data) const
@@ -165,6 +172,13 @@ namespace cicada
 	throw std::runtime_error("Tree composer can work either source or target yield");
       
       yield_source = source;
+
+      const tree_grammar_type& tree_grammar_compose = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+      
+      tree_grammar_type::const_iterator giter_end = tree_grammar_compose.end();
+      for (tree_grammar_type::const_iterator giter = tree_grammar_compose.begin(); giter != giter_end; ++ giter)
+	if ((*giter)->is_cky())
+	  throw std::runtime_error("tree grammar should not be indexed with CKY option");
     }
 
     void ComposeTree::operator()(data_type& data) const

@@ -95,6 +95,13 @@ namespace cicada
       
       if (! weights)
 	weights = &base_type::weights();
+      
+      const tree_grammar_type& tree_grammar_parse = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+      
+      tree_grammar_type::const_iterator giter_end = tree_grammar_parse.end();
+      for (tree_grammar_type::const_iterator giter = tree_grammar_parse.begin(); giter != giter_end; ++ giter)
+	if (! (*giter)->is_cky())
+	  throw std::runtime_error("tree grammar should be indexed with CKY option");
     }
     
     
@@ -225,6 +232,13 @@ namespace cicada
       
       if (! weights)
 	weights = &base_type::weights();
+      
+      const tree_grammar_type& tree_grammar_parse = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+      
+      tree_grammar_type::const_iterator giter_end = tree_grammar_parse.end();
+      for (tree_grammar_type::const_iterator giter = tree_grammar_parse.begin(); giter != giter_end; ++ giter)
+	if ((*giter)->is_cky())
+	  throw std::runtime_error("tree grammar should not be indexed with CKY option");
     }
     
     
