@@ -38,8 +38,8 @@ OPTIONS
   --scorer=SCORER       scorer for oracle computation (default:
                         bleu:order=4,exact=true)
   --scorer-cube=SIZE    cube size for oracle computation (default: 30)
-  --learn=LEARN         learning algorithms from [softmax, svm, linear,
-                        pegasos, mira, cw, arow, nherd, cp, mcp, xbleu]
+  --learn=LEARN         learning algorithms from [softmax, osoftmax, hinge,
+                        ohinge, el, oel, pa, mira, cw, arow, nherd, xbleu]
                         (default: xbleu)
   --learn-options=OPTION
                         additional learning options

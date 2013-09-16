@@ -57,7 +57,7 @@ opt_parser = OptionParser(
     make_option("--scorer-cube", default=30, action="store", type="int",
                 metavar="SIZE", help="cube size for oracle computation (default: %default)"),
     make_option("--learn", default="xbleu", action="store", type="string",
-                metavar="LEARN", help="learning algorithms from [softmax, svm, linear, hinge, mira, cw, arow, nherd, cp, mcp, xbleu] (default: %default)"),
+                metavar="LEARN", help="learning algorithms from [softmax, osoftmax, hinge, ohinge, el, oel, pa, mira, cw, arow, nherd, xbleu] (default: %default)"),
     make_option("--learn-options", default="", action="store", type="string",
                 metavar="OPTION", help="additional learning options"),
 
