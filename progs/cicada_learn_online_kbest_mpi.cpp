@@ -250,12 +250,18 @@ int main(int argc, char ** argv)
     if (int(learn_xbleu) + learn_mira + learn_softmax + learn_osoftmax + learn_el + learn_oel + learn_hinge + learn_ohinge + learn_pa + learn_cw + learn_arow + learn_nherd== 0)
       learn_softmax = true;
 
-    if (regularize_oscar > 0.0) {
-      if (regularize_l1 < 0.0)
-	throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l1 < 0.0)
+      throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l2 < 0.0)
+      throw std::runtime_error("L2 regularization must be positive or zero");
+    if (regularize_oscar < 0.0)
+      throw std::runtime_error("OSCAR regularization must be positive or zero");
+    if (regularize_lambda < 0.0)
+      throw std::runtime_error("regularization constant must be positive or zero");
+
+    if (regularize_oscar > 0.0)
       if (regularize_l2 > 0.0)
 	throw std::runtime_error("L2 regularization with OSCAR is not supported");
-    }
     
     if (learn_pa || learn_cw || learn_arow || learn_nherd || learn_mira) {
       if (regularize_lambda <= 0.0)

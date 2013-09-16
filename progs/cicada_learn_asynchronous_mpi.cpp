@@ -241,13 +241,19 @@ int main(int argc, char ** argv)
     if (int(learn_xbleu) + learn_softmax == 0)
       learn_xbleu = true;
     
-    if (regularize_oscar > 0.0) {
-      if (regularize_l1 < 0.0)
-	throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l1 < 0.0)
+      throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l2 < 0.0)
+      throw std::runtime_error("L2 regularization must be positive or zero");
+    if (regularize_oscar < 0.0)
+      throw std::runtime_error("OSCAR regularization must be positive or zero");
+    if (regularize_lambda < 0.0)
+      throw std::runtime_error("regularization constant must be positive or zero");
+
+    if (regularize_oscar > 0.0)
       if (regularize_l2 > 0.0)
 	throw std::runtime_error("L2 regularization with OSCAR is not supported");
-    }
-
+    
     if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
       throw std::runtime_error("either simple/exponential/adagrad");
     if (int(rate_exponential) + rate_simple + rate_adagrad == 0)

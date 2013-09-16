@@ -464,6 +464,17 @@ if __name__ == '__main__':
 
     learn_algorithm = Option('--learn-' + options.learn)
     
+    ### regularizer
+    
+    if options.regularize_l1 < 0.0:
+        raise ValueError, "L1 regularization must be positive"
+    if options.regularize_l2 < 0.0:
+        raise ValueError, "L2 regularization must be positive"
+    if options.regularize_lambda < 0.0:
+        raise ValueError, "regularization constant must be positive"
+    if options.regularize_oscar < 0.0:
+        raise ValueError, "OSCAR regularization must be positive"
+    
     qsub.mpirun(Program(cicada_learn,
                         Option('--input', Quoted(options.srcset)),
                         Option('--refset', Quoted(options.refset)),
