@@ -902,13 +902,10 @@ void cicada_learn_regularizer(const Rate& rate,
 			      const scorer_document_type& scorers,
 			      weight_set_type& weights)
 {
-  const bool regularize_none = (learn_pa || learn_cw || learn_arow || learn_nherd || learn_mira);
   const bool regularize_oscar = (oscar > 0.0);
 
   if (rda_mode) {
-    if (regularize_none)
-      cicada_learn_learner(RegularizeNone(), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_l1)
+    if (regularize_l1)
       cicada_learn_learner(RegularizeRDAL1(C), rate, operations, events, events_oracle, scorers, weights);
     else if (regularize_l2)
       cicada_learn_learner(RegularizeRDAL2(C), rate, operations, events, events_oracle, scorers, weights);
@@ -917,9 +914,7 @@ void cicada_learn_regularizer(const Rate& rate,
     else
       throw std::runtime_error("unsupported regularizer");
   } else {
-    if (regularize_none)
-      cicada_learn_learner(RegularizeNone(), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_l1)
+    if (regularize_l1)
       cicada_learn_learner(RegularizeL1(C), rate, operations, events, events_oracle, scorers, weights);
     else if (regularize_l2)
       cicada_learn_learner(RegularizeL2(C), rate, operations, events, events_oracle, scorers, weights);
@@ -937,17 +932,13 @@ void cicada_learn(operation_set_type& operations,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights)
 {
-  const bool rate_none = (learn_pa || learn_cw || learn_arow || learn_nherd || learn_mira);
-  
   size_t instances_rank = 0;
   for (size_t seg = 0; seg != events.size(); ++ seg)
     instances_rank += (! events[seg].empty());
   
   const size_t samples = (instances_rank + batch_size - 1) / batch_size;
   
-  if (rate_none)
-    cicada_learn_regularizer(RateNone(), operations, events, events_oracle, scorers, weights);
-  else if (rate_simple)
+  if (rate_simple)
     cicada_learn_regularizer(RateSimple(eta0), operations, events, events_oracle, scorers, weights);
   else if (rate_exponential)
     cicada_learn_regularizer(RateExponential(alpha0, eta0, samples), operations, events, events_oracle, scorers, weights);
