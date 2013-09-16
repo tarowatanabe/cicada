@@ -250,6 +250,3 @@ Implement rejection sampling
 Merge learning codes
  - There exists duplicated and experimental codes which I don't even
    remember.
-
-Very slow compilation for online-learner
- - Remove template and use virtual function to implement various regularizer/learning rates

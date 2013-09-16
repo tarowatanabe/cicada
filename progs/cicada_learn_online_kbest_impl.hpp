@@ -473,11 +473,10 @@ struct LearnXBLEUBase : public LearnBase
   gradient_type expectation;
 };
 
-template <typename Regularizer, typename Rate>
 struct LearnXBLEU : public LearnXBLEUBase
 {
-  LearnXBLEU(const Regularizer& __regularizer,
-	     const Rate& __rate)
+  LearnXBLEU(Regularize& __regularizer,
+	     Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -530,11 +529,10 @@ struct LearnXBLEU : public LearnXBLEUBase
 
   gradient_xbleu_type g;
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
-template <typename Regularizer, typename Rate>
 struct LearnExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
@@ -548,8 +546,8 @@ struct LearnExpectedLoss : public LearnBase
   typedef cicada::semiring::traits<weight_type> traits_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > expectation_type;
 
-  LearnExpectedLoss(const Regularizer& __regularizer,
-		    const Rate& __rate)
+  LearnExpectedLoss(Regularize& __regularizer,
+		    Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -669,11 +667,10 @@ struct LearnExpectedLoss : public LearnBase
 
   loss_map_type losses;
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
-template <typename Regularizer, typename Rate>
 struct LearnOExpectedLoss : public LearnBase
 {
   // lossfunction based on expected loss
@@ -744,8 +741,8 @@ struct LearnOExpectedLoss : public LearnBase
     const sample_set_type& features;
   };
 
-  LearnOExpectedLoss(const Regularizer& __regularizer,
-		     const Rate& __rate)
+  LearnOExpectedLoss(Regularize& __regularizer,
+		     Rate& __rate)
     : tolerance(0.1),
       regularizer(__regularizer),
       rate(__rate) {}
@@ -918,8 +915,8 @@ struct LearnOExpectedLoss : public LearnBase
 
   double tolerance;
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 struct LearnOnlineMargin : public LearnBase
@@ -1061,12 +1058,11 @@ struct LearnOnlineMargin : public LearnBase
 };
 
 // Pegasos learner
-template <typename Regularizer, typename Rate>
 struct LearnHinge : public LearnOnlineMargin
 {
   
-  LearnHinge(const Regularizer& __regularizer,
-	     const Rate& __rate)
+  LearnHinge(Regularize& __regularizer,
+	     Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -1136,12 +1132,11 @@ struct LearnHinge : public LearnOnlineMargin
     return 0.0;
   }
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 // optimized-Pegasos learner
-template <typename Regularizer, typename Rate>
 struct LearnOHinge : public LearnOnlineMargin
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
@@ -1204,8 +1199,8 @@ struct LearnOHinge : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnOHinge(const Regularizer& __regularizer,
-	      const Rate& __rate)
+  LearnOHinge(Regularize& __regularizer,
+	      Rate& __rate)
     : tolerance(0.1),
       regularizer(__regularizer),
       rate(__rate) {}
@@ -1291,8 +1286,8 @@ struct LearnOHinge : public LearnOnlineMargin
   
   double    tolerance;
 
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
   
   alpha_type    alpha;
   f_type        f;
@@ -1691,13 +1686,12 @@ struct LearnSoftmaxBase : public LearnBase
 
 
 // Softmax learner
-template <typename Regularizer, typename Rate>
 struct LearnSoftmax : public LearnSoftmaxBase
 {
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnSoftmax(const Regularizer& __regularizer,
-	       const Rate& __rate)
+  LearnSoftmax(Regularize& __regularizer,
+	       Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -1767,12 +1761,11 @@ struct LearnSoftmax : public LearnSoftmaxBase
   
   sample_pair_set_type samples;
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 // Softmax learner
-template <typename Regularizer, typename Rate>
 struct LearnOSoftmax : public LearnSoftmaxBase
 {
   typedef std::vector<double, std::allocator<double> >    alpha_type;
@@ -1834,8 +1827,8 @@ struct LearnOSoftmax : public LearnSoftmaxBase
 
   typedef utils::chunk_vector<sample_pair_type, 4096 / sizeof(sample_pair_type), std::allocator<sample_pair_type> > sample_pair_set_type;
     
-  LearnOSoftmax(const Regularizer& __regularizer,
-		const Rate& __rate)
+  LearnOSoftmax(Regularize& __regularizer,
+		Rate& __rate)
     : tolerance(0.1),
       regularizer(__regularizer),
       rate(__rate) {}
@@ -1957,8 +1950,8 @@ struct LearnOSoftmax : public LearnSoftmaxBase
 
   double tolerance;
 
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 struct KBestSentence

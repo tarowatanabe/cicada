@@ -1045,9 +1045,8 @@ void cicada_learn_yield(Learner& learner,
     throw std::runtime_error("invalid yield");
 }
 
-template <typename Regularizer, typename Rate>
-void cicada_learn_learner(const Regularizer& regularizer,
-			  const Rate& rate,
+void cicada_learn_learner(Regularize& regularizer,
+			  Rate& rate,
 			  operation_set_type& operations,
 			  const event_set_type& events,
 			  const event_set_type& events_oracle,
@@ -1075,31 +1074,31 @@ void cicada_learn_learner(const Regularizer& regularizer,
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_xbleu) {
-    LearnXBLEU<Regularizer, Rate> learner(regularizer, rate);
+    LearnXBLEU learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_softmax) {
-    LearnSoftmax<Regularizer, Rate> learner(regularizer, rate);
+    LearnSoftmax learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_osoftmax) {
-    LearnOSoftmax<Regularizer, Rate> learner(regularizer, rate);
+    LearnOSoftmax learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_el) {
-    LearnExpectedLoss<Regularizer, Rate> learner(regularizer, rate);
+    LearnExpectedLoss learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_oel) {
-    LearnOExpectedLoss<Regularizer, Rate> learner(regularizer, rate);
+    LearnOExpectedLoss learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_hinge) {
-    LearnHinge<Regularizer, Rate> learner(regularizer, rate);
+    LearnHinge learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_ohinge) {
-    LearnOHinge<Regularizer, Rate> learner(regularizer, rate);
+    LearnOHinge learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else
@@ -1107,8 +1106,7 @@ void cicada_learn_learner(const Regularizer& regularizer,
   
 }
 
-template <typename Rate>
-void cicada_learn_regularizer(const Rate& rate,
+void cicada_learn_regularizer(Rate& rate,
 			      operation_set_type& operations,
 			      const event_set_type& events,
 			      const event_set_type& events_oracle,
@@ -1118,26 +1116,37 @@ void cicada_learn_regularizer(const Rate& rate,
   const bool regularize_oscar = (oscar > 0.0);
 
   if (rda_mode) {
-    if (regularize_l1)
-      cicada_learn_learner(RegularizeRDAL1(C), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_l2)
-      cicada_learn_learner(RegularizeRDAL2(C), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_oscar)
-      cicada_learn_learner(RegularizeRDAOSCAR(C, oscar), rate, operations, events, events_oracle, scorers, weights);
-    else
+    if (regularize_l1) {
+      RegularizeRDAL1 regularizer(C);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else if (regularize_l2) {
+      RegularizeRDAL2 regularizer(C);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else if (regularize_oscar) {
+      RegularizeRDAOSCAR regularizer(C, oscar);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else
       throw std::runtime_error("unsupported regularizer");
   } else {
-    if (regularize_l1)
-      cicada_learn_learner(RegularizeL1(C), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_l2)
-      cicada_learn_learner(RegularizeL2(C), rate, operations, events, events_oracle, scorers, weights);
-    else if (regularize_oscar)
-      cicada_learn_learner(RegularizeOSCAR(C, oscar), rate, operations, events, events_oracle, scorers, weights);
-    else
+    if (regularize_l1) {
+      RegularizeL1 regularizer(C);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else if (regularize_l2) {
+      RegularizeL2 regularizer(C);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else if (regularize_oscar) {
+      RegularizeOSCAR regularizer(C, oscar);
+      
+      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
+    } else
       throw std::runtime_error("unsupported regularizer");
   }
 }
-
 
 void cicada_learn(operation_set_type& operations,
 		  const event_set_type& events,
@@ -1159,15 +1168,21 @@ void cicada_learn(operation_set_type& operations,
     std::cerr << "# of training instances: " << instances << std::endl;
   
   const size_t samples = (instances + batch_size - 1) / batch_size;
-  
-  if (rate_simple)
-    cicada_learn_regularizer(RateSimple(eta0), operations, events, events_oracle, scorers, weights);
-  else if (rate_exponential)
-    cicada_learn_regularizer(RateExponential(alpha0, eta0, samples), operations, events, events_oracle, scorers, weights);
-  else if (rate_adagrad)
-    cicada_learn_regularizer(RateAdaGrad(eta0), operations, events, events_oracle, scorers, weights);
-  else
-    throw std::runtime_error("unsupported learning rate");
+
+  if (rate_simple) {
+    RateSimple rate(eta0);
+    
+    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
+  } else if (rate_exponential) {
+    RateExponential rate(alpha0, eta0, samples);
+    
+    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
+  } else if (rate_adagrad) {
+    RateAdaGrad rate(eta0);
+    
+    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
+  } else
+    throw std::runtime_error("unsupported learning rate");  
 }
 
 template <typename Learner, typename KBestGenerator, typename OracleGenerator>

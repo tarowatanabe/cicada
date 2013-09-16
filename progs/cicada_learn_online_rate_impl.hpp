@@ -10,8 +10,9 @@
 
 #include <utils/mathop.hpp>
 
-struct RateNone
+class Rate
 {
+public:
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
  
@@ -19,7 +20,19 @@ struct RateNone
   typedef hypergraph_type::feature_set_type    feature_set_type;
   
   typedef feature_set_type::feature_type feature_type;
+  
+public:
+  Rate() {}
+  virtual ~Rate() {}
+  
+  virtual double operator()() const = 0;
 
+  virtual double operator()(const feature_type& feat, const double& grad) const = 0;
+};
+
+class RateNone : public Rate
+{
+public:
   double operator()() const
   {
     return 1.0;
@@ -31,21 +44,14 @@ struct RateNone
   }
 };
 
-struct RateSimple
+class RateSimple : public Rate
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
- 
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
- 
   double eta0_;
   
   double eta_;
   size_type epoch_;
-  
+
+public:  
   RateSimple(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
   double operator()() const
@@ -61,21 +67,14 @@ struct RateSimple
   }
 };
 
-struct RateSqrt
+class RateSqrt : public Rate
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
- 
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
- 
   double eta0_;
   
   double eta_;
   size_type epoch_;
-  
+
+public:  
   RateSqrt(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
   double operator()() const
@@ -91,23 +90,16 @@ struct RateSqrt
   }  
 };
 
-struct RateExponential
+class RateExponential : public Rate
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  
   double alpha0_;
   double eta0_;
   size_type samples0_;
   
   double eta_;
   size_type epoch_;
-  
+
+public:  
   RateExponential(const double& alpha0, const double& eta0, const size_type& samples0) : alpha0_(alpha0), eta0_(eta0), samples0_(samples0), epoch_(0) {}
   
   double operator()() const
@@ -123,16 +115,8 @@ struct RateExponential
   }
 };
 
-struct RateAdaGrad
+class RateAdaGrad : public Rate
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  
   typedef cicada::WeightVector<double> weight_set_type;
 
   double eta0_;
@@ -140,7 +124,8 @@ struct RateAdaGrad
   weight_set_type grads2_;
   double eta_;
   size_type epoch_;
-  
+
+public:  
   RateAdaGrad(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
   double operator()() const

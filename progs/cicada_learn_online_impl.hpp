@@ -693,11 +693,10 @@ struct LearnXBLEUBase : public LearnBase
   entropy_weights_type entropy_inside;
 };
 
-template <typename Regularizer, typename Rate>
 struct LearnXBLEU : public LearnXBLEUBase
 {
-  LearnXBLEU(const Regularizer& __regularizer,
-	     const Rate& __rate)
+  LearnXBLEU(Regularize& __regularizer,
+	     Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -746,8 +745,8 @@ struct LearnXBLEU : public LearnXBLEUBase
   
   gradient_xbleu_type g;
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 // logistic regression base...
@@ -899,11 +898,10 @@ struct LearnSoftmaxBase : public LearnBase
 };
 
 // SoftmaxL2 learner
-template <typename Regularizer, typename Rate>
 struct LearnSoftmax : public LearnSoftmaxBase
 {
-  LearnSoftmax(const Regularizer& __regularizer,
-	       const Rate& __rate)
+  LearnSoftmax(Regularize& __regularizer,
+	       Rate& __rate)
     : regularizer(__regularizer),
       rate(__rate) {}
   
@@ -952,8 +950,8 @@ struct LearnSoftmax : public LearnSoftmaxBase
   }
   
   
-  Regularizer regularizer;
-  Rate        rate;
+  Regularize& regularizer;
+  Rate&       rate;
 };
 
 struct YieldSentence

@@ -15,8 +15,9 @@
 
 #include <utils/mathop.hpp>
 
-struct RegularizeNone
+class Regularize
 {
+public:
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
@@ -27,6 +28,32 @@ struct RegularizeNone
 
   typedef cicada::WeightVector<double> weight_set_type;
 
+public:
+  Regularize() {}
+  virtual ~Regularize() {}
+
+  virtual 
+  double scale() const = 0;
+  
+  virtual
+  void initialize(weight_set_type& weights) = 0;
+  
+  virtual
+  void finalize(weight_set_type& weights) = 0;
+
+  virtual
+  void preprocess(weight_set_type& weights, const double& eta) = 0;
+
+  virtual
+  void update(weight_set_type& weights, const feature_type& feature, const double& amount, const double& eta) = 0;
+  
+  virtual
+  void postprocess(weight_set_type& weights, const double& eta) = 0;
+};
+
+class RegularizeNone : public Regularize
+{
+public:
   double scale() const { return 1.0; }
 
   void initialize(weight_set_type& weights)
@@ -55,18 +82,10 @@ struct RegularizeNone
   }
 };
 
-struct RegularizeL1
+class RegularizeL1 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-
-  typedef cicada::WeightVector<double> penalty_set_type;
-  typedef cicada::WeightVector<double> weight_set_type;
+public:
+  typedef  weight_set_type penalty_set_type;
 
   RegularizeL1(const double lambda)
     : lambda_(lambda), penalties_(), penalty_(0.0) {}
@@ -119,18 +138,10 @@ private:
   double penalty_;
 };
 
-struct RegularizeL1L2
+class RegularizeL1L2 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-
-  typedef cicada::WeightVector<double> penalty_set_type;
-  typedef cicada::WeightVector<double> weight_set_type;
+public:
+  typedef  weight_set_type penalty_set_type;
 
   RegularizeL1L2(const double lambda1, const double lambda2)
     : lambda1_(lambda1), lambda2_(lambda2), penalties_(), penalty_(0.0) {}
@@ -187,18 +198,9 @@ private:
   double penalty_;
 };
 
-struct RegularizeL2
+class RegularizeL2 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
-
+public:
   RegularizeL2(const double lambda) : lambda_(lambda), scale_(1.0), norm_(0.0) {}  
   
   double scale() const { return scale_; }
@@ -266,17 +268,9 @@ private:
 // an online version of OSCAR...
 //
 // Note that the original OSCAR has factor of two, which can be ignored in the computation.
-struct RegularizeOSCAR
+class RegularizeOSCAR : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
+public:
   
   RegularizeOSCAR(const double lambda1, const double lambda2) : lambda1_(lambda1), lambda2_(lambda2) {}
   
@@ -386,18 +380,9 @@ private:
   double lambda2_;
 };
 
-struct RegularizeRDAL1
+class RegularizeRDAL1 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  typedef feature_type::id_type id_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
+public:
 
   RegularizeRDAL1(const double lambda)
     : lambda_(lambda), averaged_(), scale_(1.0), epoch_(0) {}
@@ -430,6 +415,8 @@ struct RegularizeRDAL1
   
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    typedef feature_type::id_type id_type;
+    
     weights.clear();
 
     const double lambda = lambda_;
@@ -454,19 +441,9 @@ private:
   size_type epoch_;
 };
 
-struct RegularizeRDAL1L2
+class RegularizeRDAL1L2 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  typedef feature_type::id_type id_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
-
+public:
   RegularizeRDAL1L2(const double lambda1, const double lambda2)
     : weight_scale_(1.0), lambda1_(lambda1), lambda2_(lambda2), averaged_(), scale_(1.0), epoch_(0) {}
   
@@ -500,6 +477,8 @@ struct RegularizeRDAL1L2
   
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    typedef feature_type::id_type id_type;
+    
     weights.clear();
 
     const double lambda = lambda1_;
@@ -542,19 +521,9 @@ private:
   size_type epoch_;
 };
 
-struct RegularizeRDAL2
+class RegularizeRDAL2 : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  typedef feature_type::id_type id_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
-
+public:
   RegularizeRDAL2(const double lambda)
     : weight_scale_(1.0), lambda_(lambda), averaged_(), scale_(1.0), epoch_(0) {}
   
@@ -588,6 +557,8 @@ struct RegularizeRDAL2
   
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    typedef feature_type::id_type id_type;
+    
     weights.clear();
     
     double norm = 0.0;
@@ -620,19 +591,9 @@ private:
   size_type epoch_;
 };
 
-struct RegularizeRDAOSCAR
+class RegularizeRDAOSCAR : public Regularize
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::HyperGraph hypergraph_type;
-  typedef hypergraph_type::feature_set_type    feature_set_type;
-  
-  typedef feature_set_type::feature_type feature_type;
-  typedef feature_type::id_type id_type;
-
-  typedef cicada::WeightVector<double> weight_set_type;
-
+public:
   RegularizeRDAOSCAR(const double lambda1, const double lambda2)
     : lambda1_(lambda1), lambda2_(lambda2), averaged_(), scale_(1.0), epoch_(0) {}
   
@@ -694,6 +655,8 @@ private:
 public:
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    typedef feature_type::id_type id_type;
+
     weights.clear();
     
     const size_type num_features = feature_type::allocated();
