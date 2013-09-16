@@ -275,6 +275,11 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("OSCAR regularization is not supported");
     }
 
+    if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
+      throw std::runtime_error("either simple/exponential/adagrad");
+    if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
+      rate_exponential = true;
+
     if (scale <= 0.0)
       throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
 
