@@ -27,6 +27,8 @@ struct RegularizeNone
 
   typedef cicada::WeightVector<double> weight_set_type;
 
+  double scale() const { return 1.0; }
+
   void initialize(weight_set_type& weights)
   {
     
