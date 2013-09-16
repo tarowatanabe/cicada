@@ -27,9 +27,14 @@ OPTIONS
                         # of iterations (default: 10)
   --batch=BATCH         mini batch size (default: 8)
   --weights=FILE        initial weights
-  --C=C                 hyperparameter (default: 1e-05)
-  --regularize-l1       L1 regularization
-  --regularize-l2       L2 regularization
+  --regularize-l1=REGULARIZER
+                        L1 regularization
+  --regularize-l2=REGULARIZER
+                        L2 regularization
+  --regularize-lambda=REGULARIZER
+                        regularization hyperparameter
+  --regularize-oscar=REGULARIZER
+                        OSCAR regularization
   --scorer=SCORER       scorer for oracle computation (default:
                         bleu:order=4,exact=true)
   --scorer-cube=SIZE    cube size for oracle computation (default: 30)
