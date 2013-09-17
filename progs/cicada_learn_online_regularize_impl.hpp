@@ -144,55 +144,70 @@ public:
   typedef  weight_set_type penalty_set_type;
 
   RegularizeL1L2(const double lambda1, const double lambda2)
-    : lambda1_(lambda1), lambda2_(lambda2), penalties_(), penalty_(0.0) {}
+    : lambda1_(lambda1), lambda2_(lambda2), scale_(1.0), penalties_(), penalty_(0.0) {}
 
-  double scale() const { return 1.0; }
+  double scale() const { return scale_; }
   
   void initialize(weight_set_type& weights)
   {
-    
+    scale_ = 1.0;
   }
   
   void finalize(weight_set_type& weights)
   {
-    
+    if (scale_ != 1.0)
+      weights *= scale_;
+    scale_ = 1.0;
   }
   
   void preprocess(weight_set_type& weights, const double& eta)
   {
     // rescaling weights!
-    weights *= 1.0 - eta * lambda2_;
-
+    scale_ *= 1.0 - eta * lambda2_;
+    if (scale_ == 0.0) {
+      scale_ = 1.0;
+      std::fill(weights.begin(), weights.end(), 0.0);
+    }
+    
     penalty_ += eta * lambda1_;
   }
 
   void update(weight_set_type& weights, const feature_type& feature, const double& amount, const double& eta)
   {
-    double& x = weights[feature];
-    double& penalty = penalties_[feature];
-    
-    // update...
-    x -= amount * eta;
-    
-    // apply penalties...
-    const double x_half = x;
-    
-    if (x > 0.0)
-      x = std::max(0.0, x - penalty - penalty_);
-    else if (x < 0.0)
-      x = std::min(0.0, x - penalty + penalty_);
-    
-    penalty += x - x_half;
+    weights[feature] -= amount * eta / scale_;
   }
-
+  
   void postprocess(weight_set_type& weights, const double& eta)
   {
+    typedef feature_type::id_type id_type;
     
+    const double factor = 1.0 / scale_;
+    
+    for (id_type id = 0; id != weights.size(); ++ id)
+      if (weights[id] != 0.0) {
+	double& x = weights[id];
+	double& penalty = penalties_[id];
+	
+	// apply penalties...
+	const double x_half = x;
+	
+	if (x > 0.0)
+	  x = std::max(0.0, x - (penalty + penalty_) * factor);
+	else if (x < 0.0)
+	  x = std::min(0.0, x - (penalty - penalty_) * factor);
+	
+	penalty += (x - x_half) * scale_;
+      }
+
+    if (scale_ < 0.001 || 1000 < scale_)
+      finalize(weights);
   }
 
 private:  
   double lambda1_;
   double lambda2_;
+
+  double scale_;
   
   penalty_set_type penalties_;
   double penalty_;
@@ -504,7 +519,7 @@ public:
       weight_scale_ = std::sqrt((1.0 / lambda2_) * (1.0 / norm));
       
       if (weight_scale_ < 0.001 || 1000 < weight_scale_)
-	weights *= weight_scale_;
+	finalize(weights);
     }
     
     ++ epoch_;
@@ -575,7 +590,7 @@ public:
       weight_scale_ = std::sqrt((1.0 / lambda_) * (1.0 / norm));
       
       if (weight_scale_ < 0.001 || 1000 < weight_scale_)
-	weights *= weight_scale_;
+	finalize(weights);
     }
     
     ++ epoch_;
