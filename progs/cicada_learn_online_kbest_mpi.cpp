@@ -269,15 +269,13 @@ int main(int argc, char ** argv)
       
       if (regularize_l1 > 0.0)
 	throw std::runtime_error("L1 regularization is not supported");
-      if (regularize_l2 > 0.0)
-	throw std::runtime_error("L2 regularization is not supported");
       if (regularize_oscar > 0.0)
 	throw std::runtime_error("OSCAR regularization is not supported");
     }
 
     if (line_search_mode)
-      if (regularize_lambda <= 0.0)
-	throw std::runtime_error("hyperparameter constatnt must be positive for line-search");
+      if (regularize_l2 < 0.0)
+	throw std::runtime_error("L2 regularization must be positive or zero for line-search");
 
     if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
       throw std::runtime_error("either simple/exponential/adagrad");
@@ -1286,11 +1284,11 @@ void cicada_learn(Learner& learner,
 	const double dot_prod    = cicada::dot_product(weights_prev, weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_lambda * loss_norm;
-	const double b0_pos = (dot_prod - norm_w_prev) * regularize_lambda * loss_norm;
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_l2 * loss_norm;
+	const double b0_pos = (dot_prod - norm_w_prev) * regularize_l2 * loss_norm;
 	
-	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_lambda * loss_norm;
-	const double b0_neg = (- dot_prod - norm_w_prev) * regularize_lambda * loss_norm;
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_l2 * loss_norm;
+	const double b0_neg = (- dot_prod - norm_w_prev) * regularize_l2 * loss_norm;
 	
 	grad_pos += b0_pos;
 	grad_neg += b0_neg;

@@ -163,7 +163,8 @@ struct OptimizerSGDL1 : public OptimizerBase
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
-    const double factor = 1.0 / instances;
+    //const double factor = 1.0 / instances; // I'm not sure, whether this is correct...
+    const double factor = 1.0;
     const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
