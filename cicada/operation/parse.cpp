@@ -40,6 +40,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	yield_source(false),
 	frontier(false),
 	unique_goal(false),
@@ -78,7 +79,26 @@ namespace cicada
 	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for Tree parser: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -90,6 +110,9 @@ namespace cicada
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
       
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
+
       if (weights || weights_one)
 	weights_fixed = true;
       
@@ -136,6 +159,8 @@ namespace cicada
       
       if (weights_one)
 	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, frontier, unique_goal);
+      else if (! weights_extra.empty())
+	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), lattice, parsed, size, yield_source, frontier, unique_goal);
       else
 	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, frontier, unique_goal);
 	
@@ -180,6 +205,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	yield_source(false),
 	frontier(false),
 	debug(__debug)
@@ -215,7 +241,26 @@ namespace cicada
 	  tree_grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "frontier")
 	  frontier = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for Tree parser: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -226,6 +271,9 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -272,6 +320,8 @@ namespace cicada
       
       if (weights_one)
 	cicada::parse_tree(goal, tree_grammar_parse, grammar_parse, weight_function_one<weight_type>(), hypergraph, parsed, size, yield_source, frontier);
+      else if (! weights_extra.empty())
+	cicada::parse_tree(goal, tree_grammar_parse, grammar_parse, weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), hypergraph, parsed, size, yield_source, frontier);
       else
 	cicada::parse_tree(goal, tree_grammar_parse, grammar_parse, weight_function<weight_type>(*weights_parse), hypergraph, parsed, size, yield_source, frontier);
 	
@@ -315,6 +365,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
@@ -360,7 +411,26 @@ namespace cicada
 	  frontier = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for CKY parser: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -371,6 +441,9 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -409,6 +482,8 @@ namespace cicada
 	
       if (weights_one)
 	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier, unique_goal);
+      else if (! weights_extra.empty())
+	cicada::parse_cky(goal, grammar_parse, weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier, unique_goal);
       else
 	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier, unique_goal);
       
@@ -452,6 +527,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
@@ -494,7 +570,26 @@ namespace cicada
 	  ordered = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "frontier")
 	  frontier = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for agenda parser: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -505,6 +600,9 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -543,6 +641,8 @@ namespace cicada
       
       if (weights_one)
 	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
+      else if (! weights_extra.empty())
+	cicada::parse_agenda(goal, grammar_parse, weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       else
 	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       
@@ -597,6 +697,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
@@ -639,7 +740,26 @@ namespace cicada
 	  goal = piter->second;
 	else if (utils::ipiece(piter->first) == "grammar")
 	  grammar_local.push_back(piter->second);
-	else {
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+	  
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+	  
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else {
 	  namespace qi = boost::spirit::qi;
 	  
 	  std::string::const_iterator iter = piter->first.begin();
@@ -670,6 +790,9 @@ namespace cicada
       
       if (weights || weights_one)
 	weights_fixed = true;
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
 
       if (! weights)
 	weights = &base_type::weights();
@@ -760,6 +883,11 @@ namespace cicada
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
 			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
+      else if (! weights_extra.empty())
+	cicada::parse_coarse(goal,
+			     grammars.begin(), grammars.end(),
+			     thresholds.begin(), thresholds.end(),
+			     weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), lattice, parsed, size, yield_source, treebank, pos_mode, ordered, frontier);
       else
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
@@ -806,6 +934,7 @@ namespace cicada
 	size(200),
 	weights_one(false),
 	weights_fixed(false),
+	weights_extra(),
 	distortion(0),
 	yield_source(false),
 	frontier(false),
@@ -842,7 +971,26 @@ namespace cicada
 	  distortion = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "frontier")
 	  frontier = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for phrase parser: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -853,6 +1001,9 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -895,6 +1046,8 @@ namespace cicada
 #if 0
       if (weights_one)
 	cicada::parse_phrase(goal, grammar_parse, weight_function_one<weight_type>(), size, distortion, lattice, parsed, yield_source, frontier);
+      else if (! weights_extra.empty())
+	cicada::parse_phrase(goal, grammar_parse, weight_function_extra<weight_type>(*weights_parse, weights_extra.begin(), weights_extra.end()), size, distortion, lattice, parsed, yield_source, frontier);
       else
 	cicada::parse_phrase(goal, grammar_parse, weight_function<weight_type>(*weights_parse), size, distortion, lattice, parsed, yield_source, frontier);
 #endif

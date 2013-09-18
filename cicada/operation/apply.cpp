@@ -2,6 +2,11 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+
 #include <iostream>
 
 #include <cicada/parameter.hpp>
@@ -23,7 +28,8 @@ namespace cicada
 		 const model_type& __model,
 		 const int __debug)
       : model(__model), weights(0), weights_assigned(0), size(200), diversity(0.0),
-	weights_one(false), weights_fixed(false), rejection(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
+	weights_one(false), weights_fixed(false), weights_extra(),
+	rejection(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -64,7 +70,26 @@ namespace cicada
 	  weights_one = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "feature" || utils::ipiece(piter->first) == "feature-function")
 	  model_local.push_back(feature_function_type::create(piter->second));
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;
       }
 
@@ -156,6 +181,9 @@ namespace cicada
       
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -211,33 +239,45 @@ namespace cicada
       else if (incremental) {
 	if (weights_one)
 	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	else if (! weights_extra.empty())
+	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
 	else
 	  cicada::apply_incremental(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
       } else if (grow) {
 	if (weights_one)
 	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	else if (! weights_extra.empty())
+	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
 	else
 	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
       } else if (grow_coarse) {
 	if (weights_one)
 	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	else if (! weights_extra.empty())
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
 	else
 	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
       } else {
 	if (diversity != 0.0) {
 	  if (weights_one)
 	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_one<weight_type>(), size, diversity);
+	  else if (! weights_extra.empty())
+	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, diversity);
 	  else
 	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, diversity);
 	} else if (rejection) {
 	  if (weights_one)
 	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_one<weight_type>(), const_cast<sampler_type&>(sampler), size);
+	  else if (! weights_extra.empty())
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), const_cast<sampler_type&>(sampler), size);
 	  else
 	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), const_cast<sampler_type&>(sampler), size);
 	  
 	} else {
 	  if (weights_one)
 	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	  else if (! weights_extra.empty())
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
 	  else
 	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
 	}

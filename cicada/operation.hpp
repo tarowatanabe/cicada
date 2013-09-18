@@ -63,6 +63,9 @@ namespace cicada
 
     typedef cicada::Attribute  attribute_type;
     typedef cicada::Statistics statistics_type;
+
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
     
     typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
     

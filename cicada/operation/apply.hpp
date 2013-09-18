@@ -38,6 +38,8 @@ namespace cicada
       double diversity;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool rejection;
       

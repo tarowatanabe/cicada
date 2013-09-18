@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__EXPECTED_NGRAM__HPP__
@@ -30,6 +30,8 @@ namespace cicada
       const weight_set_type*   weights_assigned;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       double scale;
 

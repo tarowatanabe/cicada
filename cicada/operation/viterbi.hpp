@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__VITERBI__HPP__
@@ -27,6 +27,8 @@ namespace cicada
   
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
 
       bool semiring_tropical;
       bool semiring_logprob;

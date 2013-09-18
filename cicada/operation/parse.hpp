@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__PARSE__HPP__
@@ -38,6 +38,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool yield_source;
       bool frontier;
@@ -70,6 +72,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool yield_source;
       bool frontier;
@@ -98,6 +102,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool yield_source;
       bool treebank;
@@ -130,6 +136,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool yield_source;
       bool treebank;
@@ -168,6 +176,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
       
       bool yield_source;
       bool treebank;
@@ -199,6 +209,8 @@ namespace cicada
       int size;
       bool weights_one;
       bool weights_fixed;
+
+      feature_set_type weights_extra;
 
       int distortion;
       bool yield_source;

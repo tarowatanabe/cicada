@@ -75,6 +75,7 @@ apply: feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|cyk|cky|dep|dependency] binarization direction\n\
 \torder=binarization order (default: -1 == all context. sinonym: order-vertical)\n\
@@ -143,6 +144,7 @@ expected-ngram: expected ngram computation\n\
 \tbos-eos=[true|false] include <s> and </s> in ngrams\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 \tscale=scaling for score\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern (= vertial Markovization + 1. <= 0 for infinity)\n\
@@ -161,6 +163,7 @@ output: kbest or hypergraph output\n\
 \tuniform=[true|false] k-outputs by uniform sampling\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 \tyield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
 \tdebinarize=[true|false] debinarize k-best trees\n\
@@ -186,6 +189,7 @@ parse-agenda: parsing via agenda\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 parse-cky|cyk: parsing via CKY\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
@@ -198,6 +202,7 @@ parse-cky|cyk: parsing via CKY\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 parse-coarse: parsing via coarse-to-fine\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
@@ -207,6 +212,7 @@ parse-coarse: parsing via coarse-to-fine\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] fine grammar\n\
 \tcoarse0=[coarse grammar spec] the first coarse grammar\n\
@@ -223,6 +229,7 @@ parse-phrase: parsing for phrase based grammar\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 parse-tree: parsing for tree-matching\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \tfrontier=[true|false] keep source/target frontier\n\
@@ -232,6 +239,7 @@ parse-tree: parsing for tree-matching\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 parse-tree-cky: parsing for tree-matching\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \tfrontier=[true|false] keep source/target frontier\n\
@@ -241,6 +249,7 @@ parse-tree-cky: parsing for tree-matching\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 \tunique-goal=[true|false] unique goal\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
@@ -252,6 +261,7 @@ posterior: compute posterior features\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
@@ -263,6 +273,7 @@ prune: pruning\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 push-bos-eos: push bos/eos\n\
 push-head: push head (assumes dependency structure)\n\
 push-weights: push weights\n\
@@ -290,6 +301,7 @@ viterbi: compute viterbi tree\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
+\tweight=\"weight=value\" additional weight to the weight vector\n\
 ";
     return desc;
   }

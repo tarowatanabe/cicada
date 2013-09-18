@@ -1,10 +1,12 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__OPERATION__FUNCTIONAL__HPP__
 #define __CICADA__OPERATION__FUNCTIONAL__HPP__ 1
+
+#include <vector>
 
 #include <cicada/operation.hpp>
 #include <cicada/semiring.hpp>
@@ -108,6 +110,42 @@ namespace cicada
       }
     };
 
+    template <typename Weight>
+    struct weight_scaled_function_extra
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+
+      typedef hypergraph_type::feature_set_type feature_set_type;
+      typedef feature_set_type::feature_type    feature_type;
+      
+      typedef std::pair<feature_type, double> feature_value_type;
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_value_set_type;
+      
+      template <typename Iterator>
+      weight_scaled_function_extra(const weight_set_type& __weights, const double& __scale, Iterator first, Iterator last)
+	: weights(__weights), scale(__scale), weights_extra()
+      {
+	for (/**/; first != last; ++ first)
+	  weights_extra.push_back(feature_value_type(first->first, first->second - weights[first->first]));
+      }
+      
+      const weight_set_type& weights;
+      const double scale;
+      feature_value_set_type weights_extra;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x.features, weights_extra.begin(), weights_extra.end(), cicada::dot_product(x.features, weights)) * scale);
+      }
+  
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights_extra.begin(), weights_extra.end(), cicada::dot_product(x, weights)) * scale);
+      }
+    };
 
     template <typename Weight>
     struct weight_scaled_function_one
@@ -154,6 +192,42 @@ namespace cicada
       value_type operator()(const FeatureSet& x) const
       {
 	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights));
+      }
+    };
+
+    template <typename Weight>
+    struct weight_function_extra
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+
+      typedef hypergraph_type::feature_set_type feature_set_type;
+      typedef feature_set_type::feature_type    feature_type;
+      
+      typedef std::pair<feature_type, double> feature_value_type;
+      typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_value_set_type;
+      
+      template <typename Iterator>
+      weight_function_extra(const weight_set_type& __weights, Iterator first, Iterator last)
+	: weights(__weights), weights_extra()
+      {
+	for (/**/; first != last; ++ first)
+	  weights_extra.push_back(feature_value_type(first->first, first->second - weights[first->first]));
+      }
+      
+      const weight_set_type& weights;
+      feature_value_set_type weights_extra;
+
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x.features, weights_extra.begin(), weights_extra.end(), cicada::dot_product(x.features, weights)));
+      }
+  
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights_extra.begin(), weights_extra.end(), cicada::dot_product(x, weights)));
       }
     };
 

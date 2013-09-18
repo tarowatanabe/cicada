@@ -23,7 +23,7 @@ namespace cicada
   namespace operation
   {
     Viterbi::Viterbi(const std::string& parameter, const int __debug)
-      : weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
+      : weights(0), weights_assigned(0), weights_one(false), weights_fixed(false), weights_extra(),
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -49,7 +49,25 @@ namespace cicada
 	    semiring_log = true;
 	  else
 	    throw std::runtime_error("unknown semiring: " + piter->second);
-	
+	} else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
 	} else
 	  std::cerr << "WARNING: unsupported parameter for viterbi: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -60,6 +78,9 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -111,6 +132,17 @@ namespace cicada
 	  cicada::semiring::Log<double> weight;
 	  cicada::viterbi(hypergraph, edges, weight, cicada::operation::edge_traversal(), weight_function_one<cicada::semiring::Log<double> >());
 	}
+      } else if (! weights_extra.empty()) {
+	if (semiring_tropical) {
+	  cicada::semiring::Tropical<double> weight;
+	  cicada::viterbi(hypergraph, edges, weight, cicada::operation::edge_traversal(), weight_function_extra<cicada::semiring::Tropical<double> >(*weights_viterbi, weights_extra.begin(), weights_extra.end()));
+	} else if (semiring_logprob) {
+	  cicada::semiring::Logprob<double> weight;
+	  cicada::viterbi(hypergraph, edges, weight, cicada::operation::edge_traversal(), weight_function_extra<cicada::semiring::Logprob<double> >(*weights_viterbi, weights_extra.begin(), weights_extra.end()));
+	} else {
+	  cicada::semiring::Log<double> weight;
+	  cicada::viterbi(hypergraph, edges, weight, cicada::operation::edge_traversal(), weight_function_extra<cicada::semiring::Log<double> >(*weights_viterbi, weights_extra.begin(), weights_extra.end()));
+	}	
       } else {
 	if (semiring_tropical) {
 	  cicada::semiring::Tropical<double> weight;

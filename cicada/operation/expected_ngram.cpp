@@ -1,6 +1,11 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
 
 #include <iostream>
 
@@ -21,7 +26,9 @@ namespace cicada
   {
     ExpectedNGram::ExpectedNGram(const std::string& parameter, const int __debug)
       : base_type("expected-ngram"),
-	order(0), bos_eos(false), weights(0), weights_assigned(0), weights_one(false),weights_fixed(false), scale(1.0), debug(__debug)
+	order(0), bos_eos(false), weights(0), weights_assigned(0),
+	weights_one(false),weights_fixed(false), weights_extra(),
+	scale(1.0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -40,7 +47,26 @@ namespace cicada
 	  weights_one = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "scale")
 	  scale = utils::lexical_cast<double>(piter->second);
-	else
+	else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
+	} else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
 
@@ -50,6 +76,9 @@ namespace cicada
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
       
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
+
       if (weights || weights_one)
 	weights_fixed = true;
 
@@ -76,6 +105,8 @@ namespace cicada
     
       if (weights_one)
 	cicada::expected_ngram(hypergraph, weight_scaled_function_one<weight_type>(scale), ngram_counts, order, bos_eos);
+      else if (! weights_extra.empty())
+	cicada::expected_ngram(hypergraph, weight_scaled_function_extra<weight_type>(*weights_apply, scale, weights_extra.begin(), weights_extra.end()), ngram_counts, order, bos_eos);
       else
 	cicada::expected_ngram(hypergraph, weight_scaled_function<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos);
 

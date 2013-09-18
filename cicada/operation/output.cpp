@@ -350,15 +350,19 @@ namespace cicada
 				const Operation::id_type id,
 				const Hypergraph& graph,
 				const Operation::weight_set_type* weights,
+				const Operation::feature_set_type& weights_extra,
 				const Sampler& sampler,
 				const Removes& removes,
 				const KBestParam& param)
     {
       typedef cicada::semiring::Logprob<double> weight_type;
       
-      if (weights)
-	kbest_derivations_tree(os, id, graph, weight_function<weight_type>(*weights), sampler, removes, param);
-      else
+      if (weights) {
+	if (! weights_extra.empty())
+	  kbest_derivations_tree(os, id, graph, weight_function_extra<weight_type>(*weights, weights_extra.begin(), weights_extra.end()), sampler, removes, param);
+	else
+	  kbest_derivations_tree(os, id, graph, weight_function<weight_type>(*weights), sampler, removes, param);
+      } else
 	kbest_derivations_tree(os, id, graph, weight_function_one<weight_type>(), sampler, removes, param);
     }
 
@@ -370,21 +374,26 @@ namespace cicada
 			   const Traversal& traversal, 
 			   const Filter& filter,
 			   const Operation::weight_set_type* weights,
+			   const Operation::feature_set_type& weights_extra,
 			   const Sampler& sampler,
 			   const Removes& removes,
 			   const KBestParam& param)
     {
       typedef cicada::semiring::Logprob<double> weight_type;
       
-      if (weights)
-	kbest_derivations(os, id, graph, traversal, weight_function<weight_type>(*weights), filter, sampler, removes, param);
-      else
+      if (weights) {
+	if (! weights_extra.empty())
+	  kbest_derivations(os, id, graph, traversal, weight_function_extra<weight_type>(*weights, weights_extra.begin(), weights_extra.end()), filter, sampler, removes, param);
+	else
+	  kbest_derivations(os, id, graph, traversal, weight_function<weight_type>(*weights), filter, sampler, removes, param);
+      } else
 	kbest_derivations(os, id, graph, traversal, weight_function_one<weight_type>(), filter, sampler, removes, param);
     }
 
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
       : base_type("output"),
-	output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
+	output_data(__output_data), file(), directory(), weights(0), weights_assigned(0),
+	weights_one(false), weights_fixed(false), weights_extra(),
 	kbest_size(0), kbest_unique(false), kbest_sample(false), kbest_uniform(false), diversity(0.0),
 	insertion_prefix(),
 	yield_string(false),
@@ -478,6 +487,25 @@ namespace cicada
 	    yield_span = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
+	} else if (utils::ipiece(piter->first) == "weight") {
+	  namespace qi = boost::spirit::qi;
+	  namespace standard = boost::spirit::standard;
+	  
+	  std::string::const_iterator iter = piter->second.begin();
+	  std::string::const_iterator iter_end = piter->second.end();
+
+	  std::string name;
+	  double      value;
+	  
+	  if (! qi::phrase_parse(iter, iter_end,
+				 qi::lexeme[+(!(qi::lit('=') >> qi::double_ >> (standard::space | qi::eoi))
+					      >> (standard::char_ - standard::space))]
+				 >> '='
+				 >> qi::double_,
+				 standard::blank, name, value) || iter != iter_end)
+	    throw std::runtime_error("weight parameter parsing failed");
+	  
+	  weights_extra[name] = value;
 	} else
 	  std::cerr << "WARNING: unsupported parameter for output: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -485,6 +513,9 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+
+      if (weights_one && ! weights_extra.empty())
+	throw std::runtime_error("you have extra weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
@@ -727,6 +758,7 @@ namespace cicada
 			      alignment_feature_traversal(),
 			      kbest_alignment_filter_unique(hypergraph),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -735,6 +767,7 @@ namespace cicada
 			      dependency_feature_traversal(),
 			      kbest_dependency_filter_unique(hypergraph),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -743,6 +776,7 @@ namespace cicada
 			      span_feature_traversal(),
 			      kbest_span_filter_unique(hypergraph),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -751,6 +785,7 @@ namespace cicada
 			      sentence_feature_traversal(insertion_prefix),
 			      kbest_sentence_filter_unique(hypergraph),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -759,12 +794,14 @@ namespace cicada
 			      sentence_pos_feature_traversal(insertion_prefix),
 			      kbest_sentence_filter_unique(hypergraph),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
 	  else
 	    kbest_derivations_tree(os, id, hypergraph,
 				   weights_kbest,
+				   weights_extra,
 				   sampler,
 				   removes,
 				   param);
@@ -774,6 +811,7 @@ namespace cicada
 			      alignment_feature_traversal(),
 			      kbest_alignment_filter(),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -782,6 +820,7 @@ namespace cicada
 			      dependency_feature_traversal(),
 			      kbest_dependency_filter(),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -790,6 +829,7 @@ namespace cicada
 			      span_feature_traversal(),
 			      kbest_span_filter(),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -798,6 +838,7 @@ namespace cicada
 			      sentence_feature_traversal(insertion_prefix),
 			      kbest_sentence_filter(),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
@@ -806,12 +847,14 @@ namespace cicada
 			      sentence_pos_feature_traversal(insertion_prefix),
 			      kbest_sentence_filter(),
 			      weights_kbest,
+			      weights_extra,
 			      sampler,
 			      removes,
 			      param);
 	  else
 	    kbest_derivations_tree(os, id, hypergraph,
 				   weights_kbest,
+				   weights_extra,
 				   sampler,
 				   removes,
 				   param);
