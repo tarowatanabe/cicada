@@ -24,6 +24,8 @@ public:
 public:
   Rate() {}
   virtual ~Rate() {}
+
+  virtual Rate* clone() const = 0;
   
   virtual double operator()() const = 0;
 
@@ -33,6 +35,9 @@ public:
 class RateNone : public Rate
 {
 public:
+  
+  Rate* clone() const { return new RateNone(*this); }
+
   double operator()() const
   {
     return 1.0;
@@ -54,6 +59,8 @@ class RateSimple : public Rate
 public:  
   RateSimple(const double& eta0) : eta0_(eta0), epoch_(0) {}
   
+  Rate* clone() const { return new RateSimple(*this); }
+
   double operator()() const
   {
     const_cast<double&>(eta_) = eta0_ / (epoch_ + 1);
@@ -76,6 +83,8 @@ class RateSqrt : public Rate
 
 public:  
   RateSqrt(const double& eta0) : eta0_(eta0), epoch_(0) {}
+
+  Rate* clone() const { return new RateSqrt(*this); }
   
   double operator()() const
   {
@@ -101,6 +110,8 @@ class RateExponential : public Rate
 
 public:  
   RateExponential(const double& alpha0, const double& eta0, const size_type& samples0) : alpha0_(alpha0), eta0_(eta0), samples0_(samples0), epoch_(0) {}
+
+  Rate* clone() const { return new RateExponential(*this); }
   
   double operator()() const
   {
@@ -127,6 +138,8 @@ class RateAdaGrad : public Rate
 
 public:  
   RateAdaGrad(const double& eta0) : eta0_(eta0), epoch_(0) {}
+
+  Rate* clone() const { return new RateAdaGrad(*this); }
   
   double operator()() const
   {

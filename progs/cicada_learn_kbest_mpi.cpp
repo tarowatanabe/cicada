@@ -77,10 +77,11 @@ int iteration = 100;
 bool learn_softmax = false;
 bool learn_xbleu = false;
 bool learn_mira = false;
+bool learn_pa = false;
 bool learn_nherd = false;
 bool learn_arow = false;
 bool learn_cw = false;
-bool learn_pegasos = false;
+bool learn_hinge = false;
 bool learn_cp = false;
 bool learn_mcp = false;
 
@@ -88,12 +89,21 @@ bool optimize_lbfgs = false;
 bool optimize_cg = false;
 bool optimize_sgd = false;
 
-bool regularize_l1 = false;
-bool regularize_l2 = false;
-double C = 1.0;
+double regularize_l1 = 0.0;
+double regularize_l2 = 0.0;
+double regularize_lambda = 0.0;
+double regularize_oscar = 0.0;
+
 double scale = 1.0;
+double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
+
+bool rate_simple = false;
+bool rate_exponential = false;
+bool rate_adagrad = false;
+
+bool rda_mode = false;
 
 bool annealing_mode = false;
 bool quenching_mode = false;
@@ -157,7 +167,7 @@ template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
-template <typename Optimize, typename Generator>
+template <typename Generator>
 double optimize_online(const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
@@ -198,9 +208,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_softmax) + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_mcp + learn_nherd + learn_xbleu > 1)
-      throw std::runtime_error("eitehr learn-{softmax,mira,arow,cw,pegasos,cp,mcp,nherd,xbleu}");
-    if (int(learn_softmax) + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_cp + learn_mcp + learn_nherd + learn_xbleu == 0)
+    if (int(learn_softmax) + learn_mira + learn_pa + learn_arow + learn_cw + learn_hinge + learn_cp + learn_mcp + learn_nherd + learn_xbleu > 1)
+      throw std::runtime_error("eitehr learn-{softmax,mira,pa, arow,cw,hinge,cp,mcp,nherd,xbleu}");
+    if (int(learn_softmax) + learn_mira + learn_pa + learn_arow + learn_cw + learn_hinge + learn_cp + learn_mcp + learn_nherd + learn_xbleu == 0)
       learn_softmax = true;
 
     if (int(optimize_lbfgs) + optimize_cg + optimize_sgd > 1)
@@ -208,18 +218,38 @@ int main(int argc, char ** argv)
     if (int(optimize_lbfgs) + optimize_cg + optimize_sgd == 0)
       optimize_lbfgs = true;
 
-    if (regularize_l1 && regularize_l2)
-      throw std::runtime_error("either L1 or L2 regularization");
-    if (int(regularize_l1) + regularize_l2 == 0)
-      regularize_l2 = true;
+    if (regularize_l1 < 0.0)
+      throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l2 < 0.0)
+      throw std::runtime_error("L2 regularization must be positive or zero");
+    if (regularize_oscar < 0.0)
+      throw std::runtime_error("OSCAR regularization must be positive or zero");
+    if (regularize_lambda < 0.0)
+      throw std::runtime_error("regularization constant must be positive or zero");
+    
+    if (regularize_oscar > 0.0)
+      if (regularize_l2 > 0.0)
+	throw std::runtime_error("L2 regularization with OSCAR is not supported");
+
+    if (learn_cw || learn_arow || learn_nherd || learn_mira || learn_pa) {
+      if (regularize_lambda <= 0.0)
+	throw std::runtime_error("hyperparameter constant must be positive");
+      
+      if (regularize_l1 > 0.0)
+	throw std::runtime_error("L1 regularization is not supported");
+      if (regularize_oscar > 0.0)
+	throw std::runtime_error("OSCAR regularization is not supported");
+    }
+
+    if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
+      throw std::runtime_error("either simple/exponential/adagrad");
+    if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
+      rate_exponential = true;
 
     if (learn_xbleu && optimize_sgd)
       throw std::runtime_error("optimize XBLEU usign SGD is not implemeneted");
-    if (regularize_l1 && optimize_cg)
+    if (regularize_l1 > 0.0 && optimize_cg)
       throw std::runtime_error("optimize via CG with L1 regularization is not implemented");
-
-    if (C <= 0.0)
-      throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
 
     if (scale <= 0.0)
       throw std::runtime_error("scaling must be positive: " + utils::lexical_cast<std::string>(scale));
@@ -339,30 +369,14 @@ int main(int argc, char ** argv)
 
     if (learn_xbleu)
       objective = optimize_xbleu<ObjectiveXBLEU>(kbests, scorers, weights);
-    else if (learn_softmax) {
-      if (optimize_sgd) {
-	if (regularize_l1)
-	  objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(scorers, kbests, oracles, kbest_map, weights, generator);
-	else
-	  objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(scorers, kbests, oracles, kbest_map, weights, generator);
-      } else
-	objective = optimize_batch<ObjectiveSoftmax>(kbests, oracles, weights);
-    } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(scorers, kbests, oracles, kbest_map, weights, generator);
-    else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(scorers, kbests, oracles, kbest_map, weights, generator);
-    else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(scorers, kbests, oracles, kbest_map, weights, generator);
-    else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(scorers, kbests, oracles, kbest_map, weights, generator);
-    else if (learn_nherd)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(scorers, kbests, oracles, kbest_map, weights, generator);
+    else if (learn_softmax && ! optimize_sgd)
+      objective = optimize_batch<ObjectiveSoftmax>(kbests, oracles, weights);
     else if (learn_cp)
       objective = optimize_cp<OptimizeCP>(scorers, kbests, oracles, kbest_map, weights_history, weights);
     else if (learn_mcp)
-      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, weights_history, weights);
+      objective = optimize_cp<OptimizeMCP>(scorers, kbests, oracles, kbest_map, weights_history, weights);  
     else
-      throw std::runtime_error("invlaid optimization objective");
+      objective = optimize_online(scorers, kbests, oracles, kbest_map, weights, generator);
 
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
@@ -678,7 +692,7 @@ struct OptimizeOnline
   template <typename Iterator>
   weight_type function(Iterator first, Iterator last, const double init) const
   {
-    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale + init);
+    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.scale() + init);
   }
   
   template <typename Iterator>
@@ -967,8 +981,9 @@ struct OptimizeOnlineMargin
     
     for (size_t id = 0; id != ids.size(); ++ id)
       ids[id] = id;
-
-    optimizer.instances = losses.size();
+    
+    // how to handle this...!
+    //optimizer.instances = losses.size();
   }
   
   typedef Optimizer optimizer_type;
@@ -1045,7 +1060,7 @@ struct OptimizeOnlineMargin
   template <typename Iterator>
   double function(Iterator first, Iterator last)
   {
-    return cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale;
+    return cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.scale();
   }
   
   void operator()(const hypothesis_set_type& oracles,
@@ -1232,8 +1247,106 @@ void reduce_points(Points& points)
   }
 }
 
-template <typename Optimize, typename Generator>
+template <typename Optimize, typename Optimizer, typename Generator>
+double optimize_online(Optimizer& optimizer,
+		       const scorer_document_type& scorers,
+		       const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       const kbest_map_type& kbest_map,
+		       weight_set_type& weights,
+		       Generator& generator);
+
+template <typename Generator>
 double optimize_online(const scorer_document_type& scorers,
+		       const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       const kbest_map_type& kbest_map,
+		       weight_set_type& weights,
+		       Generator& generator)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  size_t samples_rank = 0;
+  for (size_t id = 0; id != kbests.size(); ++ id)
+    samples_rank += ! kbests[id].empty() && ! oracles[id].empty();
+  
+  size_t samples = 0;
+  MPI::COMM_WORLD.Allreduce(&samples_rank, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+  
+  boost::shared_ptr<Regularize> regularize;
+  boost::shared_ptr<Rate> rate;
+  
+  const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
+  const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
+  const bool reg_l1    = (regularize_l1 > 0.0);
+  const bool reg_l2    = (regularize_l2 > 0.0);
+  
+  if (rda_mode) {
+    if (reg_oscar)
+      regularize.reset(new RegularizeRDAOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularize.reset(new RegularizeRDAL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularize.reset(new RegularizeRDAL1(regularize_l1));
+    else if (reg_l2)
+      regularize.reset(new RegularizeRDAL2(regularize_l2));
+    else
+      regularize.reset(new RegularizeNone());
+  } else {
+    if (reg_oscar)
+      regularize.reset(new RegularizeOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularize.reset(new RegularizeL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularize.reset(new RegularizeL1(regularize_l1));
+    else if (reg_l2)
+      regularize.reset(new RegularizeL2(regularize_l2));
+    else
+      regularize.reset(new RegularizeNone());
+  }
+
+  if (rate_simple)
+    rate.reset(new RateSimple(eta0));
+  else if (rate_exponential)
+    rate.reset(new RateExponential(alpha0, eta0, samples));
+  else if (rate_adagrad)
+    rate.reset(new RateAdaGrad(eta0));
+  else
+    throw std::runtime_error("unsupported learning rate");
+  
+  if (learn_softmax) {
+    OptimizerSoftmax optimizer(regularize, rate);
+
+    return optimize_online<OptimizeOnline<OptimizerSoftmax> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else if (learn_hinge) {
+    OptimizerHinge optimizer(regularize, rate);
+
+    return optimize_online<OptimizeOnlineMargin<OptimizerHinge> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else if (learn_mira || learn_pa) {
+    OptimizerMIRA optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else if (learn_arow) {
+    OptimizerAROW optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else if (learn_cw) {
+    OptimizerCW optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerCW> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else if (learn_nherd) {
+    OptimizerNHERD optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(optimizer, scorers, kbests, oracles, kbest_map, weights, generator);
+  } else
+    throw std::runtime_error("invlaid optimization algorithm");
+
+}
+
+template <typename Optimize, typename Optimizer, typename Generator>
+double optimize_online(Optimizer& optimizer,
+		       const scorer_document_type& scorers,
 		       const hypothesis_map_type& kbests,
 		       const hypothesis_map_type& oracles,
 		       const kbest_map_type& kbest_map,
@@ -1247,15 +1360,7 @@ double optimize_online(const scorer_document_type& scorers,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  size_t instances_local = 0;
-  for (size_t id = 0; id != kbests.size(); ++ id)
-    instances_local += ! kbests[id].empty() && ! oracles[id].empty();
-  
-  size_t instances = 0;
-  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
 
-  optimizer_type optimizer(instances, C);
   Optimize opt(optimizer, kbests, oracles);
 
   const double norm_local = opt.normalizer();
@@ -1337,11 +1442,11 @@ double optimize_online(const scorer_document_type& scorers,
 	const double dot_prod    = cicada::dot_product(weights_prev, optimizer.weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * norm;
-	const double b0_pos = (dot_prod - norm_w_prev) * C * norm;
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_lambda * norm;
+	const double b0_pos = (dot_prod - norm_w_prev) * regularize_lambda * norm;
 	
-	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * norm;
-	const double b0_neg = (- dot_prod - norm_w_prev) * C * norm;
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_lambda * norm;
+	const double b0_neg = (- dot_prod - norm_w_prev) * regularize_lambda * norm;
 
 	//std::cerr << "a0: "  << a0 << " b0: " << b0 << std::endl;
 	
@@ -1436,13 +1541,15 @@ double optimize_online(const scorer_document_type& scorers,
       MPI::COMM_WORLD.Reduce(&objective_local, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       objective /= norm;
       
-      if (regularize_l2)
-	objective += 0.5 * C * cicada::dot_product(optimizer.weights, optimizer.weights);
-      else {
+      // fix me!
+      if (regularize_l2 > 0.0)
+	objective += 0.5 * regularize_l2 * cicada::dot_product(optimizer.weights, optimizer.weights);
+      
+      if (regularize_l1 > 0.0) {
 	double norm = 0.0;
 	for (size_t i = 0; i < optimizer.weights.size(); ++ i)
 	  norm += std::fabs(optimizer.weights[i]);
-	objective += C * norm;
+	objective += regularize_l1 * norm;
       }
       
       increased = utils::bithack::branch(iter && (objective > objective_prev), increased + 1, 0);
@@ -2849,8 +2956,8 @@ double optimize_cp(const scorer_document_type& scorers,
       typename Optimize::template HMatrix<weight_queue_type> H(a);
       typename Optimize::template MMatrix<weight_queue_type> M(a);
       
-      objective_reduced = solver(alpha, f, H, M, 1.0 / C, 1e-5);
-      objective_reduced *= - C;
+      objective_reduced = solver(alpha, f, H, M, 1.0 / regularize_lambda, 1e-5);
+      objective_reduced *= - regularize_lambda;
       
       weights.clear();
       active_size = 0;
@@ -2896,11 +3003,11 @@ double optimize_cp(const scorer_document_type& scorers,
 	const double dot_prod    = cicada::dot_product(weights_prev, weights);
 	const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
 	
-	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * opt.samples;
-	const double b0_pos = (dot_prod - norm_w_prev) * C * opt.samples;
+	const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_lambda * opt.samples;
+	const double b0_pos = (dot_prod - norm_w_prev) * regularize_lambda * opt.samples;
 	
-	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * opt.samples;
-	const double b0_neg = (- dot_prod - norm_w_prev) * C * opt.samples;
+	const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_lambda * opt.samples;
+	const double b0_neg = (- dot_prod - norm_w_prev) * regularize_lambda * opt.samples;
 	
 	grad_pos += b0_pos;
 	grad_neg += b0_neg;
@@ -3191,7 +3298,7 @@ double optimize_cp(const scorer_document_type& scorers,
 	
 	line_search_type line_search;
         
-        const optimum_type optimum = line_search(segments, line_search_type::RegularizeL2(C, origin, direction), 0.01, 2.0);
+        const optimum_type optimum = line_search(segments, line_search_type::RegularizeL2(regularize_lambda, origin, direction), 0.01, 2.0);
 	
         const double update = (optimum.lower + optimum.upper) * 0.5;
         
@@ -3245,7 +3352,7 @@ double optimize_cp(const scorer_document_type& scorers,
     objective_master -= (objective_master_local.second.first ? objective_master_local.second.first->loss() : 0.0);
     objective_master += (objective_master_local.second.second ? objective_master_local.second.second->loss() : 0.0);
     
-    objective_master += 0.5 * C * cicada::dot_product(weights, weights);
+    objective_master += 0.5 * regularize_lambda * cicada::dot_product(weights, weights);
 
     if (objective_master <= objective_master_min) {
       weights_min = weights;
@@ -4043,8 +4150,8 @@ struct ObjectiveSoftmax
     double objective = 0.0;
     MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
     
-        // L2...
-    if (regularize_l2) {
+    // L2...
+    if (lambda > 0.0) {
       double norm = 0.0;
       for (int i = 0; i < n; ++ i) {
 	g[i] += lambda * x[i];
@@ -4141,12 +4248,12 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
-    Objective objective(kbests, features, scorers, weights, C, instances, feature_scale);
+    Objective objective(kbests, features, scorers, weights, regularize_l2, instances, feature_scale);
 
     double result = 0.0;
     
     if (optimize_lbfgs) {
-      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0, 1);
+      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1, 1);
       
       result = optimize_xbleu(optimizer, weights, feature_scale);
     } else if (optimize_cg) {
@@ -4248,12 +4355,12 @@ double optimize_batch(const hypothesis_map_type& kbests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
-    Objective objective(samples, weights, C, instances);
+    Objective objective(samples, weights, regularize_l2, instances);
 
     double result = 0.0;
     
     if (optimize_lbfgs) {
-      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0);
+      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1);
       
       result = optimizer(weights.size(), &(*weights.begin()));
     } else if (optimize_cg) {
@@ -5233,10 +5340,11 @@ void options(int argc, char** argv)
     ("learn-softmax", po::bool_switch(&learn_softmax), "Softmax objective")
     ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU objective")
     ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
+    ("learn-pa",      po::bool_switch(&learn_pa),      "online PA algorithm (synonym to MIR)")
     ("learn-nherd",   po::bool_switch(&learn_nherd),   "online NHERD algorithm")
     ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
-    ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
+    ("learn-hinge",   po::bool_switch(&learn_hinge),   "hinge objective with SGD")
     ("learn-cp",      po::bool_switch(&learn_cp),      "cutting plane algorithm")
     ("learn-mcp",     po::bool_switch(&learn_mcp),     "MERT by cutting plane algorithm")
     
@@ -5244,14 +5352,22 @@ void options(int argc, char** argv)
     ("optimize-cg",    po::bool_switch(&optimize_cg),    "CG optimizer")
     ("optimize-sgd",   po::bool_switch(&optimize_sgd),   "SGD optimizer")
 
-    ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
-    ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
+    ("regularize-l1",     po::value<double>(&regularize_l1),       "L1-regularization")
+    ("regularize-l2",     po::value<double>(&regularize_l2),       "L2-regularization")
+    ("regularize-lambda", po::value<double>(&regularize_lambda),   "regularization constant")
+    ("regularize-oscar",  po::value<double>(&regularize_oscar),    "OSCAR regularization constant")
     
-    ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
-    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
-    ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
-    ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+    ("scale",         po::value<double>(&scale)->default_value(scale),   "scaling for weight")
+    ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0), "\\alpha_0 for decay")
+    ("eta0",          po::value<double>(&eta0),                          "\\eta_0 for decay")
+    ("order",         po::value<int>(&order)->default_value(order),     "ngram order for xBLEU")
     
+    ("rate-exponential", po::bool_switch(&rate_exponential),  "exponential learning rate")
+    ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
+    ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
+    
+    ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")
+
     ("annealing", po::bool_switch(&annealing_mode), "annealing")
     ("quenching", po::bool_switch(&quenching_mode), "quenching")
     

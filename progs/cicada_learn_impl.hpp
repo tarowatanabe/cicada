@@ -9,6 +9,7 @@
 #define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
@@ -21,6 +22,9 @@
 #include "cicada/dot_product.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/eval.hpp"
+
+#include "cicada_learn_online_regularize_impl.hpp"
+#include "cicada_learn_online_rate_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -40,200 +44,132 @@ typedef cicada::WeightVector<double>   weight_set_type;
 
 struct OptimizerBase
 {
-  OptimizerBase() {}
-  
+  typedef OptimizerBase base_type;
+
   typedef cicada::semiring::Log<double> weight_type;
   typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
   typedef cicada::WeightVector<weight_type >  expectation_type;
-};
 
+  OptimizerBase() : samples(0), objective(0.0), weights() {}
 
-struct OptimizerSGDL2 : public OptimizerBase
-{
-  OptimizerSGDL2(const size_t& __instances,
-		 const double& C) : instances(__instances), samples(0), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
-  
   void initialize()
   {
     samples = 0;
-    
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
-    
     objective = 0.0;
   }
+
   void finalize()
   {
-    weights *= weight_scale;
     
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
   }
 
+  size_t samples;
+  double objective;
+  weight_set_type weights;
+};
+
+struct OptimizerSoftmax : public OptimizerBase
+{
+  OptimizerSoftmax(Regularize& __regularizer, Rate&  __rate)
+    : regularizer(__regularizer.clone()),
+      rate(__rate.clone()) {}
+  OptimizerSoftmax(const boost::shared_ptr<Regularize>& __regularizer, const boost::shared_ptr<Rate>&  __rate)
+    : regularizer(__regularizer->clone()),
+      rate(__rate->clone()) {}  
+  OptimizerSoftmax(const OptimizerSoftmax& x)
+    : base_type(static_cast<const base_type&>(x)),
+      regularizer(x.regularizer->clone()),
+      rate(x.rate->clone()) {}
+  OptimizerSoftmax& operator=(const OptimizerSoftmax& x)
+  {
+    static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+    
+    regularizer.reset(x.regularizer->clone());
+    rate.reset(x.rate->clone());
+    
+    return *this;
+  }
+  
+  void initialize()
+  {
+    base_type::initialize();
+    
+    regularizer->initialize(weights);
+  }
+  
+  void finalize()
+  {
+    base_type::finalize();
+ 
+    regularizer->finalize(weights);
+  }
+
+  double scale() const { return regularizer->scale(); }
+
+  gradient_type updates;
   
   void operator()(const gradient_type& correct, 
 		  const gradient_type& gradient, 
 		  const weight_type& Z_correct,
 		  const weight_type& Z)
   {
-    //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
-    //const double eta = 1.0 / (lambda * (epoch + 2));
-    const double factor = 1.0;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
-    ++ epoch;
-    
-    rescale(1.0 - eta * lambda);
+    const double eta = rate->operator()();
 
+    regularizer->preprocess(weights, eta);
+    
+    updates.clear();
+    
     gradient_type::const_iterator citer_end = correct.end();
     for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer)
-      update(weights[citer->first], double(citer->second) * eta * factor);
+      updates[citer->first] -= citer->second;
     
     gradient_type::const_iterator miter_end = gradient.end();
     for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter)
-      update(weights[miter->first], - double(miter->second) * eta * factor);
-    
-    
-    // projection...
-    if (weight_norm > 1.0 / lambda)
-      rescale(std::sqrt(1.0 / (lambda * weight_norm)));
-    
-    objective += double(log(Z_correct) - log(Z)) * weight_scale;
-    
-    if (weight_scale < 0.001 || 1000 < weight_scale) {
-      weights *= weight_scale;
-      weight_scale = 1.0;
-      weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+      updates[miter->first] += miter->second;
+
+    gradient_type::const_iterator uiter_end = updates.end();
+    for (gradient_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter) {
+      const double amount = uiter->second;
+      
+      regularizer->update(weights, uiter->first, amount, rate->operator()(uiter->first, amount));
     }
+    
+    regularizer->postprocess(weights, eta);
+    
+    objective += double(log(Z_correct) - log(Z)) * regularizer->scale();
     
     ++ samples;
   }
-
-  void update(double& x, const double& alpha)
-  {
-    weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-    x += alpha / weight_scale;
-  }
   
-  void rescale(const double scaling)
-  {
-    weight_norm *= scaling * scaling;
-    if (scaling != 0.0)
-      weight_scale *= scaling;
-    else {
-      weight_scale = 1.0;
-      std::fill(weights.begin(), weights.end(), 0.0);
-    }
-  }
-  
-  size_t instances;
-  size_t samples;
-  size_t epoch;
-  double lambda;
-  
-  double weight_scale;
-  double weight_norm;
-  
-  double objective;
-  weight_set_type weights;
-};
-
-
-struct OptimizerSGDL1 : public OptimizerBase
-{
-  typedef cicada::WeightVector<double> penalty_set_type;
-
-  OptimizerSGDL1(const size_t& __instances, const double& C)
-    : instances(__instances), samples(0), epoch(0), lambda(C), penalties(), penalty(0.0), weight_scale(1.0) {}
-
-  void initialize()
-  {
-    samples = 0;
-    objective = 0.0;
-    weight_scale = 1.0;
-  }
-  void finalize()
-  {
-
-  }
-  
-  void operator()(const gradient_type& correct, 
-		  const gradient_type& gradient, 
-		  const weight_type& Z_correct,
-		  const weight_type& Z)
-  {
-    //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
-    //const double eta = 1.0 / (lambda * (epoch + 2));
-    //const double factor = 1.0 / instances; // I'm not sure, whether this is correct...
-    const double factor = 1.0;
-    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
-    ++ epoch;
-    
-    penalty += eta * lambda;
-    
-    gradient_type::const_iterator citer_end = correct.end();
-    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
-      weights[citer->first] += eta * double(citer->second) * factor;
-      apply(weights[citer->first], penalties[citer->first], penalty);
-    }
-    
-    gradient_type::const_iterator miter_end = gradient.end();
-    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter) {
-      weights[miter->first] -= eta * double(miter->second) * factor;
-      apply(weights[miter->first], penalties[miter->first], penalty);
-    }
-    
-    objective += double(log(Z_correct) - log(Z));
-    ++ samples;
-  }
-  
-  void apply(double& x, double& penalty, const double& cummulative)
-  {
-    const double x_half = x;
-    if (x > 0.0)
-      x = std::max(0.0, x - penalty - cummulative);
-    else if (x < 0.0)
-      x = std::min(0.0, x - penalty + cummulative);
-    penalty += x - x_half;
-  }
-  
-  size_t instances;
-  size_t samples;
-  size_t epoch;
-  double lambda;
-  
-  penalty_set_type penalties;
-  double penalty;
-  
-  double objective;
-  weight_set_type weights;
-  double weight_scale;
+  boost::shared_ptr<Regularize> regularizer;
+  boost::shared_ptr<Rate> rate;
 };
 
 struct OptimizerMIRA : public OptimizerBase
 {
-  OptimizerMIRA(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C) {}
+  OptimizerMIRA(const double& __lambda) : lambda(__lambda) {}
 
   void initialize()
   {
-    samples = 0;
-    objective = 0.0;
-    weight_scale = 1.0;
+    base_type::initialize();
   }
+  
   void finalize()
   {
-    
+    base_type::finalize();
   }
+  
+  double scale() const { return 1.0; }
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
-    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double margin   = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, first, last, 0.0);
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+    const double alpha = std::max(0.0, std::min(1.0 / lambda, (loss - margin) / variance));
     
     if (alpha > 1e-10) {
       for (/**/; first != last; ++ first)
@@ -249,12 +185,12 @@ struct OptimizerMIRA : public OptimizerBase
   {
     const feature_set_type features(features_reward - features_penalty);
     
-    const double margin = cicada::dot_product(weights, features);
+    const double margin   = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, features);
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+    const double alpha = std::max(0.0, std::min(1.0 / lambda, (loss - margin) / variance));
     
     if (alpha > 1e-10) {
       feature_set_type::const_iterator fiter_end = features.end();
@@ -263,49 +199,40 @@ struct OptimizerMIRA : public OptimizerBase
     }
     ++ samples;
   }
-  
-  size_t instances;
-  size_t samples;
-  
-  double objective;
-  weight_set_type weights;
-  double weight_scale;
+
   double lambda;
 };
 
 struct OptimizerNHERD : public OptimizerBase
 {
-  OptimizerNHERD(const size_t& __instances,
-		 const double& C) : instances(__instances), samples(0), lambda(C) {}
+  OptimizerNHERD(const double& __lambda) : lambda(1.0 / __lambda) {}
 
   void initialize()
   {
-    samples = 0;
-    objective = 0.0;
-    weight_scale = 1.0;
+    base_type::initialize();
   }
   
   void finalize()
   {
-    
+    base_type::finalize();
   }
+
+  double scale() const { return 1.0; }
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
     covariances.allocate(1.0);
     
-    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double margin   = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double beta = 1.0 / (variance + C);
+    const double beta = 1.0 / (variance + 1.0 / lambda);
     const double alpha = std::max(0.0, (loss - margin) * beta);
     
     if (alpha > 1e-10) {
-      const double lambda = 1.0 / C;
-      
       for (/**/; first != last; ++ first) {
 	const double var = covariances[first->first];
 	
@@ -326,17 +253,15 @@ struct OptimizerNHERD : public OptimizerBase
     
     covariances.allocate(1.0);
     
-    const double margin = cicada::dot_product(weights, features);
+    const double margin   = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double beta = 1.0 / (variance + C);
+    const double beta = 1.0 / (variance + 1.0 / lambda);
     const double alpha = std::max(0.0, (loss - margin) * beta);
     
     if (alpha > 1e-10) {
-      const double lambda = 1.0 / C;
-      
       feature_set_type::const_iterator fiter_end = features.end();
       for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
 	const double var = covariances[fiter->first];
@@ -346,48 +271,41 @@ struct OptimizerNHERD : public OptimizerBase
 	covariances[fiter->first]  = var / (1.0 + var * (2.0 * lambda + lambda * lambda * variance) * fiter->second * fiter->second);
       }
     }
+    
     ++ samples;
   }
   
-  size_t instances;
-  size_t samples;
-  
-  double objective;
-  weight_set_type weights;
-  double weight_scale;
   double lambda;
-
   weight_set_type covariances;
 };
 
 struct OptimizerAROW : public OptimizerBase
 {
-  OptimizerAROW(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C) {}
+  OptimizerAROW(const double& __lambda) : lambda(__lambda) {}
 
   void initialize()
   {
-    samples = 0;
-    objective = 0.0;
-    weight_scale = 1.0;
+    base_type::initialize();
   }
   
   void finalize()
   {
-    
+    base_type::finalize();
   }
+
+  double scale() const { return 1.0; }
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
     covariances.allocate(1.0);
     
-    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double margin   = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double beta = 1.0 / (variance + C);
+    const double beta = 1.0 / (variance + lambda);
     const double alpha = std::max(0.0, (loss - margin) * beta);
     
     if (alpha > 1e-10) {
@@ -410,12 +328,12 @@ struct OptimizerAROW : public OptimizerBase
     
     covariances.allocate(1.0);
     
-    const double margin = cicada::dot_product(weights, features);
+    const double margin   = cicada::dot_product(weights, features);
     const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
-    const double beta = 1.0 / (variance + C);
+    const double beta = 1.0 / (variance + lambda);
     const double alpha = std::max(0.0, (loss - margin) * beta);
     
     if (alpha > 1e-10) {
@@ -430,48 +348,40 @@ struct OptimizerAROW : public OptimizerBase
     ++ samples;
   }
   
-  size_t instances;
-  size_t samples;
-  
-  double objective;
-  weight_set_type weights;
-  double weight_scale;
   double lambda;
-
   weight_set_type covariances;
 };
 
 struct OptimizerCW : public OptimizerBase
 {
-  OptimizerCW(const size_t& __instances,
-		const double& C) : instances(__instances), samples(0), lambda(C) {}
+  OptimizerCW(const double& __lambda) : lambda(__lambda) {}
 
   void initialize()
   {
-    samples = 0;
-    objective = 0.0;
-    weight_scale = 1.0;
+    base_type::initialize();
   }
   
   void finalize()
   {
-    
+    base_type::finalize();
   }
+
+  double scale() const { return 1.0; }
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
     covariances.allocate(1.0);
     
-    const double margin = cicada::dot_product(weights, first, last, 0.0);
+    const double margin   = cicada::dot_product(weights, first, last, 0.0);
     const double variance = cicada::dot_product(first, last, covariances, first, last, 0.0); // multiply covariances...
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
-      const double theta = 1.0 + 2.0 * C * (margin - loss);
-      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
-      const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+      const double theta = 1.0 + 2.0 * lambda * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * lambda * (margin - loss - lambda * variance))) / (4.0 * lambda * variance));
+      const double beta  = (2.0 * alpha * lambda) / (1.0 + 2.0 * alpha * lambda * variance);
       
       if (alpha > 1e-10 && beta > 0.0) {
 	for (/**/; first != last; ++ first) {
@@ -502,9 +412,9 @@ struct OptimizerCW : public OptimizerBase
     objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
-      const double theta = 1.0 + 2.0 * C * (margin - loss);
-      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
-      const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+      const double theta = 1.0 + 2.0 * lambda * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * lambda * (margin - loss - lambda * variance))) / (4.0 * lambda * variance));
+      const double beta  = (2.0 * alpha * lambda) / (1.0 + 2.0 * alpha * lambda * variance);
       
       if (alpha > 1e-10 && beta > 0.0) {
 	feature_set_type::const_iterator fiter_end = features.end();
@@ -520,64 +430,65 @@ struct OptimizerCW : public OptimizerBase
     ++ samples;
   }
   
-  size_t instances;
-  size_t samples;
-  
-  double objective;
-  weight_set_type weights;
-  double weight_scale;
   double lambda;
-
   weight_set_type covariances;
 };
 
-struct OptimizerPegasos : public OptimizerBase
+struct OptimizerHinge : public OptimizerBase
 {
-  OptimizerPegasos(const size_t& __instances,
-		   const double& C) : instances(__instances), samples(0), epoch(0), weight_scale(1.0), weight_norm(0.0), lambda(C) {}
+  OptimizerHinge(Regularize& __regularizer, Rate&  __rate)
+    : regularizer(__regularizer.clone()),
+      rate(__rate.clone()) {}
+  OptimizerHinge(const boost::shared_ptr<Regularize>& __regularizer, const boost::shared_ptr<Rate>&  __rate)
+    : regularizer(__regularizer->clone()),
+      rate(__rate->clone()) {}  
+  OptimizerHinge(const OptimizerHinge& x)
+    : base_type(static_cast<const base_type&>(x)),
+      regularizer(x.regularizer->clone()),
+      rate(x.rate->clone()) {}
+  OptimizerHinge& operator=(const OptimizerHinge& x)
+  {
+    static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+    
+    regularizer.reset(x.regularizer->clone());
+    rate.reset(x.rate->clone());
+    
+    return *this;
+  }
   
   void initialize()
   {
-    samples = 0;
-    objective = 0.0;
+    base_type::initialize();
     
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    regularizer->initialize(weights);
   }
   void finalize()
   {
-    weights *= weight_scale;
-    
-    weight_scale = 1.0;
-    weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+    base_type::finalize();
+ 
+    regularizer->finalize(weights);
   }
+
+  double scale() const { return regularizer->scale(); }
 
   template <typename Iterator>
   void operator()(Iterator first, Iterator last, const double loss)
   {
-    const double margin = cicada::dot_product(weights, first, last, 0.0) * weight_scale;
+    const double margin = cicada::dot_product(weights, first, last, 0.0) * regularizer->scale();
     
     objective += (loss - margin) * (loss - margin > 0.0);
     
     if (loss - margin > 0.0) {
-      //const double eta = 1.0 / (lambda * (epoch + 2));
-      // exponential decay...
-      const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
-      ++ epoch;
+      const double eta = rate->operator()();
       
-      rescale(1.0 - eta * lambda);
-      
-      ++ samples;
+      regularizer->preprocess(weights, eta);
       
       for (/**/; first != last; ++ first) 
-	update(weights[first->first], double(first->second) * eta);
+	regularizer->update(weights, first->first, - first->second, rate->operator()(first->first, - first->second));
       
-      // projection...
-      if (weight_norm > 1.0 / lambda)
-	rescale(std::sqrt(1.0 / (lambda * weight_norm)));
+      regularizer->postprocess(weights, eta);
       
-      if (weight_scale < 0.001 || 1000 < weight_scale)
-	finalize();
+      ++ samples;
     }
   }
 
@@ -585,59 +496,27 @@ struct OptimizerPegasos : public OptimizerBase
 		  const feature_set_type& features_penalty,
 		  const double loss=1.0)
   {
-    // exponential decay...
-    const double eta = eta0 * std::pow(0.85, double(epoch) / instances);
-    ++ epoch;
-    
-    rescale(1.0 - eta * lambda);
-    
     const feature_set_type features(features_reward - features_penalty);
     
-    const double margin = cicada::dot_product(weights, features) * weight_scale;
+    const double margin = cicada::dot_product(weights, features) * regularizer->scale();
     
     objective += (loss - margin) * (loss - margin > 0.0);
-    ++ samples;
+    
+    const double eta = rate->operator()();
+    
+    regularizer->preprocess(weights, eta);
     
     feature_set_type::const_iterator fiter_end = features.end();
     for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
-      update(weights[fiter->first], double(fiter->second) * eta);
+      regularizer->update(weights, fiter->first, - fiter->second, rate->operator()(fiter->first, - fiter->second));
     
-    // projection...
-    if (weight_norm > 1.0 / lambda)
-      rescale(std::sqrt(1.0 / (lambda * weight_norm)));
-    
-    if (weight_scale < 0.001 || 1000 < weight_scale)
-      finalize();
+    regularizer->postprocess(weights, eta);
+
+    ++ samples;
   }
 
-  void update(double& x, const double& alpha)
-  {
-    weight_norm += 2.0 * x * alpha * weight_scale + alpha * alpha;
-    x += alpha / weight_scale;
-  }
-  
-  void rescale(const double scaling)
-  {
-    weight_norm *= scaling * scaling;
-    if (scaling != 0.0)
-      weight_scale *= scaling;
-    else {
-      weight_scale = 1.0;
-      std::fill(weights.begin(), weights.end(), 0.0);
-    }
-  }
-  
-  size_t instances;
-  size_t samples;
-  size_t epoch;
-  
-  double objective;
-  weight_set_type weights;
-
-  double weight_scale;
-  double weight_norm;
-  
-  double lambda;
+  boost::shared_ptr<Regularize> regularizer;
+  boost::shared_ptr<Rate> rate;
 };
 
 

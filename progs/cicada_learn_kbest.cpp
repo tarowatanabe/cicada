@@ -50,6 +50,9 @@
 #include "liblbfgs/lbfgs.hpp"
 #include "cg_descent/cg.hpp"
 
+#include "cicada_learn_online_regularize_impl.hpp"
+#include "cicada_learn_online_rate_impl.hpp"
+
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
@@ -78,14 +81,22 @@ bool optimize_cg = false;
 
 int linear_solver = L2R_L2LOSS_SVC_DUAL;
 
-bool regularize_l1 = false;
-bool regularize_l2 = false;
+double regularize_l1 = 0.0;
+double regularize_l2 = 0.0;
+double regularize_lambda = 0.0;
+double regularize_oscar = 0.0;
 
 double eps = std::numeric_limits<double>::infinity();
-double C = 1.0;
 double scale = 1.0;
+double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
+
+bool rate_simple = false;
+bool rate_exponential = false;
+bool rate_adagrad = false;
+
+bool rda_mode = false;
 
 bool annealing_mode = false;
 bool quenching_mode = false;
@@ -178,16 +189,26 @@ int main(int argc, char ** argv)
     if (conservative_loss && line_search)
       throw std::runtime_error("we do not allow both conservative-update and line-search");
     
-    if (regularize_l1 && regularize_l2)
-      throw std::runtime_error("either L1 or L2 regularization");
-    if (int(regularize_l1) + regularize_l2 == 0)
-      regularize_l2 = true;
+    if (regularize_l1 < 0.0)
+      throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l2 < 0.0)
+      throw std::runtime_error("L2 regularization must be positive or zero");
+    if (regularize_oscar < 0.0)
+      throw std::runtime_error("OSCAR regularization must be positive or zero");
+    if (regularize_lambda < 0.0)
+      throw std::runtime_error("regularization constant must be positive or zero");
     
-    if (regularize_l1 && optimize_cg)
+    if (regularize_oscar > 0.0)
+      if (regularize_l2 > 0.0)
+	throw std::runtime_error("L2 regularization with OSCAR is not supported");    
+    
+    if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
+      throw std::runtime_error("either simple/exponential/adagrad");
+    if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
+      rate_exponential = true;
+
+    if (regularize_l1 > 0.0 && optimize_cg)
       throw std::runtime_error("optimize via CG with L1 regularization is not implemented");
-    
-    if (C <= 0.0)
-      throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     
     if (scale <= 0.0)
       throw std::runtime_error("scaling must be positive: " + utils::lexical_cast<std::string>(scale));
@@ -763,7 +784,7 @@ struct OptimizeLinear
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
     parameter.p = 0.1;
-    parameter.C = 1.0 / (C * labels.size()); // renormalize!
+    parameter.C = 1.0 / (regularize_lambda * labels.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
@@ -816,7 +837,7 @@ struct OptimizeLinear
     
     const model_type* model = train(&problem, &parameter);
 
-    objective = model->objective * C;
+    objective = model->objective * regularize_lambda;
     
     // it is an optimization...
     weights.clear();
@@ -872,11 +893,11 @@ struct OptimizeLinear
       const double dot_prod    = cicada::dot_product(weights_prev, weights);
       const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
       
-      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * samples;
-      const double b0_pos = (dot_prod - norm_w_prev) * C * samples;
+      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_lambda * samples;
+      const double b0_pos = (dot_prod - norm_w_prev) * regularize_lambda * samples;
       
-      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * samples;
-      const double b0_neg = (- dot_prod - norm_w_prev) * C * samples;
+      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_lambda * samples;
+      const double b0_neg = (- dot_prod - norm_w_prev) * regularize_lambda * samples;
       
       grad_pos += b0_pos;
       grad_neg += b0_neg;
@@ -1471,8 +1492,8 @@ struct OptimizeSVM
     HMatrix H(positions, encoders);
     MMatrix M(positions, encoders);
     
-    objective = solver(alpha, f, H, M, 1.0 / (C * data_size), tolerance, true); // we do not normalize alpha values for compatibility with liblinear
-    objective *= C;
+    objective = solver(alpha, f, H, M, 1.0 / (regularize_lambda * data_size), tolerance, true); // we do not normalize alpha values for compatibility with liblinear
+    objective *= regularize_lambda;
     
     size_type actives = 0;
     weights.clear();
@@ -1528,11 +1549,11 @@ struct OptimizeSVM
       const double dot_prod    = cicada::dot_product(weights_prev, weights);
       const double norm_w_prev = cicada::dot_product(weights_prev, weights_prev);
       
-      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * C * samples;
-      const double b0_pos = (dot_prod - norm_w_prev) * C * samples;
+      const double a0_pos = (norm_w - 2.0 * dot_prod + norm_w_prev) * regularize_lambda * samples;
+      const double b0_pos = (dot_prod - norm_w_prev) * regularize_lambda * samples;
       
-      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * C * samples;
-      const double b0_neg = (- dot_prod - norm_w_prev) * C * samples;
+      const double a0_neg = (norm_w + 2.0 * dot_prod + norm_w_prev) * regularize_lambda * samples;
+      const double b0_neg = (- dot_prod - norm_w_prev) * regularize_lambda * samples;
       
       grad_pos += b0_pos;
       grad_neg += b0_neg;
@@ -2446,10 +2467,10 @@ double optimize_xbleu(const hypothesis_map_type& kbests,
   
   weights[feature_scale] = scale;
   
-  Objective objective(kbests, scorers, weights, C, feature_scale);
+  Objective objective(kbests, scorers, weights, regularize_l2, feature_scale);
   
   if (optimize_lbfgs) {
-    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0, 1);
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1, 1);
     
     return optimize_xbleu(optimizer, weights, feature_scale);
   } else if (optimize_cg) {
@@ -2466,10 +2487,10 @@ double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights)
 {
-  Objective objective(kbests, oracles, weights, C);
+  Objective objective(kbests, oracles, weights, regularize_l2);
   
   if (optimize_lbfgs) {
-    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0);
+    liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1);
     
     return optimizer(weights.size(), &(*weights.begin()));
   } else if (optimize_cg) {
@@ -3356,14 +3377,22 @@ void options(int argc, char** argv)
      "13: \tL2-regularized L1-loss epsilon support vector regression (dual)\n"
      )
     
-    ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
-    ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
-    
-    ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
-    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
-    ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
-    ("eps",           po::value<double>(&eps),                 "tolerance for liblinear")
-    ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+    ("regularize-l1",     po::value<double>(&regularize_l1),       "L1-regularization")
+    ("regularize-l2",     po::value<double>(&regularize_l2),       "L2-regularization")
+    ("regularize-lambda", po::value<double>(&regularize_lambda),   "regularization constant for SVM and liblinear")
+    ("regularize-oscar",  po::value<double>(&regularize_oscar),    "OSCAR regularization constant")
+
+    ("scale",         po::value<double>(&scale)->default_value(scale),   "scaling for weight")
+    ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0), "\\alpha_0 for decay")
+    ("eta0",          po::value<double>(&eta0),                          "\\eta_0 for decay")
+    ("eps",           po::value<double>(&eps),                           "tolerance for liblinear")
+    ("order",         po::value<int>(&order)->default_value(order),      "ngram order for xBLEU")
+
+    ("rate-exponential", po::bool_switch(&rate_exponential),  "exponential learning rate")
+    ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
+    ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
+
+    ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")
 
     ("annealing", po::bool_switch(&annealing_mode), "annealing")
     ("quenching", po::bool_switch(&quenching_mode), "quenching")

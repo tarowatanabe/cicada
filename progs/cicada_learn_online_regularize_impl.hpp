@@ -31,6 +31,9 @@ public:
 public:
   Regularize() {}
   virtual ~Regularize() {}
+  
+  virtual
+  Regularize* clone() const = 0;
 
   virtual 
   double scale() const = 0;
@@ -54,6 +57,8 @@ public:
 class RegularizeNone : public Regularize
 {
 public:
+  Regularize* clone() const { return new RegularizeNone(*this); }
+
   double scale() const { return 1.0; }
 
   void initialize(weight_set_type& weights)
@@ -89,6 +94,8 @@ public:
 
   RegularizeL1(const double lambda)
     : lambda_(lambda), penalties_(), penalty_(0.0) {}
+
+  Regularize* clone() const { return new RegularizeL1(*this); }
 
   double scale() const { return 1.0; }
   
@@ -146,6 +153,8 @@ public:
   RegularizeL1L2(const double lambda1, const double lambda2)
     : lambda1_(lambda1), lambda2_(lambda2), scale_(1.0), penalties_(), penalty_(0.0) {}
 
+  Regularize* clone() const { return new RegularizeL1L2(*this); }
+  
   double scale() const { return scale_; }
   
   void initialize(weight_set_type& weights)
@@ -217,6 +226,8 @@ class RegularizeL2 : public Regularize
 {
 public:
   RegularizeL2(const double lambda) : lambda_(lambda), scale_(1.0), norm_(0.0) {}  
+
+  Regularize* clone() const { return new RegularizeL2(*this); }
   
   double scale() const { return scale_; }
   
@@ -288,6 +299,8 @@ class RegularizeOSCAR : public Regularize
 public:
   
   RegularizeOSCAR(const double lambda1, const double lambda2) : lambda1_(lambda1), lambda2_(lambda2) {}
+
+  Regularize* clone() const { return new RegularizeOSCAR(*this); }
   
   double scale() const { return 1.0; }
 
@@ -401,6 +414,8 @@ public:
 
   RegularizeRDAL1(const double lambda)
     : lambda_(lambda), averaged_(), scale_(1.0), epoch_(0) {}
+
+  Regularize* clone() const { return new RegularizeRDAL1(*this); }
   
   double scale() const { return 1.0; }
   
@@ -461,6 +476,8 @@ class RegularizeRDAL1L2 : public Regularize
 public:
   RegularizeRDAL1L2(const double lambda1, const double lambda2)
     : weight_scale_(1.0), lambda1_(lambda1), lambda2_(lambda2), averaged_(), scale_(1.0), epoch_(0) {}
+
+  Regularize* clone() const { return new RegularizeRDAL1L2(*this); }
   
   double scale() const { return weight_scale_; }
   
@@ -541,6 +558,8 @@ class RegularizeRDAL2 : public Regularize
 public:
   RegularizeRDAL2(const double lambda)
     : weight_scale_(1.0), lambda_(lambda), averaged_(), scale_(1.0), epoch_(0) {}
+
+  Regularize* clone() const { return new RegularizeRDAL2(*this); }
   
   double scale() const { return weight_scale_; }
   
@@ -611,6 +630,8 @@ class RegularizeRDAOSCAR : public Regularize
 public:
   RegularizeRDAOSCAR(const double lambda1, const double lambda2)
     : lambda1_(lambda1), lambda2_(lambda2), averaged_(), scale_(1.0), epoch_(0) {}
+  
+  Regularize* clone() const { return new RegularizeRDAOSCAR(*this); }
   
   double scale() const { return 1.0; }
   

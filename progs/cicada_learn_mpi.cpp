@@ -71,22 +71,32 @@ int iteration = 100;
 
 bool learn_softmax = false;
 bool learn_xbleu = false;
+bool learn_pa = false;
 bool learn_mira = false;
 bool learn_nherd = false;
 bool learn_arow = false;
 bool learn_cw = false;
-bool learn_pegasos = false;
+bool learn_hinge = false;
 
 bool optimize_lbfgs = false;
 bool optimize_cg = false;
 bool optimize_sgd = false;
 
-bool regularize_l1 = false;
-bool regularize_l2 = false;
-double C = 1.0;
+double regularize_l1 = 0.0;
+double regularize_l2 = 0.0;
+double regularize_lambda = 0.0;
+double regularize_oscar = 0.0;
+
 double scale = 1.0;
+double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
+
+bool rate_simple = false;
+bool rate_exponential = false;
+bool rate_adagrad = false;
+
+bool rda_mode = false;
 
 bool annealing_mode = false;
 bool quenching_mode = false;
@@ -125,7 +135,7 @@ double optimize_xbleu(const hypergraph_set_type& forests,
 		      const scorer_document_type& scorers,
 		      weight_set_type& weights);
 
-template <typename Optimize, typename Generator>
+template <typename Generator>
 double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights,
@@ -162,9 +172,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_softmax) + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd + learn_xbleu > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
-    if (int(learn_softmax) + learn_mira + learn_arow + learn_cw + learn_pegasos + learn_nherd + learn_xbleu == 0)
+    if (int(learn_softmax) + learn_pa + learn_mira + learn_arow + learn_cw + learn_hinge + learn_nherd + learn_xbleu > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd,pa,mira,arow,cw}");
+    if (int(learn_softmax) + learn_pa + learn_mira + learn_arow + learn_cw + learn_hinge + learn_nherd + learn_xbleu == 0)
       learn_softmax = true;
 
     if (int(optimize_lbfgs) + optimize_cg + optimize_sgd > 1)
@@ -172,18 +182,38 @@ int main(int argc, char ** argv)
     if (int(optimize_lbfgs) + optimize_cg + optimize_sgd == 0)
       optimize_lbfgs = true;
 
-    if (regularize_l1 && regularize_l2)
-      throw std::runtime_error("either L1 or L2 regularization");
-    if (int(regularize_l1) + regularize_l2 == 0)
-      regularize_l2 = true;
+    if (regularize_l1 < 0.0)
+      throw std::runtime_error("L1 regularization must be positive or zero");
+    if (regularize_l2 < 0.0)
+      throw std::runtime_error("L2 regularization must be positive or zero");
+    if (regularize_oscar < 0.0)
+      throw std::runtime_error("OSCAR regularization must be positive or zero");
+    if (regularize_lambda < 0.0)
+      throw std::runtime_error("regularization constant must be positive or zero");
+    
+    if (regularize_oscar > 0.0)
+      if (regularize_l2 > 0.0)
+	throw std::runtime_error("L2 regularization with OSCAR is not supported");
+
+    if (learn_cw || learn_arow || learn_nherd || learn_mira || learn_pa) {
+      if (regularize_lambda <= 0.0)
+	throw std::runtime_error("hyperparameter constant must be positive");
+      
+      if (regularize_l1 > 0.0)
+	throw std::runtime_error("L1 regularization is not supported");
+      if (regularize_oscar > 0.0)
+	throw std::runtime_error("OSCAR regularization is not supported");
+    }
+
+    if (int(rate_exponential) + rate_simple + rate_adagrad > 1)
+      throw std::runtime_error("either simple/exponential/adagrad");
+    if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
+      rate_exponential = true;
     
     if (learn_xbleu && optimize_sgd)
       throw std::runtime_error("optimize XBLEU usign SGD is not implemeneted");
-    if (regularize_l1 && optimize_cg)
+    if (regularize_l1 > 0.0 && optimize_cg)
       throw std::runtime_error("optimize via CG with L1 regularization is not implemented");
-
-    if (C <= 0.0)
-      throw std::runtime_error("regularization constant must be positive: " + utils::lexical_cast<std::string>(C));
     
     if (scale <= 0.0)
       throw std::runtime_error("scaling must be positive: " + utils::lexical_cast<std::string>(scale));
@@ -261,26 +291,10 @@ int main(int argc, char ** argv)
 
     if (learn_xbleu)
       objective = optimize_xbleu<ObjectiveXBLEU>(graphs_forest, scorers, weights);
-    else if (learn_softmax) {
-      if (optimize_sgd) {
-	if (regularize_l1)
-	  objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs_forest, graphs_intersected, weights, generator);
-	else
-	  objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs_forest, graphs_intersected, weights, generator);
-      } else
-	objective = optimize_batch<ObjectiveSoftmax>(graphs_forest, graphs_intersected, weights);
-    } else if (learn_mira)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(graphs_forest, graphs_intersected, weights, generator);
-    else if (learn_arow)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(graphs_forest, graphs_intersected, weights, generator);
-    else if (learn_cw)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(graphs_forest, graphs_intersected, weights, generator);
-    else if (learn_pegasos)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerPegasos> >(graphs_forest, graphs_intersected, weights, generator);
-    else if (learn_nherd)
-      objective = optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(graphs_forest, graphs_intersected, weights, generator);
-    else 
-      throw std::runtime_error("invlaid optimization objective");
+    else if (learn_softmax && ! optimize_sgd)
+      objective = optimize_batch<ObjectiveSoftmax>(graphs_forest, graphs_intersected, weights);
+    else
+      objective = optimize_online(graphs_forest, graphs_intersected, weights, generator);
     
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
@@ -417,14 +431,14 @@ struct OptimizeOnline
     inside.reserve(hypergraph_forest.nodes.size());
     inside.resize(hypergraph_forest.nodes.size(), weight_type());
     cicada::inside_outside(hypergraph_forest, inside, gradients,
-			   weight_function(optimizer.weights, optimizer.weight_scale),
-			   feature_function(optimizer.weights, optimizer.weight_scale));
+			   weight_function(optimizer.weights, optimizer.scale()),
+			   feature_function(optimizer.weights, optimizer.scale()));
     
     inside_intersected.reserve(hypergraph_intersected.nodes.size());
     inside_intersected.resize(hypergraph_intersected.nodes.size(), weight_type());
     cicada::inside_outside(hypergraph_intersected, inside_intersected, gradients_intersected,
-			   weight_function(optimizer.weights, optimizer.weight_scale),
-			   feature_function(optimizer.weights, optimizer.weight_scale));
+			   weight_function(optimizer.weights, optimizer.scale()),
+			   feature_function(optimizer.weights, optimizer.scale()));
     
     gradient_type& gradient = gradients.gradient;
     weight_type& Z = inside.back();
@@ -522,14 +536,14 @@ struct OptimizeOnlineMargin
     typedef cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> > function_type;
     
     if (margin_kbest > 0)
-      cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.weight_scale), margin_kbest);
+      cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.scale()), margin_kbest);
     else
-      cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.weight_scale), margin_beam);
+      cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, optimizer.scale()), margin_beam);
     
     if (margin_kbest > 0)
-      cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.weight_scale), margin_kbest);
+      cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.scale()), margin_kbest);
     else
-      cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.weight_scale), margin_beam);
+      cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - optimizer.scale()), margin_beam);
     
     counts_intersected.clear();
     counts_forest.clear();
@@ -572,8 +586,101 @@ struct OptimizeOnlineMargin
   int    margin_kbest;
 };
 
-template <typename Optimize, typename Generator>
+template <typename Optimize, typename Optimizer, typename Generator>
+double optimize_online(Optimizer& optimizer,
+		       const hypergraph_set_type& graphs_forest,
+		       const hypergraph_set_type& graphs_intersected,
+		       weight_set_type& weights,
+		       Generator& generator);
+
+template <typename Generator>
 double optimize_online(const hypergraph_set_type& graphs_forest,
+		       const hypergraph_set_type& graphs_intersected,
+		       weight_set_type& weights,
+		       Generator& generator)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  size_t samples_rank = 0;
+  for (size_t id = 0; id != graphs_forest.size(); ++ id)
+    samples_rank += (graphs_intersected[id].is_valid() && graphs_forest[id].is_valid());
+  
+  size_t samples = 0;
+  MPI::COMM_WORLD.Allreduce(&samples_rank, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
+  
+  boost::shared_ptr<Regularize> regularize;
+  boost::shared_ptr<Rate> rate;
+  
+  const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
+  const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
+  const bool reg_l1    = (regularize_l1 > 0.0);
+  const bool reg_l2    = (regularize_l2 > 0.0);
+  
+  if (rda_mode) {
+    if (reg_oscar)
+      regularize.reset(new RegularizeRDAOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularize.reset(new RegularizeRDAL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularize.reset(new RegularizeRDAL1(regularize_l1));
+    else if (reg_l2)
+      regularize.reset(new RegularizeRDAL2(regularize_l2));
+    else
+      regularize.reset(new RegularizeNone());
+  } else {
+    if (reg_oscar)
+      regularize.reset(new RegularizeOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularize.reset(new RegularizeL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularize.reset(new RegularizeL1(regularize_l1));
+    else if (reg_l2)
+      regularize.reset(new RegularizeL2(regularize_l2));
+    else
+      regularize.reset(new RegularizeNone());
+  }
+
+  if (rate_simple)
+    rate.reset(new RateSimple(eta0));
+  else if (rate_exponential)
+    rate.reset(new RateExponential(alpha0, eta0, samples));
+  else if (rate_adagrad)
+    rate.reset(new RateAdaGrad(eta0));
+  else
+    throw std::runtime_error("unsupported learning rate");
+  
+  if (learn_softmax) {
+    OptimizerSoftmax optimizer(regularize, rate);
+
+    return optimize_online<OptimizeOnline<OptimizerSoftmax> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else if (learn_hinge) {
+    OptimizerHinge optimizer(regularize, rate);
+
+    return optimize_online<OptimizeOnlineMargin<OptimizerHinge> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else if (learn_mira || learn_pa) {
+    OptimizerMIRA optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else if (learn_arow) {
+    OptimizerAROW optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else if (learn_cw) {
+    OptimizerCW optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerCW> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else if (learn_nherd) {
+    OptimizerNHERD optimizer(regularize_lambda);
+    
+    return optimize_online<OptimizeOnlineMargin<OptimizerNHERD> >(optimizer, graphs_forest, graphs_intersected, weights, generator);
+  } else
+    throw std::runtime_error("invlaid optimization algorithm");
+}
+
+template <typename Optimize, typename Optimizer, typename Generator>
+double optimize_online(Optimizer& optimizer,
+		       const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights,
 		       Generator& generator)
@@ -595,7 +702,6 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   size_t instances = 0;
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
-  optimizer_type optimizer(instances, C);
   Optimize opt(optimizer);
   
   optimizer.weights = weights;
@@ -628,8 +734,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
       MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
       
       size_t samples = 0;
-      size_t samples_local = (optimizer.samples + 1);
-      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
+      size_t samples_rank = (optimizer.samples + 1);
+      MPI::COMM_WORLD.Reduce(&samples_rank, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
       
       optimizer.weights *= (1.0 / samples);
       
@@ -684,8 +790,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, utils::mpi_traits<double>::data_type(), MPI::SUM, 0);
 	
 	size_t samples = 0;
-	size_t samples_local = (optimizer.samples + 1);
-	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
+	size_t samples_rank = (optimizer.samples + 1);
+	MPI::COMM_WORLD.Reduce(&samples_rank, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
       }
     }
     
@@ -1757,12 +1863,12 @@ double optimize_xbleu(const hypergraph_set_type& forests,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
-    Objective objective(forests, scorers, weights, C, instances, feature_scale);
+    Objective objective(forests, scorers, weights, regularize_l2, instances, feature_scale);
     
     double result = 0.0;
     
     if (optimize_lbfgs) {
-      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0, 1);
+      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1, 1);
       
       result = optimize_xbleu(optimizer, weights, feature_scale);
     } else if (optimize_cg) {
@@ -1850,12 +1956,12 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
   if (mpi_rank == 0) {
-    Objective objective(graphs_forest, graphs_intersected, weights, C, instances);
+    Objective objective(graphs_forest, graphs_intersected, weights, regularize_l2, instances);
     
     double result = 0.0;
     
     if (optimize_lbfgs) {
-      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1 ? C : 0.0);
+      liblbfgs::LBFGS<Objective> optimizer(objective, iteration, regularize_l1);
       
       result = optimizer(weights.size(), &(*weights.begin()));
     } else if (optimize_cg) {
@@ -2408,22 +2514,31 @@ void options(int argc, char** argv)
     ("learn-softmax", po::bool_switch(&learn_softmax), "Softmax objective")
     ("learn-xbleu",   po::bool_switch(&learn_xbleu),   "xBLEU objective")
     ("learn-mira",    po::bool_switch(&learn_mira),    "online MIRA algorithm")
+    ("learn-pa",      po::bool_switch(&learn_pa),      "online PA algorithm (synonym to MIRA)")
     ("learn-nherd",   po::bool_switch(&learn_nherd),   "online NHERD algorithm")
     ("learn-arow",    po::bool_switch(&learn_arow),    "online AROW algorithm")
     ("learn-cw",      po::bool_switch(&learn_cw),      "online CW algorithm")
-    ("learn-pegasos", po::bool_switch(&learn_pegasos), "online Pegasos algorithm")
+    ("learn-hinge",   po::bool_switch(&learn_hinge),   "online hinge-loss objective with SGD")
     
     ("optimize-lbfgs", po::bool_switch(&optimize_lbfgs), "LBFGS optimizer")
     ("optimize-cg",    po::bool_switch(&optimize_cg),    "CG optimizer")
     ("optimize-sgd",   po::bool_switch(&optimize_sgd),   "SGD optimizer")
 
-    ("regularize-l1",      po::bool_switch(&regularize_l1),      "L1-regularization")
-    ("regularize-l2",      po::bool_switch(&regularize_l2),      "L2-regularization")
+    ("regularize-l1",     po::value<double>(&regularize_l1),       "L1-regularization")
+    ("regularize-l2",     po::value<double>(&regularize_l2),       "L2-regularization")
+    ("regularize-lambda", po::value<double>(&regularize_lambda),   "regularization constant")
+    ("regularize-oscar",  po::value<double>(&regularize_oscar),    "OSCAR regularization constant")
     
-    ("C",             po::value<double>(&C)->default_value(C),         "regularization constant")
-    ("scale",         po::value<double>(&scale)->default_value(scale), "scaling for weight")
-    ("eta0",          po::value<double>(&eta0),                        "\\eta_0 for decay")
-    ("order",         po::value<int>(&order)->default_value(order),    "ngram order for xBLEU")
+    ("scale",         po::value<double>(&scale)->default_value(scale),   "scaling for weight")
+    ("alpha0",        po::value<double>(&alpha0)->default_value(alpha0), "\\alpha_0 for decay")
+    ("eta0",          po::value<double>(&eta0),                          "\\eta_0 for decay")
+    ("order",         po::value<int>(&order)->default_value(order),      "ngram order for xBLEU")
+
+    ("rate-exponential", po::bool_switch(&rate_exponential),  "exponential learning rate")
+    ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
+    ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
+    
+    ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")
 
     ("annealing", po::bool_switch(&annealing_mode), "annealing")
     ("quenching", po::bool_switch(&quenching_mode), "quenching")
