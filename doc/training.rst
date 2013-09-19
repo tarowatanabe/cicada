@@ -213,6 +213,7 @@ Now, we are ready to perform tuning:
 	--refset ../../data/tune.en.ref \
 	--config cicada.config \
 	--kbest 1000 \
+	--regularize-l2 1e-5 \
 	--merge \
 	--threads 4
 
@@ -220,14 +221,16 @@ We use `tune.ja` as a source set (``--srcset``) and `tune.en.ref` as
 its reference translations (``--refset``) with `cicada.config` as a
 configuration template (``--config``). The training is performed by
 k-best merging batch style learning (``--merge``) with 1,000 best
-translations generated in each round (``--kbest``). By default,
+translations generated in each round (``--kbest``).  By default,
 training objective is xBLEU, which is superior to other objectives,
-like pair-wise ranking (PRO) or direct error minimization (MERT).
-Without the ``--merge`` flag, k-bests generated in each iteration are
-treated separately.
+like pair-wise ranking (PRO) or direct error minimization (MERT). The
+objective is regularized by L2 with the hyperparameter of 1e-5
+(``--regularize-l2 1e-5``). Without the ``--merge`` flag, k-bests
+generated in each iteration are treated separately.
 
-By default, training is performed 10 iterations, and generates several
-files ``learn.<iteration>.*``. The tuned parameters have suffix of
+By default, training is performed 10 iterations (set by
+``--iteration`` option), and generates several files
+``learn.<iteration>.*``. The tuned parameters have suffix of
 ``.weights``. The details of the tuning algorithms is described at
 `doc/learning.rst`.
 
