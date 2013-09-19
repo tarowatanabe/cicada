@@ -1,11 +1,12 @@
 #!/bin/sh
 
-cicada=/home/t_watana/research/cicada
+cicada=../../../..
 
 exec $cicada/scripts/cicada-learn.py \
 	--srcset ../../t2s/data/tune.forest.ja.gz \
 	--refset ../../data/tune.en.ref \
 	--config cicada.config \
 	--kbest 1000 \
+	--regularize-l2 1e-5 \
         --merge \
 	--threads 16
