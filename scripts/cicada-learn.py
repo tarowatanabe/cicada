@@ -44,12 +44,15 @@ opt_parser = OptionParser(
     make_option("--weights", default="", action="store", type="string",
                 metavar="FILE", help="initial weights"),
     
-    make_option("--C", default=1e-5, action="store", type="float",
-                metavar="C", help="hyperparameter (default: %default)"),
-    make_option("--regularize-l1", action="store_true",
+    make_option("--regularize-l1", default=0.0, action="store", type="float",
                 metavar="REGULARIZER", help="L1 regularization"),
-    make_option("--regularize-l2", action="store_true",
+    make_option("--regularize-l2", default=0.0,action="store", type="float",
                 metavar="REGULARIZER", help="L2 regularization"),
+    make_option("--regularize-lambda", default=0.0,action="store", type="float",
+                metavar="REGULARIZER", help="regularization hyperparameter"),
+    make_option("--regularize-oscar", default=0.0,action="store", type="float",
+                metavar="REGULARIZER", help="OSCAR regularization"),
+        
     make_option("--scorer", default="bleu:order=4,exact=true", action="store", type="string",
                 metavar="SCORER", help="scorer for oracle computation (default: %default)"),
     make_option("--scorer-cube", default=400, action="store", type="int",
@@ -420,13 +423,14 @@ if __name__ == '__main__':
             os.makedirs(options.root_dir)
 
     ### regularizer
-    regularizer = ""
-    if options.regularize_l1 and options.regularize_l2:
-        raise ValueError, "we do not support both L1 and L2 regularizers"
-    if options.regularize_l1:
-        regularizer = "--regularize-l1"
-    if options.regularize_l2:
-        regularizer = "--regularize-l2"
+    if options.regularize_l1 < 0.0:
+        raise ValueError, "L1 regularization must be positive"
+    if options.regularize_l2 < 0.0:
+        raise ValueError, "L2 regularization must be positive"
+    if options.regularize_lambda < 0.0:
+        raise ValueError, "regularization constant must be positive"
+    if options.regularize_oscar < 0.0:
+        raise ValueError, "OSCAR regularization must be positive"
 
     ### cicada
     cicada = CICADA(dir=options.cicada_dir)
@@ -721,8 +725,10 @@ if __name__ == '__main__':
                                 learn_weights,
                                 learn_algorithm,
                                 options.learn_options,
-                                Option('--C', options.C),
-                                Option(regularizer),
+                                Option('--regularize-l1',     options.regularize_l1),
+                                Option('--regularize-l2',     options.regularize_l2),
+                                Option('--regularize-lambda', options.regularize_lambda),
+                                Option('--regularize-oscar',  options.regularize_oscar),
                                 Option('--debug', 2),),
                         name="learn",
                         memory=options.max_malloc,
@@ -739,8 +745,10 @@ if __name__ == '__main__':
                              learn_weights,
                              learn_algorithm,
                              options.learn_options,
-                             Option('--C', options.C),
-                             Option(regularizer),
+                             Option('--regularize-l1',     options.regularize_l1),
+                             Option('--regularize-l2',     options.regularize_l2),
+                             Option('--regularize-lambda', options.regularize_lambda),
+                             Option('--regularize-oscar',  options.regularize_oscar),
                              Option('--threads', options.threads),
                              Option('--debug', 2),),
                      name="learn",
