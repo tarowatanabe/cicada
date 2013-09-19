@@ -165,7 +165,7 @@ class PBS:
         if not distutils.spawn.find_executable('qsub'):
             raise ValueError, "no qsub in your executable path?"
 
-    def __del__(self):
+    def wait(self):
         for worker in self.workers:
             worker.join()
             
@@ -231,7 +231,7 @@ class Threads:
         self.popen = subprocess.Popen([cicada.thrsh, '--threads', str(threads), '--debug'], stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
         
-    def __del__(self):
+    def wait(self):
         self.pipe.close()
         self.popen.wait()
 
@@ -298,7 +298,7 @@ class MPI:
         self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
         self.pipe = self.popen.stdin
         
-    def __del__(self):
+    def wait(self):
         self.pipe.close()
         self.popen.wait()
         
@@ -360,6 +360,9 @@ if __name__ == '__main__':
                         name=options.pbs_name,
                         after=options.pbs_after,
                         before=options.pbs_before)
+
+        pbs.wait()
+
     elif options.mpi:
         cicada = CICADA(options.cicada_dir)
         mpi = MPI(cicada=cicada,
@@ -373,6 +376,8 @@ if __name__ == '__main__':
             line = line.strip()
             if line:
                 mpi.run(command=line)
+
+        mpi.wait()
     
     else:
         cicada = CICADA(options.cicada_dir)
@@ -382,3 +387,5 @@ if __name__ == '__main__':
             line = line.strip()
             if line:
                 threads.run(command=line)
+
+        threads.wait()

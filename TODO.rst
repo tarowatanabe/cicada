@@ -250,3 +250,4 @@ Implement rejection sampling
 Merge learning codes
  - There exists duplicated and experimental codes which I don't even
    remember.
+ - Batch-based learner should follow online-learning style regularization.

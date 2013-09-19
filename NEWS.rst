@@ -8,6 +8,7 @@
  - Added read/write for ngram counts (TODO: allow reading and dumping)
  - Reworked online learning code to allow alternative regularization
    and learning rate strategies.
+ - Operators with weights can assign arbitrary weight by weight parameter.
  - A small bug fix for posterior operation.
 
 2013-8-2
