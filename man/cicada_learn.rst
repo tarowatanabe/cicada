@@ -46,17 +46,30 @@ OPTIONS
 
   **--optimize-sgd** SGD optimizer
 
-  **--regularize-l1** L1-regularization
+  **--regularize-l1** `arg`                    L1-regularization
 
-  **--regularize-l2** L2-regularization
+  **--regularize-l2** `arg`                    L2-regularization
 
-  **--C** `arg (=1)`                           regularization constant
+  **--regularize-lambda** `arg`                regularization constant
+
+  **--regularize-oscar** `arg`                 OSCAR regularization constant
 
   **--scale** `arg (=1)`                       scaling for weight
+
+  **--alpha0** `arg (=0.84999999999999998)`    \alpha_0 for decay
 
   **--eta0** `arg`                             \eta_0 for decay
 
   **--order** `arg (=4)`                       ngram order for xBLEU
+
+  **--rate-exponential** exponential learning rate
+
+  **--rate-simple** simple learning rate
+
+  **--rate-adagrad** adaptive learning rate (AdaGrad)
+
+  **--rda** RDA method for optimization 
+                                        (regularized dual averaging method)
 
   **--annealing** annealing
 

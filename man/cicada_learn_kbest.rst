@@ -45,57 +45,63 @@ OPTIONS
   **--optimize-cg** CG optimizer
 
   **--solver** `arg`                     liblinear solver type (default: 1)
-                                   0: L2-regularized logistic regression 
-                                      (primal)
-                                   1: L2-regularized L2-loss support vector 
-                                      classification (dual)
-                                   2: L2-regularized L2-loss support vector 
-                                      classification (primal)
-                                   3: L2-regularized L1-loss support vector 
-                                      classification (dual)
-                                   5: L1-regularized L2-loss support vector 
-                                      classification
+                                   0: L2-regularized logistic regression (primal)
+                                   1: L2-regularized L2-loss support vector classification (dual)
+                                   2: L2-regularized L2-loss support vector classification (primal)
+                                   3: L2-regularized L1-loss support vector classification (dual)
+                                   5: L1-regularized L2-loss support vector classification
                                    6: L1-regularized logistic regression
                                    7: L2-regularized logistic regression (dual)
-                                  11: L2-regularized L2-loss epsilon support 
-                                      vector regression (primal)
-                                  12: L2-regularized L2-loss epsilon support 
-                                      vector regression (dual)
-                                  13: L2-regularized L1-loss epsilon support 
-                                      vector regression (dual)
-                                  
+                                   11: L2-regularized L2-loss epsilon support vector regression (primal)
+                                   12: L2-regularized L2-loss epsilon support vector regression (dual)
+                                   13: L2-regularized L1-loss epsilon support vector regression (dual)
+                                      
 
-  **--regularize-l1** L1-regularization
+  **--regularize-l1** `arg`                  L1-regularization
 
-  **--regularize-l2** L2-regularization
+  **--regularize-l2** `arg`                  L2-regularization
 
-  **--C** `arg (=1)`                     regularization constant
+  **--regularize-lambda** `arg`              regularization constant for SVM and 
+                                      liblinear
 
-  **--scale** `arg (=1)`                 scaling for weight
+  **--regularize-oscar** `arg`               OSCAR regularization constant
 
-  **--eta0** `arg`                       \eta_0 for decay
+  **--scale** `arg (=1)`                     scaling for weight
 
-  **--eps** `arg`                        tolerance for liblinear
+  **--alpha0** `arg (=0.84999999999999998)`  \alpha_0 for decay
 
-  **--order** `arg (=4)`                 ngram order for xBLEU
+  **--eta0** `arg`                           \eta_0 for decay
+
+  **--eps** `arg`                            tolerance for liblinear
+
+  **--order** `arg (=4)`                     ngram order for xBLEU
+
+  **--rate-exponential** exponential learning rate
+
+  **--rate-simple** simple learning rate
+
+  **--rate-adagrad** adaptive learning rate (AdaGrad)
+
+  **--rda** RDA method for optimization (regularized 
+                                      dual averaging method)
 
   **--annealing** annealing
 
   **--quenching** quenching
 
-  **--temperature** `arg (=0)`           temperature
+  **--temperature** `arg (=0)`               temperature
 
-  **--temperature-start** `arg (=1000)`  start temperature for annealing
+  **--temperature-start** `arg (=1000)`      start temperature for annealing
 
-  **--temperature-end** `arg (=0.001)`   end temperature for annealing
+  **--temperature-end** `arg (=0.001)`       end temperature for annealing
 
-  **--temperature-rate** `arg (=0.5)`    annealing rate
+  **--temperature-rate** `arg (=0.5)`        annealing rate
 
-  **--quench-start** `arg (=0.01)`       start quench for annealing
+  **--quench-start** `arg (=0.01)`           start quench for annealing
 
-  **--quench-end** `arg (=100)`          end quench for annealing
+  **--quench-end** `arg (=100)`              end quench for annealing
 
-  **--quench-rate** `arg (=10)`          quenching rate
+  **--quench-rate** `arg (=10)`              quenching rate
 
   **--loss-margin** direct loss margin
 
@@ -107,22 +113,22 @@ OPTIONS
 
   **--sample-vector** perform samling
 
-  **--direct-loss** compute loss by directly treating hypothesis 
-                                  score
+  **--direct-loss** compute loss by directly treating 
+                                      hypothesis score
 
   **--conservative-loss** conservative loss
 
   **--scale-fixed** fixed scaling
 
-  **--scorer** `arg (=bleu:order=4)`     error metric
+  **--scorer** `arg (=bleu:order=4)`         error metric
 
   **--scorer-list** list of error metric
 
   **--unite** unite kbest sharing the same id
 
-  **--threads** `arg`                    # of threads
+  **--threads** `arg`                        # of threads
 
-  **--debug** `[=arg(=1)]`               debug level
+  **--debug** `[=arg(=1)]`                   debug level
 
   **--help** help message
 
