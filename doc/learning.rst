@@ -92,10 +92,11 @@ By default, we use xBLEU as our objective, which can be modified by
 ``--learn`` option. ``--merge`` implies k-best merging learning, and
 without this option, the k-best translations generated in each
 iteration is treated as a separate data set. Another important option
-is ``--C`` which specify the strength of optimization. Larger value
-implies less-overfit to training data, but smaller ``--C`` implies
-fitting to the training data. By default, we use L2 regularization
-(``--regularize-l2``) with ``--C 1e-5`` which prefers overfitting.
+is ``--regularize-{l1,l2}`` which specify the strength of
+optimization. Larger value implies less-overfit to training data, but
+a smaller value implies fitting to the training data. By default, we
+use no regularization, but usually, it is recommended to set
+``--regularize-l2 1e-5`` which prefers fitting to the training data.
 
 Online learning
 ---------------
