@@ -99,6 +99,21 @@ public:
   }  
 };
 
+
+// Exponential learning rate from:
+//
+// @InProceedings{tsuruoka-tsujii-ananiadou:2009:ACLIJCNLP,
+//   author    = {Tsuruoka, Yoshimasa  and  Tsujii, Jun'ichi  and  Ananiadou, Sophia},
+//   title     = {Stochastic Gradient Descent Training for L1-regularized Log-linear Models with Cumulative Penalty},
+//   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+//   month     = {August},
+//   year      = {2009},
+//   address   = {Suntec, Singapore},
+//   publisher = {Association for Computational Linguistics},
+//   pages     = {477--485},
+//   url       = {http://www.aclweb.org/anthology/P/P09/P09-1054}
+// }
+
 class RateExponential : public Rate
 {
   double alpha0_;
@@ -125,6 +140,24 @@ public:
     return eta_;
   }
 };
+
+// AdaGrad from:
+//
+// @article{Duchi:2011:ASM:1953048.2021068,
+//  author = {Duchi, John and Hazan, Elad and Singer, Yoram},
+//  title = {Adaptive Subgradient Methods for Online Learning and Stochastic Optimization},
+//  journal = {J. Mach. Learn. Res.},
+//  issue_date = {2/1/2011},
+//  volume = {12},
+//  month = jul,
+//  year = {2011},
+//  issn = {1532-4435},
+//  pages = {2121--2159},
+//  numpages = {39},
+//  url = {http://dl.acm.org/citation.cfm?id=1953048.2021068},
+//  acmid = {2021068},
+//  publisher = {JMLR.org},
+// } 
 
 class RateAdaGrad : public Rate
 {

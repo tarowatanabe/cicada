@@ -87,6 +87,20 @@ public:
   }
 };
 
+// L1 regularization from
+//
+// @InProceedings{tsuruoka-tsujii-ananiadou:2009:ACLIJCNLP,
+//   author    = {Tsuruoka, Yoshimasa  and  Tsujii, Jun'ichi  and  Ananiadou, Sophia},
+//   title     = {Stochastic Gradient Descent Training for L1-regularized Log-linear Models with Cumulative Penalty},
+//   booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+//   month     = {August},
+//   year      = {2009},
+//   address   = {Suntec, Singapore},
+//   publisher = {Association for Computational Linguistics},
+//   pages     = {477--485},
+//   url       = {http://www.aclweb.org/anthology/P/P09/P09-1054}
+// }
+
 class RegularizeL1 : public Regularize
 {
 public:
@@ -145,6 +159,8 @@ private:
   double penalty_;
 };
 
+
+// L1 and L2 regularization, based on the code from L1 regularizer
 class RegularizeL1L2 : public Regularize
 {
 public:
@@ -222,6 +238,25 @@ private:
   double penalty_;
 };
 
+// L2 regularization from:
+//
+// @inproceedings{Shalev-Shwartz:2007:PPE:1273496.1273598,
+//  author = {Shalev-Shwartz, Shai and Singer, Yoram and Srebro, Nathan},
+//  title = {Pegasos: Primal Estimated sub-GrAdient SOlver for SVM},
+//  booktitle = {Proceedings of the 24th international conference on Machine learning},
+//  series = {ICML '07},
+//  year = {2007},
+//  isbn = {978-1-59593-793-3},
+//  location = {Corvalis, Oregon},
+//  pages = {807--814},
+//  numpages = {8},
+//  url = {http://doi.acm.org/10.1145/1273496.1273598},
+//  doi = {10.1145/1273496.1273598},
+//  acmid = {1273598},
+//  publisher = {ACM},
+//  address = {New York, NY, USA},
+// } 
+
 class RegularizeL2 : public Regularize
 {
 public:
@@ -294,6 +329,20 @@ private:
 // an online version of OSCAR...
 //
 // Note that the original OSCAR has factor of two, which can be ignored in the computation.
+//
+//
+// @ARTICLE{6238378, 
+// author={Zhong, L.W. and Kwok, J.T.}, 
+// journal={Neural Networks and Learning Systems, IEEE Transactions on}, 
+// title={Efficient Sparse Modeling With Automatic Feature Grouping}, 
+// year={2012}, 
+// volume={23}, 
+// number={9}, 
+// pages={1436-1447}, 
+// keywords={computational complexity;computational geometry;data handling;gradient methods;learning (artificial intelligence);pattern clustering;regression analysis;OSCAR;accelerated gradient method;automatic feature grouping;data interpretation;data understanding;empirical time complexity reduction;estimation variance reduction;feature coefficients;feature selection stability improvement;high-dimensional data;iterative group merging algorithm;l1 -regularizer;learning process;octagonal shrinkage-and-clustering algorithm-for-regression;optimization procedure;pairwise l∞-regularizer;sparse modeling;sparse-modeling approach;Acceleration;Algorithm design and analysis;Complexity theory;Computational modeling;Convergence;Gradient methods;Accelerated gradient descent;feature grouping;sparse modeling;structured sparsity}, 
+// doi={10.1109/TNNLS.2012.2200262}, 
+// ISSN={2162-237X},}
+
 class RegularizeOSCAR : public Regularize
 {
 public:
@@ -407,6 +456,24 @@ private:
   double lambda1_;
   double lambda2_;
 };
+
+// Regularized Dual Averaging variant of regularization from:
+//
+// @article{Xiao:2010:DAM:1756006.1953017,
+//  author = {Xiao, Lin},
+//  title = {Dual Averaging Methods for Regularized Stochastic Learning and Online Optimization},
+//  journal = {J. Mach. Learn. Res.},
+//  issue_date = {3/1/2010},
+//  volume = {11},
+//  month = dec,
+//  year = {2010},
+//  issn = {1532-4435},
+//  pages = {2543--2596},
+//  numpages = {54},
+//  url = {http://dl.acm.org/citation.cfm?id=1756006.1953017},
+//  acmid = {1953017},
+//  publisher = {JMLR.org},
+// } 
 
 class RegularizeRDAL1 : public Regularize
 {
