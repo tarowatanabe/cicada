@@ -36,6 +36,10 @@ AC_LANG_CPLUSPLUS
 
 AC_SYS_LARGEFILE
 
+### check -ftemplate-depth=256
+if test -n "$GCC"; then
+   CXXFLAGS="$CXXFLAGS -ftemplate-depth=256"
+fi
 
 # Constants...
 # KENLM_MAX_ORDER

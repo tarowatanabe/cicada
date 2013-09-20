@@ -66,7 +66,7 @@ int main(int argc, char** argv)
   
   // random queries...
   utils::resource start;
-  test_hash_loop<64>::test(gen, hasher32, hasher64);
+  test_hash_loop<128>::test(gen, hasher32, hasher64);
   utils::resource end;
 
   std::cout << "cpu time: " << (end.cpu_time() - start.cpu_time())
