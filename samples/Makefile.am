@@ -14,11 +14,30 @@ t2s/grammar.bin: t2s/grammar.bz2 ../progs/cicada_index_tree_grammar
 
 noinst_DATA = $(generated_models)
 
-sample_models = \
-scfg \
-s2t \
-t2s
+sample_scfg_models = \
+scfg/grammar.bz2 \
+scfg/input.txt \
+scfg/ngram.bin \
+scfg/ngram.bz2 \
+scfg/sample.sh \
+scfg/weights
 
+
+sample_s2t_models = \
+s2t/grammar.bz2 \
+s2t/sample.sh \
+s2t/weights
+
+sample_t2s_models = \
+t2s/grammar.bz2 \
+t2s/input.txt \
+t2s/sample.sh \
+t2s/weights
+
+sample_models = \
+$(sample_scfg_models) \
+$(sample_s2t_models) \
+$(sample_t2s_models)
 
 sample_trains = \
 kftt.30k
