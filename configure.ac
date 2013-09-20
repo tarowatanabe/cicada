@@ -3,12 +3,12 @@
 
 AC_PREREQ([2.61])
 
-AC_INIT([cicada], [0.2.1], [taro.watanabe@nict.go.jp])
+AC_INIT([cicada], [0.2.2], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config])
 
-AM_INIT_AUTOMAKE(cicada, 0.2.1)
+AM_INIT_AUTOMAKE(cicada, 0.2.2)
 
 # 1. Start with version information of ‘0:0:0’ for each libtool library.
 # 2. Update the version information only immediately before a public release of your software. More frequent updates are unnecessary, and only guarantee that the current interface number gets larger faster.
@@ -20,7 +20,7 @@ AM_INIT_AUTOMAKE(cicada, 0.2.1)
 CICADA_LTVERSION=0:2:0
 AC_SUBST(CICADA_LTVERSION)
 
-CICADA_VERSION=0.2.1
+CICADA_VERSION=0.2.2
 AC_SUBST(CICADA_VERSION)
 
 AC_CONFIG_HEADERS(utils/config.h)

@@ -1,7 +1,8 @@
-2013-x-x
+2013-9-20
 --------
  - New: OSCAR for grouped regularization.
  - New: k-sampler which shares the interface as kbest.
+ - New: regularized dual averaging (RDA) for online learning.
  - BUGFIX: prune-kbest core dump.
  - BUGFIX: check length of morphemes for wordnet
  - Added iterator-based interface for kbest/viterbi/sample
