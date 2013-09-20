@@ -65,8 +65,9 @@ namespace cicada
   static const size_t DEBUG_DOT = 1000000;
   static const size_t DEBUG_LINE = DEBUG_DOT * 100;
 
-  struct TreeGrammarStaticImpl : public utils::hashmurmur<uint64_t>
+  class TreeGrammarStaticImpl : public utils::hashmurmur<uint64_t>
   {
+  public:
     friend class TreeGrammarStatic;
 
     typedef size_t    size_type;

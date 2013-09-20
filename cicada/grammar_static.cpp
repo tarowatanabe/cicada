@@ -64,8 +64,9 @@ namespace cicada
   static const size_t DEBUG_DOT = 1000000;
   static const size_t DEBUG_LINE = DEBUG_DOT * 100;
 
-  struct GrammarStaticImpl : public utils::hashmurmur<uint64_t>
+  class GrammarStaticImpl : public utils::hashmurmur<uint64_t>
   {
+  public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 

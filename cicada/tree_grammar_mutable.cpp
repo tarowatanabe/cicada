@@ -54,8 +54,9 @@ namespace cicada
   static const size_t DEBUG_DOT = 1000000;
   static const size_t DEBUG_LINE = DEBUG_DOT * 100;
 
-  struct TreeGrammarMutableImpl
+  class TreeGrammarMutableImpl
   {
+  public:
     friend class TreeGrammarMutable;
 
     typedef size_t    size_type;
