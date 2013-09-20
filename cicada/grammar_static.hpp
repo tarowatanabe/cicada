@@ -17,7 +17,7 @@
 namespace cicada
 {
   
-  class GrammarStaticImpl;
+  struct GrammarStaticImpl;
 
   class GrammarStatic : public Transducer
   {

@@ -17,7 +17,7 @@
 namespace cicada
 {
   
-  class TreeGrammarMutableImpl;
+  struct TreeGrammarMutableImpl;
 
   class TreeGrammarMutable : public TreeTransducer
   {

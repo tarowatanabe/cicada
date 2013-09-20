@@ -35,7 +35,7 @@ namespace cicada
     public:
       struct proxy_type
       {
-	friend struct Log;
+	friend class Log;
 	
 	proxy_type(const weight_type& x, const bool& s) : __value(x), __sign(s) {}
 	

@@ -33,7 +33,7 @@ namespace cicada
     public:
       struct proxy_type
       {
-	friend struct Tropical;
+	friend class Tropical;
 	
 	proxy_type(const weight_type& x) : __value(x) {}
 	
