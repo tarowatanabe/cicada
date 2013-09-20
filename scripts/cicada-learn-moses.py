@@ -448,6 +448,17 @@ if __name__ == '__main__':
     if options.regularize_oscar < 0.0:
         raise ValueError, "OSCAR regularization must be positive"
 
+    regularizer = []
+    if options.regularize_l1 > 0.0:
+        regularizer.append(Option('--regularize-l1',     options.regularize_l1))
+    if options.regularize_l2 > 0.0:
+        regularizer.append(Option('--regularize-l2',     options.regularize_l2))
+    if options.regularize_lambda > 0.0:
+        regularizer.append(Option('--regularize-lambda', options.regularize_lambda))
+    if options.regularize_oscar > 0.0:
+        regularizer.append(Option('--regularize-oscar',  options.regularize_oscar))
+    regularizer = ' '.join(map(str, regularizer))
+
     ### cicada
     cicada = CICADA(dir=options.cicada_dir)
     
@@ -675,10 +686,7 @@ if __name__ == '__main__':
                                 learn_weights,
                                 learn_algorithm,
                                 options.learn_options,
-                                Option('--regularize-l1',     options.regularize_l1),
-                                Option('--regularize-l2',     options.regularize_l2),
-                                Option('--regularize-lambda', options.regularize_lambda),
-                                Option('--regularize-oscar',  options.regularize_oscar),
+                                regularizer,
                                 Option('--debug', 2),),
                         name="learn",
                         memory=options.max_malloc,
@@ -695,10 +703,7 @@ if __name__ == '__main__':
                              learn_weights,
                              learn_algorithm,
                              options.learn_options,
-                             Option('--regularize-l1',     options.regularize_l1),
-                             Option('--regularize-l2',     options.regularize_l2),
-                             Option('--regularize-lambda', options.regularize_lambda),
-                             Option('--regularize-oscar',  options.regularize_oscar),
+                             regularizer,
                              Option('--threads', options.threads),
                              Option('--debug', 2),),
                      name="learn",
