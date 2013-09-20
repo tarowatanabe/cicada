@@ -96,7 +96,7 @@ int main(int argc, char** argv)
   
   {
     utils::resource start;
-    test_hash_loop<256>::test(gen, utils::hashxx<uint32_t>(), utils::hashxx<uint64_t>());
+    test_hash_loop<64>::test(gen, utils::hashxx<uint32_t>(), utils::hashxx<uint64_t>());
     utils::resource end;
     
     std::cout << "medium hashxx cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
 
   {
     utils::resource start;
-    test_hash_loop<256>::test(gen, utils::hashmurmur<uint32_t>(), utils::hashmurmur<uint64_t>());
+    test_hash_loop<64>::test(gen, utils::hashmurmur<uint32_t>(), utils::hashmurmur<uint64_t>());
     utils::resource end;
     
     std::cout << "medium hashmurmur cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
 
   {
     utils::resource start;
-    test_hash_loop<256>::test(gen, utils::hashmurmur3<uint32_t>(), utils::hashmurmur3<uint64_t>());
+    test_hash_loop<64>::test(gen, utils::hashmurmur3<uint32_t>(), utils::hashmurmur3<uint64_t>());
     utils::resource end;
     
     std::cout << "medium hashmurmur3 cpu time: " << (end.cpu_time() - start.cpu_time())
