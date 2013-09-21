@@ -1093,7 +1093,7 @@ m4_define([_BOOST_clang_test],
 #
 #
 m4_define([_BOOST_apple_clang_test],
-["defined __APPLE_CC__ && defined __clang__ && __GNUC__ == $1 && __GNUC_MINOR__ == $2 @ clang-darwin$1$2"])dnl
+["defined __APPLE_CC__ && defined __clang__ && __GNUC__ == $1 && __GNUC_MINOR__ == $2 @ xgcc$1$2 -clang-darwin$1$2"])dnl
 
 
 # _BOOST_FIND_COMPILER_TAG()
