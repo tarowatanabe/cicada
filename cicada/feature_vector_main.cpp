@@ -25,16 +25,16 @@ typedef cicada::FeatureVectorCompact  feature_compact_type;
 
 void check_compact(const feature_set_type& features, const feature_compact_type& feats)
 {
+  std::cerr << "size: " << features.size() * sizeof(feature_set_type::value_type)
+	    << " compressed: " << feats.size_compressed()
+	    << std::endl;
+#if 0
   feature_set_type::const_iterator iter = features.begin();
   feature_set_type::const_iterator iter_end = features.end();
   
   feature_compact_type::const_iterator citer = feats.begin();
   feature_compact_type::const_iterator citer_end = feats.end();
 
-  std::cerr << "size: " << features.size() * sizeof(feature_set_type::value_type)
-	    << " compressed: " << feats.size_compressed()
-	    << std::endl;
-#if 0
   while (iter != iter_end && citer != citer_end) {
     if (iter->first < citer->first) {
       std::cerr << "differ for the original vector!" << std::endl;
