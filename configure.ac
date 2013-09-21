@@ -37,9 +37,9 @@ AC_LANG_CPLUSPLUS
 
 AC_SYS_LARGEFILE
 
-### check -ftemplate-depth=256
+### check -ftemplate-depth=1024
 if test -n "$GCC"; then
-   CXXFLAGS="$CXXFLAGS -ftemplate-depth=256"
+   CXXFLAGS="$CXXFLAGS -ftemplate-depth=1024"
 fi
 
 # Constants...
