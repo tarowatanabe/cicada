@@ -748,14 +748,14 @@ struct MST
 	} else if (relation_mode) {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
-					<< " ||| " << -(karma::int_ % ' ')
+					<< " ||| " << -(karma::uint_ % ' ')
 					<< '\n'),
 				mst.words, mst.labels, mst.positions))
 	    throw std::runtime_error("generation failed");
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
-					<< " ||| " << -(karma::int_ % ' ')
+					<< " ||| " << -(karma::uint_ % ' ')
 					<< '\n'),
 				mst.words, mst.poss, mst.positions))
 	    throw std::runtime_error("generation failed");
@@ -1592,7 +1592,7 @@ struct KHayashi
 	} else {
 	  if (! karma::generate(oiter, (-(standard::string % ' ')
 					<< " ||| " << -(standard::string % ' ')
-					<< " ||| " << -(karma::int_ % ' ')
+					<< " ||| " << -(karma::uint_ % ' ')
 					<< '\n'),
 				khayashi.words, khayashi.poss, khayashi.positions))
 	    throw std::runtime_error("generation failed");
