@@ -726,10 +726,10 @@ struct ScorerMOSES
       const Unaligned::scores_type scores = unaligned(source, target, alignments);
       
       if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10,
-			    utils::mathop::exp(scores.aligned_source),
-			    utils::mathop::exp(scores.aligned_target),
-			    utils::mathop::exp(scores.unaligned_source),
-			    utils::mathop::exp(scores.unaligned_target)))
+			    utils::mathop::exp(double(scores.aligned_source)),
+			    utils::mathop::exp(double(scores.aligned_target)),
+			    utils::mathop::exp(double(scores.unaligned_source)),
+			    utils::mathop::exp(double(scores.unaligned_target))))
 	throw std::runtime_error("failed generation");
     }
     
