@@ -92,7 +92,7 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      tail %= -(karma::int_ % "\\ ");
+      tail %= -(karma::uint_ % "\\ ");
     }
     
     boost::spirit::karma::rule<Iterator, node_set_type()> tail;
