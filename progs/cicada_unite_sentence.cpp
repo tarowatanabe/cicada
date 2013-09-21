@@ -301,7 +301,7 @@ struct TranslationErrorRate : public TER, public M
   TranslationErrorRate(const TER::weights_type& __weights,
 		       const matcher_type* __matcher,
 		       const int __debug)
-    : minimum_edit_distance(__weights, __matcher, debug),
+    : minimum_edit_distance(__weights, __matcher, __debug),
       weights(__weights),
       matcher(__matcher),
       debug(__debug) {}
