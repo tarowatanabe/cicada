@@ -742,9 +742,9 @@ struct ScorerMOSES
     }
     
     if (feature_singleton_mode) {
-      const int singleton_source = phrase_pair.observed_source == 1;
-      const int singleton_target = phrase_pair.observed_target == 1;
-      const int singleton        = singleton_source && singleton_target;
+      const double singleton_source = phrase_pair.observed_source == 1;
+      const double singleton_target = phrase_pair.observed_target == 1;
+      const double singleton        = singleton_source && singleton_target;
       
       if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10,
 			    utils::mathop::exp(singleton), utils::mathop::exp(singleton_source), utils::mathop::exp(singleton_target)))
