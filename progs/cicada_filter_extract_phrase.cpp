@@ -458,7 +458,7 @@ struct ScorerCICADA
     }
     
     if (feature_cross_mode)
-      if (! karma::generate(iter, ' ' << karma::int_, cross(source, target, alignments)))
+      if (! karma::generate(iter, ' ' << karma::uint_, cross(source, target, alignments)))
 	throw std::runtime_error("failed generation");
     
     if (! mode_reordering) 
@@ -752,7 +752,7 @@ struct ScorerMOSES
     }
     
     if (feature_cross_mode)
-      if (! karma::generate(iter, ' ' << double10, utils::mathop::exp(cross(source, target, alignments))))
+      if (! karma::generate(iter, ' ' << double10, utils::mathop::exp(double(cross(source, target, alignments)))))
 	throw std::runtime_error("failed generation");
     
     os << '\n';
