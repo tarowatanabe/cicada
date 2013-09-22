@@ -1,11 +1,11 @@
 //
-//  Copyright(C) 2011-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "format.hpp"
 #include "parameter.hpp"
 
-#include "format/country.hpp"
+#include "format/region.hpp"
 #include "format/language.hpp"
 #include "format/date.hpp"
 #include "format/number.hpp"
@@ -19,11 +19,6 @@ namespace cicada
   const char* Format::lists()
   {
     static const char* desc = "\
-country: country format\n\
-\tlocale-source=[locale] parser locale\n\
-\tlocale-target=[locale] generator locale\n\
-\tlocale-parser=[locale] parser locale\n\
-\tlocale-generator=[locale] generator locale\n\
 date: date/time format\n\
 \tsource=[file] parser file\n\
 \ttarget=[file] generator file\n\
@@ -43,6 +38,11 @@ number: number format\n\
 \ttarget=[file] generator file\n\
 \tparser=[file] parser file\n\
 \tgenerator=[file] generator file\n\
+\tlocale-source=[locale] parser locale\n\
+\tlocale-target=[locale] generator locale\n\
+\tlocale-parser=[locale] parser locale\n\
+\tlocale-generator=[locale] generator locale\n\
+region: region format\n\
 \tlocale-source=[locale] parser locale\n\
 \tlocale-target=[locale] generator locale\n\
 \tlocale-parser=[locale] parser locale\n\
@@ -137,7 +137,7 @@ number: number format\n\
       }
       
       return *(iter->second);
-    } else if (utils::ipiece(param.name()) == "country") {
+    } else if (utils::ipiece(param.name()) == "region") {
       
       format_map_type::iterator iter = formats_map.find(parameter);
       if (iter == formats_map.end()) {
@@ -153,7 +153,7 @@ number: number format\n\
 	    throw std::runtime_error("unsupported parameter: " + parameter);
 	}
 	
-	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Country(locale_parser, locale_generator)))).first;
+	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Region(locale_parser, locale_generator)))).first;
 	iter->second->__algorithm = parameter;
       }
       

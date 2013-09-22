@@ -10,6 +10,7 @@
 #include "language.hpp"
 
 #include <unicode/locid.h>
+#include <unicode/locdspnm.h>
 
 #include "utils/unordered_map.hpp"
 #include "utils/piece.hpp"
@@ -34,7 +35,7 @@ private:
       
     public:
       LanguageImpl(const std::string& locale_str_source,
-		  const std::string& locale_str_target)
+		   const std::string& locale_str_target)
       {
 	const icu::Locale locale_source(locale_str_source.c_str());
 	const icu::Locale locale_target(locale_str_target.c_str());
@@ -49,12 +50,13 @@ private:
 	
 	std::string source;
 	std::string target;
+
+	std::auto_ptr<LocaleDisplayNames> lsource(LocaleDisplayNames::createInstance(locale_source));
+	std::auto_ptr<LocaleDisplayNames> ltarget(LocaleDisplayNames::createInstance(locale_target));
 	
 	for (const char* const* iter =  icu::Locale::getISOLanguages(); *iter; ++ iter) {
-	  const icu::Locale loc(*iter);
-	  
-	  loc.getDisplayLanguage(locale_source, usource);
-	  loc.getDisplayLanguage(locale_target, utarget);
+	  lsource->languageDisplayName(*iter, usource);
+	  ltarget->languageDisplayName(*iter, utarget);
 	  
 	  source.clear();
 	  target.clear();
@@ -64,6 +66,8 @@ private:
 
 	  // skip untrnlatated langauge
 	  if (source == *iter || target == *iter) continue;
+
+	  // std::cout << "lang: " << *iter << " source: " << source << " target: " << target << std::endl;
 	  
 	  language[source] = target;
 	}
