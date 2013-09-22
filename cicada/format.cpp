@@ -5,6 +5,8 @@
 #include "format.hpp"
 #include "parameter.hpp"
 
+#include "format/country.hpp"
+#include "format/language.hpp"
 #include "format/date.hpp"
 #include "format/number.hpp"
 
@@ -17,11 +19,21 @@ namespace cicada
   const char* Format::lists()
   {
     static const char* desc = "\
+country: country format\n\
+\tlocale-source=[locale] parser locale\n\
+\tlocale-target=[locale] generator locale\n\
+\tlocale-parser=[locale] parser locale\n\
+\tlocale-generator=[locale] generator locale\n\
 date: date/time format\n\
 \tsource=[file] parser file\n\
 \ttarget=[file] generator file\n\
 \tparser=[file] parser file\n\
 \tgenerator=[file] generator file\n\
+\tlocale-source=[locale] parser locale\n\
+\tlocale-target=[locale] generator locale\n\
+\tlocale-parser=[locale] parser locale\n\
+\tlocale-generator=[locale] generator locale\n\
+language: language format\n\
 \tlocale-source=[locale] parser locale\n\
 \tlocale-target=[locale] generator locale\n\
 \tlocale-parser=[locale] parser locale\n\
@@ -121,6 +133,48 @@ number: number format\n\
 	}
 	
 	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Date(file_parser, file_generator, locale_parser, locale_generator)))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "country") {
+      
+      format_map_type::iterator iter = formats_map.find(parameter);
+      if (iter == formats_map.end()) {
+	std::string locale_parser;
+	std::string locale_generator;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "locale-parser" || utils::ipiece(piter->first) == "locale-source")
+	    locale_parser = piter->second;
+	  else if (utils::ipiece(piter->first) == "locale-generator" || utils::ipiece(piter->first) == "locale-target")
+	    locale_generator = piter->second;
+	  else
+	    throw std::runtime_error("unsupported parameter: " + parameter);
+	}
+	
+	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Country(locale_parser, locale_generator)))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "language") {
+      
+      format_map_type::iterator iter = formats_map.find(parameter);
+      if (iter == formats_map.end()) {
+	std::string locale_parser;
+	std::string locale_generator;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "locale-parser" || utils::ipiece(piter->first) == "locale-source")
+	    locale_parser = piter->second;
+	  else if (utils::ipiece(piter->first) == "locale-generator" || utils::ipiece(piter->first) == "locale-target")
+	    locale_generator = piter->second;
+	  else
+	    throw std::runtime_error("unsupported parameter: " + parameter);
+	}
+	
+	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Language(locale_parser, locale_generator)))).first;
 	iter->second->__algorithm = parameter;
       }
       
