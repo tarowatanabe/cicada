@@ -37,7 +37,7 @@ namespace cicada
 {
   namespace format
   {
-    struct DateImpl : public utils::hashmurmur3<size_t>
+    class DateImpl : public utils::hashmurmur3<size_t>
     {
     public:
       typedef icu::DateFormat parser_type;
@@ -132,6 +132,8 @@ namespace cicada
 	generator_set_type::const_iterator giter_end = x.generators.end();
 	for (generator_set_type::const_iterator giter = x.generators.begin(); giter != giter_end; ++ giter)
 	  generators.push_back(dynamic_cast<generator_type*>((*giter)->clone()));
+	
+	name = x.name;
       }
       
       void clear()

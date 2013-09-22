@@ -37,7 +37,7 @@ namespace cicada
 {
   namespace format
   {
-    struct NumberImpl : public utils::hashmurmur3<size_t>
+    class NumberImpl : public utils::hashmurmur3<size_t>
     {
     public:
       typedef icu::NumberFormat parser_type;
