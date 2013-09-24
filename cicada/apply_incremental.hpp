@@ -233,10 +233,13 @@ namespace cicada
 
     ApplyIncremental(const model_type& _model,
 		     const function_type& _function,
-		     const int _pop_size_max)
+		     const int _pop_size_max,
+		     const bool _prune_bin=false)
       : model(_model),
 	function(_function),
-	pop_size_max(_pop_size_max)
+	pop_size_max(_pop_size_max),
+	prune_bin(_prune_bin),
+	attr_prune_bin(_prune_bin ? "prune-bin" : "")
 	//attr_scan("incremental-scan"),
 	//attr_complete("incremental-complete"),
 	//attr_predict("incremental-predict")
@@ -251,7 +254,7 @@ namespace cicada
       graph_out.clear();
 
       if (model.is_stateless()) {
-	ApplyStateLess __applier(model);
+	ApplyStateLess __applier(model, prune_bin); // actually, this is incorrect...
 	__applier(graph_in, graph_out);
       } else {
 	candidates.clear();
@@ -418,6 +421,9 @@ namespace cicada
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, graph_out.goal);
 	      
+	      if (prune_bin)
+		edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(step);
+	      
 	      // we will not use item any more...
 	      destroy_candidate(item);
 	      
@@ -433,6 +439,9 @@ namespace cicada
 	      
 	      edge_type& edge_new = graph_out.add_edge(item->out_edge);
 	      graph_out.connect_edge(edge_new.id, result.first->second);
+
+	      if (prune_bin)
+		edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(step);
 	      
 	      // we will not propagate...
 	      if (! result.second) {
@@ -613,6 +622,9 @@ namespace cicada
     const model_type& model;
     const function_type& function;
     size_type  pop_size_max;
+    bool prune_bin;
+    
+    attribute_type attr_prune_bin;
 
 #if 0
     attribute_type attr_scan;
@@ -623,18 +635,18 @@ namespace cicada
   
   template <typename Function>
   inline
-  void apply_incremental(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int pop_size)
+  void apply_incremental(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int pop_size, const bool prune_bin=false)
   {
-    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size)(source, target);
+    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size, prune_bin)(source, target);
   }
 
   template <typename Function>
   inline
-  void apply_incremental(const Model& model, HyperGraph& source, const Function& func, const int pop_size)
+  void apply_incremental(const Model& model, HyperGraph& source, const Function& func, const int pop_size, const bool prune_bin=false)
   {
     HyperGraph target;
     
-    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size)(source, target);
+    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size, prune_bin)(source, target);
     
     source.swap(target);
   }

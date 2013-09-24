@@ -56,6 +56,10 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
 
     typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
 
     typedef Model model_type;
     
@@ -168,11 +172,14 @@ namespace cicada
     ApplyCubePruneDiverse(const model_type& _model,
 			  const function_type& _function,
 			  const int _cube_size_max,
-			  const double _diversity)
+			  const double _diversity,
+			  const bool _prune_bin=false)
       : model(_model),
 	function(_function),
 	cube_size_max(_cube_size_max),
-	diversity(_diversity)
+	diversity(_diversity),
+	prune_bin(_prune_bin),
+	attr_prune_bin(_prune_bin ? "prune-bin" : "")
     { 
     }
     
@@ -184,7 +191,7 @@ namespace cicada
       const_cast<model_type&>(model).initialize();
 
       if (model.is_stateless()) {
-	ApplyStateLess __applier(model);
+	ApplyStateLess __applier(model, prune_bin);
 	__applier(graph_in, graph_out);
       } else {
 	candidates.clear();
@@ -294,6 +301,10 @@ namespace cicada
 		     hypergraph_type& graph)
     {
       edge_type& edge_new = graph.add_edge(item.out_edge);
+
+      // prune-bin attribute
+      if (prune_bin)
+	edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(item.in_edge->head);
       
       if (is_goal) {
 	// perform hypothesis re-combination toward goal-node...
@@ -424,22 +435,25 @@ namespace cicada
     const function_type& function;
     const size_type  cube_size_max;
     const double     diversity;
+    bool prune_bin;
+    
+    attribute_type attr_prune_bin;
   };
   
   template <typename Function>
   inline
-  void apply_cube_prune_diverse(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size, const double diversity)
+  void apply_cube_prune_diverse(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size, const double diversity, const bool prune_bin=false)
   {
-    ApplyCubePruneDiverse<typename Function::value_type, Function>(model, func, cube_size, diversity)(source, target);
+    ApplyCubePruneDiverse<typename Function::value_type, Function>(model, func, cube_size, diversity, prune_bin)(source, target);
   }
 
   template <typename Function>
   inline
-  void apply_cube_prune_diverse(const Model& model, HyperGraph& source, const Function& func, const int cube_size, const double diversity)
+  void apply_cube_prune_diverse(const Model& model, HyperGraph& source, const Function& func, const int cube_size, const double diversity, const bool prune_bin=false)
   {
     HyperGraph target;
     
-    ApplyCubePruneDiverse<typename Function::value_type, Function>(model, func, cube_size, diversity)(source, target);
+    ApplyCubePruneDiverse<typename Function::value_type, Function>(model, func, cube_size, diversity, prune_bin)(source, target);
     
     source.swap(target);
   }

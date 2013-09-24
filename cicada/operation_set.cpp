@@ -72,6 +72,7 @@ apply: feature application\n\
 \tdense=[true|false]  apply non-sparse features only\n\
 \tstate-full=[true|false] apply state-full features only\n\
 \tstate-less=[true|false] apply state-less features only\n\
+\tprune-bin=[true|false] preserve pruning bin information\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__APPLY_EXACT__HPP__
@@ -34,6 +34,10 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
 
     typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
 
     typedef Model model_type;
     
@@ -50,8 +54,11 @@ namespace cicada
 			       model_type::state_hash, model_type::state_equal,
 			       std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
         
-    ApplyExact(const model_type& _model)
-      : model(_model)
+    ApplyExact(const model_type& _model,
+	       const bool _prune_bin=false)
+      : model(_model),
+	prune_bin(_prune_bin),
+	attr_prune_bin(_prune_bin ? "prune-bin" : "")
     {  }
     
     void operator()(const hypergraph_type& graph_in,
@@ -60,7 +67,7 @@ namespace cicada
       const_cast<model_type&>(model).initialize();
 
       if (model.is_stateless()) {
-	ApplyStateLess __applier(model);
+	ApplyStateLess __applier(model, prune_bin);
 	__applier(graph_in, graph_out);
       } else {
 	node_map.clear();
@@ -113,6 +120,9 @@ namespace cicada
 	  edge_new.rule = edge.rule;
 	  edge_new.features   = edge.features;
 	  edge_new.attributes = edge.attributes;
+	  
+	  if (prune_bin)
+	    edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(v);
 
 	  const state_type state = model.apply(node_states, edge_new, edge_new.features, is_goal);
 	  
@@ -164,23 +174,26 @@ namespace cicada
     state_set_type      node_states;
     
     const model_type& model;
+    bool prune_bin;
+    
+    attribute_type attr_prune_bin;
   };
 
 
   inline
-  void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target)
+  void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target, const bool prune_bin=false)
   {
-    ApplyExact __apply(model);
+    ApplyExact __apply(model, prune_bin);
 
     __apply(source, target);
   }
   
   inline
-  void apply_exact(const Model& model, HyperGraph& source)
+  void apply_exact(const Model& model, HyperGraph& source, const bool prune_bin=false)
   {
     HyperGraph target;
     
-    ApplyExact __apply(model);
+    ApplyExact __apply(model, prune_bin);
     
     __apply(source, target);
     

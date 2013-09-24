@@ -29,7 +29,7 @@ namespace cicada
 		 const int __debug)
       : model(__model), weights(0), weights_assigned(0), size(200), diversity(0.0),
 	weights_one(false), weights_fixed(false), weights_extra(),
-	rejection(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), debug(__debug)
+	rejection(false), exact(false), prune(false), grow(false), grow_coarse(false), incremental(false), forced(false), sparse(false), dense(false), state_less(false), state_full(false), prune_bin(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -64,6 +64,8 @@ namespace cicada
 	  state_full = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "state-less")
 	  state_less = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "prune-bin")
+	  prune_bin = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -238,48 +240,48 @@ namespace cicada
 	cicada::apply_exact(__model, hypergraph, applied);
       else if (incremental) {
 	if (weights_one)
-	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_one<weight_type>(), size, prune_bin);
 	else if (! weights_extra.empty())
-	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
+	  cicada::apply_incremental(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, prune_bin);
 	else
-	  cicada::apply_incremental(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
+	  cicada::apply_incremental(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, prune_bin);
       } else if (grow) {
 	if (weights_one)
-	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_one<weight_type>(), size, prune_bin);
 	else if (! weights_extra.empty())
-	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
+	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, prune_bin);
 	else
-	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
+	  cicada::apply_cube_grow(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, prune_bin);
       } else if (grow_coarse) {
 	if (weights_one)
-	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_one<weight_type>(), size, prune_bin);
 	else if (! weights_extra.empty())
-	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, prune_bin);
 	else
-	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
+	  cicada::apply_cube_grow_coarse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, prune_bin);
       } else {
 	if (diversity != 0.0) {
 	  if (weights_one)
-	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_one<weight_type>(), size, diversity);
+	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_one<weight_type>(), size, diversity, prune_bin);
 	  else if (! weights_extra.empty())
-	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, diversity);
+	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, diversity, prune_bin);
 	  else
-	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, diversity);
+	    cicada::apply_cube_prune_diverse(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, diversity, prune_bin);
 	} else if (rejection) {
 	  if (weights_one)
-	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_one<weight_type>(), const_cast<sampler_type&>(sampler), size);
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_one<weight_type>(), const_cast<sampler_type&>(sampler), size, prune_bin);
 	  else if (! weights_extra.empty())
-	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), const_cast<sampler_type&>(sampler), size);
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), const_cast<sampler_type&>(sampler), size, prune_bin);
 	  else
-	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), const_cast<sampler_type&>(sampler), size);
+	    cicada::apply_cube_prune_rejection(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), const_cast<sampler_type&>(sampler), size, prune_bin);
 	  
 	} else {
 	  if (weights_one)
-	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size);
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_one<weight_type>(), size, prune_bin);
 	  else if (! weights_extra.empty())
-	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size);
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function_extra<weight_type>(*weights_apply, weights_extra.begin(), weights_extra.end()), size, prune_bin);
 	  else
-	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size);
+	    cicada::apply_cube_prune(__model, hypergraph, applied, weight_function<weight_type>(*weights_apply), size, prune_bin);
 	}
       }
     

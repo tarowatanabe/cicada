@@ -69,6 +69,10 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
 
     typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
 
     typedef Model model_type;
     
@@ -184,10 +188,13 @@ namespace cicada
     
     ApplyCubeGrowCoarse(const model_type& _model,
 			const function_type& _function,
-			const int _cube_size_max)
+			const int _cube_size_max,
+			const bool _prune_bin=false)
       : model(_model),
 	function(_function),
-	cube_size_max(_cube_size_max)
+	cube_size_max(_cube_size_max),
+	prune_bin(_prune_bin),
+	attr_prune_bin(_prune_bin ? "prune-bin" : "")
     { 
       
     }
@@ -200,7 +207,7 @@ namespace cicada
       graph_out.clear();
 
       if (model.is_stateless()) {
-	ApplyStateLess __applier(model);
+	ApplyStateLess __applier(model, prune_bin);
 	__applier(graph_in, graph_out);
       } else {
 	candidates.clear();
@@ -378,6 +385,9 @@ namespace cicada
 	
 	edge_type& edge = graph_out.add_edge(candidate.out_edge);
 	graph_out.connect_edge(edge.id, candidate.out_edge.head);
+
+	if (prune_bin)
+	  edge.attributes[attr_prune_bin] = attribute_set_type::int_type(item->in_edge->head);
 	
 	state.D.push_back(item);
       }
@@ -468,22 +478,25 @@ namespace cicada
     const model_type& model;
     const function_type& function;
     size_type  cube_size_max;
+    bool prune_bin;
+    
+    attribute_type attr_prune_bin;
   };
   
   template <typename Function>
   inline
-  void apply_cube_grow_coarse(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  void apply_cube_grow_coarse(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size, const bool prune_bin=false)
   {
-    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size, prune_bin)(source, target);
   }
 
   template <typename Function>
   inline
-  void apply_cube_grow_coarse(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
+  void apply_cube_grow_coarse(const Model& model, HyperGraph& source, const Function& func, const int cube_size, const bool prune_bin=false)
   {
     HyperGraph target;
     
-    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyCubeGrowCoarse<typename Function::value_type, Function>(model, func, cube_size, prune_bin)(source, target);
     
     source.swap(target);
   }

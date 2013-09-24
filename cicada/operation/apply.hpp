@@ -56,6 +56,8 @@ namespace cicada
       bool state_less;
       bool state_full;
 
+      bool prune_bin;
+
       sampler_type sampler;
   
       int debug;

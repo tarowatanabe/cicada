@@ -32,6 +32,10 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
 
     typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
 
     typedef Model model_type;
     
@@ -39,8 +43,11 @@ namespace cicada
     typedef model_type::state_set_type state_set_type;
         
     
-    ApplyStateLess(const model_type& _model)
-      : model(_model)
+    ApplyStateLess(const model_type& _model,
+		   const bool _prune_bin=false)
+      : model(_model),
+	prune_bin(_prune_bin),
+	attr_prune_bin(_prune_bin ? "prune-bin" : "")
     {  }
     
     void operator()(const hypergraph_type& graph_in,
@@ -68,6 +75,9 @@ namespace cicada
 	  edge_type& edge = graph_out.edges[*eiter];
 	  
 	  model.apply(node_states, edge, edge.features, node.id == graph_out.goal);
+
+	  if (prune_bin)
+	    edge.attributes[attr_prune_bin] = attribute_set_type::int_type(node.id);
 	}
       }
       
@@ -80,23 +90,26 @@ namespace cicada
     state_set_type      node_states;
     
     const model_type& model;
+    bool prune_bin;
+    
+    attribute_type attr_prune_bin;
   };
 
 
   inline
-  void apply_state_less(const Model& model, const HyperGraph& source, HyperGraph& target)
+  void apply_state_less(const Model& model, const HyperGraph& source, HyperGraph& target, const bool prune_bin=false)
   {
-    ApplyStateLess __apply(model);
+    ApplyStateLess __apply(model, prune_bin);
 
     __apply(source, target);
   }
   
   inline
-  void apply_state_less(const Model& model, HyperGraph& source)
+  void apply_state_less(const Model& model, HyperGraph& source, const bool prune_bin=false)
   {
     HyperGraph target;
     
-    ApplyStateLess __apply(model);
+    ApplyStateLess __apply(model, prune_bin);
     
     __apply(source, target);
     
