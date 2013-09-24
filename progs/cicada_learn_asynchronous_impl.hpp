@@ -39,6 +39,7 @@
 #include "utils/mathop.hpp"
 #include "utils/indexed_trie.hpp"
 #include "utils/getline.hpp"
+#include "utils/mulvector2.hpp"
 
 #include "cicada_learn_online_regularize_impl.hpp"
 #include "cicada_learn_online_rate_impl.hpp"
@@ -988,6 +989,85 @@ struct LearnSoftmax : public LearnSoftmaxBase
   Rate&       rate;
 };
 
+struct Margin
+{
+  typedef std::pair<feature_type, double> feature_value_type;
+  typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > delta_set_type;
+  
+  virtual ~Margin() {}
+
+  virtual void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle) = 0;
+  
+  void clear() { deltas.clear(); }
+  
+  delta_set_type deltas;
+};
+
+struct MarginDerivation : public Margin
+{
+  // full-derivation margin
+  
+  void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
+  {
+    if (! forest.is_valid() || ! oracle.is_valid()) return;
+
+    // take maximum from forest wrt weights
+    // take minimum from oracle wrt weights
+    
+    
+  }
+};
+
+struct MarginViolationSingle : public Margin
+{
+  // single max-violation node margin
+
+  void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
+  {
+    if (! forest.is_valid() || ! oracle.is_valid()) return;
+
+    // First, take minimum from oracle wrt weights
+    
+    // Second, take maximum from forest wrt weights
+    
+    // Third, compute the largest margin
+    
+  }
+  
+};
+
+struct MarginViolationMultiple : public Margin
+{
+  // multiple max-violation node margin
+  
+  void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
+  {
+    if (! forest.is_valid() || ! oracle.is_valid()) return;
+    
+    // First, take minimum from oracle wrt weights
+    
+    // Second, take maximum from forest wrt weights
+    
+    // Third, enumerate prune-bin and if difference is greater than zero, then, encode in samples
+    
+  }
+};
+
+struct LearnMargin : public LearnBase
+{
+  //
+  // large margin style update, including perceptron
+  //
+
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    
+    
+    
+    
+  }
+  
+};
 
 struct YieldSentence
 {
