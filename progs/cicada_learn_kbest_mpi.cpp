@@ -1274,8 +1274,18 @@ double optimize_online(const scorer_document_type& scorers,
   size_t samples = 0;
   MPI::COMM_WORLD.Allreduce(&samples_rank, &samples, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
   
-  boost::shared_ptr<Regularize> regularize;
   boost::shared_ptr<Rate> rate;
+
+  if (rate_simple)
+    rate.reset(new RateSimple(eta0));
+  else if (rate_exponential)
+    rate.reset(new RateExponential(alpha0, eta0, samples));
+  else if (rate_adagrad)
+    rate.reset(new RateAdaGrad(eta0));
+  else
+    throw std::runtime_error("unsupported learning rate");
+
+  boost::shared_ptr<Regularize> regularize;
   
   const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
   const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
@@ -1305,15 +1315,6 @@ double optimize_online(const scorer_document_type& scorers,
     else
       regularize.reset(new RegularizeNone());
   }
-
-  if (rate_simple)
-    rate.reset(new RateSimple(eta0));
-  else if (rate_exponential)
-    rate.reset(new RateExponential(alpha0, eta0, samples));
-  else if (rate_adagrad)
-    rate.reset(new RateAdaGrad(eta0));
-  else
-    throw std::runtime_error("unsupported learning rate");
   
   if (learn_softmax) {
     OptimizerSoftmax optimizer(regularize, rate);

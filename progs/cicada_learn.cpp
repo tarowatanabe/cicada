@@ -511,14 +511,24 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   for (int id = 0; id != id_max; ++ id)
     samples += (graphs_forest[id].is_valid() && graphs_intersected[id].is_valid());
   
-  boost::shared_ptr<Regularize> regularize;
   boost::shared_ptr<Rate> rate;
+
+  if (rate_simple)
+    rate.reset(new RateSimple(eta0));
+  else if (rate_exponential)
+    rate.reset(new RateExponential(alpha0, eta0, samples));
+  else if (rate_adagrad)
+    rate.reset(new RateAdaGrad(eta0));
+  else
+    throw std::runtime_error("unsupported learning rate");
   
   const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
   const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
   const bool reg_l1    = (regularize_l1 > 0.0);
   const bool reg_l2    = (regularize_l2 > 0.0);
   
+  boost::shared_ptr<Regularize> regularize;
+
   if (rda_mode) {
     if (reg_oscar)
       regularize.reset(new RegularizeRDAOSCAR(regularize_l1, regularize_oscar));
@@ -542,15 +552,6 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
     else
       regularize.reset(new RegularizeNone());
   }
-
-  if (rate_simple)
-    rate.reset(new RateSimple(eta0));
-  else if (rate_exponential)
-    rate.reset(new RateExponential(alpha0, eta0, samples));
-  else if (rate_adagrad)
-    rate.reset(new RateAdaGrad(eta0));
-  else
-    throw std::runtime_error("unsupported learning rate");
   
   return Optimizer(graphs_forest, graphs_intersected, weights, generator)(typename Optimizer::optimizer_type(regularize, rate));
 }
