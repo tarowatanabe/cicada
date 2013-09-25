@@ -109,8 +109,12 @@ int iteration = 10;
 int batch_size = 8;
 
 // solver parameters
-bool learn_xbleu = false;
-bool learn_softmax    = false;
+bool learn_xbleu   = false;
+bool learn_softmax = false;
+bool learn_hinge   = false;
+bool learn_ohinge  = false;
+bool learn_pa      = false;
+bool learn_mira    = false;
 
 double regularize_l1 = 0.0;
 double regularize_l2 = 0.0;
@@ -123,9 +127,13 @@ double alpha0 = 0.85;
 double eta0 = 0.2;
 int order = 4;
 
-bool rate_simple = false;
+bool rate_simple      = false;
 bool rate_exponential = false;
-bool rate_adagrad = false;
+bool rate_adagrad     = false;
+
+bool violation_derivation = false;
+bool violation_single     = false;
+bool violation_all        = false;
 
 // additional misc parameters...
 bool rda_mode = false;
@@ -236,9 +244,9 @@ int main(int argc, char ** argv)
     if (int(yield_sentence) + yield_alignment + yield_dependency == 0)
       yield_sentence = true;
     
-    if (int(learn_xbleu) + learn_softmax  > 1)
-      throw std::runtime_error("you can specify either --learn-{xbleu,softmax}");
-    if (int(learn_xbleu) + learn_softmax == 0)
+    if (int(learn_xbleu) + learn_softmax + learn_hinge + learn_ohinge + learn_pa + learn_mira > 1)
+      throw std::runtime_error("you can specify either --learn-{xbleu,softmax,hinge,ohinge,pa,mira}");
+    if (int(learn_xbleu) + learn_softmax + learn_hinge + learn_ohinge + learn_pa + learn_mira == 0)
       learn_xbleu = true;
     
     if (regularize_l1 < 0.0)
@@ -258,6 +266,11 @@ int main(int argc, char ** argv)
       throw std::runtime_error("either simple/exponential/adagrad");
     if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
       rate_exponential = true;
+
+    if (int(violation_derivation) + violation_single + violation_all > 1)
+      throw std::runtime_error("either derivation/sinlge/all violations");
+    if (int(violation_derivation) + violation_single + violation_all == 0)
+      violation_derivation = true;
 
     if (scale <= 0.0)
       throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
@@ -1081,8 +1094,37 @@ void cicada_learn_learner(Regularize& regularizer,
     LearnSoftmax learner(regularizer, rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
-  } else
-    throw std::runtime_error("invalid learner");
+  } else {
+    boost::shared_ptr<Margin> margin;
+    
+    if (violation_derivation)
+      margin.reset(new MarginDerivation());
+    else if (violation_single)
+      margin.reset(new MarginViolationSingle());
+    else if (violation_all)
+      margin.reset(new MarginViolationAll());
+    else
+      throw std::runtime_error("unsupported violation computation");
+
+    if (learn_hinge) {
+      LearnHinge learner(*margin, regularizer, rate);
+      
+      cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+    } else if (learn_ohinge) {
+      LearnOHinge learner(*margin, regularizer, rate);
+      
+      cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+    } else if (learn_pa) {
+      LearnPA learner(*margin, regularize_lambda);
+      
+      cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+    } else if (learn_mira) {
+      LearnMIRA learner(*margin, regularize_lambda);
+      
+      cicada_learn_yield(learner, operations, events, events_oracle, scorers, functions, weights);
+    } else
+      throw std::runtime_error("invalid learner");
+  }
 }
 
 void cicada_learn_regularizer(Rate& rate,
@@ -1799,8 +1841,13 @@ void options(int argc, char** argv)
     ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
     ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
     
-    ("learn-softmax", po::bool_switch(&learn_softmax),  "online softmax algorithm")
-    ("learn-xbleu",   po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
+    ("learn-softmax",  po::bool_switch(&learn_softmax),  "online softmax algorithm")
+    ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online xBLEU algorithm")
+    ("learn-hinge",    po::bool_switch(&learn_hinge),    "online SGD with hinge loss (Pegasos)")
+    ("learn-ohinge",   po::bool_switch(&learn_ohinge),   "online optimized-SGD with hinge loss (optimized-Pegasos)")
+    ("learn-mira",     po::bool_switch(&learn_mira),     "online MIRA algorithm")
+    ("learn-pa",       po::bool_switch(&learn_pa),       "online PA algorithm")
+
 
     ("regularize-l1",     po::value<double>(&regularize_l1),       "L1-regularization")
     ("regularize-l2",     po::value<double>(&regularize_l2),       "L2-regularization")
@@ -1816,6 +1863,10 @@ void options(int argc, char** argv)
     ("rate-exponential", po::bool_switch(&rate_exponential),  "exponential learning rate")
     ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
     ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
+
+    ("violation-derivation", po::bool_switch(&violation_derivation), "full derivation based violation")
+    ("violation-single",     po::bool_switch(&violation_single),     "single-node max-violation")
+    ("violation-all",        po::bool_switch(&violation_all),        "violations from all the nodes")
 
     ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")
 
