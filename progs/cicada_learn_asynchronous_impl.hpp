@@ -1510,9 +1510,9 @@ struct LearnOHinge : public LearnMargin
     for (feature_set_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter)
       regularizer.update(weights, uiter->first, uiter->second, eta);
     
-        if (debug >= 2)
-	  std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
-	
+    if (debug >= 2)
+      std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
+    
     regularizer.postprocess(weights, eta);
     
     margin.clear();
@@ -1528,6 +1528,58 @@ struct LearnOHinge : public LearnMargin
   alpha_type    alpha;
   f_type        f;
   index_type    index;
+};
+
+struct LearnPA : public LearnMargin
+{
+  LearnPA(Margin& __margin, const double& __lambda)
+    : LearnMargin(__margin), lambda(__lambda) {}
+  
+  void initialize(weight_set_type& weights) {}
+  
+  void finalize(weight_set_type& weights) {}
+  
+  void update(weight_set_type& weights, const feature_set_type& updates)
+  {
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
+      weights[fiter->first] += fiter->second;
+  }
+
+  double learn(weight_set_type& weights, feature_set_type& updates)
+  {
+    updates.clear();
+    
+    double objective = 0.0;
+    
+    const double constant = 1.0 / lambda;
+    
+    for (size_type i = 0; i != margin.deltas.size(); ++ i) {
+      const double suffered = 1.0 - cicada::dot_product(weights, margin.deltas[i].begin(), margin.deltas[i].end(), 0.0);
+      
+      if (suffered <= 0.0) continue;
+      
+      // PA-I
+      const double variance = cicada::dot_product(margin.deltas[i].begin(), margin.deltas[i].end(),
+						  margin.deltas[i].begin(), margin.deltas[i].end(),
+						  0.0);
+      const double alpha = std::min(suffered / variance, constant);
+      
+      Margin::delta_set_type::const_reference::const_iterator fiter_end = margin.deltas[i].end();
+      for (Margin::delta_set_type::const_reference::const_iterator fiter = margin.deltas[i].begin(); fiter != fiter_end; ++ fiter) {
+	const double update = alpha * fiter->second;
+
+	weights[fiter->first] += update;
+	updates[fiter->first] += update;
+      }
+      
+      objective += suffered;
+    }
+    
+    return objective / margin.deltas.size();
+  }
+
+  double lambda;
 };
 
 struct YieldSentence
