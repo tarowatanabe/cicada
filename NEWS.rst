@@ -1,5 +1,11 @@
-2013-9-20
+2013-x-x
 --------
+ - New: Violation-fixing based online learning
+ - BUGFIX: margin-based online learner incorrectly keep all the
+   training instances!
+
+2013-9-20
+---------
  - New: OSCAR for grouped regularization.
  - New: k-sampler which shares the interface as kbest.
  - New: regularized dual averaging (RDA) for online learning.
