@@ -43,6 +43,7 @@
 
 #include "cicada_learn_online_regularize_impl.hpp"
 #include "cicada_learn_online_rate_impl.hpp"
+#include "cicada_learn_online_margin_impl.hpp"
 
 #include <boost/tokenizer.hpp>
 

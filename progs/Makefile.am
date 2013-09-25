@@ -328,6 +328,7 @@ cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDAD
 cicada_learn_asynchronous_mpi_SOURCES  = \
 	cicada_learn_asynchronous_mpi.cpp \
 	cicada_learn_asynchronous_impl.hpp \
+	cicada_learn_online_margin_impl.hpp \
 	cicada_learn_online_rate_impl.hpp \
 	cicada_learn_online_regularize_impl.hpp
 cicada_learn_asynchronous_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
@@ -336,6 +337,7 @@ cicada_learn_asynchronous_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS)
 cicada_learn_asynchronous_kbest_mpi_SOURCES  = \
 	cicada_learn_asynchronous_kbest_mpi.cpp \
 	cicada_learn_asynchronous_kbest_impl.hpp \
+	cicada_learn_online_margin_impl.hpp \
 	cicada_learn_online_rate_impl.hpp \
 	cicada_learn_online_regularize_impl.hpp
 cicada_learn_asynchronous_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
@@ -351,6 +353,7 @@ cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boos
 cicada_learn_online_kbest_mpi_SOURCES  = \
 	cicada_learn_online_kbest_mpi.cpp \
 	cicada_learn_online_kbest_impl.hpp \
+	cicada_learn_online_margin_impl.hpp \
 	cicada_learn_online_rate_impl.hpp \
 	cicada_learn_online_regularize_impl.hpp
 cicada_learn_online_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
@@ -360,6 +363,7 @@ cicada_learn_online_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS)
 cicada_learn_online_mpi_SOURCES  = \
 	cicada_learn_online_mpi.cpp \
 	cicada_learn_online_impl.hpp \
+	cicada_learn_online_margin_impl.hpp \
 	cicada_learn_online_rate_impl.hpp \
 	cicada_learn_online_regularize_impl.hpp
 cicada_learn_online_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
