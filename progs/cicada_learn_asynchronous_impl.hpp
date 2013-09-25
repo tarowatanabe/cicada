@@ -1576,10 +1576,145 @@ struct LearnPA : public LearnMargin
       objective += suffered;
     }
     
-    return objective / margin.deltas.size();
+    objective /= margin.deltas.size();
+
+    margin.clear();
+    
+    return objective;
   }
 
   double lambda;
+};
+
+struct LearnMIRA : public LearnMargin
+{
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
+  typedef std::vector<int, std::allocator<int> >          index_type;
+
+  typedef Margin::delta_set_type delta_set_type;
+
+  struct HMatrix
+  {
+    HMatrix(const delta_set_type& __deltas, const index_type& __index) : deltas(__deltas), index(__index) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(deltas[index[i]].begin(), deltas[index[i]].end(), deltas[index[j]].begin(), deltas[index[j]].end(), 0.0);
+    }
+    
+    const delta_set_type& deltas;
+    const index_type& index;
+  };
+  
+  struct MMatrix
+  {
+    MMatrix(const delta_set_type& __deltas, const index_type& __index) : deltas(__deltas), index(__index) {}
+    
+    template <typename __W>
+    void operator()(__W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = index.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+	  for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename __W>
+    double operator()(const __W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+      for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename __W>
+    void operator()(__W& w, const double& update, const size_t& i) const
+    {
+      delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+      for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const delta_set_type& deltas;
+    const index_type& index;
+  };
+
+  LearnMIRA(Margin& __margin, const double& __lambda)
+    : LearnMargin(__margin), tolerance(0.1), lambda(__lambda) {}
+  
+  void initialize(weight_set_type& weights) {}
+  
+  void finalize(weight_set_type& weights) {}
+  
+  void update(weight_set_type& weights, const feature_set_type& updates)
+  {
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
+      weights[fiter->first] += fiter->second;
+  }
+
+  double learn(weight_set_type& weights, feature_set_type& updates)
+  {
+    updates.clear();
+    
+    if (margin.deltas.empty()) return 0.0;
+    
+    alpha.clear();
+    index.clear();
+    f.clear();
+    
+    double objective = 0.0;
+    for (size_type i = 0; i != margin.deltas.size(); ++ i) {
+      const double loss = 1.0 - cicada::dot_product(margin.deltas[i].begin(), margin.deltas[i].end(), weights, 0.0);
+      
+      if (loss <= 0.0) continue;
+      
+      f.push_back(- loss);
+      index.push_back(i);
+      
+      objective += loss;
+    }
+
+    objective /= index.size();
+    
+    alpha.resize(index.size(), 0.0);
+    
+    {
+      HMatrix H(margin.deltas, index);
+      MMatrix M(margin.deltas, index);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, 1.0 / lambda, tolerance);
+    }
+    
+    for (size_type i = 0; i != alpha.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	delta_set_type::const_reference::const_iterator fiter_end = margin.deltas[index[i]].end();
+	for (delta_set_type::const_reference::const_iterator fiter = margin.deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) {
+	  const double update = alpha[i] * fiter->second;
+	  
+	  weights[fiter->first] += update;
+	  updates[fiter->first] += update;
+	}
+      }
+
+    margin.clear();
+    
+    return objective;
+  }
+
+  double tolerance;
+  double lambda;
+
+  alpha_type    alpha;
+  f_type        f;
+  index_type    index;
 };
 
 struct YieldSentence

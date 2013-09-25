@@ -1326,8 +1326,13 @@ struct LearnPA : public LearnOnlineMargin
       
       objective += suffered;
     }
+
+    objective /= losses.size();
     
-    return objective / losses.size();
+    features.clear();
+    losses.clear();
+    
+    return objective;
   }
   
   double lambda;
@@ -1373,8 +1378,13 @@ struct LearnCW : public LearnOnlineMargin
       
       objective += suffered;
     }
+
+    objective /= losses.size();
+
+    features.clear();
+    losses.clear();
     
-    return objective / losses.size();
+    return objective;
   }
   
   weight_set_type covariances;
@@ -1421,7 +1431,12 @@ struct LearnAROW : public LearnOnlineMargin
       objective += suffered;
     }
     
-    return objective / losses.size();
+    objective /= losses.size();
+
+    features.clear();
+    losses.clear();
+    
+    return objective;
   }
   
   weight_set_type covariances;
@@ -1466,8 +1481,13 @@ struct LearnNHERD : public LearnOnlineMargin
       
       objective += suffered;
     }
+
+    objective /= losses.size();
+
+    features.clear();
+    losses.clear();
     
-    return objective / losses.size();
+    return objective;    
   }
   
   weight_set_type covariances;

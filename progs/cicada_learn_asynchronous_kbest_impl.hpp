@@ -1340,7 +1340,12 @@ struct LearnPA : public LearnOnlineMargin
       objective += suffered;
     }
     
-    return objective / losses.size();
+    objective /= losses.size();
+    
+    features.clear();
+    losses.clear();
+    
+    return objective;
   }
   
   double lambda;
@@ -1394,8 +1399,13 @@ struct LearnCW : public LearnOnlineMargin
       
       objective += suffered;
     }
+
+    objective /= losses.size();
     
-    return objective / losses.size();
+    features.clear();
+    losses.clear();
+
+    return objective;
   }
   
   weight_set_type covariances;
@@ -1449,7 +1459,12 @@ struct LearnAROW : public LearnOnlineMargin
       objective += suffered;
     }
     
-    return objective / losses.size();
+    objective /= losses.size();
+    
+    features.clear();
+    losses.clear();
+
+    return objective;
   }
   
   weight_set_type covariances;
@@ -1501,8 +1516,13 @@ struct LearnNHERD : public LearnOnlineMargin
       
       objective += suffered;
     }
+
+    objective /= losses.size();
     
-    return objective / losses.size();
+    features.clear();
+    losses.clear();
+    
+    return objective;
   }
   
   weight_set_type covariances;
@@ -1626,9 +1646,10 @@ struct LearnMIRA : public LearnOnlineMargin
 	
 	sample_set_type::value_type::const_iterator fiter_end = features[index[i]].end();
 	for (sample_set_type::value_type::const_iterator fiter = features[index[i]].begin(); fiter != fiter_end; ++ fiter) {
-	  weights[fiter->first] += alpha[i] * fiter->second;
+	  const double update = alpha[i] * fiter->second;
 	  
-	  updates[fiter->first] += alpha[i] * fiter->second;
+	  weights[fiter->first] += update;
+	  updates[fiter->first] += update;
 	}
       }
     
