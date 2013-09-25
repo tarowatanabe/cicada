@@ -852,14 +852,60 @@ void cicada_learn_yield(Learner& learner,
     throw std::runtime_error("invalid yield");
 }
 
-void cicada_learn_learner(Regularize& regularizer,
-			  Rate& rate,
-			  operation_set_type& operations,
-			  const event_set_type& events,
-			  const event_set_type& events_oracle,
-			  const scorer_document_type& scorers,
-			  weight_set_type& weights)
+void cicada_learn(operation_set_type& operations,
+		  const event_set_type& events,
+		  const event_set_type& events_oracle,
+		  const scorer_document_type& scorers,
+		  weight_set_type& weights)
 {
+  size_t instances_rank = 0;
+  for (size_t seg = 0; seg != events.size(); ++ seg)
+    instances_rank += (! events[seg].empty());
+  
+  const size_t samples = (instances_rank + batch_size - 1) / batch_size;
+  
+  boost::shared_ptr<Rate> rate;
+  
+  if (rate_simple)
+    rate.reset(new RateSimple(eta0));
+  else if (rate_exponential)
+    rate.reset(new RateExponential(alpha0, eta0, samples));
+  else if (rate_adagrad)
+    rate.reset(new RateAdaGrad(eta0));
+  else
+    throw std::runtime_error("unsupported learning rate");
+
+  const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
+  const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
+  const bool reg_l1    = (regularize_l1 > 0.0);
+  const bool reg_l2    = (regularize_l2 > 0.0);
+
+  boost::shared_ptr<Regularize> regularizer;
+  
+  if (rda_mode) {
+    if (reg_oscar)
+      regularizer.reset(new RegularizeRDAOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularizer.reset(new RegularizeRDAL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularizer.reset(new RegularizeRDAL1(regularize_l1));
+    else if (reg_l2)
+      regularizer.reset(new RegularizeRDAL2(regularize_l2));
+    else
+      regularizer.reset(new RegularizeNone());
+  } else {
+    if (reg_oscar)
+      regularizer.reset(new RegularizeOSCAR(regularize_l1, regularize_oscar));
+    else if (reg_l1l2)
+      regularizer.reset(new RegularizeL1L2(regularize_l1, regularize_l2));
+    else if (reg_l1)
+      regularizer.reset(new RegularizeL1(regularize_l1));
+    else if (reg_l2)
+      regularizer.reset(new RegularizeL2(regularize_l2));
+    else
+      regularizer.reset(new RegularizeNone());
+  }
+
   if (learn_pa) {
     LearnPA learner(regularize_lambda);
     
@@ -881,124 +927,35 @@ void cicada_learn_learner(Regularize& regularizer,
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_xbleu) {
-    LearnXBLEU learner(regularizer, rate);
+    LearnXBLEU learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_softmax) {
-    LearnSoftmax learner(regularizer, rate);
+    LearnSoftmax learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_osoftmax) {
-    LearnOSoftmax learner(regularizer, rate);
+    LearnOSoftmax learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_el) {
-    LearnExpectedLoss learner(regularizer, rate);
+    LearnExpectedLoss learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_oel) {
-    LearnOExpectedLoss learner(regularizer, rate);
+    LearnOExpectedLoss learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_hinge) {
-    LearnHinge learner(regularizer, rate);
+    LearnHinge learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else if (learn_ohinge) {
-    LearnOHinge learner(regularizer, rate);
+    LearnOHinge learner(*regularizer, *rate);
     
     cicada_learn_yield(learner, operations, events, events_oracle, scorers, weights);
   } else
     throw std::runtime_error("invalid learner");
-  
-}
-
-void cicada_learn_regularizer(Rate& rate,
-			      operation_set_type& operations,
-			      const event_set_type& events,
-			      const event_set_type& events_oracle,
-			      const scorer_document_type& scorers,
-			      weight_set_type& weights)
-{
-  const bool reg_oscar = (regularize_oscar > 0.0) && (regularize_l1 >= 0.0);
-  const bool reg_l1l2  = (regularize_l1 > 0.0) && (regularize_l2 > 0.0);
-  const bool reg_l1    = (regularize_l1 > 0.0);
-  const bool reg_l2    = (regularize_l2 > 0.0);
-
-  if (rda_mode) {
-    if (reg_oscar) {
-      RegularizeRDAOSCAR regularizer(regularize_l1, regularize_oscar);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l1l2) {
-      RegularizeRDAL1L2 regularizer(regularize_l1, regularize_l2);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l1) {
-      RegularizeRDAL1 regularizer(regularize_l1);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l2) {
-      RegularizeRDAL2 regularizer(regularize_l2);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else {
-      RegularizeNone regularizer;
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    }
-  } else {
-    if (reg_oscar) {
-      RegularizeOSCAR regularizer(regularize_l1, regularize_oscar);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l1l2) {
-      RegularizeL1L2 regularizer(regularize_l1, regularize_l2);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l1) {
-      RegularizeL1 regularizer(regularize_l1);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else if (reg_l2) {
-      RegularizeL2 regularizer(regularize_l2);
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    } else {
-      RegularizeNone regularizer;
-      
-      cicada_learn_learner(regularizer, rate, operations, events, events_oracle, scorers, weights);
-    }
-  }
-}
-
-
-void cicada_learn(operation_set_type& operations,
-		  const event_set_type& events,
-		  const event_set_type& events_oracle,
-		  const scorer_document_type& scorers,
-		  weight_set_type& weights)
-{
-  size_t instances_rank = 0;
-  for (size_t seg = 0; seg != events.size(); ++ seg)
-    instances_rank += (! events[seg].empty());
-  
-  const size_t samples = (instances_rank + batch_size - 1) / batch_size;
-  
-  if (rate_simple) {
-    RateSimple rate(eta0);
-    
-    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
-  } else if (rate_exponential) {
-    RateExponential rate(alpha0, eta0, samples);
-    
-    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
-  } else if (rate_adagrad) {
-    RateAdaGrad rate(eta0);
-    
-    cicada_learn_regularizer(rate, operations, events, events_oracle, scorers, weights);
-  } else
-    throw std::runtime_error("unsupported learning rate");
 }
 
 
