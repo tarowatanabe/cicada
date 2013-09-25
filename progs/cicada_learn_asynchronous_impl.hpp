@@ -1187,7 +1187,6 @@ struct MarginViolationSingle : public MarginViolation
   // single max-violation node margin
   
   MarginViolationSingle()  {}
-    
   
   void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
   {
@@ -1263,18 +1262,272 @@ struct MarginViolationAll : public MarginViolation
 
 struct LearnMargin : public LearnBase
 {
-  //
-  // large margin style update, including perceptron
-  //
+  LearnMargin(Margin& __margin)
+    : margin(__margin) {}
 
-  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  void clear()
   {
-    
-    
-    
-    
+    margin.clear();
   }
   
+  void encode(const size_type id, const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle, const scorer_ptr_type& scorer)
+  {
+    margin.encode(weights, forest, oracle);
+  }
+  
+  Margin&     margin;
+};
+
+struct LearnHinge : public LearnMargin
+{
+  LearnHinge(Margin& __margin,
+	     Regularize& __regularizer,
+	     Rate& __rate)
+    : LearnMargin(__margin),
+      regularizer(__regularizer),
+      rate(__rate) {}
+  
+  void initialize(weight_set_type& weights)
+  {
+    regularizer.initialize(weights);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    regularizer.finalize(weights);
+  }
+  
+  void update(weight_set_type& weights, const feature_set_type& updates)
+  {
+    const double eta = rate();
+    
+    regularizer.preprocess(weights, eta);
+    
+    // udpate...
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
+      regularizer.update(weights, fiter->first, fiter->second, rate(fiter->first, fiter->second));
+    
+    regularizer.postprocess(weights, eta);
+  }
+  
+  typedef std::vector<bool, std::allocator<bool> > suffered_set_type;
+  suffered_set_type suffered;
+
+  double learn(weight_set_type& weights, feature_set_type& updates)
+  {
+    updates.clear();
+    
+    if (margin.deltas.empty()) return 0.0;
+  
+    size_type k = 0;
+    suffered.clear();
+    suffered.resize(margin.deltas.size(), false);
+    
+    for (size_type i = 0; i != margin.deltas.size(); ++ i) {
+      const double loss = 1.0 - cicada::dot_product(margin.deltas[i].begin(), margin.deltas[i].end(), weights, 0.0) * regularizer.scale();
+      const bool suffer_loss = loss > 0.0;
+      
+      suffered[i] = suffer_loss;
+      k += suffer_loss;
+    }
+    
+    if (k) {
+      //const double k_norm = 1.0 / (features.size());
+      const double k_norm = 1.0 / k; // it is wrong, but works quite well in practice
+      
+      // udpate...
+      for (size_type i = 0; i != margin.deltas.size(); ++ i)
+	if (suffered[i]) {
+	  Margin::delta_set_type::const_reference::const_iterator fiter_end = margin.deltas[i].end();
+	  for (Margin::delta_set_type::const_reference::const_iterator fiter = margin.deltas[i].begin(); fiter != fiter_end; ++ fiter)
+	    updates[fiter->first] -= k_norm * fiter->second;
+	}
+      
+      if (! updates.empty())
+	update(weights, updates);
+    }
+    
+    margin.clear();
+    
+    return 0.0;
+  }
+
+  Regularize& regularizer;
+  Rate&       rate;
+};
+
+// optimized-Pegasos learner
+struct LearnOHinge : public LearnMargin
+{
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    f_type;
+  typedef std::vector<int, std::allocator<int> >          index_type;
+
+  typedef Margin::delta_set_type delta_set_type;
+
+  struct HMatrix
+  {
+    HMatrix(const delta_set_type& __deltas, const index_type& __index) : deltas(__deltas), index(__index) {}
+    
+    double operator()(int i, int j) const
+    {
+      return cicada::dot_product(deltas[index[i]].begin(), deltas[index[i]].end(), deltas[index[j]].begin(), deltas[index[j]].end(), 0.0);
+    }
+    
+    const delta_set_type& deltas;
+    const index_type& index;
+  };
+  
+  struct MMatrix
+  {
+    MMatrix(const delta_set_type& __deltas, const index_type& __index) : deltas(__deltas), index(__index) {}
+    
+    template <typename __W>
+    void operator()(__W& w, const alpha_type& alpha) const
+    {
+      const size_type model_size = index.size();
+      
+      for (size_type i = 0; i != model_size; ++ i)
+	if (alpha[i] > 0.0) {
+	  delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+	  for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	    w[fiter->first] += alpha[i] * fiter->second;
+	}
+    }
+    
+    template <typename __W>
+    double operator()(const __W& w, const size_t& i) const
+    {
+      double dot = 0.0;
+      delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+      for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	dot += w[fiter->first] * fiter->second;
+      return dot;
+    }
+    
+    template <typename __W>
+    void operator()(__W& w, const double& update, const size_t& i) const
+    {
+      delta_set_type::const_reference::const_iterator fiter_end = deltas[index[i]].end();
+      for (delta_set_type::const_reference::const_iterator fiter = deltas[index[i]].begin(); fiter != fiter_end; ++ fiter) 
+	w[fiter->first] += update * fiter->second;
+    }
+    
+    const delta_set_type& deltas;
+    const index_type& index;
+  };
+  
+
+  LearnOHinge(Margin& __margin,
+	      Regularize& __regularizer,
+	      Rate& __rate)
+    : LearnMargin(__margin),
+      tolerance(0.1),
+      regularizer(__regularizer),
+      rate(__rate) {}
+  
+  void initialize(weight_set_type& weights)
+  {
+    regularizer.initialize(weights);
+  }
+  
+  void finalize(weight_set_type& weights)
+  {
+    regularizer.finalize(weights);
+  }
+  
+  void update(weight_set_type& weights, const feature_set_type& updates)
+  {
+    const double eta = rate();
+    
+    regularizer.preprocess(weights, eta);
+    
+    // udpate...
+    feature_set_type::const_iterator fiter_end = updates.end();
+    for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
+      regularizer.update(weights, fiter->first, fiter->second, rate(fiter->first, fiter->second));
+    
+    regularizer.postprocess(weights, eta);
+  }
+  
+  double learn(weight_set_type& weights, feature_set_type& updates)
+  {
+    updates.clear();
+    
+    if (margin.deltas.empty()) return 0.0;
+
+    const double eta = rate();
+    
+    alpha.clear();
+    f.clear();
+    index.clear();
+    
+    for (size_type i = 0; i != margin.deltas.size(); ++ i)
+      f.push_back(cicada::dot_product(margin.deltas[i].begin(), margin.deltas[i].end(), weights, 0.0));
+    
+    const double weight_scale_curr = regularizer.scale();
+    
+    regularizer.preprocess(weights, eta);
+    
+    double objective = 0.0;
+    for (size_type i = 0; i != f.size(); ++ i) {
+      const double loss = 1.0 - f[i] * weight_scale_curr;
+      
+      if (loss <= 0.0) continue;
+      
+      f[index.size()] = - (1.0 - f[i] * regularizer.scale());
+      index.push_back(i);
+      objective += loss;
+    }
+    
+    objective /= f.size();
+    
+    // resize of f and alpha....
+    f.resize(index.size());
+    alpha.resize(index.size(), 0.0);
+
+    {
+      HMatrix H(margin.deltas, index);
+      MMatrix M(margin.deltas, index);
+      
+      cicada::optimize::QPDCD()(alpha, f, H, M, eta, tolerance);
+    }
+    
+    size_type actives = 0;
+    size_type negatives = 0;
+    for (size_type i = 0; i != index.size(); ++ i)
+      if (alpha[i] > 0.0) {
+	delta_set_type::const_reference::const_iterator fiter_end = margin.deltas[index[i]].end();
+	for (delta_set_type::const_reference::const_iterator fiter = margin.deltas[index[i]].begin(); fiter != fiter_end; ++ fiter)
+	  updates[fiter->first] -= alpha[i] * fiter->second / eta;
+	
+	++ actives;
+	negatives += f[i] > 0.0;
+      }
+    
+    feature_set_type::const_iterator uiter_end = updates.end();
+    for (feature_set_type::const_iterator uiter = updates.begin(); uiter != uiter_end; ++ uiter)
+      regularizer.update(weights, uiter->first, uiter->second, eta);
+    
+        if (debug >= 2)
+	  std::cerr << "actives: " << actives << " negatives: " << negatives << " vectors: " << alpha.size() << std::endl;
+	
+    regularizer.postprocess(weights, eta);
+    
+    margin.clear();
+    
+    return 0.0;
+  }
+
+  double    tolerance;
+
+  Regularize& regularizer;
+  Rate&       rate;
+
+  alpha_type    alpha;
+  f_type        f;
+  index_type    index;
 };
 
 struct YieldSentence
