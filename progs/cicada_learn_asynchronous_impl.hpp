@@ -1104,7 +1104,9 @@ struct LearnOHinge : public LearnMargin
     
     double operator()(int i, int j) const
     {
-      return cicada::dot_product(deltas[index[i]].begin(), deltas[index[i]].end(), deltas[index[j]].begin(), deltas[index[j]].end(), 0.0);
+      const double dot = cicada::dot_product(deltas[index[i]].begin(), deltas[index[i]].end(), deltas[index[j]].begin(), deltas[index[j]].end(), 0.0);
+
+      return dot;
     }
     
     const delta_set_type& deltas;
@@ -1212,7 +1214,7 @@ struct LearnOHinge : public LearnMargin
       index.push_back(i);
       objective += loss;
     }
-    
+
     objective /= f.size();
     
     // resize of f and alpha....

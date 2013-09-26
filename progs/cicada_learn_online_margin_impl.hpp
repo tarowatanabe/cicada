@@ -34,7 +34,17 @@ struct Margin
   typedef attribute_set_type::attribute_type attribute_type;
   
   typedef std::pair<feature_type, double> feature_value_type;
+  
   typedef utils::mulvector2<feature_value_type, std::allocator<feature_value_type> > delta_set_type;
+  typedef std::vector<feature_value_type, std::allocator<feature_value_type> > feature_value_set_type;
+
+  struct less_feature_value
+  {
+    bool operator()(const feature_value_type& x, const feature_value_type& y) const
+    {
+      return x.first < y.first;
+    }
+  };
 
   typedef cicada::WeightVector<double> weight_set_type;
   
@@ -43,8 +53,26 @@ struct Margin
   virtual void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle) = 0;
   
   void clear() { deltas.clear(); }
-  
-  delta_set_type deltas;
+
+  void push_back(const feature_set_type& features)
+  {
+    delta.clear();
+    delta.reserve(features.size());
+    
+    feature_set_type::const_iterator fiter_end = features.end();
+    for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+      if (fiter->second != 0.0)
+	delta.push_back(*fiter);
+    
+    if (delta.empty()) return;
+    
+    std::sort(delta.begin(), delta.end(), less_feature_value());
+    
+    deltas.push_back(delta.begin(), delta.end());
+  }
+
+  delta_set_type         deltas;
+  feature_value_set_type delta;
 };
 
 struct MarginDerivation : public Margin
@@ -91,13 +119,22 @@ struct MarginDerivation : public Margin
 		    weight_forest,
 		    traversal(),
 		    cicada::operation::weight_function<weight_type >(weights));
+
+    bool weights_empty = weights.empty();
+    if (! weights_empty) {
+      int count_non_zero = 0;
+      for (feature_type::id_type id = 0; id != weights.size() && ! count_non_zero; ++ id)
+	count_non_zero += (weights[id] != 0.0);
+      
+      weights_empty = (! count_non_zero);
+    }
     
     // already achieved optimum...
-    if (weight_oracle >= weight_forest) return;
+    if (! weights_empty && weight_oracle >= weight_forest) return;
     
     features_oracle -= features_forest;
     
-    deltas.push_back(features_oracle.begin(), features_oracle.end());
+    push_back(features_oracle);
   }
 };
 
@@ -105,6 +142,19 @@ struct MarginViolation : public Margin
 {
   // single max-violation node margin
   typedef cicada::semiring::Tropical<double>  weight_type;
+
+  struct traversal
+  {
+    typedef feature_set_type value_type;
+
+    template <typename Edge, typename Iterator>
+    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+    {
+      yield = edge.features;
+      for (/**/; first != last; ++ first)
+	yield += *first;
+    }
+  };
 
   // Initially, I tried to implement on top of the inside/outside framework, but it seems to be easier
   // to implement a special functions...
@@ -224,36 +274,70 @@ struct MarginViolationSingle : public MarginViolation
   {
     if (! forest.is_valid() || ! oracle.is_valid()) return;
 
-    // First, take maximum from oracle wrt weights
-    inside_oracle(weights, oracle);
+    bool weights_empty = weights.empty();
+    if (! weights_empty) {
+      int count_non_zero = 0;
+      for (feature_type::id_type id = 0; id != weights.size() && ! count_non_zero; ++ id)
+	count_non_zero += (weights[id] != 0.0);
+      
+      weights_empty = (! count_non_zero);
+    }
     
-    // Second, take maximum from forest wrt weights
-    inside_forest(weights, forest);
-    
-    // Third, compute the largest margin
-    
-    const size_type bin_max = utils::bithack::min(inside_forest.weights_bin.size(), inside_oracle.weights_bin.size());
-    
-    if (! bin_max) return;
-    
-    size_type margin_pos(-1);
-    double    margin_max(- std::numeric_limits<double>::infinity());
-    
-    for (size_type bin = 0; bin != bin_max; ++ bin) 
-      if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
-	const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
-			       - cicada::semiring::log(inside_oracle.weights_bin[bin]));
-	
-	if (margin > 0.0 && margin > margin_max) {
-	  margin_pos = bin;
-	  margin_max = margin;
+    if (weights_empty) {
+      weight_type weight_forest;
+      weight_type weight_oracle;
+      
+      feature_set_type features_forest;
+      feature_set_type features_oracle;
+      
+      cicada::viterbi(oracle,
+		      features_oracle,
+		      weight_oracle,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      cicada::viterbi(forest,
+		      features_forest,
+		      weight_forest,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      
+      features_oracle -= features_forest;
+      
+      
+      push_back(features_oracle);
+    } else {
+      // First, take maximum from oracle wrt weights
+      inside_oracle(weights, oracle);
+      
+      // Second, take maximum from forest wrt weights
+      inside_forest(weights, forest);
+      
+      // Third, compute the largest margin
+      
+      const size_type bin_max = utils::bithack::min(inside_forest.weights_bin.size(), inside_oracle.weights_bin.size());
+      
+      if (! bin_max) return;
+      
+      size_type margin_pos(-1);
+      double    margin_max(- std::numeric_limits<double>::infinity());
+      
+      for (size_type bin = 0; bin != bin_max; ++ bin) 
+	if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
+	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
+				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
+	  
+	  if (margin > 0.0 && margin > margin_max) {
+	    margin_pos = bin;
+	    margin_max = margin;
+	  }
 	}
+      
+      // found the best margin!
+      if (margin_pos != size_type(-1)) {
+	inside_oracle.features_bin[margin_pos] -= inside_forest.features_bin[margin_pos];
+	
+	push_back(inside_oracle.features_bin[margin_pos]);
       }
-    
-    // found the best margin!
-    if (margin_pos != size_type(-1)) {
-      inside_oracle.features_bin[margin_pos] -= inside_forest.features_bin[margin_pos];
-      deltas.push_back(inside_oracle.features_bin[margin_pos].begin(), inside_oracle.features_bin[margin_pos].end());
     }
   }
   
@@ -267,28 +351,61 @@ struct MarginViolationAll : public MarginViolation
   {
     if (! forest.is_valid() || ! oracle.is_valid()) return;
 
-    // First, take maximum from oracle wrt weights
-    inside_oracle(weights, oracle);
-    
-    // Second, take maximum from forest wrt weights
-    inside_forest(weights, forest);
-    
-    // Third, compute all the margins
-    
-    const size_type bin_max = utils::bithack::min(inside_forest.weights_bin.size(), inside_oracle.weights_bin.size());
-    
-    if (! bin_max) return;
-    
-    for (size_type bin = 0; bin != bin_max; ++ bin)
-      if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
-	const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
-			       - cicada::semiring::log(inside_oracle.weights_bin[bin]));
-	
-	if (margin > 0.0) {
-	  inside_oracle.features_bin[bin] -= inside_forest.features_bin[bin];
-	  deltas.push_back(inside_oracle.features_bin[bin].begin(), inside_oracle.features_bin[bin].end());
+    bool weights_empty = weights.empty();
+    if (! weights_empty) {
+      int count_non_zero = 0;
+      for (feature_type::id_type id = 0; id != weights.size() && ! count_non_zero; ++ id)
+	count_non_zero += (weights[id] != 0.0);
+      
+      weights_empty = (! count_non_zero);
+    }
+
+    if (weights_empty) {
+      weight_type weight_forest;
+      weight_type weight_oracle;
+      
+      feature_set_type features_forest;
+      feature_set_type features_oracle;
+      
+      cicada::viterbi(oracle,
+		      features_oracle,
+		      weight_oracle,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      cicada::viterbi(forest,
+		      features_forest,
+		      weight_forest,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      
+      features_oracle -= features_forest;
+      
+      push_back(features_oracle);
+    } else {
+      // First, take maximum from oracle wrt weights
+      inside_oracle(weights, oracle);
+      
+      // Second, take maximum from forest wrt weights
+      inside_forest(weights, forest);
+      
+      // Third, compute all the margins
+      
+      const size_type bin_max = utils::bithack::min(inside_forest.weights_bin.size(), inside_oracle.weights_bin.size());
+      
+      if (! bin_max) return;
+      
+      for (size_type bin = 0; bin != bin_max; ++ bin)
+	if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
+	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
+				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
+	  
+	  if (margin > 0.0) {
+	    inside_oracle.features_bin[bin] -= inside_forest.features_bin[bin];
+	    
+	    push_back(inside_oracle.features_bin[bin]);
+	  }
 	}
-      }
+    }
   }
 };
 
