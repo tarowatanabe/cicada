@@ -267,9 +267,9 @@ struct TaskSingle
       model.push_back(features[id]);
       
       if (apply_exact)
-	cicada::apply_exact(model, graphs[id], graph_oracle);
+	cicada::apply_exact(model, graphs[id], graph_oracle, true);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube, true);
       
       // compute viterbi...
       weight_type weight;
@@ -365,9 +365,9 @@ struct TaskOracle
       model.push_back(features[id]);
       
       if (apply_exact)
-	cicada::apply_exact(model, graphs[id], graph_oracle);
+	cicada::apply_exact(model, graphs[id], graph_oracle, true);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_scorer, score_factor), scorer_cube, true);
       
       // compute viterbi...
       weight_type weight;
