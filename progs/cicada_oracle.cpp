@@ -548,12 +548,60 @@ double compute_oracles(const hypergraph_set_type& graphs,
   return objective_best;
 }
 
+struct ReadTstset
+{
+  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  
+  ReadTstset(queue_type& __queue, const size_t size) : queue(__queue), graphs(size) {}
+
+  void operator()()
+  {
+    size_t id;
+    hypergraph_type hypergraph;
+    
+    std::string line;
+    
+    for (;;) {
+      queue.pop_swap(line);
+      
+      if (line.empty()) break;
+      
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end  = line.end();
+      
+      if (! parse_id(id, iter, end))
+	throw std::runtime_error("invalid id input: " + line);
+      if (id >= graphs.size())
+	throw std::runtime_error("tstset size exceeds refset size? " + line);
+      
+      if (! hypergraph.assign(iter, end))
+	throw std::runtime_error("invalid graph format: " + line);
+      if (iter != end)
+	throw std::runtime_error("invalid id ||| graph format: " + line);
+      
+      graphs[id].unite(hypergraph);
+    }
+  }
+  
+  queue_type& queue;
+  hypergraph_set_type graphs;
+};
 
 void read_tstset(const path_set_type& files,
 		 hypergraph_set_type& graphs,
 		 const sentence_document_type& sentences,
 		 feature_function_ptr_set_type& features)
 {
+  typedef ReadTstset task_type;
+
+  task_type::queue_type queue(64 * threads);
+  
+  std::vector<task_type, std::allocator<task_type> > tasks(threads, task_type(queue, graphs.size()));
+  
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
   std::string line;
 
   path_set_type::const_iterator titer_end = tstset_files.end();
@@ -563,9 +611,6 @@ void read_tstset(const path_set_type& files,
       std::cerr << "file: " << *titer << std::endl;
     
     if (boost::filesystem::is_directory(*titer)) {
-      size_t id;
-      hypergraph_type hypergraph;
-      
       for (size_t i = 0; /**/; ++ i) {
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 	
@@ -576,50 +621,35 @@ void read_tstset(const path_set_type& files,
 	if (! utils::getline(is, line))
 	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
 	
-	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end  = line.end();
-	
-	if (! parse_id(id, iter, end))
-	  throw std::runtime_error("invalid id input: " + path.string());
-	if (id != i)
-	  throw std::runtime_error("id mismatch: "  + path.string());
-	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
-	
-	if (! hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid graph format" + path.string());
-	if (iter != end)
-	  throw std::runtime_error("invalid id ||| graph format" + path.string());
-	
-	graphs[id].unite(hypergraph);
+	if (! line.empty())
+	  queue.push_swap(line);
       }
     } else {
       const path_type& path = *titer;
       
       utils::compress_istream is(path, 1024 * 1024);
-      
-      size_t id;
-      hypergraph_type hypergraph;
 
-      while (utils::getline(is, line)) {
-	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end  = line.end();
-	
-	if (! parse_id(id, iter, end))
-	  throw std::runtime_error("invalid id input: " + path.string());
-	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->string());
-	
-	if (! hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid graph format" + path.string());
-	if (iter != end)
-	  throw std::runtime_error("invalid id ||| graph format" + path.string());
-	
-	graphs[id].unite(hypergraph);
-      }
+      while (utils::getline(is, line))
+	if (! line.empty())
+	  queue.push_swap(line);
     }
   }
-
+  
+  // terminaltion
+  for (int i = 0; i != threads; ++ i)
+    queue.push(std::string());
+  
+  workers.join_all();
+  
+  // merging...
+  for (int i = 0; i != threads; ++ i)
+    for (size_t seg = 0; seg != graphs.size(); ++ seg)
+      if (tasks[i].graphs[seg].is_valid())
+	graphs[seg].unite(tasks[i].graphs[seg]);
+  
+  // finish!
+  tasks.clear();
+  
   if (debug)
     std::cerr << "assign scorer feature" << std::endl;
   

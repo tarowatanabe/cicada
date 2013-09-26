@@ -15,66 +15,153 @@
 
 #include "utils/compress_stream.hpp"
 #include "utils/getline.hpp"
+#include "utils/lexical_cast.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
+class Reader
+{
+public:
+  Reader() : finished(false) {}
+  virtual ~Reader() {}
+  
+  virtual Reader& read(std::string& line) = 0;
+  
+  virtual operator bool() const { return ! finished; }
+  
+  bool finished;
+};
+
+class ReaderFile : public Reader
+{
+public:
+  ReaderFile(const path_type& path)
+    : is(new utils::compress_istream(path, 1024 * 1024)) {}
+  
+  ~ReaderFile()
+  {
+    if (is)
+      delete is;
+  }
+  
+  Reader& read(std::string& line)
+  {
+    if (! utils::getline(*is, line)) {
+      line.clear();
+      finished = true;
+    }
+    
+    return *this;
+  }
+  
+  std::istream* is;
+};
+
+class ReaderDirectory : public Reader
+{
+public:
+  ReaderDirectory(const path_type& __path)
+    : path(__path), id(0) {}
+  
+  Reader& read(std::string& line)
+  {
+    const path_type file = path / (utils::lexical_cast<std::string>(id) + ".gz");
+    
+    if (! boost::filesystem::exists(file)) {
+      line.clear();
+      finished = true;
+      return *this;
+    }
+    
+    utils::compress_istream is(file, 1024 * 1024);
+    if (! utils::getline(is, line)) {
+      line.clear();
+      finished = true;
+      return *this;
+    }
+    
+    ++ id;
+
+    return *this;
+  }
+  
+  path_type path;
+  uint64_t id;
+};
+
 path_set_type input_files;
 path_type     output_file = "-";
+
+bool id_mode = false;
 
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
   try {
-    typedef std::vector<std::istream*, std::allocator<std::istream*> > istream_set_type;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    typedef Reader reader_type;
+    typedef std::vector<reader_type*, std::allocator<reader_type*> > reader_set_type;
     typedef std::vector<std::string, std::allocator<std::string> > line_set_type;
-
+    
     options(argc, argv);
 
     if (input_files.empty())
       input_files.push_back("-");
     
-    istream_set_type istreams(input_files.size());
-
+    reader_set_type readers(input_files.size());
+    line_set_type lines(input_files.size());
+    
     for (size_t i = 0; i != input_files.size(); ++ i) {
       if (input_files[i] != "-" && ! boost::filesystem::exists(input_files[i]))
 	throw std::runtime_error("no file? " + input_files[i].string());
-      
-      istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
+
+      if (boost::filesystem::is_directory(input_files[i]))
+	readers[i] = new ReaderDirectory(input_files[i]);
+      else
+	readers[i] = new ReaderFile(input_files[i]);
     }
+    
+    uint64_t id = 0;
+    karma::uint_generator<uint64_t> id_gen;
 
     utils::compress_ostream os(output_file, 1024 * 1024);
     std::ostream_iterator<char> oiter(os);
     
-    line_set_type lines(istreams.size());
     for (;;) {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      
       bool terminated = false;
       
-      for (size_t i = 0; i != istreams.size(); ++ i)
-	terminated |= (! utils::getline(*istreams[i], lines[i]));
+      for (size_t i = 0; i != readers.size(); ++ i)
+	terminated |= ! readers[i]->read(lines[i]);
       
       if (terminated) break;
       
-      if (! karma::generate(oiter, (standard::string % " ||| ") << '\n', lines))
-	throw std::runtime_error("generation failed");
+      if (id_mode) {
+	if (! karma::generate(oiter, id_gen << " ||| " << (standard::string % " ||| ") << '\n', id, lines))
+	  throw std::runtime_error("generation failed");
+      } else {
+	if (! karma::generate(oiter, (standard::string % " ||| ") << '\n', lines))
+	  throw std::runtime_error("generation failed");
+      }
+
+      ++ id;
     }
     
-    bool incompatible = false;
+    int incompatible = 0;
     
-    istream_set_type::iterator iiter_end = istreams.end();
-    for (istream_set_type::iterator iiter = istreams.begin(); iiter != iiter_end; ++ iiter) {
+    reader_set_type::iterator iiter_end = readers.end();
+    for (reader_set_type::iterator iiter = readers.begin(); iiter != iiter_end; ++ iiter) {
       if (**iiter)
-	incompatible = true;
+	++ incompatible;
       
       delete *iiter;
     }
     
     if (incompatible)
-      throw std::runtime_error("# of lines do not match");
+      throw std::runtime_error("# of lines do not match: " + utils::lexical_cast<std::string>(incompatible));
   }
   catch(std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -90,6 +177,7 @@ void options(int argc, char** argv)
   po::options_description desc("options");
   desc.add_options()
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+    ("id", po::bool_switch(&id_mode), "output id")
     ("help", "help message");
   
   po::options_description hidden;
