@@ -578,8 +578,11 @@ struct ReadTstset
 	throw std::runtime_error("invalid graph format: " + line);
       if (iter != end)
 	throw std::runtime_error("invalid id ||| graph format: " + line);
-      
-      graphs[id].unite(hypergraph);
+
+      if (graphs[id].is_valid())
+	graphs[id].unite(hypergraph);
+      else
+	graphs[id].swap(hypergraph);
     }
   }
   
@@ -642,10 +645,19 @@ void read_tstset(const path_set_type& files,
   workers.join_all();
   
   // merging...
-  for (int i = 0; i != threads; ++ i)
+  for (int i = 0; i != threads; ++ i) {
     for (size_t seg = 0; seg != graphs.size(); ++ seg)
-      if (tasks[i].graphs[seg].is_valid())
-	graphs[seg].unite(tasks[i].graphs[seg]);
+      if (tasks[i].graphs[seg].is_valid()) {
+	
+	if (graphs[seg].is_valid())
+	  graphs[seg].unite(tasks[i].graphs[seg]);
+	else
+	  graphs[seg].swap(tasks[i].graphs[seg]);
+	
+	tasks[i].graphs[seg].clear();
+      }
+    tasks[i].graphs.clear();
+  }
   
   // finish!
   tasks.clear();
