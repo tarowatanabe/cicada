@@ -367,15 +367,28 @@ namespace cicada
 	states_counts.clear();
       }
       
-      
+      sentence_type __sentence_skipped;
+      sentence_type __sentence_tokenized;
+
       void insert(const sentence_type& __sentence)
       {
 	typedef utils::unordered_map<id_type, count_type, boost::hash<id_type>, std::equal_to<id_type>, std::allocator<std::pair<const id_type, count_type> > >::type counts_type;
 	
-	sentence_type __sentence_tokenized;
-	if (tokenizer)
-	  tokenizer(__sentence, __sentence_tokenized);
-	const sentence_type& sentence = (tokenizer ? __sentence_tokenized : __sentence);
+	if (skip_sgml_tag) {
+	  __sentence_skipped.clear();
+	  sentence_type::const_iterator siter_end = __sentence.end();
+	  for (sentence_type::const_iterator siter = __sentence.begin(); siter != siter_end; ++ siter) 
+	    if (*siter != vocab_type::BOS && *siter != vocab_type::EOS && ! siter->is_sgml_tag())
+	      __sentence_skipped.push_back(*siter);
+	}
+	
+	const sentence_type& sentence_skipped = (skip_sgml_tag ? __sentence_skipped : __sentence);
+	
+	if (tokenizer) {
+	  __sentence_tokenized.clear();
+	  tokenizer(sentence_skipped, __sentence_tokenized);
+	}
+	const sentence_type& sentence = (tokenizer ? __sentence_tokenized : sentence_skipped);
 	
 	counts_type counts;
 	sentence_type::const_iterator siter_end = sentence.end();
