@@ -422,7 +422,7 @@ namespace cicada
 	      graph_out.connect_edge(edge_new.id, graph_out.goal);
 	      
 	      if (prune_bin)
-		edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(step);
+		edge_new.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(step)));
 	      
 	      // we will not use item any more...
 	      destroy_candidate(item);
@@ -441,7 +441,7 @@ namespace cicada
 	      graph_out.connect_edge(edge_new.id, result.first->second);
 
 	      if (prune_bin)
-		edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(step);
+		edge_new.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(step)));
 	      
 	      // we will not propagate...
 	      if (! result.second) {

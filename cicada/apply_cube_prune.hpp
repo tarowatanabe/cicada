@@ -282,7 +282,7 @@ namespace cicada
 
       // prune-bin attribute
       if (prune_bin)
-	edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(item.in_edge->head);
+	edge_new.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(item.in_edge->head)));
 
 #if 0
       std::cerr << "edge-id: " << edge_new.id

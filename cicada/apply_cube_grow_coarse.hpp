@@ -387,7 +387,7 @@ namespace cicada
 	graph_out.connect_edge(edge.id, candidate.out_edge.head);
 
 	if (prune_bin)
-	  edge.attributes[attr_prune_bin] = attribute_set_type::int_type(item->in_edge->head);
+	  edge.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(item->in_edge->head)));
 	
 	state.D.push_back(item);
       }
