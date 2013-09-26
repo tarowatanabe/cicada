@@ -763,7 +763,10 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
-	graphs[id].unite(hypergraph);
+	if (graphs[id].is_valid())
+	  graphs[id].unite(hypergraph);
+	else
+	  graphs[id].swap(hypergraph);
       }
     } else {
       const path_type& path = *titer;
@@ -790,7 +793,10 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
-	graphs[id].unite(hypergraph);
+	if (graphs[id].is_valid())
+	  graphs[id].unite(hypergraph);
+	else
+	  graphs[id].swap(hypergraph);
       }
     }
   }

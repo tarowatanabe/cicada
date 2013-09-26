@@ -355,6 +355,7 @@ libcicada_neuron_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
+operation/attribute.hpp \
 operation/binarize.hpp \
 operation/clear.hpp \
 operation/compose.hpp \
@@ -389,6 +390,7 @@ operation/viterbi.hpp
 
 libcicada_operation_la_SOURCES = \
 operation/apply.cpp \
+operation/attribute.cpp \
 operation/binarize.cpp \
 operation/clear.cpp \
 operation/compose.cpp \

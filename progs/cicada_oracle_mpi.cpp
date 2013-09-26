@@ -361,9 +361,9 @@ struct TaskOracle
 	model.push_back(features[id]);
 	
 	if (apply_exact)
-	  cicada::apply_exact(model, graphs[id], graph_oracle, true);
+	  cicada::apply_exact(model, graphs[id], graph_oracle);
 	else
-	  cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), scorer_cube, true);
+	  cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), scorer_cube);
 	
 	// compute viterbi...
 	weight_type weight;
@@ -399,9 +399,9 @@ struct TaskOracle
       model.push_back(features[id]);
       
       if (apply_exact)
-	cicada::apply_exact(model, graphs[id], graph_oracle, true);
+	cicada::apply_exact(model, graphs[id], graph_oracle);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), scorer_cube, true);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_scorer, score_factor), scorer_cube);
       
       // compute viterbi...
       weight_type weight;
@@ -567,7 +567,10 @@ void read_tstset(const path_set_type& files,
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
-	graphs[id].unite(hypergraph);
+	if (graphs[id].is_valid())
+	  graphs[id].unite(hypergraph);
+	else
+	  graphs[id].swap(hypergraph);
       }
     } else {
       const path_type& path = *titer;
@@ -593,7 +596,10 @@ void read_tstset(const path_set_type& files,
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
-	graphs[id].unite(hypergraph);
+	if (graphs[id].is_valid())
+	  graphs[id].unite(hypergraph);
+	else
+	  graphs[id].swap(hypergraph);
       }
     }
   }

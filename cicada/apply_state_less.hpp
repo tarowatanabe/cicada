@@ -77,7 +77,7 @@ namespace cicada
 	  model.apply(node_states, edge, edge.features, node.id == graph_out.goal);
 
 	  if (prune_bin)
-	    edge.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(node.id)));
+	    edge.attributes[attr_prune_bin] = attribute_set_type::int_type(node.id);
 	}
       }
       

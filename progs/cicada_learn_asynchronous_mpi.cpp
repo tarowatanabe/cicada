@@ -131,6 +131,7 @@ bool rate_simple      = false;
 bool rate_exponential = false;
 bool rate_adagrad     = false;
 
+std::string violation_bin = "prune-bin";
 bool violation_derivation = false;
 bool violation_single     = false;
 bool violation_all        = false;
@@ -271,6 +272,9 @@ int main(int argc, char ** argv)
       throw std::runtime_error("either derivation/sinlge/all violations");
     if (int(violation_derivation) + violation_single + violation_all == 0)
       violation_derivation = true;
+
+    if ((violation_single || violation_all) && violation_bin.empty())
+      throw std::runtime_error("no violation-bin?");
 
     if (scale <= 0.0)
       throw std::runtime_error("weight scale constant must be positive: " + utils::lexical_cast<std::string>(scale));
@@ -1154,9 +1158,9 @@ void cicada_learn(operation_set_type& operations,
     if (violation_derivation)
       margin.reset(new MarginDerivation());
     else if (violation_single)
-      margin.reset(new MarginViolationSingle());
+      margin.reset(new MarginViolationSingle(violation_bin));
     else if (violation_all)
-      margin.reset(new MarginViolationAll());
+      margin.reset(new MarginViolationAll(violation_bin));
     else
       throw std::runtime_error("unsupported violation computation");
 
@@ -1819,6 +1823,7 @@ void options(int argc, char** argv)
     ("rate-simple",      po::bool_switch(&rate_simple),       "simple learning rate")
     ("rate-adagrad",     po::bool_switch(&rate_adagrad),      "adaptive learning rate (AdaGrad)")
 
+    ("violation-bin",        po::value<std::string>(&violation_bin)->default_value(violation_bin), "violation bin")
     ("violation-derivation", po::bool_switch(&violation_derivation), "full derivation based violation")
     ("violation-single",     po::bool_switch(&violation_single),     "single-node max-violation")
     ("violation-all",        po::bool_switch(&violation_all),        "violations from all the nodes")

@@ -251,3 +251,8 @@ Merge learning codes
  - There exists duplicated and experimental codes which I don't even
    remember.
  - Batch-based learner should follow online-learning style regularization.
+
+Add head-node annotator for each edge:
+ - This can be used to identify the pruning bin, so that we do not
+   rely on the "prune-bin" attribute assigned during feature
+   application.

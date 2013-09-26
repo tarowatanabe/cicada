@@ -122,7 +122,7 @@ namespace cicada
 	  edge_new.attributes = edge.attributes;
 	  
 	  if (prune_bin)
-	    edge_new.attributes.insert(std::make_pair(attr_prune_bin, attribute_set_type::int_type(v)));
+	    edge_new.attributes[attr_prune_bin] = attribute_set_type::int_type(v);
 
 	  const state_type state = model.apply(node_states, edge_new, edge_new.features, is_goal);
 	  

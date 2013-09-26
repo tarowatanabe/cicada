@@ -1750,7 +1750,10 @@ void read_forest(const path_set_type& forest_path,
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
 	
-	forests[id].unite(graph);
+	if (forests[id].is_valid())
+	  forests[id].unite(graph);
+	else
+	  forests[id].swap(graph);
       }
     }
 
@@ -1843,7 +1846,10 @@ void read_forest(const path_set_type& forest_path,
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
       
-	graphs_forest[id_forest].unite(graph);
+	if (graphs_forest[id_forest].is_valid())
+	  graphs_forest[id_forest].unite(graph);
+	else
+	  graphs_forest[id_forest].swap(graph);
       }
     }
     
@@ -1877,7 +1883,10 @@ void read_forest(const path_set_type& forest_path,
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
 	
-	graphs_intersected[id_intersected].unite(graph);
+	if (graphs_intersected[id_intersected].is_valid())
+	  graphs_intersected[id_intersected].unite(graph);
+	else
+	  graphs_intersected[id_intersected].swap(graph);
       }
     }
     

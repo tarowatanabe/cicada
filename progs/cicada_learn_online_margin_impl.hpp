@@ -175,7 +175,7 @@ struct MarginViolation : public Margin
       attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
     };
     
-    Inside() : attr_prune_bin("prune-bin") {}
+    Inside(const std::string& violation_bin) : attr_violation_bin(violation_bin) {}
     
     void operator()(const weight_set_type& weights, const hypergraph_type& forest)
     {
@@ -222,7 +222,7 @@ struct MarginViolation : public Margin
 	    features_computed = true;
 	  }
 	  
-	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_prune_bin);
+	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_violation_bin);
 	  if (piter == edge.attributes.end()) continue;
 	  
 	  const int bin_pos = boost::apply_visitor(attribute_int(), piter->second);
@@ -256,9 +256,12 @@ struct MarginViolation : public Margin
     weight_bin_type  weights_bin;
     feature_bin_type features_bin;
 
-    const attribute_type attr_prune_bin;
+    const attribute_type attr_violation_bin;
   };
   
+  MarginViolation(const std::string& violation_bin)
+    : inside_forest(violation_bin),
+      inside_oracle(violation_bin) {}
 
   Inside inside_forest;
   Inside inside_oracle;
@@ -268,7 +271,7 @@ struct MarginViolationSingle : public MarginViolation
 {
   // single max-violation node margin
   
-  MarginViolationSingle()  {}
+  MarginViolationSingle(const std::string& violation_bin) : MarginViolation(violation_bin)  {}
   
   void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
   {
@@ -347,6 +350,8 @@ struct MarginViolationAll : public MarginViolation
 {
   // multiple max-violation node margin
   
+  MarginViolationAll(const std::string& violation_bin) : MarginViolation(violation_bin)  {}
+
   void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
   {
     if (! forest.is_valid() || ! oracle.is_valid()) return;

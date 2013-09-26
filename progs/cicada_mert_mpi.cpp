@@ -1011,7 +1011,10 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	if (iter != end)
 	  throw std::runtime_error("invalid id ||| graph format" + path.string());
 	
-	graphs[mpi_id].unite(hypergraph);
+	if (graphs[mpi_id].is_valid())
+	  graphs[mpi_id].unite(hypergraph);
+	else
+	  graphs[mpi_id].swap(hypergraph);
       }
     } else {
       const path_type& path = *titer;
@@ -1042,7 +1045,10 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	if (mpi_id >= static_cast<int>(graphs.size()))
 	  graphs.resize(mpi_id + 1);
 	
-	graphs[mpi_id].unite(hypergraph);
+	if (graphs[mpi_id].is_valid())
+	  graphs[mpi_id].unite(hypergraph);
+	else
+	  graphs[mpi_id].swap(hypergraph);
       }
     }
   }

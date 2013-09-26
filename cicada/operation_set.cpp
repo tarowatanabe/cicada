@@ -22,6 +22,7 @@
 #include "operation/compose.hpp"
 #include "operation/generate.hpp"
 #include "operation/apply.hpp"
+#include "operation/attribute.hpp"
 #include "operation/debinarize.hpp"
 #include "operation/expand_ngram.hpp"
 #include "operation/expected_ngram.hpp"
@@ -77,6 +78,7 @@ apply: feature application\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\
 \tweight=\"weight=value\" additional weight to the weight vector\n\
+attribute: annotate head-node attribute for each edge\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|cyk|cky|dep|dependency] binarization direction\n\
 \torder=binarization order (default: -1 == all context. sinonym: order-vertical)\n\
@@ -397,6 +399,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, debug)));
       else if (param_name == "apply")
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
+      else if (param_name == "attribute")
+	operations.push_back(operation_ptr_type(new operation::Attribute(*piter, debug)));
       else if (param_name == "posterior")
 	operations.push_back(operation_ptr_type(new operation::Posterior(*piter, debug)));
       else if (param_name == "prune")
