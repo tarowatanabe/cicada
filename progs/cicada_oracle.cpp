@@ -548,9 +548,21 @@ double compute_oracles(const hypergraph_set_type& graphs,
   return objective_best;
 }
 
+typedef std::pair<path_type, std::string> path_line_type;
+
+namespace std
+{
+  inline
+  void swap(path_line_type& x, path_line_type& y)
+  {
+    x.first.swap(y.first);
+    x.second.swap(y.second);
+  }
+};
+
 struct ReadTstset
 {
-  typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  typedef utils::lockfree_list_queue<path_line_type, std::allocator<path_line_type> > queue_type;
   
   ReadTstset(queue_type& __queue, const size_t size) : queue(__queue), graphs(size) {}
 
@@ -559,12 +571,23 @@ struct ReadTstset
     size_t id;
     hypergraph_type hypergraph;
     
-    std::string line;
+    path_line_type path_line;
     
     for (;;) {
-      queue.pop_swap(line);
+      queue.pop_swap(path_line);
       
-      if (line.empty()) break;
+      if (path_line.first.empty() && path_line.second.empty()) break;
+      
+      if (! path_line.first.empty()) {
+	utils::compress_istream is(path_line.first, 1024 * 1024);
+	
+	if (! utils::getline(is, path_line.second))
+	  throw std::runtime_error("no line: " + path_line.first.string());
+      }
+
+      const std::string& line = path_line.second;
+      
+      if (line.empty()) continue;
       
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end  = line.end();
@@ -605,8 +628,6 @@ void read_tstset(const path_set_type& files,
   for (int i = 0; i != threads; ++ i)
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
-  std::string line;
-
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
@@ -618,29 +639,23 @@ void read_tstset(const path_set_type& files,
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 	
 	if (! boost::filesystem::exists(path)) break;
-	
-	utils::compress_istream is(path, 1024 * 1024);
-	
-	if (! utils::getline(is, line))
-	  throw std::runtime_error("no line in file-no: " + utils::lexical_cast<std::string>(i));
-	
-	if (! line.empty())
-	  queue.push_swap(line);
+
+	queue.push(std::make_pair(path, std::string()));
       }
     } else {
-      const path_type& path = *titer;
+      path_line_type path_line;
       
-      utils::compress_istream is(path, 1024 * 1024);
-
-      while (utils::getline(is, line))
-	if (! line.empty())
-	  queue.push_swap(line);
+      utils::compress_istream is(*titer, 1024 * 1024);
+      
+      while (utils::getline(is, path_line.second))
+	if (! path_line.second.empty())
+	  queue.push_swap(path_line);
     }
   }
   
   // terminaltion
   for (int i = 0; i != threads; ++ i)
-    queue.push(std::string());
+    queue.push(std::make_pair(path_type(), std::string()));
   
   workers.join_all();
   
