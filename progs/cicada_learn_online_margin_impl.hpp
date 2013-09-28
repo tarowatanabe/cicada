@@ -167,6 +167,8 @@ struct MarginViolation : public Margin
     typedef std::vector<weight_type, std::allocator<weight_type> >           weight_bin_type;
     typedef utils::chunk_vector<feature_set_type, 4096/sizeof(feature_set_type), std::allocator<feature_set_type> > feature_bin_type;
 
+    typedef std::vector<bool, std::allocator<bool> > visited_type;
+
     struct attribute_int : public boost::static_visitor<attribute_set_type::int_type>
     {
       // we will not throw, but simply return zero. (TODO: return negative?)
@@ -181,8 +183,11 @@ struct MarginViolation : public Margin
     {
       weights_inside.clear();
       features_inside.clear();
+      
       weights_bin.clear();
+      minimum_bin.clear();
       features_bin.clear();
+      visited_bin.clear();
 
       cicada::operation::weight_function<weight_type > function(weights);
       
@@ -208,7 +213,7 @@ struct MarginViolation : public Margin
 	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    score *= weights_inside[*niter];
-
+	  
 	  bool features_computed = false;
 	  
 	  if (score > weight) {
@@ -231,8 +236,16 @@ struct MarginViolation : public Margin
 	  
 	  if (bin_pos >= weights_bin.size())
 	    weights_bin.resize(bin_pos + 1);
+	  if (bin_pos >= minimum_bin.size())
+	    minimum_bin.resize(bin_pos + 1, cicada::semiring::traits<weight_type>::max());
 	  if (bin_pos >= features_bin.size())
 	    features_bin.resize(bin_pos + 1);
+	  
+	  if (bin_pos >= visited_bin.size())
+	    visited_bin.resize(bin_pos + 1, false);
+	  
+	  visited_bin[bin_pos] = true;
+	  minimum_bin[bin_pos] = std::min(minimum_bin[bin_pos], score);
 	  
 	  if (score > weights_bin[bin_pos])  {
 	    weights_bin[bin_pos] = score;
@@ -254,7 +267,9 @@ struct MarginViolation : public Margin
     feature_map_type features_inside;
     
     weight_bin_type  weights_bin;
+    weight_bin_type  minimum_bin;
     feature_bin_type features_bin;
+    visited_type     visited_bin;
 
     const attribute_type attr_violation_bin;
   };
@@ -325,7 +340,9 @@ struct MarginViolationSingle : public MarginViolation
       double    margin_max(- std::numeric_limits<double>::infinity());
       
       for (size_type bin = 0; bin != bin_max; ++ bin) 
-	if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
+	if (inside_forest.visited_bin[bin]
+	    && inside_oracle.visited_bin[bin]
+	    && inside_forest.minimum_bin[bin] > inside_oracle.weights_bin[bin]) {
 	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
 				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
 	  
@@ -400,7 +417,9 @@ struct MarginViolationAll : public MarginViolation
       if (! bin_max) return;
       
       for (size_type bin = 0; bin != bin_max; ++ bin)
-	if (! inside_forest.features_bin[bin].empty() && ! inside_oracle.features_bin[bin].empty()) {
+	if (inside_forest.visited_bin[bin]
+	    && inside_oracle.visited_bin[bin]
+	    && inside_forest.minimum_bin[bin] > inside_oracle.weights_bin[bin]) {
 	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
 				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
 	  

@@ -32,6 +32,8 @@ opt_parser = OptionParser(
                 metavar="FILE", help="training data"),
     make_option("--refset", default="", action="store", type="string",
                 metavar="FILE", help="reference translations"),
+    make_option("--oracle", default="", action="store", type="string",
+                metavar="FILE", help="oracle training data"),
 
     make_option("--config", default="", action="store", type="string",
                 metavar="CONFIG", help="cicada config file"),
@@ -485,10 +487,15 @@ if __name__ == '__main__':
     if options.regularize_oscar > 0.0:
         regularizer.append(Option('--regularize-oscar',  options.regularize_oscar))
     regularizer = ' '.join(map(str, regularizer))
+
+    oracle = ""
+    if options.oracle:
+        oracle = str(Option('--oracle', Quoted(options.oracle)))
     
     qsub.mpirun(Program(cicada_learn,
                         Option('--input', Quoted(options.srcset)),
                         Option('--refset', Quoted(options.refset)),
+                        oracle,
                         Option('--scorer', options.scorer),
                         Option('--config', Quoted(options.config)),
                         Option('--iteration', options.iteration),
