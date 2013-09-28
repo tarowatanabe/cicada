@@ -148,7 +148,7 @@ namespace std
   inline
   void swap(utils::vector2<Tp, Alloc>& x, utils::vector2<Tp, Alloc>& y)
   {
-    x.swap(x);
+    x.swap(y);
   }
 };
 #endif

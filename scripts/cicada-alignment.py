@@ -543,9 +543,8 @@ class Giza:
         self.posterior_source_target = os.path.join(dir_source_target, prefix_source_target + '.posterior.final.gz')
         self.posterior_target_source = os.path.join(dir_target_source, prefix_target_source + '.posterior.final.gz')
         
-        command += " --posterior-source-target \"%s\"" %(self.viterbi_source_target)
-        command += " --posterior-target-source \"%s\"" %(self.viterbi_target_source)
-        
+        command += " --posterior-source-target \"%s\"" %(self.posterior_source_target)
+        command += " --posterior-target-source \"%s\"" %(self.posterior_target_source)
 
         if iteration_model4 > 0:
             command += " --iteration-model4 %d" %(iteration_model4)

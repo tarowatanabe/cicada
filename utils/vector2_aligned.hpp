@@ -181,7 +181,7 @@ namespace std
   inline
   void swap(utils::vector2_aligned<Tp, Alloc>& x, utils::vector2_aligned<Tp, Alloc>& y)
   {
-    x.swap(x);
+    x.swap(y);
   }
 };
 #endif

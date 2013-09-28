@@ -13,7 +13,6 @@
 #include "cicada/symbol_vector.hpp"
 #include "cicada/cluster.hpp"
 
-#include "utils/vector2.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"

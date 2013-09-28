@@ -1815,8 +1815,10 @@ namespace std
 };
 
 template <typename Infer>
-struct PosteriorMapper : public PosteriorMapReduce, public Infer
+struct PosteriorMapper : public PosteriorMapReduce
 {
+  Infer infer;
+
   queue_mapper_type&  mapper;
   queue_reducer_type& reducer_source_target;
   queue_reducer_type& reducer_target_source;
@@ -1827,7 +1829,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
 		  queue_reducer_type& __reducer_source_target,
 		  queue_reducer_type& __reducer_target_source,
 		  queue_reducer_type& __reducer_combined)
-    : Infer(__infer),
+    : infer(__infer),
       mapper(__mapper),
       reducer_source_target(__reducer_source_target),
       reducer_target_source(__reducer_target_source),
@@ -1846,14 +1848,14 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
     for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
-      
+
       posterior_source_target.clear();
       posterior_target_source.clear();
       posterior_combined.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty()) {
 	
-	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
+	infer(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
 	
 	// merging...
 	const size_type source_size = bitext.source.size();
@@ -1881,7 +1883,7 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
       reducer_combined.push_swap(posterior_combined);
       
       if ((iter & iter_mask) == iter_mask)
-	Infer::shrink();
+	infer.shrink();
     }
   }
 };

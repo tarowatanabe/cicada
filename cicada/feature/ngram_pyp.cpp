@@ -11,7 +11,6 @@
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 
-#include "utils/vector2.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"
