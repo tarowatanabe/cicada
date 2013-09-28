@@ -1540,8 +1540,9 @@ struct SampleBurnMapper : public SampleMapReduce, public Burner
     
     const int iter_mask = (1 << 8) - 1;
     
-    for (int iter = 0;; ++ iter) {
+    for (int iter = 0; /**/; ++ iter) {
       mapper.pop_swap(bitext);
+      
       if (bitext.source.empty() && bitext.target.empty()) break;
       
       base(bitext.source,
