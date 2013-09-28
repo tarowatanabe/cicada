@@ -1508,7 +1508,6 @@ struct PosteriorHMM : public ViterbiBase
       std::copy(hmm_source_target.posterior.begin(trg), hmm_source_target.posterior.end(trg), posterior_source_target.begin(trg));
     for (size_type src = 0; src <= source_size; ++ src)
       std::copy(hmm_target_source.posterior.begin(src), hmm_target_source.posterior.end(src), posterior_target_source.begin(src));
-
   }
 
   void shrink()

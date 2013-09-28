@@ -1917,6 +1917,12 @@ struct PosteriorModel4 : public ViterbiBase
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
+    posterior_source_target.reserve(target_size + 1, source_size + 1);
+    posterior_target_source.reserve(source_size + 1, target_size + 1);
+
+    posterior_source_target.resize(target_size + 1, source_size + 1);
+    posterior_target_source.resize(source_size + 1, target_size + 1);
+
     model4.assign(source,
 		  target,
 		  alignment_source_target,
