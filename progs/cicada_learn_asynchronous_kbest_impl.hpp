@@ -1297,7 +1297,11 @@ struct LearnOHinge : public LearnOnlineMargin
 
 struct LearnPA : public LearnOnlineMargin
 {
-  LearnPA(const double& __lambda) : lambda(__lambda) {}
+  LearnPA(const double& __lambda) : lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
 
   void initialize(weight_set_type& weights) {}
   
@@ -1316,7 +1320,7 @@ struct LearnPA : public LearnOnlineMargin
     
     double objective = 0.0;
     
-    const double constant = 1.0 / lambda;
+    const double constant = 1.0 / (lambda * losses.size());
     
     for (size_t i = 0; i != losses.size(); ++ i) {
       const double margin = cicada::dot_product(weights, features[i].begin(), features[i].end(), 0.0);
@@ -1353,7 +1357,11 @@ struct LearnPA : public LearnOnlineMargin
 
 struct LearnCW : public LearnOnlineMargin
 {
-  LearnCW(const double& __lambda) : lambda(__lambda) {}
+  LearnCW(const double& __lambda) : lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
 
   void initialize(weight_set_type& weights) {}
   
@@ -1414,7 +1422,11 @@ struct LearnCW : public LearnOnlineMargin
 
 struct LearnAROW : public LearnOnlineMargin
 {
-  LearnAROW(const double& __lambda) : lambda(__lambda) {}
+  LearnAROW(const double& __lambda) : lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
 
   void initialize(weight_set_type& weights) {}
   
@@ -1443,7 +1455,7 @@ struct LearnAROW : public LearnOnlineMargin
 
       const double variance = cicada::dot_product(features[i].begin(), features[i].end(), covariances, features[i].begin(), features[i].end(), 0.0);
       
-      const double beta = 1.0 / (variance + lambda);
+      const double beta = 1.0 / (variance + lambda * losses.size());
       const double alpha = std::max(0.0, (loss - margin) * beta);
       
       if (alpha > 1e-12) {
@@ -1473,7 +1485,11 @@ struct LearnAROW : public LearnOnlineMargin
 
 struct LearnNHERD : public LearnOnlineMargin
 {
-  LearnNHERD(const double& __lambda) : lambda(1.0 / __lambda) {}
+  LearnNHERD(const double& __lambda) : lambda(1.0 / __lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
 
   void initialize(weight_set_type& weights) {}
   
@@ -1594,7 +1610,11 @@ struct LearnMIRA : public LearnOnlineMargin
     const index_type& index;
   };
 
-  LearnMIRA(const double& __lambda) : tolerance(0.1), lambda(__lambda) {}
+  LearnMIRA(const double& __lambda) : tolerance(0.1), lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
   
   void initialize(weight_set_type& weights) {}
   

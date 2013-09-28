@@ -1267,7 +1267,11 @@ struct LearnOHinge : public LearnMargin
 struct LearnPA : public LearnMargin
 {
   LearnPA(Margin& __margin, const double& __lambda)
-    : LearnMargin(__margin), lambda(__lambda) {}
+    : LearnMargin(__margin), lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
   
   void initialize(weight_set_type& weights) {}
   
@@ -1286,7 +1290,7 @@ struct LearnPA : public LearnMargin
     
     double objective = 0.0;
     
-    const double constant = 1.0 / lambda;
+    const double constant = 1.0 / (lambda * margin.deltas.size());
     
     for (size_type i = 0; i != margin.deltas.size(); ++ i) {
       const double suffered = 1.0 - cicada::dot_product(weights, margin.deltas[i].begin(), margin.deltas[i].end(), 0.0);
@@ -1381,7 +1385,11 @@ struct LearnMIRA : public LearnMargin
   };
 
   LearnMIRA(Margin& __margin, const double& __lambda)
-    : LearnMargin(__margin), tolerance(0.1), lambda(__lambda) {}
+    : LearnMargin(__margin), tolerance(0.1), lambda(__lambda)
+  {
+    if (__lambda <= 0.0)
+      throw std::runtime_error("lambda is <= 0?");
+  }
   
   void initialize(weight_set_type& weights) {}
   
