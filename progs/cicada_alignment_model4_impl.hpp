@@ -1935,6 +1935,8 @@ struct PosteriorModel4 : public ViterbiBase
 
     // hill-climb
     model4.climb();
+
+    model4.estimate_posterior(source, target);
     
     for (size_type trg = 0; trg <= target_size; ++ trg)
       std::copy(model4.posterior.begin(trg), model4.posterior.end(trg), posterior_source_target.begin(trg));
@@ -1951,6 +1953,8 @@ struct PosteriorModel4 : public ViterbiBase
     
     // hill-climb
     model4.climb();
+
+    model4.estimate_posterior(target, source);
     
     for (size_type src = 0; src <= source_size; ++ src)
       std::copy(model4.posterior.begin(src), model4.posterior.end(src), posterior_target_source.begin(src));
