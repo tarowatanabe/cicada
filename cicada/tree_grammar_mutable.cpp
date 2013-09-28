@@ -52,7 +52,8 @@
 namespace cicada
 {
   static const size_t DEBUG_DOT = 1000000;
-  static const size_t DEBUG_LINE = DEBUG_DOT * 100;
+  static const size_t DEBUG_WRAP = 100;
+  static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
   class TreeGrammarMutableImpl
   {
@@ -376,7 +377,7 @@ namespace cicada
     utils::resource end;
 
     if (debug) {
-      if ((num_line % DEBUG_DOT) % 100)
+      if ((num_line / DEBUG_DOT) % DEBUG_WRAP)
 	std::cerr << std::endl;
 
       std::cerr << "# of rules: " << num_line << std::endl;

@@ -274,7 +274,7 @@ struct progress_mapper : public Mapper
     
     void final() const
     {
-      if ((i % 1000000) % 100)
+      if ((i / 1000000) % 100)
 	std::cerr << std::endl;
     }
   

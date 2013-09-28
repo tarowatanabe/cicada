@@ -27,6 +27,10 @@ typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
 typedef boost::filesystem::path path_type;
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
+
 path_type source_file;
 path_type target_file;
 path_type alignment_file;
@@ -105,14 +109,14 @@ int main(int argc, char** argv)
 	++ num_samples;
 	
 	if (debug) {
-	  if (num_samples % 10000 == 0)
+	  if (num_samples % DEBUG_DOT == 0)
 	    std::cerr << '.';
-	  if (num_samples % 1000000 == 0)
+	  if (num_samples % DEBUG_LINE == 0)
 	    std::cerr << std::endl;
 	}
       }
     }
-    if (debug)
+    if (debug && ((num_samples / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
     if (debug)
       std::cerr << "# of samples: " << num_samples << std::endl;

@@ -110,6 +110,9 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 typedef BitextGiza bitext_giza_type;
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type source_target_file;
 path_type target_source_file;
@@ -1378,14 +1381,14 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
     ++ id;
 
     if (debug) {
-      if (id % 10000 == 0)
+      if (id % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (id % 1000000 == 0)
+      if (id % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
   }
 
-  if (debug && id >= 10000)
+  if (debug && ((id / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << id << std::endl;
@@ -1788,14 +1791,14 @@ void process_posterior(std::istream& is_src_trg, std::istream& is_trg_src, std::
     ++ id;
 
     if (debug) {
-      if (id % 10000 == 0)
+      if (id % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (id % 1000000 == 0)
+      if (id % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
   }
   
-  if (debug && id >= 10000)
+  if (debug && ((id / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << id << std::endl;

@@ -237,6 +237,10 @@ struct ttable_pair_type
   count_dict_type ttable;
 };
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
+
 path_type source_file = "-";
 path_type target_file = "-";
 path_type alignment_file = "-";
@@ -510,9 +514,9 @@ void learn(ttable_type& ttable, ttable_pair_type& ttable_prefix, ttable_pair_typ
 
     ++ num_bitext;
     if (debug) {
-      if (num_bitext % 10000 == 0)
+      if (num_bitext % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (num_bitext % 1000000 == 0)
+      if (num_bitext % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
       
@@ -525,7 +529,7 @@ void learn(ttable_type& ttable, ttable_pair_type& ttable_prefix, ttable_pair_typ
   if (! bitexts.empty())
     queue.push_swap(bitexts);
   
-  if (debug && num_bitext >= 10000)
+  if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << num_bitext << std::endl;

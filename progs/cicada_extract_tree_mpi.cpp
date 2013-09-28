@@ -27,6 +27,10 @@
 
 #include "codec/lz4.hpp"
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
+
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Alignment alignment_type;
 
@@ -186,9 +190,9 @@ int main(int argc, char** argv)
 	    
 	    ++ num_samples;
 	    if (debug) {
-	      if (num_samples % 10000 == 0)
+	      if (num_samples % DEBUG_DOT == 0)
 		std::cerr << '.';
-	      if (num_samples % 1000000 == 0)
+	      if (num_samples % DEBUG_LINE == 0)
 		std::cerr << std::endl;
 	    }
 	  }
@@ -210,9 +214,9 @@ int main(int argc, char** argv)
 	  queue.push_swap(bitext);
 	  ++ num_samples;
 	  if (debug) {
-	    if (num_samples % 10000 == 0)
+	    if (num_samples % DEBUG_DOT == 0)
 	      std::cerr << '.';
-	    if (num_samples % 1000000 == 0)
+	    if (num_samples % DEBUG_LINE == 0)
 	      std::cerr << std::endl;
 	  }
 	  found = true;
@@ -224,7 +228,7 @@ int main(int argc, char** argv)
       if (is_src || is_trg || is_alg)
 	throw std::runtime_error("# of lines do not match");
 
-      if (debug)
+      if (debug && ((num_samples / DEBUG_DOT) % DEBUG_WRAP))
 	std::cerr << std::endl;
       if (debug)
 	std::cerr << "# of samples: " << num_samples << std::endl;

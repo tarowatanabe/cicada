@@ -14,6 +14,10 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
+
 path_type source_file = "-";
 path_type target_file = "-";
 path_type alignment_file;
@@ -618,9 +622,9 @@ void learn(const Maximizer& maximizer,
 
       ++ num_bitext;
       if (debug) {
-	if (num_bitext % 10000 == 0)
+	if (num_bitext % DEBUG_DOT == 0)
 	  std::cerr << '.';
-	if (num_bitext % 1000000 == 0)
+	if (num_bitext % DEBUG_LINE == 0)
 	  std::cerr << '\n';
       }
       
@@ -633,7 +637,7 @@ void learn(const Maximizer& maximizer,
     if (! bitexts.empty())
       queue_bitext.push_swap(bitexts);
     
-    if (debug && ((num_bitext % 10000) % 100))
+    if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
     if (debug)
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
@@ -981,14 +985,14 @@ void viterbi(const ttable_type& ttable_source_target,
     ++ bitext.id;
     
     if (debug) {
-      if (bitext.id % 10000 == 0)
+      if (bitext.id % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (bitext.id % 1000000 == 0)
+      if (bitext.id % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
   }
 
-  if (debug && ((bitext.id % 10000) % 100))
+  if (debug && ((bitext.id / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
@@ -1274,14 +1278,14 @@ void project_dependency(const ttable_type& ttable_source_target,
     ++ bitext.id;
     
     if (debug) {
-      if (bitext.id % 10000 == 0)
+      if (bitext.id % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (bitext.id % 1000000 == 0)
+      if (bitext.id % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
   }
   
-  if (debug && ((bitext.id % 10000) % 100))
+  if (debug && ((bitext.id / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
@@ -1592,14 +1596,14 @@ void posterior(const ttable_type& ttable_source_target,
     ++ bitext.id;
     
     if (debug) {
-      if (bitext.id % 10000 == 0)
+      if (bitext.id % DEBUG_DOT == 0)
 	std::cerr << '.';
-      if (bitext.id % 1000000 == 0)
+      if (bitext.id % DEBUG_LINE == 0)
 	std::cerr << '\n';
     }
   }
   
-  if (debug && ((bitext.id % 10000) % 100))
+  if (debug && ((bitext.id / DEBUG_DOT) % DEBUG_WRAP))
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
