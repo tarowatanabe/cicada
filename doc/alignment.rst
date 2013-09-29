@@ -50,11 +50,59 @@ be used to perform word alignment for held-out test data:
   model/aligner.sh \
 	  --source <source test data> \
 	  --target <target test data> \
-	  --viterbi-source-target <alignment for source to target> \
-	  --viterbi-target-source <alignment for target to source> \
+	  --viterbi-source-target <alignment for P(target | source)> \
+	  --viterbi-target-source <alignment for P(source | target)> \
 	  --itg
 
-which computes ITG constrained word alignment.
+which computes ITG constrained word alignment, for instance.
+The word alignment can be heuristically combined by first computing
+Viterbi alignment:
+
+.. code:: bash
+
+  model/aligner.sh \
+	  --source <source test data> \
+	  --target <target test data> \
+	  --viterbi-source-target <alignment for P(target | source)> \
+	  --viterbi-target-source <alignment for P(source | target)>
+
+Then, use ``cicada_alignment`` to merge:
+
+.. code:: bash
+
+  cicada_alignment \
+	  --source-target <alignment for P(target | source)> \
+	  --target-source <alignment for P(source | target)> \
+	  --grow \
+	  --diag \
+	  --final-and
+
+which applies ``grow-diag-final-and`` heuristic. You can also try
+``--itg`` heuristic or ``--max-match`` to compute one-to-one alignment
+using Hungarian algorithm. Alternatively, combined word alignment can
+be estimated by first generating posteriors:
+
+.. code:: bash
+
+  model/aligner.sh \
+	  --source <source test data> \
+	  --target <target test data> \
+	  --posterior-source-target <posteriors for P(target | source)> \
+	  --posterior-target-source <posteriors for P(source | target)>
+
+Then, use a threshold to combine:
+
+.. code:: bash
+
+  cicada_alignment \
+	  --source-target <posterior for P(target | source)> \
+	  --target-source <posterior for P(source | target)> \
+	  --posterior \
+	  --posterior-threshold 0.2
+
+As in Viterbi alignment combination, you can try ``--itg`` to estimate
+ITG constrained alignment or ``--max-match`` to apply Hungarian
+algorithm to compute one-to-one alignment.
 
 Details
 -------
