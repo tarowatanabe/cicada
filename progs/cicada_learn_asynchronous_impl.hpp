@@ -1180,7 +1180,7 @@ struct LearnOHinge : public LearnMargin
     // udpate...
     feature_set_type::const_iterator fiter_end = updates.end();
     for (feature_set_type::const_iterator fiter = updates.begin(); fiter != fiter_end; ++ fiter)
-      regularizer.update(weights, fiter->first, fiter->second, rate(fiter->first, fiter->second));
+      regularizer.update(weights, fiter->first, fiter->second, eta);
     
     regularizer.postprocess(weights, eta);
   }
