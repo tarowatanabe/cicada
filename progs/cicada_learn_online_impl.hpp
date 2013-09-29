@@ -1008,13 +1008,19 @@ struct LearnHinge : public LearnMargin
     suffered.clear();
     suffered.resize(margin.deltas.size(), false);
     
+    double objective = 0.0;
+    
     for (size_type i = 0; i != margin.deltas.size(); ++ i) {
       const double loss = 1.0 - cicada::dot_product(margin.deltas[i].begin(), margin.deltas[i].end(), weights, 0.0) * regularizer.scale();
       const bool suffer_loss = loss > 0.0;
+
+      objective += loss * suffer_loss;
       
       suffered[i] = suffer_loss;
       k += suffer_loss;
     }
+    
+    objective /= margin.deltas.size();
     
     if (k) {
       //const double k_norm = 1.0 / (features.size());
@@ -1040,7 +1046,7 @@ struct LearnHinge : public LearnMargin
     
     margin.clear();
     
-    return 0.0;
+    return objective;
   }
 
   Regularize& regularizer;
@@ -1195,7 +1201,7 @@ struct LearnOHinge : public LearnMargin
     
     margin.clear();
     
-    return 0.0;
+    return objective;
   }
 
   double    tolerance;
