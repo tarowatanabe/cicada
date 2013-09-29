@@ -174,6 +174,9 @@ int main(int argc, char ** argv)
 				   && ! boost::filesystem::is_regular_file(output_file)));
     
     if (posterior_mode) {
+      if (int(itg_mode) + max_match_mode > 1)
+	throw std::runtime_error("you cannnot do both of ITG and MaxMatch");
+
       utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
       utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
       utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
@@ -217,6 +220,9 @@ int main(int argc, char ** argv)
       
       process_alignment(is, os);
     } else {
+      if (int(itg_mode) + max_match_mode > 1)
+	throw std::runtime_error("you cannnot do both of ITG and MaxMatch");
+
       if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
 	throw std::runtime_error("no f2e file?" + source_target_file.string());
       if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
@@ -869,6 +875,8 @@ struct MaxMatch
 	costs(src + target_size, trg) = score_null;
       }
     
+    align.clear();
+    
     kuhn_munkres_assignment(costs, insert_align<Alignment>(source_size, target_size, align));
   }
   
@@ -880,12 +888,14 @@ struct MaxMatch
 void process_alignment(std::istream& is, std::ostream& os)
 {
   alignment_type align;
-  alignment_type inverted;
   alignment_type closured;
-  AlignmentInserter invert_inserter(inverted);
+  alignment_type inverted;
+  
   AlignmentInserter closure_inserter(closured);
-  Invert invert;
+  AlignmentInserter invert_inserter(inverted);
+  
   Closure closure;
+  Invert invert;
   
   if (invert_mode || closure_mode) {
     while (is >> align) {
@@ -941,17 +951,17 @@ void process_giza(std::istream& is, std::ostream& os)
   iter_type iter_end;
   
   alignment_type    alignment;
-  alignment_type    inverted;
   alignment_type    closured;
+  alignment_type    inverted;
   
   AlignmentInserter inserter(alignment);
-  AlignmentInserter inverted_inserter(inverted);
   AlignmentInserter closured_inserter(closured);
+  AlignmentInserter inverted_inserter(inverted);
   
   if (source_target_mode) {
     SourceTarget process;
-    Invert       invert;
     Closure      closure;
+    Invert       invert;
     
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -989,8 +999,8 @@ void process_giza(std::istream& is, std::ostream& os)
     }
   } else {
     TargetSource process;
-    Invert       invert;
     Closure      closure;
+    Invert       invert;
   
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -1178,11 +1188,12 @@ struct Mapper
     
     align_set_type aligns;
     alignment_type alignment;
-    alignment_type inverted;
     alignment_type closured;
+    alignment_type inverted;
+    
     AlignmentInserter inserter(alignment);
-    AlignmentInserter inverted_inserter(inverted);
     AlignmentInserter closured_inserter(closured);
+    AlignmentInserter inverted_inserter(inverted);
 
     ITG       __itg;
     MaxMatch  __max_match;
@@ -1193,8 +1204,8 @@ struct Mapper
     Final     __final;
     FinalAnd  __final_and;
     
-    Invert    __invert;
     Closure   __closure;
+    Invert    __invert;
     
     while (1) {
       queue_bitext.pop_swap(bitext_pair);
@@ -1636,9 +1647,17 @@ struct MapperPosterior
     span_set_type span_target;
 
     alignment_type alignment;
+    alignment_type closured;
+    alignment_type inverted;
 
+    AlignmentInserter closured_inserter(closured);
+    AlignmentInserter inverted_inserter(inverted);
+    
     ITG      __itg;
     MaxMatch __max_match;
+    
+    Closure   __closure;
+    Invert    __invert;
     
     for (;;) {
       queue_posterior.pop_swap(posteriors);
@@ -1689,6 +1708,21 @@ struct MapperPosterior
 	    if (score > posterior_threshold)
 	      alignment.push_back(std::make_pair(src - 1, trg - 1));
 	  }
+      }
+      
+      // closure
+      if (closure_mode) {
+	closured.clear();
+	__closure(alignment, closured_inserter);
+	alignment.swap(closured);
+      }
+      
+      // invert this alignment...
+      if (invert_mode) {
+	inverted.clear();
+	__invert(alignment, inverted_inserter);
+	std::sort(inverted.begin(), inverted.end());
+	alignment.swap(inverted);
       }
       
       queue_alignment.push(id_alignment_type(posteriors.id, alignment));
