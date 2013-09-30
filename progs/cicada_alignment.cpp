@@ -193,10 +193,23 @@ int main(int argc, char ** argv)
       std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
       
       process_posterior(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
-    } else if (source_target_mode || target_source_mode) {
-      if (source_target_mode && target_source_mode)
-	throw std::runtime_error("which mode f2e or e2f?");
+    } else  if (input_file == "-" || boost::filesystem::exists(input_file)) {
+      utils::compress_istream is(input_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
+      process_alignment(is, os);
+    } else {
+      if (int(intersection_mode) + union_mode + grow_mode + itg_mode + max_match_mode + source_target_mode + target_source_mode > 1)
+	throw std::runtime_error("one of intersection|union|grow|f2e|e2f|itg|max-match");
+      
+      // defaul to intersection
+      if (int(intersection_mode) + union_mode + grow_mode + itg_mode + max_match_mode + source_target_mode + target_source_mode == 0)
+	intersection_mode = true;
+
+      if (grow_mode)
+	if (final_mode && final_and_mode)
+	  throw std::runtime_error("either one of final|final-and");
+
       if (source_target_mode) {
 	if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
 	  throw std::runtime_error("no f2e file?" + source_target_file.string());
@@ -205,7 +218,7 @@ int main(int argc, char ** argv)
 	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
 	
 	process_giza(is, os);
-      } else {
+      } else if (target_source_mode) {
 	if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
 	  throw std::runtime_error("no e2f file?" + target_source_file.string());
 	
@@ -213,37 +226,29 @@ int main(int argc, char ** argv)
 	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
 	
 	process_giza(is, os);
+      } else {
+	if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
+	  throw std::runtime_error("no f2e file?" + source_target_file.string());
+	if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
+	  throw std::runtime_error("no e2f file?" + target_source_file.string());
+	
+	utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
+	utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
+	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+	
+	if (! span_source_file.empty())
+	  if (span_source_file != "-" && ! boost::filesystem::exists(span_source_file))
+	    throw std::runtime_error("no spna source file: " + span_source_file.string());
+	
+	if (! span_target_file.empty())
+	  if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
+	    throw std::runtime_error("no spna target file: " + span_target_file.string());
+	
+	std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+	std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
+	
+	process_giza(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
       }
-    } else if (input_file == "-" || boost::filesystem::exists(input_file)) {
-      utils::compress_istream is(input_file, 1024 * 1024);
-      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
-      
-      process_alignment(is, os);
-    } else {
-      if (int(itg_mode) + max_match_mode > 1)
-	throw std::runtime_error("you cannnot do both of ITG and MaxMatch");
-
-      if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
-	throw std::runtime_error("no f2e file?" + source_target_file.string());
-      if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
-	throw std::runtime_error("no e2f file?" + target_source_file.string());
-      
-      utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
-      utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
-      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
-
-      if (! span_source_file.empty())
-	if (span_source_file != "-" && ! boost::filesystem::exists(span_source_file))
-	  throw std::runtime_error("no spna source file: " + span_source_file.string());
-      
-      if (! span_target_file.empty())
-	if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
-	  throw std::runtime_error("no spna target file: " + span_target_file.string());
-      
-      std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
-      std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
-
-      process_giza(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
     }
   }
   catch (const std::exception& err) {
@@ -1883,8 +1888,8 @@ void options(int argc, char** argv)
     ("final-and",    po::bool_switch(&final_and_mode),    "final-and")
     ("closure",      po::bool_switch(&closure_mode),      "closure")
     ("invert",       po::bool_switch(&invert_mode),       "invert alignment")
-
-    ("moses", po::bool_switch(&moses_mode), "moses alignment (not GIZA++ alignment)")
+    
+    ("moses", po::bool_switch(&moses_mode), "moses alignment (not GIZA++ alignment) for input")
 
     ("prob-null",         po::value<double>(&prob_null)->default_value(prob_null),                 "NULL probability")
     ("prob-union",        po::value<double>(&prob_union)->default_value(prob_union),               "union probability")
