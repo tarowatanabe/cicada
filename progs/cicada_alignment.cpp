@@ -892,6 +892,18 @@ struct MaxMatch
 
 void process_alignment(std::istream& is, std::ostream& os)
 {
+  typedef boost::spirit::istream_iterator iter_type;
+  
+  is.unsetf(std::ios::skipws);
+  
+  iter_type iter(is);
+  iter_type iter_end;
+
+  alignment_parser<iter_type> parser_alignment;
+  bitext_giza_parser<iter_type> parser_giza;
+
+  bitext_giza_type bitext;
+  
   alignment_type align;
   alignment_type closured;
   alignment_type inverted;
@@ -903,7 +915,31 @@ void process_alignment(std::istream& is, std::ostream& os)
   Invert invert;
   
   if (invert_mode || closure_mode) {
-    while (is >> align) {
+    while (iter != iter_end) {
+      
+      if (moses_mode) {
+	align.clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser_alignment, boost::spirit::standard::blank, align))
+	  if (iter != iter_end)
+	    throw std::runtime_error("parsing failed");
+	
+      } else {
+	bitext.clear();
+	align.clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser_giza, boost::spirit::standard::blank, bitext))
+	  if (iter != iter_end)
+	    throw std::runtime_error("parsing failed");
+	
+	for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) { 
+	  const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
+	  
+	  bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+	  for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	    align.push_back(std::make_pair(src - 1, *titer - 1));
+	}
+      }
       
       if (closure_mode) {
 	closured.clear();
@@ -921,8 +957,32 @@ void process_alignment(std::istream& is, std::ostream& os)
       os << align << '\n';
     }
   } else {
-    while (is >> align) {
-      std::sort(align.begin(), align.end());
+    while (iter != iter_end) {
+      if (moses_mode) {
+	align.clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser_alignment, boost::spirit::standard::blank, align))
+	  if (iter != iter_end)
+	    throw std::runtime_error("parsing failed");
+	
+	std::sort(align.begin(), align.end());
+      } else {
+	bitext.clear();
+	align.clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser_giza, boost::spirit::standard::blank, bitext))
+	  if (iter != iter_end)
+	    throw std::runtime_error("parsing failed");
+	
+	for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) { 
+	  const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
+	  
+	  bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+	  for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	    align.push_back(std::make_pair(src - 1, *titer - 1));
+	}
+      }
+      
       os << align << '\n';
     }
   }
