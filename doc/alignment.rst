@@ -27,7 +27,7 @@ This will result in four directories and files:
   giza.trg-src/         (parameters for P(target | source))
   model/
       aligned.posterior-itg (word alignment)
-      aligner.sh            (word aligner script)
+      aligner.sh            (word aligner script. See **Forced Alignment** section)
 
 Word alignment training is performed in three steps:
 
@@ -42,8 +42,40 @@ Word alignment training is performed in three steps:
    directory (or specified by ``--model-dir``).
 
 The file ``model/aligned.posterior-itg`` is the final alignment for
-the given bilingual data. The aligner script, ``model/aligner.sh`` can
-be used to perform word alignment for held-out test data:
+the given bilingual data. 
+
+Details
+-------
+
+The supported alignment models are:
+
+- IBM Model 1 [1]_ (``--iteration-model1 5``)
+- HMM [2]_         (``--iteration-hmm 5``)
+- IBM Model 4 [1]_ (``--iteration-model4 5``)
+
+Two directions are integrated during the learning process either by:
+
+- Native symmetric learning [2]_ (``--symmetric``)
+- Posterior constrained learning [3]_ (``--symmetric`` and ``--posterior``, which are recommended)
+
+The parameters are smoothed by:
+
+- Native variational Bayes estimate (``--variational``, which is recommended)
+- L0 regularization [5]_ (``--l0``, probably better than ``--variational`` but slow.)
+
+After the parameter estimation, we can produce the final word
+alignment by specifying ``--alignment`` option:
+
+- Simple heuristics (``grow-diag-final`` etc.)
+- Produce ITG constrained alignment from posteriors (``posterior-itg``, which is the default parameter)
+- Produce one-to-one alignment using the Hungarian algorithm from
+  posteriors (``posterior-max-match``).
+
+Forced Alignment
+----------------
+
+The aligner script, ``model/aligner.sh`` can be used to perform word
+alignment for held-out test data:
 
 .. code:: bash
 
@@ -56,7 +88,7 @@ be used to perform word alignment for held-out test data:
 
 which computes ITG constrained word alignment, for instance.
 The word alignment can be heuristically combined by first computing
-Viterbi alignment:
+Viterbi alignment in two directions:
 
 .. code:: bash
 
@@ -100,36 +132,10 @@ Then, use a threshold to combine:
 	  --posterior \
 	  --posterior-threshold 0.2
 
-As in Viterbi alignment combination, you can try ``--itg`` to estimate
-ITG constrained alignment or ``--max-match`` to apply Hungarian
-algorithm to compute one-to-one alignment.
-
-Details
--------
-
-The supported alignment models are:
-
-- IBM Model 1 [1]_ (``--iteration-model1 5``)
-- HMM [2]_         (``--iteration-hmm 5``)
-- IBM Model 4 [3]_ (``--iteration-model4 5``)
-
-Two directions are integrated during the learning process either by:
-
-- Native symmetric learning [2]_ (``--symmetric``)
-- Posterior constrained learning [3]_ (``--symmetric`` and ``--posterior``, which are recommended)
-
-The parameters are smoothed by:
-
-- Native variational Bayes estimate (``--variational``, which is recommended)
-- L0 regularization [5]_ (``--l0``, probably better than ``--variational`` but slow.)
-
-After the parameter estimation, we can produce the final word
-alignment by specifying ``--alignment`` option:
-
-- Simple heuristics (``grow-diag-final`` etc.)
-- Produce ITG constrained alignment from posteriors (``posterior-itg``, which is the default parameter)
-- Produce one-to-one alignment using the Hungarian algorithm from
-  posteriors (``posterior-max-match``).
+which output word alignment when the posterior probability is higher
+than 0.2 [2]_. As in Viterbi alignment combination, you can try
+``--itg`` to estimate ITG constrained alignment or ``--max-match`` to
+apply Hungarian algorithm to compute one-to-one alignment.
 
 Visualization
 -------------
