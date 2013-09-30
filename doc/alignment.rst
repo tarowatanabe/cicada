@@ -122,7 +122,7 @@ be estimated by first generating posteriors:
 	  --posterior-source-target <posteriors for P(target | source)> \
 	  --posterior-target-source <posteriors for P(source | target)>
 
-Then, use a threshold to combine:
+Then, use a threshold to combine them:
 
 .. code:: bash
 
@@ -132,10 +132,11 @@ Then, use a threshold to combine:
 	  --posterior \
 	  --posterior-threshold 0.2
 
-which output word alignment when the posterior probability is higher
+which annotate a word pair as aligned when the square root of the
+product of its posterior probabilities in two directions is higher
 than 0.2 [2]_. As in Viterbi alignment combination, you can try
-``--itg`` to estimate ITG constrained alignment or ``--max-match`` to
-apply Hungarian algorithm to compute one-to-one alignment.
+``--itg`` to estimate ITG constrained alignment or ``--max-match``
+to apply Hungarian algorithm to compute one-to-one alignment.
 
 Visualization
 -------------
