@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 // cicada alignment tool:
@@ -206,9 +206,13 @@ int main(int argc, char ** argv)
       if (int(intersection_mode) + union_mode + grow_mode + itg_mode + max_match_mode + source_target_mode + target_source_mode == 0)
 	intersection_mode = true;
 
-      if (grow_mode)
+      if (grow_mode) {
 	if (final_mode && final_and_mode)
 	  throw std::runtime_error("either one of final|final-and");
+      } else {
+	if (diag_mode || final_mode || final_and_mode)
+	  throw std::runtime_error("no diag|final|final-and for non-grow alignment");
+      }
 
       if (source_target_mode) {
 	if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
