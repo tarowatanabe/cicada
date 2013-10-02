@@ -31,6 +31,9 @@ is performed in three steps:
 3. Two models in opposite directions are combined, and put in `model`
    directory (or specified by ``--model-dir``).
 
+The performed steps are controlled both by the ``--first-step`` and
+``--last-step`` options.
+
 Internally, it calls `cicada_alignment_model1(1)`,
 `cicada_alignment_hmm(1)` or `cicada_alignment_model4(1)` for word
 alignment learning and Viterbi alignment computation depending on the

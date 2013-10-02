@@ -42,7 +42,7 @@ Word alignment training is performed in three steps:
    directory (or specified by ``--model-dir``).
 
 The file ``model/aligned.posterior-itg`` is the final alignment for
-the given bilingual data. 
+the given bilingual data.
 
 Details
 -------
@@ -53,10 +53,13 @@ The supported alignment models are:
 - HMM [2]_         (``--iteration-hmm 5``)
 - IBM Model 4 [1]_ (``--iteration-model4 5``)
 
+which are controlled by specifying the number of iterations. If you
+want to train only HMM, then, set ``--iteration-model4`` to ``0``.
+
 Two directions are integrated during the learning process either by:
 
-- Native symmetric learning [2]_ (``--symmetric``)
-- Posterior constrained learning [3]_ (``--symmetric`` and ``--posterior``, which are recommended)
+- Naive symmetric learning [2]_ (``--symmetric``)
+- Posterior regularized learning [3]_ (``--symmetric`` and ``--posterior``, which are recommended)
 
 The parameters are smoothed by:
 
@@ -66,8 +69,13 @@ The parameters are smoothed by:
 After the parameter estimation, we can produce the final word
 alignment by specifying ``--alignment`` option:
 
-- Simple heuristics (``grow-diag-final`` etc.)
-- Produce ITG constrained alignment from posteriors (``posterior-itg``, which is the default parameter)
+- Simple combination heuristics from two Viterbi alignments of two
+  directions (``grow-diag-final`` etc.)
+- Produce word alignment which are higher than a certain threshold
+  given the posterior probabilities in two directions
+  (``posterior-0.1`` etc.)
+- Produce ITG constrained alignment from the combined posteriors
+  (``posterior-itg``, which is the default parameter)
 - Produce one-to-one alignment using the Hungarian algorithm from
   posteriors (``posterior-max-match``).
 

@@ -1,8 +1,11 @@
-2013-x-x
+2013-10-2
 --------
  - New: Violation-fixing based online learning
- - BUGFIX: margin-based online learner incorrectly keep all the
+ - BUGFIX: margin-based online learner(s) incorrectly keep all the
    training instances!
+ - BUGFIX: two-dimensional vector swap operations are wrong, which
+   was the source of core dump in alignment learning with posterior
+   probability outputs.
 
 2013-9-20
 ---------
