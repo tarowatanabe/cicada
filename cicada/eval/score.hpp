@@ -180,7 +180,7 @@ namespace cicada
 	  sentence_type skipped;
 	  sentence_type::const_iterator siter_end = source.end();
 	  for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	    if (*siter != vocab_type::EPSILON && (*siter == vocab_type::BOS || *siter == vocab_type::EOS || ! siter->is_sgml_tag()))
+	    if (*siter != vocab_type::EPSILON && *siter != vocab_type::BOS && *siter != vocab_type::EOS && ! siter->is_sgml_tag())
 	      skipped.push_back(*siter);
 	  
 	  if (tokenizer)
