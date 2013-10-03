@@ -346,7 +346,7 @@ struct MarginViolationSingle : public MarginViolation
 	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
 				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
 	  
-	  if (margin > 0.0 && margin > margin_max) {
+	  if (margin > margin_max) {
 	    margin_pos = bin;
 	    margin_max = margin;
 	  }
@@ -420,14 +420,10 @@ struct MarginViolationAll : public MarginViolation
 	if (inside_forest.visited_bin[bin]
 	    && inside_oracle.visited_bin[bin]
 	    && inside_forest.minimum_bin[bin] > inside_oracle.weights_bin[bin]) {
-	  const double margin = (cicada::semiring::log(inside_forest.weights_bin[bin])
-				 - cicada::semiring::log(inside_oracle.weights_bin[bin]));
 	  
-	  if (margin > 0.0) {
-	    inside_oracle.features_bin[bin] -= inside_forest.features_bin[bin];
-	    
-	    push_back(inside_oracle.features_bin[bin]);
-	  }
+	  inside_oracle.features_bin[bin] -= inside_forest.features_bin[bin];
+	  
+	  push_back(inside_oracle.features_bin[bin]);
 	}
     }
   }
