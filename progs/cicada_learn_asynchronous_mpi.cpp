@@ -133,7 +133,8 @@ bool rate_adagrad     = false;
 
 std::string violation_bin = "prune-bin";
 bool violation_derivation = false;
-bool violation_single     = false;
+bool violation_max        = false;
+bool violation_early      = false;
 bool violation_all        = false;
 
 // additional misc parameters...
@@ -268,12 +269,12 @@ int main(int argc, char ** argv)
     if (int(rate_exponential) + rate_simple + rate_adagrad == 0)
       rate_exponential = true;
 
-    if (int(violation_derivation) + violation_single + violation_all > 1)
+    if (int(violation_derivation) + violation_max + violation_early + violation_all > 1)
       throw std::runtime_error("either derivation/sinlge/all violations");
-    if (int(violation_derivation) + violation_single + violation_all == 0)
+    if (int(violation_derivation) + violation_max + violation_early + violation_all == 0)
       violation_derivation = true;
-
-    if ((violation_single || violation_all) && violation_bin.empty())
+    
+    if ((violation_max || violation_early || violation_all) && violation_bin.empty())
       throw std::runtime_error("no violation-bin?");
 
     if (scale <= 0.0)
@@ -1157,8 +1158,10 @@ void cicada_learn(operation_set_type& operations,
     
     if (violation_derivation)
       margin.reset(new MarginDerivation());
-    else if (violation_single)
-      margin.reset(new MarginViolationSingle(violation_bin));
+    else if (violation_max)
+      margin.reset(new MarginViolationMax(violation_bin));
+    else if (violation_early)
+      margin.reset(new MarginViolationEarly(violation_bin));
     else if (violation_all)
       margin.reset(new MarginViolationAll(violation_bin));
     else
@@ -1825,7 +1828,8 @@ void options(int argc, char** argv)
 
     ("violation-bin",        po::value<std::string>(&violation_bin)->default_value(violation_bin), "violation bin")
     ("violation-derivation", po::bool_switch(&violation_derivation), "full derivation based violation")
-    ("violation-single",     po::bool_switch(&violation_single),     "single-node max-violation")
+    ("violation-max",        po::bool_switch(&violation_max),        "single-node max violation")
+    ("violation-early",      po::bool_switch(&violation_early),      "single-node early violation")
     ("violation-all",        po::bool_switch(&violation_all),        "violations from all the nodes")
 
     ("rda", po::bool_switch(&rda_mode), "RDA method for optimization (regularized dual averaging method)")

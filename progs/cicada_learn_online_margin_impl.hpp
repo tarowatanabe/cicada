@@ -282,11 +282,81 @@ struct MarginViolation : public Margin
   Inside inside_oracle;
 };
 
-struct MarginViolationSingle : public MarginViolation
+struct MarginViolationEarly : public MarginViolation
 {
   // single max-violation node margin
   
-  MarginViolationSingle(const std::string& violation_bin) : MarginViolation(violation_bin)  {}
+  MarginViolationEarly(const std::string& violation_bin) : MarginViolation(violation_bin)  {}
+  
+  void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
+  {
+    if (! forest.is_valid() || ! oracle.is_valid()) return;
+
+    bool weights_empty = weights.empty();
+    if (! weights_empty) {
+      int count_non_zero = 0;
+      for (feature_type::id_type id = 0; id != weights.size() && ! count_non_zero; ++ id)
+	count_non_zero += (weights[id] != 0.0);
+      
+      weights_empty = (! count_non_zero);
+    }
+    
+    if (weights_empty) {
+      weight_type weight_forest;
+      weight_type weight_oracle;
+      
+      feature_set_type features_forest;
+      feature_set_type features_oracle;
+      
+      cicada::viterbi(oracle,
+		      features_oracle,
+		      weight_oracle,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      cicada::viterbi(forest,
+		      features_forest,
+		      weight_forest,
+		      traversal(),
+		      cicada::operation::weight_function<weight_type >(weights));
+      
+      features_oracle -= features_forest;
+      
+      
+      push_back(features_oracle);
+    } else {
+      // First, take maximum from oracle wrt weights
+      inside_oracle(weights, oracle);
+      
+      // Second, take maximum from forest wrt weights
+      inside_forest(weights, forest);
+      
+      // Third, compute the largest margin
+      
+      const size_type bin_max = utils::bithack::min(inside_forest.weights_bin.size(), inside_oracle.weights_bin.size());
+      
+      if (! bin_max) return;
+      
+      for (size_type bin = 0; bin != bin_max; ++ bin) 
+	if (inside_forest.visited_bin[bin]
+	    && inside_oracle.visited_bin[bin]
+	    && inside_forest.minimum_bin[bin] > inside_oracle.weights_bin[bin]) {
+	  
+	  inside_oracle.features_bin[bin] -= inside_forest.features_bin[bin];
+	  
+	  push_back(inside_oracle.features_bin[bin]);
+	  
+	  break;
+	}
+    }
+  }
+  
+};
+
+struct MarginViolationMax : public MarginViolation
+{
+  // single max-violation node margin
+  
+  MarginViolationMax(const std::string& violation_bin) : MarginViolation(violation_bin)  {}
   
   void encode(const weight_set_type& weights, const hypergraph_type& forest, const hypergraph_type& oracle)
   {
@@ -362,6 +432,7 @@ struct MarginViolationSingle : public MarginViolation
   }
   
 };
+
 
 struct MarginViolationAll : public MarginViolation
 {
