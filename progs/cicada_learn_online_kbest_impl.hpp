@@ -24,6 +24,7 @@
 #include "cicada/eval.hpp"
 
 #include "cicada/kbest.hpp"
+#include "cicada/kbest_diverse.hpp"
 #include "cicada/operation/traversal.hpp"
 #include "cicada/operation/functional.hpp"
 #include "cicada/optimize_qp.hpp"
@@ -2003,9 +2004,6 @@ struct KBestSentence
   typedef cicada::operation::kbest_sentence_filter_unique filter_unique_type;
   typedef cicada::operation::kbest_sentence_filter        filter_type;
   
-  typedef cicada::KBest<traversal_type, function_type, filter_unique_type> derivation_unique_set_type;
-  typedef cicada::KBest<traversal_type, function_type, filter_type>        derivation_set_type;
-
   typedef traversal_type::value_type derivation_type;
   
   void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
@@ -2022,23 +2020,59 @@ struct KBestSentence
     
     // generate kbests...
     const hypergraph_type& graph = operations.get_data().hypergraph;
-    
-    if (kbest_diverse_mode) {
-      derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_type());
 
-      derivation_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter)
-	kbests.push_back(hypothesis_type(boost::get<0>(diter->second).begin(), boost::get<0>(diter->second).end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+    if (kbest_unique_mode) {
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_unique_type> derivations(graph,
+											    kbest_size,
+											    traversal_type(),
+											    function_type(weights),
+											    filter_unique_type(graph),
+											    kbest_diversity);
+	
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_unique_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_unique_type(graph));
+	
+	kbest_derivations(derivations, kbests);
+      }
     } else {
-      derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
-      
-      derivation_unique_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_unique_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter)
-	kbests.push_back(hypothesis_type(boost::get<0>(diter->second).begin(), boost::get<0>(diter->second).end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_type(),
+										     kbest_diversity);
+	
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_type> derivations(graph,
+									      kbest_size,
+									      traversal_type(),
+									      function_type(weights),
+									      filter_type());
+	
+	kbest_derivations(derivations, kbests);
+      }
     }
   }
+  
+  template <typename Derivations>
+  void kbest_derivations(const Derivations& derivations, hypothesis_set_type& kbests)
+  {
+    typedef Derivations derivation_set_type;
+    
+    typename derivation_set_type::const_iterator diter_end = derivations.end();
+    for (typename derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter)
+      kbests.push_back(hypothesis_type(boost::get<0>(diter->second).begin(), boost::get<0>(diter->second).end(),
+				       boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+  }
+
 };
 
 struct KBestAlignment
@@ -2050,9 +2084,6 @@ struct KBestAlignment
   typedef cicada::operation::kbest_alignment_filter_unique filter_unique_type;
   typedef cicada::operation::kbest_alignment_filter        filter_type;
   
-  typedef cicada::KBest<traversal_type, function_type, filter_unique_type> derivation_unique_set_type;
-  typedef cicada::KBest<traversal_type, function_type, filter_type>        derivation_set_type;
-
   typedef traversal_type::value_type derivation_type;
   
   void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
@@ -2069,37 +2100,66 @@ struct KBestAlignment
     
     // generate kbests...
     const hypergraph_type& graph = operations.get_data().hypergraph;
-    
-    if (kbest_diverse_mode) {
-      derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_type());
-      
-      sentence_type   sentence;
 
-      derivation_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	std::ostringstream os;
-	os << boost::get<0>(diter->second);
-	sentence.assign(os.str());
+    if (kbest_unique_mode) {
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_unique_type> derivations(graph,
+											    kbest_size,
+											    traversal_type(),
+											    function_type(weights),
+											    filter_unique_type(graph),
+											    kbest_diversity);
 	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_unique_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_unique_type(graph));
+	
+	kbest_derivations(derivations, kbests);
       }
     } else {
-      derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
-      
-      sentence_type   sentence;
-
-      derivation_unique_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_unique_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	std::ostringstream os;
-	os << boost::get<0>(diter->second);
-	sentence.assign(os.str());
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_type(),
+										     kbest_diversity);
 	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_type> derivations(graph,
+									      kbest_size,
+									      traversal_type(),
+									      function_type(weights),
+									      filter_type());
+	
+	kbest_derivations(derivations, kbests);
       }
     }
   }
+
+  template <typename Derivations>
+  void kbest_derivations(const Derivations& derivations, hypothesis_set_type& kbests)
+  {
+    typedef Derivations derivation_set_type;
+
+    sentence_type sentence;
+    
+    typename derivation_set_type::const_iterator diter_end = derivations.end();
+    for (typename derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
+      std::ostringstream os;
+      os << boost::get<0>(diter->second);
+      sentence.assign(os.str());
+      
+      kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
+				       boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+    }
+  }
+
 };
 
 struct KBestDependency
@@ -2111,9 +2171,6 @@ struct KBestDependency
   typedef cicada::operation::kbest_dependency_filter_unique filter_unique_type;
   typedef cicada::operation::kbest_dependency_filter        filter_type;
   
-  typedef cicada::KBest<traversal_type, function_type, filter_unique_type> derivation_unique_set_type;
-  typedef cicada::KBest<traversal_type, function_type, filter_type>        derivation_set_type;
-
   typedef traversal_type::value_type derivation_type;
   
   void operator()(operation_set_type& operations, const std::string& input, const weight_set_type& weights, hypothesis_set_type& kbests)
@@ -2131,34 +2188,62 @@ struct KBestDependency
     // generate kbests...
     const hypergraph_type& graph = operations.get_data().hypergraph;
 
-    if (kbest_diverse_mode) {
-      derivation_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_type());
-      
-      sentence_type   sentence;
-
-      derivation_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	std::ostringstream os;
-	os << boost::get<0>(diter->second);
-	sentence.assign(os.str());
+    if (kbest_unique_mode) {
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_unique_type> derivations(graph,
+											    kbest_size,
+											    traversal_type(),
+											    function_type(weights),
+											    filter_unique_type(graph),
+											    kbest_diversity);
 	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_unique_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_unique_type(graph));
+	
+	kbest_derivations(derivations, kbests);
       }
     } else {
-      derivation_unique_set_type derivations(graph, kbest_size, traversal_type(), function_type(weights), filter_unique_type(graph));
-
-      sentence_type   sentence;
-
-      derivation_unique_set_type::const_iterator diter_end = derivations.end();
-      for (derivation_unique_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
-	std::ostringstream os;
-	os << boost::get<0>(diter->second);
-	sentence.assign(os.str());
+      if (kbest_diversity != 0.0) {
+	cicada::KBestDiverse<traversal_type, function_type, filter_type> derivations(graph,
+										     kbest_size,
+										     traversal_type(),
+										     function_type(weights),
+										     filter_type(),
+										     kbest_diversity);
 	
-	kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
-					 boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
+	kbest_derivations(derivations, kbests);
+      } else {
+	cicada::KBest<traversal_type, function_type, filter_type> derivations(graph,
+									      kbest_size,
+									      traversal_type(),
+									      function_type(weights),
+									      filter_type());
+	
+	kbest_derivations(derivations, kbests);
       }
+    }
+  }
+
+  template <typename Derivations>
+  void kbest_derivations(const Derivations& derivations, hypothesis_set_type& kbests)
+  {
+    typedef Derivations derivation_set_type;
+
+    sentence_type sentence;
+    
+    typename derivation_set_type::const_iterator diter_end = derivations.end();
+    for (typename derivation_set_type::const_iterator diter = derivations.begin(); diter != diter_end; ++ diter) {
+      std::ostringstream os;
+      os << boost::get<0>(diter->second);
+      sentence.assign(os.str());
+      
+      kbests.push_back(hypothesis_type(sentence.begin(), sentence.end(),
+				       boost::get<1>(diter->second).begin(), boost::get<1>(diter->second).end()));
     }
   }
 };

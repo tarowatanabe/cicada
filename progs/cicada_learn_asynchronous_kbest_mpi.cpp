@@ -108,7 +108,8 @@ bool yield_dependency = false;
 int iteration = 10;
 int batch_size = 8;
 int kbest_size = 1000;
-bool kbest_diverse_mode = false;
+bool kbest_unique_mode = true;
+double kbest_diversity = 0.0;
 
 // solver parameters
 bool learn_xbleu = false;
@@ -1792,11 +1793,12 @@ void options(int argc, char** argv)
     ("yield-alignment",  po::bool_switch(&yield_alignment),                                "alignment yield")
     ("yield-dependency", po::bool_switch(&yield_dependency),                               "dependency yield")
     
-    ("iteration",     po::value<int>(&iteration)->default_value(iteration),   "learning iterations")
-    ("batch",         po::value<int>(&batch_size)->default_value(batch_size), "batch (or batch, bin) size")
-    ("kbest",         po::value<int>(&kbest_size)->default_value(kbest_size), "kbest size")
-    ("kbest-diverse", po::bool_switch(&kbest_diverse_mode),                   "non unique kbest")
-    
+    ("iteration",       po::value<int>(&iteration)->default_value(iteration),                "learning iterations")
+    ("batch",           po::value<int>(&batch_size)->default_value(batch_size),              "batch (or batch, bin) size")
+    ("kbest",           po::value<int>(&kbest_size)->default_value(kbest_size),              "kbest size")
+    ("kbest-unique",    utils::true_false_switch(&kbest_unique_mode),                        "unique kbest")
+    ("kbest-diversity", po::value<double>(&kbest_diversity)->default_value(kbest_diversity), "kbest diversity")
+
     ("learn-xbleu",    po::bool_switch(&learn_xbleu),    "online SGD with xBLEU loss")
     ("learn-softmax",  po::bool_switch(&learn_softmax),  "online SGD with softmax loss")
     ("learn-osoftmax", po::bool_switch(&learn_osoftmax), "online optimized-SGD with softmax loss")
