@@ -1664,14 +1664,14 @@ struct OutputAlignment : OutputMapReduce
 	  bitexts.insert(bitext);
 	
 	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	  write(os_source_target.get(), os_target_source.get(), bitext);
+	  write(os_source_target.get(), os_target_source.get(), *bitexts.begin());
 	  bitexts.erase(bitexts.begin());
 	  ++ id;
 	}
       }
       
       while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	write(os_source_target.get(), os_target_source.get(), bitext);
+	write(os_source_target.get(), os_target_source.get(), *bitexts.begin());
 	bitexts.erase(bitexts.begin());
 	++ id;
       }
