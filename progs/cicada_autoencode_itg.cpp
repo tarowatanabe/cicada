@@ -33,9 +33,9 @@
 // + batch algorithm using LBFGS
 //
 
-
+#include <cstdlib>
 #include <cmath>
-#include <climit>
+#include <climits>
 
 #include <Eigen/Core>
 
@@ -45,9 +45,15 @@
 
 #include "utils/bichart.hpp"
 #include "utils/bithack.hpp"
+#include "utils/compact_set.hpp"
+#include "utils/lockfree_list_queue.hpp"
+#include "utils/mathop.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/program_options.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/repository.hpp"
+
+#include <boost/thread.hpp>
 
 struct Bitext
 {
@@ -80,7 +86,7 @@ struct Bitext
 namespace std
 {
   inline
-  void swap(Bitext& x, Bitet& y)
+  void swap(Bitext& x, Bitext& y)
   {
     x.swap(y);
   }
@@ -112,7 +118,7 @@ struct Model
   Model() : dimension_(0), lambda_(0) {}
   Model(const size_type& dimension) 
     : dimension_(dimension), lambda_(0) { initialize(dimension); }
-  Model(const size_type& dimension, const double& lambdam) 
+  Model(const size_type& dimension, const double& lambda) 
     : dimension_(dimension), lambda_(lambda) { initialize(dimension); }
   
   
@@ -123,7 +129,7 @@ struct Model
       embedding_type::iterator eiter = source_.find(siter->first);
       
       if (eiter == source_.end())
-	eiter = source_.insert(std::make_pair(siter->first, tensor_type(dimension_, 1)));
+	eiter = source_.insert(std::make_pair(siter->first, tensor_type(dimension_, 1))).first;
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = siter->second.col(0)[i] * x.scale_source_;
@@ -138,7 +144,7 @@ struct Model
       embedding_type::iterator eiter = target_.find(titer->first);
       
       if (eiter == target_.end())
-	eiter = source_.insert(std::make_pair(siter->first, tensor_type(dimension_, 1)));
+	eiter = source_.insert(std::make_pair(titer->first, tensor_type(dimension_, 1))).first;
       
       for (difference_type i = 0; i != titer->second.rows(); ++ i) {
 	const double amount = titer->second.col(0)[i] * x.scale_target_;
@@ -157,6 +163,8 @@ struct Model
     bs2_ += x.bs2_;
     Wi2_ += x.Wi2_;
     bi2_ += x.bi2_;
+
+    return *this;
   }
   
   void clear()
@@ -183,93 +191,71 @@ struct Model
 
   void finalize()
   {
-    if (scale_source_ == 0.0) {
-      source_.clear();
-      scale_source_ = 1.0;
-      norm_source_ = 0.0;
-    } else if (scale_source_ != 1.0) {
+    if (scale_source_ != 1.0) {
       norm_source_ = 0.0;
       
       embedding_type::iterator siter_end = source_.end();
       for (embedding_type::iterator siter = source_.begin(); siter != siter_end; ++ siter) {
-	siter->second.array() *= scale_source_;
+	siter->second *= scale_source_;
 	norm_source_ += siter->second.squaredNorm();
       }
       
       scale_source_ = 1.0;
     }
     
-    if (scale_target_ == 0.0) {
-      target_.clear();
-      scale_target_ = 1.0;
-      norm_target_ = 0.0;      
-    } else if  (scale_target_ != 1.0) {
+    if  (scale_target_ != 1.0) {
       norm_target_ = 0.0;
       
       embedding_type::iterator titer_end = target_.end();
       for (embedding_type::iterator titer = target_.begin(); titer != titer_end; ++ titer) {
-	titer->second.array() *= scale_target_;
+	titer->second *= scale_target_;
 	norm_target_ += titer->second.squaredNorm();
       }
       
       scale_target_ = 1.0;
     }
-    
   }
 
   void rescale(const double scaling, const bool ignore_bias)
   {
-    if (ignore_bias) {
-      if (scaling == 0.0) {
-	source_.clear();
-	target_.clear();
-	scale_source_ = 1.0;
-	scale_target_ = 1.0;
-	norm_source_ = 0.0;
-	norm_target_ = 0.0;
-	
-	Ws1_.setZero();
-	Wi1_.setZero();
-	
-	Ws2_.setZero();
-	Wi2_.setZero();
-      } else {
-	scale_source_ *= scaling;
-	scale_target_ *= scaling;
-	norm_source_ *= scaling * scaling;
-	norm_target_ *= scaling * scaling;
-	
-	Ws1_.array() *= scaling;
-	Wi1_.array() *= scaling;
-	
-	Ws2_.array() *= scaling;
-	Wi2_.array() *= scaling;
-      }
+    if (scaling == 0.0) {
+      embedding_type::iterator siter_end = source_.end();
+      for (embedding_type::iterator siter = source_.begin(); siter != siter_end; ++ siter)
+	siter->second.setZero();
+      
+      embedding_type::iterator titer_end = target_.end();
+      for (embedding_type::iterator titer = target_.begin(); titer != titer_end; ++ titer)
+	titer->second.setZero();
+      
+      scale_source_ = 1.0;
+      scale_target_ = 1.0;
+      norm_source_ = 0.0;
+      norm_target_ = 0.0;
     } else {
-      if (scaling == 0.0)
-	clear();
-      else {
-	scale_source_ *= scaling;
-	scale_target_ *= scaling;
-	norm_source_ *= scaling * scaling;
-	norm_target_ *= scaling * scaling;
-	
-	Ws1_.array() *= scaling;
-	bs1_.array() *= scaling;
-	Wi1_.array() *= scaling;
-	bi1_.array() *= scaling;
-	
-	Ws2_.array() *= scaling;
-	bs2_.array() *= scaling;
-	Wi2_.array() *= scaling;
-	bi2_.array() *= scaling;
-      }
+      scale_source_ *= scaling;
+      scale_target_ *= scaling;
+      norm_source_ *= scaling * scaling;
+      norm_target_ *= scaling * scaling;
+    }
+
+    Ws1_ *= scaling;
+    Wi1_ *= scaling;
+    
+    Ws2_ *= scaling;
+    Wi2_ *= scaling;
+    
+    if (! ignore_bias) {
+      bs1_ *= scaling;
+      bi1_ *= scaling;
+      
+      bs2_ *= scaling;
+      bi2_ *= scaling;      
     }
   }
 
   double squared_norm(bool ignore_bias) const
   {
-    double norm = norm_source_ + norm_target;
+    double norm = norm_source_ + norm_target_;
 
     norm += Ws1_.squaredNorm();
     norm += Wi1_.squaredNorm();
@@ -277,7 +263,7 @@ struct Model
     norm += Ws2_.squaredNorm();
     norm += Wi2_.squaredNorm();
     
-    if (! ignore_bian) {
+    if (! ignore_bias) {
       norm += bs1_.squaredNorm();
       norm += bi1_.squaredNorm();
       
@@ -315,22 +301,25 @@ struct Model
   }
   
   template <typename Iterator>
-  void embeddig(Iterator first, Iterator last)
+  void embedding(Iterator first, Iterator last)
   {
     source_.clear();
     target_.clear();
     scale_source_ = 1.0;
     scale_target_ = 1.0;
     
-    source_[vocab_type::EPSILON].setRandom();
-    target_[vocab_type::EPSILON].setRandom();
+    tensor_type& epsilon_source = source_[vocab_type::EPSILON];
+    tensor_type& epsilon_target = target_[vocab_type::EPSILON];
     
-    norm_source_ = source_[vocab_type::EPSILON].squaredNorm();
-    norm_target_ = target_[vocab_type::EPSILON].squaredNorm();
+    epsilon_source = tensor_type::Random(dimension_, 1);
+    epsilon_target = tensor_type::Random(dimension_, 1);
+    
+    norm_source_ = epsilon_source.squaredNorm();
+    norm_target_ = epsilon_target.squaredNorm();
     
     for (/**/; first != last; ++ first) {
-      norm_source_ += embedding(first->source, source_);
-      norm_target_ += embedding(first->target, target_);
+      norm_source_ += embedding(first->source_, source_);
+      norm_target_ += embedding(first->target_, target_);
     }
   }
   
@@ -345,7 +334,7 @@ struct Model
       if (eiter == embedding.end()) {
 	tensor_type& we = embedding[*siter];
 	
-	we = tensor_type::Random(dimension, 1);
+	we = tensor_type::Random(dimension_, 1);
 	norm += we.squaredNorm();
       }
     }
@@ -420,6 +409,25 @@ struct ITGTree
     
     bool empty() const { return first_ == last_; }
     size_type size() const { return last_ - first_; }
+
+    friend
+    bool operator==(const Span& x, const Span& y)
+    {
+      return x.first_ == y.first_ && x.last_ == y.last_;
+    }
+
+    friend
+    bool operator!=(const Span& x, const Span& y)
+    {
+      return x.first_ != y.first_ || x.last_ != y.last_;
+    }
+
+    friend
+    std::ostream& operator<<(std::ostream& os, const Span& x)
+    {
+      os << x.first_ << ".." << x.last_;
+      return os;
+    }
     
     index_type first_;
     index_type last_;
@@ -432,11 +440,39 @@ struct ITGTree
     typedef Span span_type;
     typedef span_type value_type;
     
-    SpanPair(const span_type& source, const span_type& target) : source_(source), target_(target) {}
-    tempalte <typename _Span>
-    SpanPair(const std::pair<_Span, _Span>& x) : source(x.first), target(x.second) {}
+    typedef span_type::index_type index_type;
+    
+    SpanPair(const span_type& source, const span_type& target)
+      : source_(source), target_(target) {}
+    SpanPair(const index_type& w, const index_type& x, const index_type& y, const index_type& z)
+      : source_(w, x), target_(y, z) {}
+    template <typename _Span>
+    SpanPair(const std::pair<_Span, _Span>& x)
+      : source_(x.first), target_(x.second) {}
     SpanPair() : source_(), target_() {}
-        
+
+    bool empty() const { return source_.empty() && target_.empty(); }
+    size_type size() const { return source_.size() + target_.size(); }
+
+    friend
+    bool operator==(const SpanPair& x, const SpanPair& y)
+    {
+      return x.source_ == y.source_ && x.target_ == y.target_;
+    }
+
+    friend
+    bool operator!=(const SpanPair& x, const SpanPair& y)
+    {
+      return x.source_ != y.source_ || x.target_ != y.target_;
+    }
+
+    friend
+    std::ostream& operator<<(std::ostream& os, const SpanPair& x)
+    {
+      os << x.source_ << "-" << x.target_;
+      return os;
+    }
+    
     span_type source_;
     span_type target_;
   };
@@ -450,7 +486,7 @@ struct ITGTree
 
   typedef std::vector<span_pair_stack_type, std::allocator<span_pair_stack_type> > stack_type;
 
-  typedef std::pair<logprob_type, span_pair_type> score_span_pair_type;
+  typedef std::pair<double, span_pair_type> score_span_pair_type;
   typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
 
   typedef std::pair<span_pair_type, span_pair_type> tail_set_type;
@@ -459,8 +495,10 @@ struct ITGTree
   {
     tail_set_type operator()() const
     {
-      return tail_set_type(span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)),
-			   span_pair_type(size_type(-1), size_type(-1), size_type(-1), size_type(-1)));
+      return tail_set_type(span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
+					  span_type::index_type(-1), span_type::index_type(-1)),
+			   span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
+					  span_type::index_type(-1), span_type::index_type(-1)));
     }
   };
   
@@ -476,7 +514,7 @@ struct ITGTree
     
     Node() : score_(std::numeric_limits<double>::infinity()), total_(0.0) {}
 
-    bool terminal() const { return tails_.first.empty() && tail_.second.empty(); }
+    bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     
     double      score_;
     double      total_;
@@ -501,6 +539,8 @@ struct ITGTree
     agenda_.clear();
     heap_.clear();
     uniques_.clear();
+    
+    stack_.clear();
   }
   
   // sort by greater item so that we can pop from less
@@ -514,189 +554,213 @@ struct ITGTree
 
   void forward(const sentence_type& source,
 	       const sentence_type& target,
-	       model_type& theta,
+	       const model_type& theta,
 	       const double beam)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
 
+    // initialization
     clear();
     
-    // initialization
     nodes_.reserve(source_size + 1, target_size + 1);
     nodes_.resize(source_size + 1, target_size + 1);
     
-    agenda.reserve(source_size + target_size + 1);
-    agenda.resize(source_size + target_size + 1);
-        
+    agenda_.reserve(source_size + target_size + 1);
+    agenda_.resize(source_size + target_size + 1);
+    
     // initialization
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = 0; trg <= target_size; ++ trg) 
 	if (src < source_size || trg < target_size) {
-	  
+
 	  // epsilon at target
 	  if (src < source_size)
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta);
 	  
 	  // epsilon at source
 	  if (trg < target_size)
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta);
+	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta);
 	  
 	  // word-pair
 	  if (src < source_size && trg < target_size)
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta);
 	}
-    
+
     // iterate!
     const double infty = std::numeric_limits<double>::infinity();
     const size_type length_max = source_size + target_size;
-    
-    for (size_type length = 1; length != length_max; ++ length) 
-      if (! agenda_[length].empty()) {
-	span_pair_set_type& spans = agenda_[length];
-	
-	heap_.clear();
-	heap_.reserve(spans.size());
-	
-	span_pair_set_type::const_iterator siter_end = spans.end();
-	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
-	  heap_.push_back(score_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
-						      siter->target_.first_, siter->target_.last_).score_,
-					       *siter));
+    double beam_curr = beam;
+
+    uniques_.clear();
+
+    for (;;) {
+      
+      for (size_type length = 1; length != length_max; ++ length) 
+	if (! agenda_[length].empty()) {
+	  span_pair_set_type& spans = agenda_[length];
 	  
-	  std::push_heap(heap_.begin(), heap_.end(), heap_compare());
-	}
-	
-	heap_type::iterator hiter_begin = heap.begin();
-	heap_type::iterator hiter       = heap.end();
-	heap_type::iterator hiter_end   = heap.end();
-	
-	// we will derive those with smaller reconstruction error...
-	const double threshold = hiter_begin->first + beam;
-	for (/**/; hiter_begin != hiter && hiter_begin->first > threshold; -- hiter)
-	  std::pop_heap(hiter_begin, hiter, heap_compare());
-	
-	uniques_.clear();
-	
-	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
-	  const span_pair_type& span_pair = iter->second;
+	  heap_.clear();
+	  heap_.reserve(spans.size());
 	  
-	  // we borrow the notation...
-	  const difference_type l = length;
-	  const difference_type s = span_pair_.source_.first_;
-	  const difference_type t = span_pair_.source_.last_;
-	  const difference_type u = span_pair_.target_.first_;
-	  const difference_type v = span_pair_.target_.last_;
-	  
-	  const difference_type T = source_size;
-	  const difference_type V = target_size;
-	  
-	  // remember, we have processed only upto length l. thus, do not try to combine with spans greather than l!
-	  // also, keep used pair of spans in order to remove duplicates.
-	  
-	  for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
-	    const difference_type L = l - (s - S);
+	  span_pair_set_type::const_iterator siter_end = spans.end();
+	  for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
+	    heap_.push_back(score_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
+							siter->target_.first_, siter->target_.last_).score_,
+						 *siter));
 	    
-	    // straight
-	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == s); ++ U) {
-	      // parent span: StUv
-	      // span1: SsUu
-	      // span2: stuv
-	      
-	      if (nodes_(S, s, U, u).score_ == infty) continue;
-	      
-	      const span_pair_type  span1(S, s, U, u);
-	      const span_pair_type& span2(span_pair);
-	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
-	      
-	      // compute score and add hyperedge
-	      forward(span_pair_type(S, t, U, v), span1, span2, theta);
-	    }
-
-	    // inversion
-	    for (difference_type U = v + (S == s); U <= utils::bithack::min(v + L, V); ++ U) {
-	      // parent span: StuU
-	      // span1: SsvU
-	      // span2: stuv
-
-	      if (nodes_(S, s, v, U).score_ == infty) continue;
-	      
-	      const span_pair_type  span1(S, s, v, U);
-	      const span_pair_type& span2(span_pair);
-	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
-	      
-	      // compute score and add hyperedge
-	      forward(span_pair_type(S, t, u, U), span1, span2, theta);
-	    }
+	    std::push_heap(heap_.begin(), heap_.end(), heap_compare());
 	  }
 	  
-	  for (difference_type S = t; S <= utils::bithack::min(t + l, T); ++ S) {
-	    const difference_type L = l - (S - t);
+	  heap_type::iterator hiter_begin = heap_.begin();
+	  heap_type::iterator hiter       = heap_.end();
+	  heap_type::iterator hiter_end   = heap_.end();
+	  
+	  // we will derive those with smaller reconstruction error...
+	  const double threshold = hiter_begin->first + beam_curr;
+	  for (/**/; hiter_begin != hiter && hiter_begin->first < threshold; -- hiter)
+	    std::pop_heap(hiter_begin, hiter, heap_compare());
+	  
+	  //std::cerr << "length: " << length << " beam_curr: " << (hiter_end - hiter) << std::endl;
+	  
+	  for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
+	    const span_pair_type& span_pair = iter->second;
 	    
-	    // inversion
-	    for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == t); ++ U) {
-	      // parent span: sSUv
-	      // span1: stuv
-	      // span2: tSUu
+	    // we borrow the notation...
+	    const difference_type l = length;
+	    const difference_type s = span_pair.source_.first_;
+	    const difference_type t = span_pair.source_.last_;
+	    const difference_type u = span_pair.target_.first_;
+	    const difference_type v = span_pair.target_.last_;
+	  
+	    const difference_type T = source_size;
+	    const difference_type V = target_size;
+	  
+	    // remember, we have processed only upto length l. thus, do not try to combine with spans greather than l!
+	    // also, keep used pair of spans in order to remove duplicates.
+	  
+	    for (difference_type S = utils::bithack::max(s - l, difference_type(0)); S <= s; ++ S) {
+	      const difference_type L = l - (s - S);
+	    
+	      // straight
+	      for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == s); ++ U) {
+		// parent span: StUv
+		// span1: SsUu
+		// span2: stuv
+	      
+		if (nodes_(S, s, U, u).score_ == infty) continue;
+	      
+		const span_pair_type  span1(S, s, U, u);
+		const span_pair_type& span2(span_pair);
+	      
+		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+		// compute score and add hyperedge
+		forward(span_pair_type(S, t, U, v), span1, span2, theta);
+	      }
 
-	      if (nodes_(t, S, U, u).score_ == infty) continue;
+	      // inversion
+	      for (difference_type U = v + (S == s); U <= utils::bithack::min(v + L, V); ++ U) {
+		// parent span: StuU
+		// span1: SsvU
+		// span2: stuv
+
+		if (nodes_(S, s, v, U).score_ == infty) continue;
 	      
-	      const span_pair_type& span1(span_pair);
-	      const span_pair_type  span2(t, S, U, u);
+		const span_pair_type  span1(S, s, v, U);
+		const span_pair_type& span2(span_pair);
 	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
-	      // compute score and add hyperedge
-	      forward(span_pair_type(s, S, U, v), span1, span2, theta);
+		// compute score and add hyperedge
+		forward(span_pair_type(S, t, u, U), span1, span2, theta);
+	      }
 	    }
+	  
+	    for (difference_type S = t; S <= utils::bithack::min(t + l, T); ++ S) {
+	      const difference_type L = l - (S - t);
 	    
-	    // straight
-	    for (difference_type U = v + (S == t); U <= utils::bithack::min(v + L, V); ++ U) {
-	      // parent span: sSuU
-	      // span1: stuv
-	      // span2: tSvU
+	      // inversion
+	      for (difference_type U = utils::bithack::max(u - L, difference_type(0)); U <= u - (S == t); ++ U) {
+		// parent span: sSUv
+		// span1: stuv
+		// span2: tSUu
+
+		if (nodes_(t, S, U, u).score_ == infty) continue;
 	      
-	      if (nodes_(t, S, v, U).score_ == infty) continue;
+		const span_pair_type& span1(span_pair);
+		const span_pair_type  span2(t, S, U, u);
 	      
-	      const span_pair_type& span1(span_pair);
-	      const span_pair_type  span2(t, S, v, U);
+		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+		// compute score and add hyperedge
+		forward(span_pair_type(s, S, U, v), span1, span2, theta);
+	      }
+	    
+	      // straight
+	      for (difference_type U = v + (S == t); U <= utils::bithack::min(v + L, V); ++ U) {
+		// parent span: sSuU
+		// span1: stuv
+		// span2: tSvU
 	      
-	      forward(span_pair_type(s, S, u, U), span1, span2, theta);
+		if (nodes_(t, S, v, U).score_ == infty) continue;
+	      
+		const span_pair_type& span1(span_pair);
+		const span_pair_type  span2(t, S, v, U);
+	      
+		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+		forward(span_pair_type(s, S, u, U), span1, span2, theta);
+	      }
 	    }
 	  }
 	}
-      }
+      
+      if (nodes_(0, source.size(), 0, target.size()).score_ != infty) break;
+
+      std::cerr << "parsing failed: " << beam_curr << std::endl;
+      
+      beam_curr *= 10;
+    }
   }
 
   // terminal!
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& parent,
-	       model_type& theta)
+	       const model_type& theta)
   {
+    typedef model_type::embedding_type embedding_type;
+    
     const size_type dimension = theta.dimension_;
     
     node_type& node = nodes_(parent.source_.first_, parent.source_.last_, parent.target_.first_, parent.target_.last_);
     
     const word_type& embedding_source = (! parent.source_.empty() ? source[parent.source_.first_] : vocab_type::EPSILON);
     const word_type& embedding_target = (! parent.target_.empty() ? target[parent.target_.first_] : vocab_type::EPSILON);
+
+    embedding_type::const_iterator siter = theta.source_.find(embedding_source);
+    if (siter == theta.source_.end())
+      throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(embedding_source));
+
+    embedding_type::const_iterator titer = theta.target_.find(embedding_target);
+    if (titer == theta.target_.end())
+      throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(embedding_target));
     
     node.score_ = 0.0;
     node.total_ = 0.0;
     node.output_norm_ = tensor_type(dimension * 2, 1);
-    node.output_norm_ << (theta.source_[embedding_source] * theta.scale_source_,
-			  theta.target_[embedding_target] * theta.scale_target_);
+    
+    node.output_norm_ << siter->second * theta.scale_source_, titer->second * theta.scale_target_;
+    
+    agenda_[parent.size()].push_back(parent);
   }
   
   // binary rules
   void forward(const span_pair_type& parent,
 	       const span_pair_type& child1,
-	       const span_pair_type& chile2,
-	       model_type& theta)
+	       const span_pair_type& child2,
+	       const model_type& theta)
   {
     const size_type dimension = theta.dimension_;
     const bool straight = (child1.target_.last_ == child2.target_.first_);
@@ -717,30 +781,35 @@ struct ITGTree
     const tensor_type p = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
       
     // internal representation...
-    const tensor_type p_norm = p.normalize();
+    tensor_type p_norm = p.normalized();
       
     // compute reconstruction
     const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
     
     // internal representation...
-    const tensor_type y_minus_c = y.normalize() - c;
+    tensor_type y_minus_c = y.normalized() - c;
     
     // representation error
     const double e = theta.lambda_ * 0.5 * y_minus_c.squaredNorm();
+
+    if (node.score_ == std::numeric_limits<double>::infinity())
+      agenda_[parent.size()].push_back(parent);
     
     if (e < node.score_) {
       node.score_       = e;
+      node.total_       = e + node1.total_ + node2.total_;
       node.output_      = p;
       node.output_norm_ = p_norm;
-	
+      
       node.reconstruction_ = y_minus_c.array() * theta.lambda_;
-	
+      
       // 1 - x * x for tanh!
       node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
 	
       node.tails_.first  = child1;
       node.tails_.second = child2;
     }
+    
   }
   
   // backward propagation from the goal node!
@@ -777,9 +846,9 @@ struct ITGTree
 				      parent.target_.first_, parent.target_.last_);
       
       const bool root(span == parent && span == span_root);
-      const bool straight((span.source_.first_ == parent.source_.first__ && span.target_.first_ == parent.target_.first__)
-			  || (span.source_.last == parent.source_.last && span.target_.last == parent.target_.last__));
-      const bool left(span.source_.first_ == parent.source_.first__);
+      const bool straight((span.source_.first_ == parent.source_.first_ && span.target_.first_ == parent.target_.first_)
+			  || (span.source_.last_ == parent.source_.last_ && span.target_.last_ == parent.target_.last_));
+      const bool left(span.source_.first_ == parent.source_.first_);
       
       const tensor_type& W1 = (root ? root_W1 : (straight ? theta.Ws1_ : theta.Wi1_));
       const tensor_type& W2 = (root ? root_W2 : (straight ? theta.Ws2_ : theta.Wi2_));
@@ -792,10 +861,10 @@ struct ITGTree
 	tensor_type update;
 	
 	if (root || left)
-	  update = (W1.block(0, 0, dimension * 2, dimension * 2).tranpose() * node_parent.delta_
+	  update = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		    - reconstruction.block(0, 0, dimension * 2, 1));
 	else
-	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).tranpose() * node_parent.delta_
+	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		    - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
 	
 	tensor_type& dsource = (! span.source_.empty()
@@ -824,16 +893,17 @@ struct ITGTree
 	stack_.push_back(std::make_pair(child1, span));
 	stack_.push_back(std::make_pair(child2, span));
 	
+	// 1.0 - x * x for tanh
 	if (root || left)
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-			     - reconstruction.block(0, 0, dimension * 2, 1)));
+			     - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-			     - reconstruction.block(dimension * 2, 0, dimension * 2, 1)));
+			     - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	node2.delta_ = node1.delta_;
 	
 	// accumulate based on the deltas
@@ -898,40 +968,46 @@ struct LearnAdaGrad
   
   void operator()(model_type& theta, const gradient_type& gradient) const
   {
+    typedef model_type::embedding_type embedding_type;
+
     embedding_type::const_iterator siter_end = gradient.source_.end();
     for (embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter) {
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
       if (eiter == theta.source_.end())
-	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1)));
+	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1))).first;
       
       if (siter->first.id() >= source_.cols()) {
 	const size_type pos_first = source_.cols();
 	const size_type pos_last  = siter->first.id() + 1;
+
+	tensor_type& matrix = const_cast<tensor_type&>(source_);
 	
-	source_.conservativeResize(dimension_, pos_last);
-	source_.block(0, pos_first, dimension, pos_last - pos_first).setZero();
+	matrix.conservativeResize(dimension_, pos_last);
+	matrix.block(0, pos_first, dimension_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, source_[siter->first.id()], siter->second);
+      update(eiter->second, source_.col(siter->first.id()), siter->second);
     }
 
-    embedding_type::const_iterator siter_end = gradient.target_.end();
-    for (embedding_type::const_iterator siter = gradient.target_.begin(); siter != siter_end; ++ siter) {
-      embedding_type::iterator eiter = theta.target_.find(siter->first);
+    embedding_type::const_iterator titer_end = gradient.target_.end();
+    for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer) {
+      embedding_type::iterator eiter = theta.target_.find(titer->first);
       
       if (eiter == theta.target_.end())
-	eiter = theta.target_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1)));
+	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type(theta.dimension_, 1))).first;
       
-      if (siter->first.id() >= target_.cols()) {
+      if (titer->first.id() >= target_.cols()) {
 	const size_type pos_first = target_.cols();
-	const size_type pos_last  = siter->first.id() + 1;
+	const size_type pos_last  = titer->first.id() + 1;
+
+	tensor_type& matrix = const_cast<tensor_type&>(target_);
 	
-	target_.conservativeResize(dimension_, pos_last);
-	target_.block(0, pos_first, dimension, pos_last - pos_first).setZero();
+	matrix.conservativeResize(dimension_, pos_last);
+	matrix.block(0, pos_first, dimension_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, target_[siter->first.id()], siter->second);
+      update(eiter->second, target_.col(titer->first.id()), titer->second);
     }
     
     update(theta.Ws1_, Ws1_, gradient.Ws1_);
@@ -966,7 +1042,7 @@ struct LearnAdaGrad
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
       
-      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - eta0 * lambda_ / rate);
+      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - eta0_ * lambda_ / rate);
     }
     
     tensor_type& theta_;
@@ -977,13 +1053,17 @@ struct LearnAdaGrad
     const double eta0_;
   };
   
-  void update(tensor_type& theta, tensor_type& G, const tensor_type& g, const bool regularize=true)
+  void update(tensor_type& theta, const tensor_type& __G, const tensor_type& g, const bool regularize=true) const
   {
-    if (regularize)
-      theta.visit(update_visitor_regularize(theta, G, g, lambda_, eta0_));
-    else {
-      G += g.array() * g.array();
-      theta -= eta0_ * g.array() / G.array().sqrt();
+    tensor_type& G = const_cast<tensor_type&>(__G);
+
+    if (regularize) {
+      update_visitor_regularize visitor(theta, G, g, lambda_, eta0_);
+      
+      theta.visit(visitor);
+    } else {
+      G.array() += g.array() * g.array();
+      theta.array() -= eta0_ * g.array() / G.array().sqrt();
     }
   }
   
@@ -1034,7 +1114,7 @@ struct LearnL2
 
     const double eta = eta0_ / (epoch_ + 1);
     ++ const_cast<size_type&>(epoch_);
-    
+
     // suffer L2 regularizer... actually, we should not rescale bias
     if (lambda_ != 0.0)
       theta.rescale(1.0 - eta * lambda_, true);
@@ -1045,12 +1125,12 @@ struct LearnL2
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
       if (eiter == theta.source_.end())
-	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1)));
+	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1))).first;
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = - siter->second.col(0)[i] * gradient.scale_source_ * eta;
 	
-	norm_source_ += 2.0 * eiter->second.col(0)[i] * theta.scale_source_ * amount + amount * amount;
+	theta.norm_source_ += 2.0 * eiter->second.col(0)[i] * theta.scale_source_ * amount + amount * amount;
 	eiter->second.col(0)[i] += amount / theta.scale_source_;
       }
     }
@@ -1059,26 +1139,26 @@ struct LearnL2
     for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer) {
       embedding_type::iterator eiter = theta.target_.find(titer->first);
       
-      if (eiter == target_.end())
-	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1)));
+      if (eiter == theta.target_.end())
+	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type(theta.dimension_, 1))).first;
       
       for (difference_type i = 0; i != titer->second.rows(); ++ i) {
 	const double amount = - titer->second.col(0)[i] * gradient.scale_target_ * eta;
 	
-	norm_target_ += 2.0 * eiter->second.col(0)[i] *theta. scale_source_ * amount + amount * amount;
+	theta.norm_target_ += 2.0 * eiter->second.col(0)[i] *theta. scale_target_ * amount + amount * amount;
 	eiter->second.col(0)[i] += amount / theta.scale_target_;
       }
     }
 
-    theta.Ws1_ -= gradient.Ws1_.array() * eta;
-    theta.bs1_ -= gradient.bs1_.array() * eta;
-    theta.Wi1_ -= gradient.Wi1_.array() * eta;
-    theta.bi1_ -= gradient.bi1_.array() * eta;
+    theta.Ws1_.array() -= gradient.Ws1_.array() * eta;
+    theta.bs1_.array() -= gradient.bs1_.array() * eta;
+    theta.Wi1_.array() -= gradient.Wi1_.array() * eta;
+    theta.bi1_.array() -= gradient.bi1_.array() * eta;
     
-    theta.Ws2_ -= gradient.Ws2_.array() * eta;
-    theta.bs2_ -= gradient.bs2_.array() * eta;
-    theta.Wi2_ -= gradient.Wi2_.array() * eta;
-    theta.bi2_ -= gradient.bi2_.array() * eta;
+    theta.Ws2_.array() -= gradient.Ws2_.array() * eta;
+    theta.bs2_.array() -= gradient.bs2_.array() * eta;
+    theta.Wi2_.array() -= gradient.Wi2_.array() * eta;
+    theta.bi2_.array() -= gradient.bi2_.array() * eta;
     
     // projection onto L2 norm..
     if (lambda_ != 0.0) {
@@ -1086,6 +1166,9 @@ struct LearnL2
       
       if (norm > 1.0 / lambda_)
 	theta.rescale(std::sqrt((1.0 / lambda_) * (1.0 / norm)), true);
+
+      if (theta.scale_source_ < 0.001 || theta.scale_source_ > 1000 || theta.scale_target_ < 0.001 || theta.scale_target_ > 1000)
+	theta.finalize();
     }
   }
   
@@ -1101,14 +1184,64 @@ typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
 typedef Model model_type;
 
+static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_WRAP = 100;
+static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
+
+path_type source_file;
+path_type target_file;
+
+path_type derivation_file;
+path_type alignment_source_target_file;
+path_type alignment_target_source_file;
+path_type output_model_file;
+
+double lambda = 1.0;
+int dimension = 16;
+
+bool optimize_sgd = false;
+bool optimize_adagrad = false;
+
+int iteration = 10;
+int batch_size = 128;
+double beam = 1;
+double regularize_lambda = 1;
+double eta0 = 1;
+
+int threads = 2;
+
+int debug = 0;
+
+template <typename Learner>
+void learn_online(const Learner& learner,
+		  const bitext_set_type& bitexts,
+		  model_type& theta);
+void derivation(const bitext_set_type& bitexts,
+		const model_type& theta);
+void read_data(const path_type& source_file,
+	       const path_type& target_file,
+	       bitext_set_type& bitexts);
+
+void options(int argc, char** argv);
+
 int main(int argc, char** argv)
 {
   try {
+    options(argc, argv);
+
+    threads = utils::bithack::max(threads, 1);
+
+    if (int(optimize_sgd) + optimize_adagrad > 1)
+      throw std::runtime_error("either one of optimize-{sgd,adagrad}");
+
+    if (int(optimize_sgd) + optimize_adagrad == 0)
+      optimize_sgd = true;
+    
     // srand is used in Eigen
     std::srand(utils::random_seed());
   
     // this is optional, but safe to set this
-    std::srandom(utils::random_seed());
+    ::srandom(utils::random_seed());
 
     if (source_file.empty())
       throw std::runtime_error("no source data?");
@@ -1122,12 +1255,13 @@ int main(int argc, char** argv)
     model_type theta(dimension, lambda);
     
     theta.embedding(bitexts.begin(), bitexts.end());
+
     
     if (iteration > 0) {
-      if (adagrad_mode)
-	learn_online(LearnAdaGrad(dimension, lambda, eta0), bitexts, theta);
+      if (optimize_adagrad)
+	learn_online(LearnAdaGrad(dimension, regularize_lambda, eta0), bitexts, theta);
       else
-	learn_online(LearnL2(lambda, eta0), bitexts, theta);
+	learn_online(LearnL2(regularize_lambda, eta0), bitexts, theta);
     }
     
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
@@ -1137,7 +1271,7 @@ int main(int argc, char** argv)
       theta.write(output_model_file);
     
   } catch (std::exception& err) {
-    std::cerr << err.waht() << std::endl;
+    std::cerr << err.what() << std::endl;
     return 1;
   }
   
@@ -1163,7 +1297,7 @@ int main(int argc, char** argv)
 // Basically, we split data into mini batch, and compute gradient only over the minibatch
 //
 
-struct TaskLearn
+struct TaskAccumulate
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
@@ -1211,17 +1345,19 @@ struct TaskLearn
   };
   typedef Counter counter_type;
 
-  TaskLearn(const bitext_set_type& bitexts,
-	    const model_type& theta,
-	    const double& beam,
-	    queue_type& queue,
-	    counter_type& counter)
+  TaskAccumulate(const bitext_set_type& bitexts,
+		 const model_type& theta,
+		 const double& beam,
+		 queue_type& queue,
+		 counter_type& counter)
     : bitexts_(bitexts),
       theta_(theta),
       beam_(beam),
       queue_(queue),
       counter_(counter),
-      gradient_(model.dimension_) {}
+      gradient_(theta.dimension_),
+      error_(0),
+      samples_(0) {}
   
   void operator()()
   {
@@ -1233,17 +1369,43 @@ struct TaskLearn
       
       if (bitext_id == size_type(-1)) break;
       
-      const sentence_type& source = bitexts[bitext_id].source_;
-      const sentence_type& target = bitexts[bitext_id].target_;
+      const sentence_type& source = bitexts_[bitext_id].source_;
+      const sentence_type& target = bitexts_[bitext_id].target_;
+      
+      if (! source.empty() && ! target.empty()) {
+
+#if 0
+	std::cerr << "source: " << source << std::endl
+		  << "target: " << target << std::endl;
+#endif
+	
+	
+	itg_tree_.forward(source, target, theta_, beam_);
+
+	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
+
+	const bool parsed = (root.score_ != std::numeric_limits<double>::infinity());
+	
+	if (parsed) {
+	  itg_tree_.backward(source, target, theta_, gradient_);
+	  
+	  error_ += root.total_;
+	  ++ samples_;
+	} else
+	  std::cerr << "failed parsing: " << std::endl
+		    << "source: " << source << std::endl
+		    << "target: " << target << std::endl;
+      }
       
       counter_.increment();
-      
-      if (source.empty() || target.empty()) continue;
-      
-      itg_tree_.forward(source, target, theta_, beam_);
-      
-      itg_tree.backward(source, target, theta_, gradient_);
     }
+  }
+
+  void clear()
+  {
+    gradient_.clear();
+    error_ = 0.0;
+    samples_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -1254,7 +1416,10 @@ struct TaskLearn
   counter_type& counter_;
   
   itg_tree_type itg_tree_;
+
   gradient_type gradient_;
+  double        error_;
+  size_type     samples_;
 };
 
 template <typename Learner>
@@ -1262,7 +1427,7 @@ void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
 		  model_type& theta)
 {
-  typedef TaskLearn task_type;
+  typedef TaskAccumulate task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
   typedef task_type::size_type size_type;
@@ -1275,41 +1440,71 @@ void learn_online(const Learner& learner,
   task_set_type tasks(threads, task_type(bitexts, theta, beam, mapper, reducer));
   
   id_set_type ids(bitexts.size());
-  for (size_type i = 0; i != ids.size(); ++ id)
+  for (size_type i = 0; i != ids.size(); ++ i)
     ids[i] = i;
   
   boost::thread_group workers;
   for (size_type i = 0; i != tasks.size(); ++ i)
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
-  for (int iter = 0; iter < iteration; ++ iter) {
+  for (int t = 0; t < iteration; ++ t) {
+    if (debug)
+      std::cerr << "iteration: " << (t + 1) << std::endl;
+
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
+
+    double error = 0.0;
+    size_type samples = 0;
+    size_type num_bitext = 0;
     
     while (biter < biter_end) {
       // clear gradients...
       for (size_type i = 0; i != tasks.size(); ++ i)
-	tasks[i].gradient_.clear();
+	tasks[i].clear();
       
       // clear reducer
       reducer.clear();
       
       // map bitexts
       id_set_type::const_iterator iter_end = std::min(biter + batch_size, biter_end);
-      for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter)
+      for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter) {
 	mapper.push(*iter);
+	
+	++ num_bitext;
+	if (debug) {
+	  if (num_bitext % DEBUG_DOT == 0)
+	    std::cerr << '.';
+	  if (num_bitext % DEBUG_LINE == 0)
+	    std::cerr << '\n';
+	}
+      }
       
       // wait...
       reducer.wait(iter_end - biter);
       biter = iter_end;
       
       // merge gradients
-      for (size_type i = 1; i != tasks.size(); ++ i)
+      error   += tasks.front().error_;
+      samples += tasks.front().samples_;
+      for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_ += tasks[i].gradient_;
+	error   += tasks[i].error_;
+	samples += tasks[i].samples_;
+      }
       
       // update model parameters
-      learner(model, tasks.front().gradient_);
+      learner(theta, tasks.front().gradient_);
     }
+    
+    if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
+      std::cerr << std::endl;
+    if (debug)
+      std::cerr << "# of bitexts: " << num_bitext << std::endl;
+
+    if (debug)
+      std::cerr << "average error: " << (error / samples) << std::endl
+		<< "parsed: " << samples << std::endl;
     
     // shuffle bitexts!
     std::random_shuffle(ids.begin(), ids.end());
@@ -1317,21 +1512,25 @@ void learn_online(const Learner& learner,
 
   // termination
   for (size_type i = 0; i != tasks.size(); ++ i)
-    queue_bitext.push(size_type(-1));
+    mapper.push(size_type(-1));
+
+  workers.join_all();
   
   // call this after learning
   theta.finalize();
 }
 
+// TODO!
 void derivation(const bitext_set_type& bitexts,
 		const model_type& theta)
 {
   
   
+  
+  
 }
 
-
-void read_data(const path_tyep& source_file,
+void read_data(const path_type& source_file,
 	       const path_type& target_file,
 	       bitext_set_type& bitexts)
 {
@@ -1354,4 +1553,51 @@ void read_data(const path_tyep& source_file,
   
   if (src || trg)
     throw std::runtime_error("# of sentnces do not match");
+}
+
+void options(int argc, char** argv)
+{
+  namespace po = boost::program_options;
+  
+  po::options_description opts_command("command line options");
+  opts_command.add_options()
+    ("source",    po::value<path_type>(&source_file),    "source file")
+    ("target",    po::value<path_type>(&target_file),    "target file")
+    
+    ("derivation",               po::value<path_type>(&derivation_file),               "output derivation")
+    ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "output alignemnt for P(target | source)")
+    ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "output alignemnt for P(source | target)")
+
+    ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
+    
+    ("lambda",    po::value<double>(&lambda)->default_value(lambda),    "model hyperparameter for error")
+    ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
+    
+    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
+    ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
+    
+    ("iteration",         po::value<int>(&iteration)->default_value(iteration),                    "max # of iterations")
+    ("batch",             po::value<int>(&batch_size)->default_value(batch_size),                  "mini-batch size")
+    ("beam",              po::value<double>(&beam)->default_value(beam),                           "beam width for parsing")
+    ("regularize-lambda", po::value<double>(&regularize_lambda)->default_value(regularize_lambda), "regularization constant")
+    ("eta0",              po::value<double>(&eta0)->default_value(eta0),                           "\\eta_0 for decay")
+    
+    ("threads", po::value<int>(&threads), "# of threads")
+    
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
+    ("help", "help message");
+  
+  po::options_description desc_command;
+  desc_command.add(opts_command);
+  
+  po::variables_map variables;
+  po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
+  
+  po::notify(variables);
+
+  if (variables.count("help")) {
+    std::cout << argv[0] << " [options] [operations]\n"
+	      << opts_command << std::endl;
+    exit(0);
+  }
 }

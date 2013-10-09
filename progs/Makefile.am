@@ -37,6 +37,7 @@ bin_PROGRAMS = \
 	cicada_alignment_hmm \
 	cicada_alignment_model1 \
 	cicada_alignment_model4 \
+	cicada_autoencode_itg \
 	cicada_clean \
 	cicada_cluster_word \
 	cicada_convex_hull \
@@ -157,6 +158,9 @@ cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_alignment_SOURCES = cicada_alignment.cpp itg_alignment.hpp kuhn_munkres.hpp
 cicada_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_autoencode_itg_SOURCES = cicada_autoencode_itg.cpp
+cicada_autoencode_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_clean_SOURCES = cicada_clean.cpp
 cicada_clean_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
