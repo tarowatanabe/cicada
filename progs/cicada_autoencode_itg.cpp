@@ -37,21 +37,30 @@
 #include <cmath>
 #include <climits>
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+
 #include <Eigen/Core>
 
 #include "cicada/symbol.hpp"
 #include "cicada/sentence.hpp"
 #include "cicada/vocab.hpp"
 
+#include "utils/lexical_cast.hpp"
 #include "utils/bichart.hpp"
 #include "utils/bithack.hpp"
 #include "utils/compact_set.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/mathop.hpp"
 #include "utils/unordered_map.hpp"
+#include "utils/repository.hpp"
 #include "utils/program_options.hpp"
 #include "utils/random_seed.hpp"
 #include "utils/repository.hpp"
+#include "utils/compress_stream.hpp"
 
 #include <boost/thread.hpp>
 
@@ -342,12 +351,93 @@ struct Model
     return norm;
   }
   
+  struct real_policy : boost::spirit::karma::real_policies<parameter_type>
+  {
+    static unsigned int precision(parameter_type)
+    {
+      return 10;
+    }
+  };
+
+  boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+  
   void write(const path_type& path) const
   {
     // we use a repository structure...
+    typedef utils::repository repository_type;
     
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
     
+    repository_type rep(path, repository_type::write);
     
+    rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
+    rep["lambda"]    = utils::lexical_cast<std::string>(lambda_);
+    
+    const path_type source_file = rep.path("source.gz");
+    const path_type target_file = rep.path("target.gz");
+
+    {
+      utils::compress_ostream os(source_file, 1024 * 1024);
+      std::ostream_iterator<char> iter(os);
+      
+      embedding_type::const_iterator siter_end = source_.end();
+      for (embedding_type::const_iterator siter = source_.begin(); siter != siter_end; ++ siter) {
+	karma::generate(iter, standard::string, siter->first);
+	
+	for (difference_type i = 0; i != siter->second.rows(); ++ i)
+	  karma::generate(iter, karma::lit(' ') << float10, siter->second.row(i)[0]);
+	
+	karma::generate(iter, karma::lit('\n'));
+      }
+    }
+
+    {
+      utils::compress_ostream os(target_file, 1024 * 1024);
+      std::ostream_iterator<char> iter(os);
+      
+      embedding_type::const_iterator titer_end = target_.end();
+      for (embedding_type::const_iterator titer = target_.begin(); titer != titer_end; ++ titer) {
+	karma::generate(iter, standard::string, titer->first);
+	
+	for (difference_type i = 0; i != titer->second.rows(); ++ i)
+	  karma::generate(iter, karma::lit(' ') << float10, titer->second.row(i)[0]);
+	
+	karma::generate(iter, karma::lit('\n'));
+      }
+    }
+    
+    // dump matrices...
+    // we will dump two: binary and text
+    write(rep.path("Ws1.txt.gz"), rep.path("Ws1.bin"), Ws1_);
+    write(rep.path("bs1.txt.gz"), rep.path("bs1.bin"), bs1_);
+    write(rep.path("Wi1.txt.gz"), rep.path("Wi1.bin"), Wi1_);
+    write(rep.path("bi1.txt.gz"), rep.path("bi1.bin"), bi1_);
+
+    write(rep.path("Ws2.txt.gz"), rep.path("Ws2.bin"), Ws2_);
+    write(rep.path("bs2.txt.gz"), rep.path("bs2.bin"), bs2_);
+    write(rep.path("Wi2.txt.gz"), rep.path("Wi2.bin"), Wi2_);
+    write(rep.path("bi2.txt.gz"), rep.path("bi2.bin"), bi2_);    
+  }
+
+  void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
+  {
+    {
+      utils::compress_ostream os(path_text, 1024 * 1024);
+      os.precision(10);
+      os << matrix;
+    }
+    
+    {
+      utils::compress_ostream os(path_binary, 1024 * 1024);
+      
+      const tensor_type::Index rows = matrix.rows();
+      const tensor_type::Index cols = matrix.cols();
+      
+      os.write((char*) &rows, sizeof(tensor_type::Index));
+      os.write((char*) &cols, sizeof(tensor_type::Index));
+      os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+    }
   }
   
   // dimension...
@@ -1203,9 +1293,9 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
-int batch_size = 128;
-double beam = 1;
-double regularize_lambda = 1;
+int batch_size = 1024;
+double beam = 0.1;
+double regularize_lambda = 0.01;
 double eta0 = 1;
 
 int threads = 2;
@@ -1235,7 +1325,7 @@ int main(int argc, char** argv)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
 
     if (int(optimize_sgd) + optimize_adagrad == 0)
-      optimize_sgd = true;
+      optimize_adagrad = true;
     
     // srand is used in Eigen
     std::srand(utils::random_seed());
