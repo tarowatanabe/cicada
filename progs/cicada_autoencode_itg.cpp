@@ -40,6 +40,8 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
+#include <set>
+
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 
@@ -48,6 +50,7 @@
 #include "cicada/symbol.hpp"
 #include "cicada/sentence.hpp"
 #include "cicada/vocab.hpp"
+#include "cicada/alignment.hpp"
 
 #include "utils/lexical_cast.hpp"
 #include "utils/bichart.hpp"
@@ -568,13 +571,37 @@ struct ITGTree
   };
   
   typedef SpanPair span_pair_type;
-  
+
+  struct Hyperedge
+  {
+    span_pair_type span_;
+    span_pair_type left_;
+    span_pair_type right_;
+
+    Hyperedge()
+      : span_(), left_(), right_() {}
+    Hyperedge(const span_pair_type& span)
+      : span_(span), left_(), right_() {}
+    Hyperedge(const span_pair_type& span, const span_pair_type& left, const span_pair_type& right)
+      : span_(span), left_(left), right_(right) {}
+    
+    bool aligned() const { return ! span_.source_.empty() && ! span_.target_.empty(); }
+    bool terminal() const { return left_.empty() && right_.empty(); }
+    bool straight() const { return ! terminal() && left_.target_.last_  == right_.target_.first_; }
+    bool inverted() const { return ! terminal() && left_.target_.first_ == right_.target_.last_; }
+  };
+
+  typedef Hyperedge hyperedge_type;
+
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
 
   typedef std::pair<span_pair_type, span_pair_type> span_pair_stack_type;
 
   typedef std::vector<span_pair_stack_type, std::allocator<span_pair_stack_type> > stack_type;
+
+  typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > derivation_type;
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_derivation_type;
 
   typedef std::pair<double, span_pair_type> score_span_pair_type;
   typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
@@ -631,6 +658,7 @@ struct ITGTree
     uniques_.clear();
     
     stack_.clear();
+    stack_derivation_.clear();
   }
   
   // sort by greater item so that we can pop from less
@@ -1015,6 +1043,36 @@ struct ITGTree
       }
     }
   }
+
+  void derivation(const sentence_type& source,
+		  const sentence_type& target,
+		  derivation_type& d)
+  {
+    d.clear();
+    
+    stack_derivation_.clear();
+    stack_derivation_.push_back(span_pair_type(0, source.size(), 0, target.size()));
+    
+    while (! stack_derivation_.empty()) {
+      const span_pair_type span = stack_derivation_.back();
+      stack_derivation_.pop_back();
+      
+      const node_type& node = nodes_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+      
+      if (node.terminal())
+	d.push_back(hyperedge_type(span));
+      else {
+	const span_pair_type& child1 = node.tails_.first;
+	const span_pair_type& child2 = node.tails_.second;
+	
+	d.push_back(hyperedge_type(span, child1, child2));
+	
+	// we will push in right-to-left order...!
+	stack_derivation_.push_back(child2);
+	stack_derivation_.push_back(child1);
+      }
+    }
+  }
   
   node_set_type nodes_;
   
@@ -1023,6 +1081,7 @@ struct ITGTree
   tail_set_unique_type uniques_;
   
   stack_type stack_;
+  stack_derivation_type stack_derivation_;
 };
 
 struct LearnAdaGrad
@@ -1077,7 +1136,7 @@ struct LearnAdaGrad
 	matrix.block(0, pos_first, dimension_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, source_.col(siter->first.id()), siter->second);
+      update(eiter->second, source_.col(siter->first.id()), siter->second, lambda_ != 0.0);
     }
 
     embedding_type::const_iterator titer_end = gradient.target_.end();
@@ -1097,17 +1156,17 @@ struct LearnAdaGrad
 	matrix.block(0, pos_first, dimension_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, target_.col(titer->first.id()), titer->second);
+      update(eiter->second, target_.col(titer->first.id()), titer->second, lambda_ != 0.0);
     }
     
-    update(theta.Ws1_, Ws1_, gradient.Ws1_);
+    update(theta.Ws1_, Ws1_, gradient.Ws1_, lambda_ != 0.0);
     update(theta.bs1_, bs1_, gradient.bs1_, false);
-    update(theta.Wi1_, Wi1_, gradient.Wi1_);
+    update(theta.Wi1_, Wi1_, gradient.Wi1_, lambda_ != 0.0);
     update(theta.bi1_, bi1_, gradient.bi1_, false);
 
-    update(theta.Ws2_, Ws2_, gradient.Ws2_);
+    update(theta.Ws2_, Ws2_, gradient.Ws2_, lambda_ != 0.0);
     update(theta.bs2_, bs2_, gradient.bs2_, false);
-    update(theta.Wi2_, Wi2_, gradient.Wi2_);
+    update(theta.Wi2_, Wi2_, gradient.Wi2_, lambda_ != 0.0);
     update(theta.bi2_, bi2_, gradient.bi2_, false);
   }
 
@@ -1132,7 +1191,7 @@ struct LearnAdaGrad
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
       
-      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - eta0_ * lambda_ / rate);
+      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
     
     tensor_type& theta_;
@@ -1295,8 +1354,10 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 double beam = 0.1;
-double regularize_lambda = 0.01;
+double regularize_lambda = 1;
 double eta0 = 1;
+
+bool dump_mode = false;
 
 int threads = 2;
 
@@ -1387,6 +1448,270 @@ int main(int argc, char** argv)
 // Basically, we split data into mini batch, and compute gradient only over the minibatch
 //
 
+struct OutputMapReduce
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef boost::filesystem::path path_type;
+  
+  typedef Bitext bitext_type;
+  
+  typedef bitext_type::word_type word_type;
+  typedef bitext_type::sentence_type sentence_type;
+  typedef bitext_type::vocab_type vocab_type;
+
+  typedef ITGTree itg_tree_type;
+  
+  typedef itg_tree_type::span_type       span_type;
+  typedef itg_tree_type::span_pair_type  span_pair_type;
+  typedef itg_tree_type::hyperedge_type  hyperedge_type;
+  typedef itg_tree_type::derivation_type derivation_type;
+
+  struct bitext_derivation_type
+  {
+    size_type       id_;
+    bitext_type     bitext_;
+    derivation_type derivation_;
+    
+    bitext_derivation_type() : id_(size_type(-1)), bitext_(), derivation_() {}
+    bitext_derivation_type(const size_type& id,
+			   const bitext_type& bitext,
+			   const derivation_type& derivation)
+      : id_(id), bitext_(bitext), derivation_(derivation) {}
+    
+    void swap(bitext_derivation_type& x)
+    {
+      std::swap(id_, x.id_);
+      bitext_.swap(x.bitext_);
+      derivation_.swap(x.derivation_);
+    }
+
+    void clear()
+    {
+      id_ = size_type(-1);
+      bitext_.clear();
+      derivation_.clear();
+    }
+  };
+  
+  typedef bitext_derivation_type value_type;
+
+  typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
+
+  struct compare_value
+  {
+    bool operator()(const value_type& x, const value_type& y) const
+    {
+      return x.id_ < y.id_;
+    }
+  };
+  typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_set_type;
+
+};
+
+namespace std
+{
+  inline
+  void swap(OutputMapReduce::value_type& x,
+	    OutputMapReduce::value_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+struct OutputDerivation : OutputMapReduce
+{
+  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
+	  
+  OutputDerivation(const path_type& path,
+		   queue_type& queue)
+    : path_(path), queue_(queue) {}
+  
+  void operator()()
+  {
+    if (path_.empty()) {
+      bitext_derivation_type bitext;
+      
+      for (;;) {
+	queue_.pop_swap(bitext);
+	
+	if (bitext.id_ == size_type(-1)) break;
+      }
+    } else {
+      bitext_set_type bitexts;
+      bitext_derivation_type bitext;
+      size_type id = 0;
+      
+      utils::compress_ostream os(path_, 1024 * 1024);
+      
+      for (;;) {
+	queue_.pop_swap(bitext);
+	
+	if (bitext.id_ == size_type(-1)) break;
+	
+	if (bitext.id_ == id) {
+	  write(os, bitext);
+	  ++ id;
+	} else
+	  bitexts.insert(bitext);
+	
+	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
+	  write(os, *bitexts.begin());
+	  bitexts.erase(bitexts.begin());
+	  ++ id;
+	}
+      }
+      
+      while (! bitexts.empty() && bitexts.begin()->id_ == id) {
+	write(os, *bitexts.begin());
+	bitexts.erase(bitexts.begin());
+	++ id;
+      }
+      
+      if (! bitexts.empty())
+	throw std::runtime_error("error while writing derivation output?");
+    }
+  }
+  
+  void write(std::ostream& os, const value_type& bitext)
+  {
+    stack_.clear();
+    
+    derivation_type::const_iterator diter_end = bitext.derivation_.end();
+    for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter) {
+      if (diter->terminal()) {
+	const word_type& source = (! diter->span_.source_.empty()
+				   ? bitext.bitext_.source_[diter->span_.source_.first_]
+				   : vocab_type::EPSILON);
+	const word_type& target = (! diter->span_.target_.empty()
+				   ? bitext.bitext_.target_[diter->span_.target_.first_]
+				   : vocab_type::EPSILON);
+	
+	os << "((( " << source << " ||| " << target << " )))";
+	
+	while (! stack_.empty() && stack_.back() != " ") {
+	  os << stack_.back();
+	  stack_.pop_back();
+	}
+	
+	if (! stack_.empty() && stack_.back() == " ") {
+	  os << stack_.back();
+	  stack_.pop_back();
+	}
+      } else if (diter->straight()) {
+	os << "[ ";
+	stack_.push_back(" ]");
+	stack_.push_back(" ");
+      } else {
+	os << "< ";
+	stack_.push_back(" >");
+	stack_.push_back(" ");
+      }
+    }
+    
+    os << '\n';
+  }
+  
+  path_type   path_;
+  queue_type& queue_;
+  
+  stack_type stack_;
+};
+
+struct OutputAlignment : OutputMapReduce
+{
+  typedef cicada::Alignment alignment_type;
+
+  OutputAlignment(const path_type& path_source_target,
+		  const path_type& path_target_source,
+		  queue_type& queue)
+    : path_source_target_(path_source_target),
+      path_target_source_(path_target_source),
+      queue_(queue) {}
+  
+  void operator()()
+  {
+    if (path_source_target_.empty() && path_target_source_.empty()) {
+      bitext_derivation_type bitext;
+      
+      for (;;) {
+	queue_.pop_swap(bitext);
+	
+	if (bitext.id_ == size_type(-1)) break;
+      }
+    } else {
+      bitext_set_type bitexts;
+      bitext_derivation_type bitext;
+      size_type id = 0;
+      
+      std::auto_ptr<std::ostream> os_source_target(! path_source_target_.empty()
+						   ? new utils::compress_ostream(path_source_target_, 1024 * 1024)
+						   : 0);
+      std::auto_ptr<std::ostream> os_target_source(! path_target_source_.empty()
+						   ? new utils::compress_ostream(path_target_source_, 1024 * 1024)
+						   : 0);
+      
+      for (;;) {
+	queue_.pop_swap(bitext);
+	
+	if (bitext.id_ == size_type(-1)) break;
+	
+	if (bitext.id_ == id) {
+	  write(os_source_target.get(), os_target_source.get(), bitext);
+	  ++ id;
+	} else
+	  bitexts.insert(bitext);
+	
+	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
+	  write(os_source_target.get(), os_target_source.get(), bitext);
+	  bitexts.erase(bitexts.begin());
+	  ++ id;
+	}
+      }
+      
+      while (! bitexts.empty() && bitexts.begin()->id_ == id) {
+	write(os_source_target.get(), os_target_source.get(), bitext);
+	bitexts.erase(bitexts.begin());
+	++ id;
+      }
+      
+      if (! bitexts.empty())
+	throw std::runtime_error("error while writing derivation output?");
+    }
+  }
+
+
+  
+  void write(std::ostream* os_source_target, std::ostream* os_target_source, const value_type& bitext)
+  {
+    alignment_.clear();
+
+    derivation_type::const_iterator diter_end = bitext.derivation_.end();
+    for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter)
+      if (diter->terminal() && diter->aligned())
+	alignment_.push_back(std::make_pair(diter->span_.source_.first_, diter->span_.target_.first_));
+    
+    if (os_source_target) {
+      std::sort(alignment_.begin(), alignment_.end());
+      *os_source_target << alignment_ << '\n';
+    }
+    
+    if (os_target_source) {
+      alignment_.inverse();
+      
+      std::sort(alignment_.begin(), alignment_.end());
+      *os_target_source << alignment_ << '\n';
+    }
+  }
+
+  path_type  path_source_target_;
+  path_type  path_target_source_;
+  queue_type& queue_;
+  
+  alignment_type alignment_;
+};
+
 struct TaskAccumulate
 {
   typedef size_t    size_type;
@@ -1400,6 +1725,11 @@ struct TaskAccumulate
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
   typedef bitext_type::vocab_type vocab_type;
+
+  typedef OutputMapReduce output_map_reduce_type;
+
+  typedef output_map_reduce_type::bitext_derivation_type bitext_derivation_type;
+  typedef output_map_reduce_type::queue_type queue_derivation_type;
 
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
 
@@ -1439,12 +1769,16 @@ struct TaskAccumulate
 		 const model_type& theta,
 		 const double& beam,
 		 queue_type& queue,
-		 counter_type& counter)
+		 counter_type& counter,
+		 queue_derivation_type& queue_derivation,
+		 queue_derivation_type& queue_alignment)
     : bitexts_(bitexts),
       theta_(theta),
       beam_(beam),
       queue_(queue),
       counter_(counter),
+      queue_derivation_(queue_derivation),
+      queue_alignment_(queue_alignment),
       gradient_(theta.dimension_),
       error_(0),
       samples_(0) {}
@@ -1452,6 +1786,8 @@ struct TaskAccumulate
   void operator()()
   {
     gradient_.clear();
+
+    bitext_derivation_type bitext_derivation;
     
     size_type bitext_id;
     for (;;) {
@@ -1461,6 +1797,10 @@ struct TaskAccumulate
       
       const sentence_type& source = bitexts_[bitext_id].source_;
       const sentence_type& target = bitexts_[bitext_id].target_;
+
+      bitext_derivation.id_     = bitext_id;
+      bitext_derivation.bitext_ = bitexts_[bitext_id];
+      bitext_derivation.derivation_.clear();
       
       if (! source.empty() && ! target.empty()) {
 
@@ -1481,6 +1821,8 @@ struct TaskAccumulate
 	  
 	  error_ += root.total_;
 	  ++ samples_;
+	  
+	  itg_tree_.derivation(source, target, bitext_derivation.derivation_);
 	} else
 	  std::cerr << "failed parsing: " << std::endl
 		    << "source: " << source << std::endl
@@ -1488,6 +1830,9 @@ struct TaskAccumulate
       }
       
       counter_.increment();
+      
+      queue_derivation_.push(bitext_derivation);
+      queue_alignment_.push(bitext_derivation);
     }
   }
 
@@ -1502,8 +1847,10 @@ struct TaskAccumulate
   const model_type& theta_;
   const double beam_;
   
-  queue_type&   queue_;
-  counter_type& counter_;
+  queue_type&            queue_;
+  counter_type&          counter_;
+  queue_derivation_type& queue_derivation_;
+  queue_derivation_type& queue_alignment_;
   
   itg_tree_type itg_tree_;
 
@@ -1511,6 +1858,32 @@ struct TaskAccumulate
   double        error_;
   size_type     samples_;
 };
+
+inline
+path_type add_suffix(const path_type& path, const std::string& suffix)
+{
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path_added = path;
+  
+  if (path.extension() == ".gz") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_gz = true;
+  } else if (path.extension() == ".bz2") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path_added = path_added.string() + suffix;
+  
+  if (has_suffix_gz)
+    path_added = path_added.string() + ".gz";
+  else if (has_suffix_bz2)
+    path_added = path_added.string() + ".bz2";
+  
+  return path_added;
+}
 
 template <typename Learner>
 void learn_online(const Learner& learner,
@@ -1522,12 +1895,19 @@ void learn_online(const Learner& learner,
 
   typedef task_type::size_type size_type;
 
+  typedef OutputMapReduce  output_map_reduce_type;
+  typedef OutputDerivation output_derivation_type;
+  typedef OutputAlignment  output_alignemnt_type;
+
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
   task_type::queue_type   mapper(256 * threads);
   task_type::counter_type reducer;
+
+  output_map_reduce_type::queue_type queue_derivation;
+  output_map_reduce_type::queue_type queue_alignment;
   
-  task_set_type tasks(threads, task_type(bitexts, theta, beam, mapper, reducer));
+  task_set_type tasks(threads, task_type(bitexts, theta, beam, mapper, reducer, queue_derivation, queue_alignment));
   
   id_set_type ids(bitexts.size());
   for (size_type i = 0; i != ids.size(); ++ i)
@@ -1540,6 +1920,20 @@ void learn_online(const Learner& learner,
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
+
+    const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
+
+    boost::thread output_derivation(output_derivation_type(! derivation_file.empty() && dump_mode
+							   ? add_suffix(derivation_file, iter_tag)
+							   : path_type(),
+							   queue_derivation));
+    boost::thread output_alignment(output_alignemnt_type(! alignment_source_target_file.empty() && dump_mode
+							 ? add_suffix(alignment_source_target_file, iter_tag)
+							 : path_type(),
+							 ! alignment_target_source_file.empty() && dump_mode
+							 ? add_suffix(alignment_target_source_file, iter_tag)
+							 : path_type(),
+							 queue_alignment));
 
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
@@ -1586,7 +1980,10 @@ void learn_online(const Learner& learner,
       // update model parameters
       learner(theta, tasks.front().gradient_);
     }
-    
+
+    queue_derivation.push(output_map_reduce_type::value_type());
+    queue_alignment.push(output_map_reduce_type::value_type());
+
     if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
     if (debug)
@@ -1598,6 +1995,9 @@ void learn_online(const Learner& learner,
     
     // shuffle bitexts!
     std::random_shuffle(ids.begin(), ids.end());
+    
+    output_derivation.join();
+    output_alignment.join();
   }
 
   // termination
@@ -1671,6 +2071,8 @@ void options(int argc, char** argv)
     ("beam",              po::value<double>(&beam)->default_value(beam),                           "beam width for parsing")
     ("regularize-lambda", po::value<double>(&regularize_lambda)->default_value(regularize_lambda), "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),                           "\\eta_0 for decay")
+
+    ("dump", po::bool_switch(&dump_mode), "dump intermediate derivations and alignments")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
