@@ -184,11 +184,8 @@ public:
   double operator()(const feature_type& feat, const double& grad) const
   {
     double& grad2 = const_cast<weight_set_type&>(grads2_).operator[](feat);
-    const double eta = (grad2 == 0.0 ? eta0_ : eta0_ / utils::mathop::sqrt(grad2));
-    
     grad2 += grad * grad;
-    
-    return eta;
+    return eta0_ / utils::mathop::sqrt(grad2);
   }
 };
 
