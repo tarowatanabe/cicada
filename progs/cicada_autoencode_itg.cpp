@@ -1346,7 +1346,7 @@ path_type alignment_target_source_file;
 path_type output_model_file;
 
 double lambda = 1.0;
-int dimension = 16;
+int dimension = 128;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
