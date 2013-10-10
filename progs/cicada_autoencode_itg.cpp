@@ -1010,13 +1010,19 @@ struct ITGTree
     agenda_[parent.size()].push_back(parent);
     
     // compute reconstruction: we will apply sigmoid function
-    const tensor_type y = 1.0 / ((- (theta.Wl3_ * node.output_norm_ + theta.bl3_).array()).exp() + 1.0);
-    const tensor_type y_sigmoid = 1.0 / ((- y.array()).exp() + 1.0);
+    const tensor_type y = ((- (theta.Wl3_ * node.output_norm_ + theta.bl3_).array()).exp() + 1.0).inverse();
+    const tensor_type y_sigmoid = ((- y.array()).exp() + 1.0).inverse();
     const tensor_type y_minus_prob = y.array() - prob;
     
     const double e = 0.5 * y_minus_prob.squaredNorm();
     
-    //std::cerr << "y: " << y << " error: " << e << " source: " << embedding_source << " target: " << embedding_target << std::endl;
+#if 0
+    std::cerr << "y: " << y
+	      << " prob: " << prob
+	      << " error: " << e
+	      << " source: " << embedding_source
+	      << " target: " << embedding_target << std::endl;
+#endif
     
     node.score_ = e;
     node.total_ = e;
@@ -1982,7 +1988,7 @@ struct TaskAccumulate
   
   void operator()()
   {
-    gradient_.clear();
+    clear();
 
     bitext_derivation_type bitext_derivation;
     
