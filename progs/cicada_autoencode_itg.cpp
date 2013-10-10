@@ -219,11 +219,11 @@ struct Model
 
   typedef boost::filesystem::path path_type;
   
-  Model() : dimension_(0), lambda_(0) {}
+  Model() : dimension_(0), alpha_(0) {}
   Model(const size_type& dimension) 
-    : dimension_(dimension), lambda_(0) { initialize(dimension); }
-  Model(const size_type& dimension, const double& lambda) 
-    : dimension_(dimension), lambda_(lambda) { initialize(dimension); }
+    : dimension_(dimension), alpha_(0) { initialize(dimension); }
+  Model(const size_type& dimension, const double& alpha) 
+    : dimension_(dimension), alpha_(alpha) { initialize(dimension); }
   
   Model& operator+=(const Model& x)
   {
@@ -484,7 +484,7 @@ struct Model
     repository_type rep(path, repository_type::write);
     
     rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
-    rep["lambda"]    = utils::lexical_cast<std::string>(lambda_);
+    rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
     
     const path_type source_file = rep.path("source.gz");
     const path_type target_file = rep.path("target.gz");
@@ -559,7 +559,7 @@ struct Model
   size_type dimension_;
   
   // hyperparameter
-  double lambda_;
+  double alpha_;
   
   // Embedding
   embedding_type source_;
@@ -1007,7 +1007,7 @@ struct ITGTree
 			 ? prob_source_target
 			 : (embedding_target == vocab_type::EPSILON
 			    ? prob_target_source
-			    : std::sqrt(prob_source_target) * std::sqrt(prob_target_source)));
+			    : prob_source_target * prob_target_source));
     const double logprob = std::log(prob);
     
     node.output_norm_ = tensor_type(dimension * 2, 1);
@@ -1016,11 +1016,12 @@ struct ITGTree
     agenda_[parent.size()].push_back(parent);
     
     // compute reconstruction: we will apply sigmoid function
-    const tensor_type y = ((- (theta.Wl3_ * node.output_norm_ + theta.bl3_).array()).exp() + 1.0).inverse();
-    const tensor_type y_sigmoid = ((- y.array()).exp() + 1.0).inverse();
-    const tensor_type y_minus_prob = y.array() - prob;
+    const double y = std::min(1.0 / (1.0 + std::exp(- double((theta.Wl3_ * node.output_norm_ + theta.bl3_)(0, 0)))),
+			      1.0 - 1e-10);
+    const double y_sigmoid = 1.0 / (1.0 + std::exp(- y));
+    const double cross_entropy = - prob * std::log(y) - (1.0 - prob) * std::log(1.0 - y);
     
-    const double e = 0.5 * y_minus_prob.squaredNorm();
+    const double e = cross_entropy;
     
 #if 0
     std::cerr << "y: " << y
@@ -1034,8 +1035,10 @@ struct ITGTree
     node.total_ = e;
     node.logprob_ = logprob;
     
-    node.reconstruction_ = y_minus_prob;
-    node.delta_reconstruction_ = y_sigmoid.array() * (1.0 - y_sigmoid.array()) * node.reconstruction_.array();
+    node.reconstruction_ = tensor_type::Constant(1, 1, - prob / y + (1.0 - prob) / (1.0 - y));
+    node.delta_reconstruction_ = tensor_type::Constant(1, 1, y_sigmoid * (1.0 - y_sigmoid) * node.reconstruction_(0, 0));
+
+    //std::cerr << "reconstruction: " << node.reconstruction_(0,0) << std::endl;
   }
   
   // binary rules
@@ -1074,7 +1077,7 @@ struct ITGTree
     const tensor_type y_minus_c = y.normalized() - c;
     
     // representation error
-    const double e = theta.lambda_ * 0.5 * y_minus_c.squaredNorm();
+    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
 
     if (node.score_ == std::numeric_limits<double>::infinity())
       agenda_[parent.size()].push_back(parent);
@@ -1086,7 +1089,7 @@ struct ITGTree
       node.output_      = p;
       node.output_norm_ = p_norm;
       
-      node.reconstruction_ = y_minus_c.array() * theta.lambda_;
+      node.reconstruction_ = y_minus_c.array() * theta.alpha_;
       
       // 1 - x * x for tanh!
       node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
@@ -1543,7 +1546,7 @@ path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 path_type output_model_file;
 
-double lambda = 1.0;
+double alpha = 1.0;
 int dimension = 16;
 
 bool optimize_sgd = false;
@@ -1552,7 +1555,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 double beam = 0.1;
-double regularize_lambda = 1;
+double lambda = 1;
 double eta0 = 1;
 
 bool dump_mode = false;
@@ -1605,7 +1608,7 @@ int main(int argc, char** argv)
     
     read_data(source_file, target_file, bitexts);
     
-    model_type theta(dimension, lambda);
+    model_type theta(dimension, alpha);
     
     theta.embedding(bitexts.begin(), bitexts.end());
 
@@ -1629,9 +1632,9 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, regularize_lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnAdaGrad(dimension, lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
       else
-	learn_online(LearnL2(regularize_lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnL2(lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
     }
     
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
@@ -2293,7 +2296,7 @@ void options(int argc, char** argv)
 
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
-    ("lambda",    po::value<double>(&lambda)->default_value(lambda),    "model hyperparameter for error")
+    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "model parameter")
     ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
@@ -2302,7 +2305,7 @@ void options(int argc, char** argv)
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),                    "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size),                  "mini-batch size")
     ("beam",              po::value<double>(&beam)->default_value(beam),                           "beam width for parsing")
-    ("regularize-lambda", po::value<double>(&regularize_lambda)->default_value(regularize_lambda), "regularization constant")
+    ("lambda",            po::value<double>(&lambda)->default_value(lambda),                       "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),                           "\\eta_0 for decay")
 
     ("dump", po::bool_switch(&dump_mode), "dump intermediate derivations and alignments")
