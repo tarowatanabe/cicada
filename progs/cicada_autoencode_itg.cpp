@@ -1000,6 +1000,7 @@ struct ITGTree
     if (titer->second.rows() != dimension)
       throw std::runtime_error("dimensin does not for the target side");
     
+#if 0
     const double prob_source_target = lexicon_source_target(embedding_source, embedding_target);
     const double prob_target_source = lexicon_target_source(embedding_target, embedding_source);
     
@@ -1009,12 +1010,16 @@ struct ITGTree
 			    ? prob_target_source
 			    : prob_source_target * prob_target_source));
     const double logprob = std::log(prob);
-    
+#endif
+
+    node.score_ = 0.0;
+    node.total_ = 0.0;
     node.output_norm_ = tensor_type(dimension * 2, 1);
     node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
     
     agenda_[parent.size()].push_back(parent);
     
+#if 0
     // compute reconstruction: we will apply sigmoid function
     const double y = std::min(1.0 / (1.0 + std::exp(- double((theta.Wl3_ * node.output_norm_ + theta.bl3_)(0, 0)))),
 			      1.0 - 1e-10);
@@ -1022,6 +1027,7 @@ struct ITGTree
     const double cross_entropy = - prob * std::log(y) - (1.0 - prob) * std::log(1.0 - y);
     
     const double e = cross_entropy;
+#endif
     
 #if 0
     std::cerr << "y: " << y
@@ -1031,12 +1037,14 @@ struct ITGTree
 	      << " target: " << embedding_target << std::endl;
 #endif
     
+#if 0
     node.score_ = e;
     node.total_ = e;
     node.logprob_ = logprob;
     
     node.reconstruction_ = tensor_type::Constant(1, 1, - prob / y + (1.0 - prob) / (1.0 - y));
     node.delta_reconstruction_ = tensor_type::Constant(1, 1, y_sigmoid * (1.0 - y_sigmoid) * node.reconstruction_(0, 0));
+#endif
 
     //std::cerr << "reconstruction: " << node.reconstruction_(0,0) << std::endl;
   }
@@ -1071,7 +1079,7 @@ struct ITGTree
     // compute reconstruction
     const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
     
-    const double logprob = node1.logprob_ + node2.logprob_;
+    //const double logprob = node1.logprob_ + node2.logprob_;
     
     // internal representation...
     const tensor_type y_minus_c = y.normalized() - c;
@@ -1085,7 +1093,7 @@ struct ITGTree
     if (e < node.score_) {
       node.score_       = e;
       node.total_       = e + node1.total_ + node2.total_;
-      node.logprob_     = logprob;
+      //node.logprob_     = logprob;
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -1149,12 +1157,10 @@ struct ITGTree
 	tensor_type update;
 	
 	if (root || left)
-	  update = (theta.Wl3_.transpose() * node.delta_reconstruction_
-		    + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+	  update = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		    - reconstruction.block(0, 0, dimension * 2, 1));
 	else
-	  update = (theta.Wl3_.transpose() * node.delta_reconstruction_
-		    + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		    - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
 	
 	tensor_type& dsource = (! span.source_.empty()
@@ -1173,9 +1179,9 @@ struct ITGTree
 	  dtarget = update.block(dimension, 0, dimension, 1);
 	else
 	  dtarget += update.block(dimension, 0, dimension, 1);
-
-	gradient.Wl3_ += node.delta_reconstruction_ * node.output_norm_.transpose();
-	gradient.bl3_ += node.delta_reconstruction_;
+	
+	//gradient.Wl3_ += node.delta_reconstruction_ * node.output_norm_.transpose();
+	//gradient.bl3_ += node.delta_reconstruction_;
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
