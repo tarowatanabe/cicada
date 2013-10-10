@@ -327,26 +327,29 @@ struct Model
 
   void rescale(const double scaling, const bool ignore_bias)
   {
-    if (scaling == 0.0) {
+    scale_source_ *= scaling;
+    scale_target_ *= scaling;
+
+    if (scale_source_ == 0.0) {
       embedding_type::iterator siter_end = source_.end();
       for (embedding_type::iterator siter = source_.begin(); siter != siter_end; ++ siter)
 	siter->second.setZero();
       
+      scale_source_ = 1.0;
+      norm_source_  = 0.0;
+    } else
+      norm_source_ *= scaling * scaling;
+
+    if (scale_target_ == 0.0) {
       embedding_type::iterator titer_end = target_.end();
       for (embedding_type::iterator titer = target_.begin(); titer != titer_end; ++ titer)
 	titer->second.setZero();
       
-      scale_source_ = 1.0;
       scale_target_ = 1.0;
-      norm_source_ = 0.0;
       norm_target_ = 0.0;
-    } else {
-      scale_source_ *= scaling;
-      scale_target_ *= scaling;
-      norm_source_ *= scaling * scaling;
+    } else
       norm_target_ *= scaling * scaling;
-    }
-
+    
     Ws1_ *= scaling;
     Wi1_ *= scaling;
     
@@ -837,7 +840,7 @@ struct ITGTree
 
     uniques_.clear();
 
-    for (;;) {
+    for (int iter = 0; iter != 10; ++ iter) {
       
       for (size_type length = 1; length != length_max; ++ length) 
 	if (! agenda_[length].empty()) {
@@ -1011,6 +1014,7 @@ struct ITGTree
 			    : prob_source_target * prob_target_source));
     const double logprob = std::log(prob);
 #endif
+    
 
     node.score_ = 0.0;
     node.total_ = 0.0;
@@ -1066,6 +1070,17 @@ struct ITGTree
     const tensor_type b1 = (straight ? theta.bs1_ : theta.bi1_);
     const tensor_type W2 = (straight ? theta.Ws2_ : theta.Wi2_);
     const tensor_type b2 = (straight ? theta.bs2_ : theta.bi2_);
+    
+    if (node1.output_norm_.rows() != dimension * 2)
+      std::cerr << "dimension does not match for child1: "
+		<< parent << " : " << child1 << " + " << child2 << std::endl
+		<< "score1: " << node1.score_ << " score2: " << node2.score_ << std::endl;
+    
+    if (node2.output_norm_.rows() != dimension * 2)
+      std::cerr << "dimension does not match for child2: "
+		<< parent << " : " << child1 << " + " << child2 << std::endl
+		<< "score1: " << node1.score_ << " score2: " << node2.score_ << std::endl;
+    
 
     tensor_type c(dimension * 4, 1);
     c << node1.output_norm_, node2.output_norm_;
@@ -1086,11 +1101,14 @@ struct ITGTree
     
     // representation error
     const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-
-    if (node.score_ == std::numeric_limits<double>::infinity())
-      agenda_[parent.size()].push_back(parent);
+    
+    const double infty = std::numeric_limits<double>::infinity();
     
     if (e < node.score_) {
+
+      if (node.score_ == infty)
+	agenda_[parent.size()].push_back(parent);
+
       node.score_       = e;
       node.total_       = e + node1.total_ + node2.total_;
       //node.logprob_     = logprob;
@@ -1444,7 +1462,7 @@ struct LearnL2
   LearnL2(const double& lambda, const double& eta0)
     : lambda_(lambda), eta0_(eta0), epoch_(0)
   {
-    if (lambda_ < 0.0)
+    if (lambda_ <= 0.0)
       throw std::runtime_error("invalid regularization");
 
     if (eta0_ <= 0.0)
