@@ -225,7 +225,6 @@ struct Model
   Model(const size_type& dimension, const double& lambda) 
     : dimension_(dimension), lambda_(lambda) { initialize(dimension); }
   
-  
   Model& operator+=(const Model& x)
   {
     embedding_type::const_iterator siter_end = x.source_.end();
@@ -233,7 +232,7 @@ struct Model
       embedding_type::iterator eiter = source_.find(siter->first);
       
       if (eiter == source_.end())
-	eiter = source_.insert(std::make_pair(siter->first, tensor_type(dimension_, 1))).first;
+	eiter = source_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_, 1))).first;
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = siter->second.col(0)[i] * x.scale_source_;
@@ -248,12 +247,12 @@ struct Model
       embedding_type::iterator eiter = target_.find(titer->first);
       
       if (eiter == target_.end())
-	eiter = source_.insert(std::make_pair(titer->first, tensor_type(dimension_, 1))).first;
+	eiter = target_.insert(std::make_pair(titer->first, tensor_type::Zero(dimension_, 1))).first;
       
       for (difference_type i = 0; i != titer->second.rows(); ++ i) {
 	const double amount = titer->second.col(0)[i] * x.scale_target_;
 	
-	norm_target_ += 2.0 * eiter->second.col(0)[i] * scale_source_ * amount + amount * amount;
+	norm_target_ += 2.0 * eiter->second.col(0)[i] * scale_target_ * amount + amount * amount;
 	eiter->second.col(0)[i] += amount / scale_target_;
       }
     }
@@ -749,12 +748,13 @@ struct ITGTree
     typedef uint32_t index_type;
     typedef std::vector<index_type, std::allocator<index_type> > edge_set_type;
     
-    Node() : score_(std::numeric_limits<double>::infinity()), total_(0.0) {}
-
+    Node() : score_(std::numeric_limits<double>::infinity()), total_(0.0), logprob_(0.0) {}
+    
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     
     double      score_;
     double      total_;
+    double      logprob_;
     
     tensor_type output_;
     tensor_type output_norm_;
@@ -995,17 +995,23 @@ struct ITGTree
     if (titer == theta.target_.end())
       throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(embedding_target));
     
+    if (siter->second.rows() != dimension)
+      throw std::runtime_error("dimensin does not for the source side");
+    if (titer->second.rows() != dimension)
+      throw std::runtime_error("dimensin does not for the target side");
+    
     const double prob_source_target = lexicon_source_target(embedding_source, embedding_target);
     const double prob_target_source = lexicon_target_source(embedding_target, embedding_source);
-
+    
     const double prob = (embedding_source == vocab_type::EPSILON
 			 ? prob_source_target
 			 : (embedding_target == vocab_type::EPSILON
 			    ? prob_target_source
 			    : std::sqrt(prob_source_target) * std::sqrt(prob_target_source)));
+    const double logprob = std::log(prob);
     
     node.output_norm_ = tensor_type(dimension * 2, 1);
-    node.output_norm_ << siter->second * theta.scale_source_, titer->second * theta.scale_target_;
+    node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
     
     agenda_[parent.size()].push_back(parent);
     
@@ -1026,6 +1032,7 @@ struct ITGTree
     
     node.score_ = e;
     node.total_ = e;
+    node.logprob_ = logprob;
     
     node.reconstruction_ = y_minus_prob;
     node.delta_reconstruction_ = y_sigmoid.array() * (1.0 - y_sigmoid.array()) * node.reconstruction_.array();
@@ -1048,7 +1055,7 @@ struct ITGTree
     const tensor_type b1 = (straight ? theta.bs1_ : theta.bi1_);
     const tensor_type W2 = (straight ? theta.Ws2_ : theta.Wi2_);
     const tensor_type b2 = (straight ? theta.bs2_ : theta.bi2_);
-    
+
     tensor_type c(dimension * 4, 1);
     c << node1.output_norm_, node2.output_norm_;
 
@@ -1060,6 +1067,8 @@ struct ITGTree
       
     // compute reconstruction
     const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
+    
+    const double logprob = node1.logprob_ + node2.logprob_;
     
     // internal representation...
     const tensor_type y_minus_c = y.normalized() - c;
@@ -1073,6 +1082,7 @@ struct ITGTree
     if (e < node.score_) {
       node.score_       = e;
       node.total_       = e + node1.total_ + node2.total_;
+      node.logprob_     = logprob;
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -1288,8 +1298,10 @@ struct LearnAdaGrad
     for (embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter) {
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
-      if (eiter == theta.source_.end())
-	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1))).first;
+      if (eiter == theta.source_.end()) {
+	std::cerr << "WARNING: this should not happen" << std::endl;
+	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
+      }
       
       if (siter->first.id() >= source_.cols()) {
 	const size_type pos_first = source_.cols();
@@ -1308,8 +1320,10 @@ struct LearnAdaGrad
     for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer) {
       embedding_type::iterator eiter = theta.target_.find(titer->first);
       
-      if (eiter == theta.target_.end())
-	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type(theta.dimension_, 1))).first;
+      if (eiter == theta.target_.end()) {
+	std::cerr << "WARNING: this should not happen" << std::endl;
+	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type::Zero(theta.dimension_, 1))).first;
+      }
       
       if (titer->first.id() >= target_.cols()) {
 	const size_type pos_first = target_.cols();
@@ -1444,8 +1458,10 @@ struct LearnL2
     for (embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter) {
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
-      if (eiter == theta.source_.end())
-	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type(theta.dimension_, 1))).first;
+      if (eiter == theta.source_.end()) {
+	std::cerr << "WARNING: this should not happen" << std::endl;
+	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
+      }
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = - siter->second.col(0)[i] * gradient.scale_source_ * eta;
@@ -1459,13 +1475,15 @@ struct LearnL2
     for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer) {
       embedding_type::iterator eiter = theta.target_.find(titer->first);
       
-      if (eiter == theta.target_.end())
-	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type(theta.dimension_, 1))).first;
+      if (eiter == theta.target_.end()) {
+	std::cerr << "WARNING: this should not happen" << std::endl;
+	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type::Zero(theta.dimension_, 1))).first;
+      }
       
       for (difference_type i = 0; i != titer->second.rows(); ++ i) {
 	const double amount = - titer->second.col(0)[i] * gradient.scale_target_ * eta;
 	
-	theta.norm_target_ += 2.0 * eiter->second.col(0)[i] *theta. scale_target_ * amount + amount * amount;
+	theta.norm_target_ += 2.0 * eiter->second.col(0)[i] * theta.scale_target_ * amount + amount * amount;
 	eiter->second.col(0)[i] += amount / theta.scale_target_;
       }
     }
@@ -1490,8 +1508,10 @@ struct LearnL2
       if (norm > 1.0 / lambda_)
 	theta.rescale(std::sqrt((1.0 / lambda_) * (1.0 / norm)), true);
 
+#if 0
       if (theta.scale_source_ < 0.001 || theta.scale_source_ > 1000 || theta.scale_target_ < 0.001 || theta.scale_target_ > 1000)
 	theta.finalize();
+#endif
     }
   }
   
@@ -1524,7 +1544,7 @@ path_type alignment_target_source_file;
 path_type output_model_file;
 
 double lambda = 1.0;
-int dimension = 128;
+int dimension = 16;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
