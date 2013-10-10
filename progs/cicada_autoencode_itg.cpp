@@ -417,7 +417,7 @@ struct Model
     bi2_ = tensor_type::Random(dimension * 4, 1);
     
     // lexical reconstruction
-    Wl3_ = tensor_type::Random(1, dimension);
+    Wl3_ = tensor_type::Random(1, dimension * 2);
     bl3_ = tensor_type::Random(1, 1);
   }
   
@@ -1261,7 +1261,7 @@ struct LearnAdaGrad
     Wi2_ = tensor_type::Zero(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Zero(dimension * 4, 1);
     
-    Wl3_ = tensor_type::Zero(1, dimension);
+    Wl3_ = tensor_type::Zero(1, dimension * 2);
     bl3_ = tensor_type::Zero(1, 1);
   }
   
