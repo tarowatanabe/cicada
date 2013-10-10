@@ -69,6 +69,7 @@
 #include "utils/compress_stream.hpp"
 
 #include <boost/thread.hpp>
+#include <boost/math/special_functions/expm1.hpp>
 
 struct Bitext
 {
@@ -597,6 +598,7 @@ struct ITGTree
 
   typedef Lexicon lexicon_type;
   
+  typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
   
   typedef Bitext bitext_type;
@@ -856,11 +858,14 @@ struct ITGTree
 	  heap_type::iterator hiter_begin = heap_.begin();
 	  heap_type::iterator hiter       = heap_.end();
 	  heap_type::iterator hiter_end   = heap_.end();
-	  
-	  // we will derive those with smaller reconstruction error...
-	  const double threshold = hiter_begin->first + beam_curr;
-	  for (/**/; hiter_begin != hiter && hiter_begin->first < threshold; -- hiter)
-	    std::pop_heap(hiter_begin, hiter, heap_compare());
+
+	  if (length > 2) {
+	    // we will derive those with smaller reconstruction error...
+	    const double threshold = hiter_begin->first + beam_curr;
+	    for (/**/; hiter_begin != hiter && hiter_begin->first < threshold; -- hiter)
+	      std::pop_heap(hiter_begin, hiter, heap_compare());
+	  } else
+	    hiter = hiter_begin;
 	  
 	  //std::cerr << "length: " << length << " beam_curr: " << (hiter_end - hiter) << std::endl;
 	  
@@ -1000,7 +1005,6 @@ struct ITGTree
 			    : std::sqrt(prob_source_target) * std::sqrt(prob_target_source)));
     
     node.output_norm_ = tensor_type(dimension * 2, 1);
-    
     node.output_norm_ << siter->second * theta.scale_source_, titer->second * theta.scale_target_;
     
     agenda_[parent.size()].push_back(parent);
@@ -1011,6 +1015,8 @@ struct ITGTree
     const tensor_type y_minus_prob = y.array() - prob;
     
     const double e = 0.5 * y_minus_prob.squaredNorm();
+    
+    //std::cerr << "y: " << y << " error: " << e << " source: " << embedding_source << " target: " << embedding_target << std::endl;
     
     node.score_ = e;
     node.total_ = e;
@@ -1148,6 +1154,9 @@ struct ITGTree
 	  dtarget = update.block(dimension, 0, dimension, 1);
 	else
 	  dtarget += update.block(dimension, 0, dimension, 1);
+
+	gradient.Wl3_ += node.delta_reconstruction_ * node.output_norm_.transpose();
+	gradient.bl3_ += node.delta_reconstruction_;
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
