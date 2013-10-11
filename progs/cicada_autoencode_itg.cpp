@@ -70,6 +70,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
+#include <boost/math/special_functions/log1p.hpp>
 
 struct Bitext
 {
@@ -725,8 +726,8 @@ struct ITGTree
   typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > derivation_type;
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_derivation_type;
 
-  typedef std::pair<double, span_pair_type> score_span_pair_type;
-  typedef std::vector<score_span_pair_type, std::allocator<score_span_pair_type> > heap_type;
+  typedef std::pair<double, span_pair_type> error_span_pair_type;
+  typedef std::vector<error_span_pair_type, std::allocator<error_span_pair_type> > heap_type;
 
   typedef std::pair<span_pair_type, span_pair_type> tail_set_type;
   
@@ -751,11 +752,11 @@ struct ITGTree
     typedef uint32_t index_type;
     typedef std::vector<index_type, std::allocator<index_type> > edge_set_type;
     
-    Node() : score_(std::numeric_limits<double>::infinity()), total_(0.0), logprob_(0.0) {}
+    Node() : error_(std::numeric_limits<double>::infinity()), total_(0.0), logprob_(0.0) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     
-    double      score_;
+    double      error_;
     double      total_;
     double      logprob_;
     
@@ -765,6 +766,9 @@ struct ITGTree
     
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
+
+    tensor_type lexicon_;
+    tensor_type delta_lexicon_;
     
     tail_set_type tails_;
   };
@@ -787,7 +791,7 @@ struct ITGTree
   // sort by greater item so that we can pop from less
   struct heap_compare
   {
-    bool operator()(const score_span_pair_type& x, const score_span_pair_type& y) const
+    bool operator()(const error_span_pair_type& x, const error_span_pair_type& y) const
     {
       return x.first > y.first;
     }
@@ -851,8 +855,8 @@ struct ITGTree
 	  
 	  span_pair_set_type::const_iterator siter_end = spans.end();
 	  for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
-	    heap_.push_back(score_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
-							siter->target_.first_, siter->target_.last_).score_,
+	    heap_.push_back(error_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
+							siter->target_.first_, siter->target_.last_).error_,
 						 *siter));
 	    
 	    std::push_heap(heap_.begin(), heap_.end(), heap_compare());
@@ -897,7 +901,7 @@ struct ITGTree
 		// span1: SsUu
 		// span2: stuv
 	      
-		if (nodes_(S, s, U, u).score_ == infty) continue;
+		if (nodes_(S, s, U, u).error_ == infty) continue;
 	      
 		const span_pair_type  span1(S, s, U, u);
 		const span_pair_type& span2(span_pair);
@@ -914,7 +918,7 @@ struct ITGTree
 		// span1: SsvU
 		// span2: stuv
 
-		if (nodes_(S, s, v, U).score_ == infty) continue;
+		if (nodes_(S, s, v, U).error_ == infty) continue;
 	      
 		const span_pair_type  span1(S, s, v, U);
 		const span_pair_type& span2(span_pair);
@@ -935,7 +939,7 @@ struct ITGTree
 		// span1: stuv
 		// span2: tSUu
 
-		if (nodes_(t, S, U, u).score_ == infty) continue;
+		if (nodes_(t, S, U, u).error_ == infty) continue;
 	      
 		const span_pair_type& span1(span_pair);
 		const span_pair_type  span2(t, S, U, u);
@@ -952,7 +956,7 @@ struct ITGTree
 		// span1: stuv
 		// span2: tSvU
 	      
-		if (nodes_(t, S, v, U).score_ == infty) continue;
+		if (nodes_(t, S, v, U).error_ == infty) continue;
 	      
 		const span_pair_type& span1(span_pair);
 		const span_pair_type  span2(t, S, v, U);
@@ -965,7 +969,7 @@ struct ITGTree
 	  }
 	}
       
-      if (nodes_(0, source.size(), 0, target.size()).score_ != infty) break;
+      if (nodes_(0, source.size(), 0, target.size()).error_ != infty) break;
 
       std::cerr << "parsing failed: " << beam_curr << std::endl;
       
@@ -1003,54 +1007,45 @@ struct ITGTree
     if (titer->second.rows() != dimension)
       throw std::runtime_error("dimensin does not for the target side");
     
-#if 0
     const double prob_source_target = lexicon_source_target(embedding_source, embedding_target);
     const double prob_target_source = lexicon_target_source(embedding_target, embedding_source);
     
-    const double prob = (embedding_source == vocab_type::EPSILON
-			 ? prob_source_target
-			 : (embedding_target == vocab_type::EPSILON
-			    ? prob_target_source
-			    : prob_source_target * prob_target_source));
-    const double logprob = std::log(prob);
-#endif
+    const double prob_lexicon = (embedding_source == vocab_type::EPSILON
+				 ? prob_source_target
+				 : (embedding_target == vocab_type::EPSILON
+				    ? prob_target_source
+				    : prob_source_target * prob_target_source));
     
+    const double logprob = std::log(prob_lexicon);
+    const double prob = std::exp(logprob / parent.size());
 
-    node.score_ = 0.0;
-    node.total_ = 0.0;
     node.output_norm_ = tensor_type(dimension * 2, 1);
     node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
     
-    agenda_[parent.size()].push_back(parent);
+    const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wl3_ * node.output_norm_ + theta.bl3_)(0, 0)))),
+					std::log(1.0 - 1e-10));
+    const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
     
+    const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
+
 #if 0
-    // compute reconstruction: we will apply sigmoid function
-    const double y = std::min(1.0 / (1.0 + std::exp(- double((theta.Wl3_ * node.output_norm_ + theta.bl3_)(0, 0)))),
-			      1.0 - 1e-10);
-    const double y_sigmoid = 1.0 / (1.0 + std::exp(- y));
-    const double cross_entropy = - prob * std::log(y) - (1.0 - prob) * std::log(1.0 - y);
-    
+    std::cerr << "prob: " << prob
+	      << " lexicon: " << std::exp(log_lexicon)
+	      << " sigmoid: " << std::exp(log_sigmoid)
+	      << " cross-entropy: " << cross_entropy
+	      << std::endl;
+#endif
+
     const double e = cross_entropy;
-#endif
     
-#if 0
-    std::cerr << "y: " << y
-	      << " prob: " << prob
-	      << " error: " << e
-	      << " source: " << embedding_source
-	      << " target: " << embedding_target << std::endl;
-#endif
-    
-#if 0
-    node.score_ = e;
+    node.error_ = e;
     node.total_ = e;
     node.logprob_ = logprob;
     
-    node.reconstruction_ = tensor_type::Constant(1, 1, - prob / y + (1.0 - prob) / (1.0 - y));
-    node.delta_reconstruction_ = tensor_type::Constant(1, 1, y_sigmoid * (1.0 - y_sigmoid) * node.reconstruction_(0, 0));
-#endif
-
-    //std::cerr << "reconstruction: " << node.reconstruction_(0,0) << std::endl;
+    node.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
+    node.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * node.lexicon_(0, 0));
+    
+    agenda_[parent.size()].push_back(parent);
   }
   
   // binary rules
@@ -1074,12 +1069,12 @@ struct ITGTree
     if (node1.output_norm_.rows() != dimension * 2)
       std::cerr << "dimension does not match for child1: "
 		<< parent << " : " << child1 << " + " << child2 << std::endl
-		<< "score1: " << node1.score_ << " score2: " << node2.score_ << std::endl;
+		<< "error1: " << node1.error_ << " error2: " << node2.error_ << std::endl;
     
     if (node2.output_norm_.rows() != dimension * 2)
       std::cerr << "dimension does not match for child2: "
 		<< parent << " : " << child1 << " + " << child2 << std::endl
-		<< "score1: " << node1.score_ << " score2: " << node2.score_ << std::endl;
+		<< "error1: " << node1.error_ << " error2: " << node2.error_ << std::endl;
     
 
     tensor_type c(dimension * 4, 1);
@@ -1094,24 +1089,40 @@ struct ITGTree
     // compute reconstruction
     const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
     
-    //const double logprob = node1.logprob_ + node2.logprob_;
-    
     // internal representation...
     const tensor_type y_minus_c = y.normalized() - c;
     
+    // for lexical error:
+    const double logprob = node1.logprob_ + node2.logprob_;
+    const double prob = std::exp(logprob / parent.size());
+    
+    const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wl3_ * p_norm + theta.bl3_)(0, 0)))),
+					std::log(1.0 - 1e-10));
+    const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
+        
+    const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
+    
+#if 0
+    std::cerr << "prob: " << prob
+	      << " log-lexicon: " << log_lexicon
+	      << " log-sigmoid: " << log_sigmoid
+	      << " cross-entropy: " << cross_entropy
+	      << std::endl;
+#endif
+
     // representation error
-    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm() + cross_entropy;
     
     const double infty = std::numeric_limits<double>::infinity();
     
-    if (e < node.score_) {
+    if (e < node.error_) {
 
-      if (node.score_ == infty)
+      if (node.error_ == infty)
 	agenda_[parent.size()].push_back(parent);
-
-      node.score_       = e;
+      
+      node.error_       = e;
       node.total_       = e + node1.total_ + node2.total_;
-      //node.logprob_     = logprob;
+      node.logprob_     = logprob;
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -1119,6 +1130,9 @@ struct ITGTree
       
       // 1 - x * x for tanh!
       node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
+      
+      node.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
+      node.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * node.lexicon_(0, 0));
       
       node.tails_.first  = child1;
       node.tails_.second = child2;
@@ -1176,9 +1190,11 @@ struct ITGTree
 	
 	if (root || left)
 	  update = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		    + theta.Wl3_.transpose() * node.delta_lexicon_
 		    - reconstruction.block(0, 0, dimension * 2, 1));
 	else
 	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		    + theta.Wl3_.transpose() * node.delta_lexicon_
 		    - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
 	
 	tensor_type& dsource = (! span.source_.empty()
@@ -1198,8 +1214,8 @@ struct ITGTree
 	else
 	  dtarget += update.block(dimension, 0, dimension, 1);
 	
-	//gradient.Wl3_ += node.delta_reconstruction_ * node.output_norm_.transpose();
-	//gradient.bl3_ += node.delta_reconstruction_;
+	gradient.Wl3_ += node.delta_lexicon_ * node.output_norm_.transpose();
+	gradient.bl3_ += node.delta_lexicon_;
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
@@ -1215,11 +1231,13 @@ struct ITGTree
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+			     + theta.Wl3_.transpose() * node.delta_lexicon_
 			     - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+			     + theta.Wl3_.transpose() * node.delta_lexicon_
 			     - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	node2.delta_ = node1.delta_;
 	
@@ -1237,8 +1255,11 @@ struct ITGTree
 	
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
 	
+	gradient.Wl3_ += node.delta_lexicon_ * node.output_norm_.transpose();
+	
 	db1 += delta;
 	db2 += node.delta_reconstruction_;
+	gradient.bl3_ += node.delta_lexicon_;
       }
     }
   }
@@ -2063,7 +2084,7 @@ struct TaskAccumulate
 
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 
-	const bool parsed = (root.score_ != std::numeric_limits<double>::infinity());
+	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
 	
 	if (parsed) {
 	  itg_tree_.backward(source, target, theta_, gradient_);
