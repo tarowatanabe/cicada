@@ -18,11 +18,9 @@
 
 // currently, we learn and output the last derivation in a format similar to pialign:
 //
-// < [ "word" "word" ] < "word" "word" > >
+// < [ ((( word |||  word ))) ] <  ((( word ||| word ))) > >
 //
 // [ ] indicates straight and < > indicates inversion.
-// All the words are c-style double quoted, including SGML tags.
-//
 
 // we will try four learning algorithms:
 //
