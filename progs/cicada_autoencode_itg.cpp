@@ -109,93 +109,6 @@ namespace std
   }
 };
 
-struct Lexicon
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef double parameter_type;
-  
-  typedef Bitext bitext_type;
-  
-  typedef bitext_type::word_type word_type;
-  typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
-
-  typedef boost::filesystem::path path_type;
-
-  typedef utils::compact_map<word_type, parameter_type,
-			     utils::unassigned<word_type>, utils::unassigned<word_type>,
-			     boost::hash<word_type>, std::equal_to<word_type>,
-			     std::allocator<std::pair<const word_type, parameter_type> > > mapped_type;
-
-  typedef utils::alloc_vector<mapped_type, std::allocator<mapped_type> > lexicon_type;
-
-  Lexicon() : smooth(1e-7) {}
-  Lexicon(const path_type& path) : smooth(1e-7) { read(path); }
-
-  parameter_type operator()(const word_type& source, const word_type& target) const
-  {
-    if (source == vocab_type::BOS || source == vocab_type::EOS
-	|| target == vocab_type::BOS || target == vocab_type::EOS)
-      return source == target;
-    
-    if (! lexicon.exists(source.id())) return smooth;
-    
-    const mapped_type& mapped = lexicon[source.id()];
-    
-    mapped_type::const_iterator miter = mapped.find(target);
-    
-    return (miter == mapped.end() ? smooth : miter->second);
-  }
-
-  void read(const path_type& path)
-  {
-    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
-    typedef boost::spirit::istream_iterator iterator_type;
-    
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
-    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
-    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
-    
-    word   %= qi::lexeme[+(standard::char_ - standard::space)];
-    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
-    
-    smooth = 1e-7;
-    lexicon.clear();
-    
-    utils::compress_istream is(path, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
-    
-    iterator_type iter(is);
-    iterator_type iter_end;
-    
-    lexicon_parsed_type lexicon_parsed;
-    
-    while (iter != iter_end) {
-      boost::fusion::get<0>(lexicon_parsed).clear();
-      boost::fusion::get<1>(lexicon_parsed).clear();
-      
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
-	if (iter != iter_end)
-	  throw std::runtime_error("global lexicon parsing failed");
-      
-      const word_type target(boost::fusion::get<0>(lexicon_parsed));
-      const word_type source(boost::fusion::get<1>(lexicon_parsed));
-      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
-      
-      lexicon[source.id()][target] = prob;
-      smooth = std::min(smooth, prob);
-    }
-    
-    lexicon.shrink();
-  }
-
-  lexicon_type lexicon;
-  parameter_type smooth;
-};
 
 struct Model
 {
@@ -268,9 +181,6 @@ struct Model
     Wi2_ += x.Wi2_;
     bi2_ += x.bi2_;
     
-    Wl3_ += x.Wl3_;
-    bl3_ += x.bl3_;
-
     return *this;
   }
   
@@ -294,9 +204,6 @@ struct Model
     bs2_.setZero();
     Wi2_.setZero();
     bi2_.setZero();
-
-    Wl3_.setZero();
-    bl3_.setZero();
   }
 
   void finalize()
@@ -357,16 +264,12 @@ struct Model
     Ws2_ *= scaling;
     Wi2_ *= scaling;
     
-    Wl3_ *= scaling;
-    
     if (! ignore_bias) {
       bs1_ *= scaling;
       bi1_ *= scaling;
       
       bs2_ *= scaling;
       bi2_ *= scaling;
-
-      bl3_ *= scaling;
     }
   }
 
@@ -380,16 +283,12 @@ struct Model
     norm += Ws2_.squaredNorm();
     norm += Wi2_.squaredNorm();
 
-    norm += Wl3_.squaredNorm();
-    
     if (! ignore_bias) {
       norm += bs1_.squaredNorm();
       norm += bi1_.squaredNorm();
       
       norm += bs2_.squaredNorm();
       norm += bi2_.squaredNorm();
-
-      norm += bl3_.squaredNorm();
     }
     
     return norm;
@@ -419,10 +318,6 @@ struct Model
     bs2_ = tensor_type::Random(dimension * 4, 1);
     Wi2_ = tensor_type::Random(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Random(dimension * 4, 1);
-    
-    // lexical reconstruction
-    Wl3_ = tensor_type::Random(1, dimension * 2);
-    bl3_ = tensor_type::Random(1, 1);
   }
   
   template <typename Iterator>
@@ -534,9 +429,6 @@ struct Model
     write(rep.path("bs2.txt.gz"), rep.path("bs2.bin"), bs2_);
     write(rep.path("Wi2.txt.gz"), rep.path("Wi2.bin"), Wi2_);
     write(rep.path("bi2.txt.gz"), rep.path("bi2.bin"), bi2_);
-    
-    write(rep.path("Wl3.txt.gz"), rep.path("Wl3.bin"), Wl3_);
-    write(rep.path("bl3.txt.gz"), rep.path("bl3.bin"), bl3_);
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -584,10 +476,6 @@ struct Model
   tensor_type bs2_;
   tensor_type Wi2_;
   tensor_type bi2_;
-  
-  // Wl3 aqnd bl3 for lexical reconstruction
-  tensor_type Wl3_;
-  tensor_type bl3_;
 };
 
 
@@ -599,8 +487,6 @@ struct ITGTree
   typedef Model model_type;
   typedef Model gradient_type;
 
-  typedef Lexicon lexicon_type;
-  
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
   
@@ -752,13 +638,12 @@ struct ITGTree
     typedef uint32_t index_type;
     typedef std::vector<index_type, std::allocator<index_type> > edge_set_type;
     
-    Node() : error_(std::numeric_limits<double>::infinity()), total_(0.0), logprob_(0.0) {}
+    Node() : error_(std::numeric_limits<double>::infinity()), total_(0.0) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     
     double      error_;
     double      total_;
-    double      logprob_;
     
     tensor_type output_;
     tensor_type output_norm_;
@@ -767,9 +652,6 @@ struct ITGTree
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
 
-    tensor_type lexicon_;
-    tensor_type delta_lexicon_;
-    
     tail_set_type tails_;
   };
   
@@ -800,8 +682,6 @@ struct ITGTree
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta,
-	       const lexicon_type& lexicon_source_target,
-	       const lexicon_type& lexicon_target_source,
 	       const double beam)
   {
     const size_type source_size = source.size();
@@ -824,17 +704,17 @@ struct ITGTree
 	  // epsilon at target
 	  if (src < source_size)
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)),
-		    theta, lexicon_source_target, lexicon_target_source);
+		    theta);
 	  
 	  // epsilon at source
 	  if (trg < target_size)
 	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)),
-		    theta, lexicon_source_target, lexicon_target_source);
+		    theta);
 	  
 	  // word-pair
 	  if (src < source_size && trg < target_size)
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)),
-		    theta, lexicon_source_target, lexicon_target_source);
+		    theta);
 	}
 
     // iterate!
@@ -982,9 +862,7 @@ struct ITGTree
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& parent,
-	       const model_type& theta,
-	       const lexicon_type& lexicon_source_target,
-	       const lexicon_type& lexicon_target_source)
+	       const model_type& theta)
   {
     typedef model_type::embedding_type embedding_type;
     
@@ -1008,44 +886,12 @@ struct ITGTree
     if (titer->second.rows() != dimension)
       throw std::runtime_error("dimensin does not for the target side");
     
-    const double prob_source_target = lexicon_source_target(embedding_source, embedding_target);
-    const double prob_target_source = lexicon_target_source(embedding_target, embedding_source);
-    
-    const double prob_lexicon = (embedding_source == vocab_type::EPSILON
-				 ? prob_source_target
-				 : (embedding_target == vocab_type::EPSILON
-				    ? prob_target_source
-				    : prob_source_target * prob_target_source));
-    
-    const double logprob = std::log(prob_lexicon);
-    const double prob = std::exp(logprob / parent.size());
+    node.error_ = 0;
+    node.total_ = 0;
 
     node.output_norm_ = tensor_type(dimension * 2, 1);
     node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
-    
-    const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wl3_ * node.output_norm_ + theta.bl3_)(0, 0)))),
-					std::log(1.0 - 1e-10));
-    const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
-    
-    const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
-
-#if 0
-    std::cerr << "prob: " << prob
-	      << " lexicon: " << std::exp(log_lexicon)
-	      << " sigmoid: " << std::exp(log_sigmoid)
-	      << " cross-entropy: " << cross_entropy
-	      << std::endl;
-#endif
-
-    const double e = cross_entropy;
-    
-    node.error_ = e;
-    node.total_ = e;
-    node.logprob_ = logprob;
-    
-    node.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
-    node.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * node.lexicon_(0, 0));
-    
+        
     agenda_[parent.size()].push_back(parent);
   }
   
@@ -1093,26 +939,8 @@ struct ITGTree
     // internal representation...
     const tensor_type y_minus_c = y.normalized() - c;
     
-    // for lexical error:
-    const double logprob = node1.logprob_ + node2.logprob_;
-    const double prob = std::exp(logprob / parent.size());
-    
-    const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wl3_ * p_norm + theta.bl3_)(0, 0)))),
-					std::log(1.0 - 1e-10));
-    const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
-        
-    const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
-    
-#if 0
-    std::cerr << "prob: " << prob
-	      << " log-lexicon: " << log_lexicon
-	      << " log-sigmoid: " << log_sigmoid
-	      << " cross-entropy: " << cross_entropy
-	      << std::endl;
-#endif
-
     // representation error
-    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm() + cross_entropy;
+    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
     
     const double infty = std::numeric_limits<double>::infinity();
     
@@ -1123,7 +951,6 @@ struct ITGTree
       
       node.error_       = e;
       node.total_       = e + node1.total_ + node2.total_;
-      node.logprob_     = logprob;
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -1131,9 +958,6 @@ struct ITGTree
       
       // 1 - x * x for tanh!
       node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
-      
-      node.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
-      node.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * node.lexicon_(0, 0));
       
       node.tails_.first  = child1;
       node.tails_.second = child2;
@@ -1191,11 +1015,9 @@ struct ITGTree
 	
 	if (root || left)
 	  update = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		    + theta.Wl3_.transpose() * node.delta_lexicon_
 		    - reconstruction.block(0, 0, dimension * 2, 1));
 	else
 	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		    + theta.Wl3_.transpose() * node.delta_lexicon_
 		    - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
 	
 	tensor_type& dsource = (! span.source_.empty()
@@ -1214,9 +1036,6 @@ struct ITGTree
 	  dtarget = update.block(dimension, 0, dimension, 1);
 	else
 	  dtarget += update.block(dimension, 0, dimension, 1);
-	
-	gradient.Wl3_ += node.delta_lexicon_ * node.output_norm_.transpose();
-	gradient.bl3_ += node.delta_lexicon_;
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
@@ -1232,13 +1051,11 @@ struct ITGTree
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-			     + theta.Wl3_.transpose() * node.delta_lexicon_
 			     - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-			     + theta.Wl3_.transpose() * node.delta_lexicon_
 			     - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	node2.delta_ = node1.delta_;
 	
@@ -1256,11 +1073,8 @@ struct ITGTree
 	
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
 	
-	gradient.Wl3_ += node.delta_lexicon_ * node.output_norm_.transpose();
-	
 	db1 += delta;
 	db2 += node.delta_reconstruction_;
-	gradient.bl3_ += node.delta_lexicon_;
       }
     }
   }
@@ -1334,9 +1148,6 @@ struct LearnAdaGrad
     bs2_ = tensor_type::Zero(dimension * 4, 1);
     Wi2_ = tensor_type::Zero(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Zero(dimension * 4, 1);
-    
-    Wl3_ = tensor_type::Zero(1, dimension * 2);
-    bl3_ = tensor_type::Zero(1, 1);
   }
   
   void operator()(model_type& theta, const gradient_type& gradient) const
@@ -1396,9 +1207,6 @@ struct LearnAdaGrad
     update(theta.bs2_, bs2_, gradient.bs2_, false);
     update(theta.Wi2_, Wi2_, gradient.Wi2_, lambda_ != 0.0);
     update(theta.bi2_, bi2_, gradient.bi2_, false);
-    
-    update(theta.Wl3_, Wl3_, gradient.Wl3_, lambda_ != 0.0);
-    update(theta.bl3_, bl3_, gradient.bl3_, false);    
   }
 
   struct update_visitor_regularize
@@ -1466,9 +1274,6 @@ struct LearnAdaGrad
   tensor_type bs2_;
   tensor_type Wi2_;
   tensor_type bi2_;
-
-  tensor_type Wl3_;
-  tensor_type bl3_;
 };
 
 struct LearnL2
@@ -1547,9 +1352,6 @@ struct LearnL2
     theta.Wi2_.array() -= gradient.Wi2_.array() * eta;
     theta.bi2_.array() -= gradient.bi2_.array() * eta;
     
-    theta.Wl3_.array() -= gradient.Wl3_.array() * eta;
-    theta.bl3_.array() -= gradient.bl3_.array() * eta;
-    
     // projection onto L2 norm..
     if (lambda_ != 0.0) {
       const double norm = theta.squared_norm(true);
@@ -1575,7 +1377,6 @@ typedef Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
 typedef Model model_type;
-typedef Lexicon lexicon_type;
 
 static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
@@ -1583,9 +1384,6 @@ static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type source_file;
 path_type target_file;
-
-path_type lexicon_source_target_file;
-path_type lexicon_target_source_file;
 
 path_type derivation_file;
 path_type alignment_source_target_file;
@@ -1613,13 +1411,9 @@ int debug = 0;
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  model_type& theta,
-		  const lexicon_type& lexicon_source_target,
-		  const lexicon_type& lexicon_target_source);
+		  model_type& theta);
 void derivation(const bitext_set_type& bitexts,
-		const model_type& theta,
-		const lexicon_type& lexicon_source_target,
-		const lexicon_type& lexicon_target_source);
+		const model_type& theta);
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
 	       bitext_set_type& bitexts);
@@ -1658,33 +1452,16 @@ int main(int argc, char** argv)
     
     theta.embedding(bitexts.begin(), bitexts.end());
 
-    lexicon_type lexicon_source_target;
-    lexicon_type lexicon_target_source;
-
-    if (! lexicon_source_target_file.empty()) {
-      if (! boost::filesystem::exists(lexicon_source_target_file))
-	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_source_target_file.string());
-
-      lexicon_source_target.read(lexicon_source_target_file);
-    }
-
-    if (! lexicon_target_source_file.empty()) {
-      if (! boost::filesystem::exists(lexicon_target_source_file))
-	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_target_source_file.string());
-
-      lexicon_target_source.read(lexicon_target_source_file);
-    }    
-    
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnAdaGrad(dimension, lambda, eta0), bitexts, theta);
       else
-	learn_online(LearnL2(lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnL2(lambda, eta0), bitexts, theta);
     }
     
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
-      derivation(bitexts, theta, lexicon_source_target, lexicon_target_source);
+      derivation(bitexts, theta);
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -2035,8 +1812,6 @@ struct TaskAccumulate
 
   TaskAccumulate(const bitext_set_type& bitexts,
 		 const model_type& theta,
-		 const lexicon_type& lexicon_source_target,
-		 const lexicon_type& lexicon_target_source,
 		 const double& beam,
 		 queue_type& queue,
 		 counter_type& counter,
@@ -2044,8 +1819,6 @@ struct TaskAccumulate
 		 queue_derivation_type& queue_alignment)
     : bitexts_(bitexts),
       theta_(theta),
-      lexicon_source_target_(lexicon_source_target),
-      lexicon_target_source_(lexicon_target_source),
       beam_(beam),
       queue_(queue),
       counter_(counter),
@@ -2081,7 +1854,7 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, lexicon_source_target_, lexicon_target_source_, beam_);
+	itg_tree_.forward(source, target, theta_, beam_);
 
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 
@@ -2116,8 +1889,6 @@ struct TaskAccumulate
 
   const bitext_set_type& bitexts_;
   const model_type& theta_;
-  const lexicon_type& lexicon_source_target_;
-  const lexicon_type& lexicon_target_source_;
   const double beam_;
   
   queue_type&            queue_;
@@ -2161,9 +1932,7 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  model_type& theta,
-		  const lexicon_type& lexicon_source_target,
-		  const lexicon_type& lexicon_target_source)
+		  model_type& theta)
 {
   typedef TaskAccumulate task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -2183,7 +1952,7 @@ void learn_online(const Learner& learner,
   output_map_reduce_type::queue_type queue_alignment;
   
   task_set_type tasks(threads, task_type(bitexts,
-					 theta, lexicon_source_target, lexicon_target_source, beam,
+					 theta, beam,
 					 mapper, reducer, queue_derivation, queue_alignment));
   
   id_set_type ids(bitexts.size());
@@ -2289,9 +2058,7 @@ void learn_online(const Learner& learner,
 
 // TODO!
 void derivation(const bitext_set_type& bitexts,
-		const model_type& theta,
-		const lexicon_type& lexicon_source_target,
-		const lexicon_type& lexicon_target_source)
+		const model_type& theta)
 {
   
   
@@ -2332,10 +2099,7 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("source",    po::value<path_type>(&source_file),    "source file")
     ("target",    po::value<path_type>(&target_file),    "target file")
-    
-    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),  "lexicon model for P(target | source)")
-    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),  "lexicon model for P(source | target)")
-    
+        
     ("derivation",               po::value<path_type>(&derivation_file),               "output derivation")
     ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "output alignemnt for P(target | source)")
     ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "output alignemnt for P(source | target)")
