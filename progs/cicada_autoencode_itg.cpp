@@ -639,6 +639,7 @@ struct ITGTree
     Node() : error_(std::numeric_limits<double>::infinity()), total_(0.0) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
+    bool straight() const { return tails_.first.target_.last_ == tails_.second.target_.first_; }
     
     double      error_;
     double      total_;
@@ -1060,11 +1061,13 @@ struct ITGTree
 	// accumulate based on the deltas
 	
 	const tensor_type& delta = node1.delta_;
+
+	const bool straight_child = node.straight();
 	
-	tensor_type& dW1 = ((root || straight) ? gradient.Ws1_ : gradient.Wi1_);
-	tensor_type& dW2 = ((root || straight) ? gradient.Ws2_ : gradient.Wi2_);
-	tensor_type& db1 = ((root || straight) ? gradient.bs1_ : gradient.bi1_);
-	tensor_type& db2 = ((root || straight) ? gradient.bs2_ : gradient.bi2_);
+	tensor_type& dW1 = (straight_child ? gradient.Ws1_ : gradient.Wi1_);
+	tensor_type& dW2 = (straight_child ? gradient.Ws2_ : gradient.Wi2_);
+	tensor_type& db1 = (straight_child ? gradient.bs1_ : gradient.bi1_);
+	tensor_type& db2 = (straight_child ? gradient.bs2_ : gradient.bi2_);
 	
 	dW1.block(0, 0, dimension * 2, dimension * 2)             += delta * node1.output_norm_.transpose();
 	dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_norm_.transpose();
