@@ -6,7 +6,7 @@
 # libtool related stuff
 .libs
 .deps
-
+.dirstamp
 
 ## ignore backup
 *~
