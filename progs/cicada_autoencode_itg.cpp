@@ -1941,7 +1941,7 @@ void learn_online(const Learner& learner,
 
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputDerivation output_derivation_type;
-  typedef OutputAlignment  output_alignemnt_type;
+  typedef OutputAlignment  output_alignment_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
@@ -1952,8 +1952,12 @@ void learn_online(const Learner& learner,
   output_map_reduce_type::queue_type queue_alignment;
   
   task_set_type tasks(threads, task_type(bitexts,
-					 theta, beam,
-					 mapper, reducer, queue_derivation, queue_alignment));
+					 theta,
+					 beam,
+					 mapper,
+					 reducer,
+					 queue_derivation,
+					 queue_alignment));
   
   id_set_type ids(bitexts.size());
   for (size_type i = 0; i != ids.size(); ++ i)
@@ -1973,7 +1977,7 @@ void learn_online(const Learner& learner,
 							   ? add_suffix(derivation_file, iter_tag)
 							   : path_type(),
 							   queue_derivation));
-    boost::thread output_alignment(output_alignemnt_type(! alignment_source_target_file.empty() && dump_mode
+    boost::thread output_alignment(output_alignment_type(! alignment_source_target_file.empty() && dump_mode
 							 ? add_suffix(alignment_source_target_file, iter_tag)
 							 : path_type(),
 							 ! alignment_target_source_file.empty() && dump_mode
@@ -2056,14 +2060,147 @@ void learn_online(const Learner& learner,
   theta.finalize();
 }
 
-// TODO!
+struct TaskDerivation
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model model_type;
+  typedef Model gradient_type;
+
+  typedef ITGTree itg_tree_type;
+  
+  typedef bitext_type::word_type word_type;
+  typedef bitext_type::sentence_type sentence_type;
+  typedef bitext_type::vocab_type vocab_type;
+
+  typedef OutputMapReduce output_map_reduce_type;
+
+  typedef output_map_reduce_type::bitext_derivation_type bitext_derivation_type;
+  typedef output_map_reduce_type::queue_type queue_derivation_type;
+
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
+  
+  TaskDerivation(const bitext_set_type& bitexts,
+		 const model_type& theta,
+		 const double& beam,
+		 queue_type& queue,
+		 queue_derivation_type& queue_derivation,
+		 queue_derivation_type& queue_alignment)
+    : bitexts_(bitexts),
+      theta_(theta),
+      beam_(beam),
+      queue_(queue),
+      queue_derivation_(queue_derivation),
+      queue_alignment_(queue_alignment) {}
+  
+  void operator()()
+  {
+    bitext_derivation_type bitext_derivation;
+    
+    size_type bitext_id;
+    for (;;) {
+      queue_.pop(bitext_id);
+      
+      if (bitext_id == size_type(-1)) break;
+      
+      const sentence_type& source = bitexts_[bitext_id].source_;
+      const sentence_type& target = bitexts_[bitext_id].target_;
+      
+      bitext_derivation.id_     = bitext_id;
+      bitext_derivation.bitext_ = bitexts_[bitext_id];
+      bitext_derivation.derivation_.clear();
+      
+      if (! source.empty() && ! target.empty()) {
+
+#if 0
+	std::cerr << "source: " << source << std::endl
+		  << "target: " << target << std::endl;
+#endif
+	
+	itg_tree_.forward(source, target, theta_, beam_);
+	
+	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
+	
+	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
+	
+	if (parsed)
+	  itg_tree_.derivation(source, target, bitext_derivation.derivation_);
+	else
+	  std::cerr << "failed parsing: " << std::endl
+		    << "source: " << source << std::endl
+		    << "target: " << target << std::endl;
+      }
+      
+      queue_derivation_.push(bitext_derivation);
+      queue_alignment_.push(bitext_derivation);
+    }
+  }
+
+  const bitext_set_type& bitexts_;
+  const model_type& theta_;
+  const double beam_;
+  
+  queue_type&            queue_;
+  queue_derivation_type& queue_derivation_;
+  queue_derivation_type& queue_alignment_;
+  
+  itg_tree_type itg_tree_;
+};
+
 void derivation(const bitext_set_type& bitexts,
 		const model_type& theta)
 {
+  typedef TaskDerivation task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   
+  typedef task_type::size_type size_type;
   
+  typedef OutputMapReduce  output_map_reduce_type;
+  typedef OutputDerivation output_derivation_type;
+  typedef OutputAlignment  output_alignment_type;
+
+  task_type::queue_type   mapper(256 * threads);
+  output_map_reduce_type::queue_type queue_derivation;
+  output_map_reduce_type::queue_type queue_alignment;
   
+  task_set_type tasks(threads, task_type(bitexts,
+					 theta,
+					 beam,
+					 mapper,
+					 queue_derivation,
+					 queue_alignment));
+
+  boost::thread_group workers;
+  for (size_type i = 0; i != tasks.size(); ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
+  boost::thread_group workers_dump;
+  workers_dump.add_thread(new boost::thread(output_derivation_type(! derivation_file.empty()
+								   ? derivation_file
+								   : path_type(),
+								   queue_derivation)));
+  workers_dump.add_thread(new boost::thread(output_alignment_type(! alignment_source_target_file.empty()
+								  ? alignment_source_target_file
+								  : path_type(),
+								  ! alignment_target_source_file.empty()
+								  ? alignment_target_source_file
+								  : path_type(),
+								  queue_alignment)));
+  
+  for (size_type i = 0; i != bitexts.size(); ++ i)
+    mapper.push(i);
+  
+  // termination
+  for (size_type i = 0; i != tasks.size(); ++ i)
+    mapper.push(size_type(-1));
+  
+  workers.join_all();
+
+  queue_derivation.push(output_map_reduce_type::value_type());
+  queue_alignment.push(output_map_reduce_type::value_type());
+  
+  workers_dump.join_all();
 }
 
 void read_data(const path_type& source_file,
