@@ -179,6 +179,11 @@ struct Model
     Wi2_ += x.Wi2_;
     bi2_ += x.bi2_;
     
+    Wl1_ += x.Wl1_;
+    bl1_ += x.bl1_;
+    Wl2_ += x.Wl2_;
+    bl2_ += x.bl2_;
+    
     return *this;
   }
   
@@ -202,6 +207,11 @@ struct Model
     bs2_.setZero();
     Wi2_.setZero();
     bi2_.setZero();
+
+    Wl1_.setZero();
+    bl1_.setZero();
+    Wl2_.setZero();
+    bl2_.setZero();    
   }
 
   void finalize()
@@ -261,6 +271,9 @@ struct Model
     
     Ws2_ *= scaling;
     Wi2_ *= scaling;
+
+    Wl1_ *= scaling;
+    Wl2_ *= scaling;
     
     if (! ignore_bias) {
       bs1_ *= scaling;
@@ -268,6 +281,9 @@ struct Model
       
       bs2_ *= scaling;
       bi2_ *= scaling;
+
+      bl1_ *= scaling;
+      bl2_ *= scaling;
     }
   }
 
@@ -281,12 +297,18 @@ struct Model
     norm += Ws2_.squaredNorm();
     norm += Wi2_.squaredNorm();
 
+    norm += Wl1_.squaredNorm();
+    norm += Wl2_.squaredNorm();
+    
     if (! ignore_bias) {
       norm += bs1_.squaredNorm();
       norm += bi1_.squaredNorm();
       
       norm += bs2_.squaredNorm();
       norm += bi2_.squaredNorm();
+      
+      norm += bl1_.squaredNorm();
+      norm += bl2_.squaredNorm();
     }
     
     return norm;
@@ -316,6 +338,14 @@ struct Model
     bs2_ = tensor_type::Random(dimension * 4, 1);
     Wi2_ = tensor_type::Random(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Random(dimension * 4, 1);
+    
+    // lexicon
+    Wl1_ = tensor_type::Random(dimension * 2, dimension * 2);
+    bl1_ = tensor_type::Random(dimension * 2, 1);
+    
+    // lexicon reconstruction
+    Wl2_ = tensor_type::Random(dimension * 2, dimension * 2);
+    bl2_ = tensor_type::Random(dimension * 2, 1);
   }
   
   template <typename Iterator>
@@ -427,6 +457,12 @@ struct Model
     write(rep.path("bs2.txt.gz"), rep.path("bs2.bin"), bs2_);
     write(rep.path("Wi2.txt.gz"), rep.path("Wi2.bin"), Wi2_);
     write(rep.path("bi2.txt.gz"), rep.path("bi2.bin"), bi2_);
+
+    write(rep.path("Wl1.txt.gz"), rep.path("Wl1.bin"), Wl1_);
+    write(rep.path("bl1.txt.gz"), rep.path("bl1.bin"), bl1_);
+
+    write(rep.path("Wl2.txt.gz"), rep.path("Wl2.bin"), Wl2_);
+    write(rep.path("bl2.txt.gz"), rep.path("bl2.bin"), bl2_);
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -474,6 +510,14 @@ struct Model
   tensor_type bs2_;
   tensor_type Wi2_;
   tensor_type bi2_;
+  
+  // Wl1 and bl1 for encoding
+  tensor_type Wl1_;
+  tensor_type bl1_;
+  
+  // Wl2 and bl2 for reconstruction
+  tensor_type Wl2_;
+  tensor_type bl2_;  
 };
 
 
@@ -636,7 +680,9 @@ struct ITGTree
     typedef uint32_t index_type;
     typedef std::vector<index_type, std::allocator<index_type> > edge_set_type;
     
-    Node() : error_(std::numeric_limits<double>::infinity()), total_(0.0) {}
+    Node()
+      : error_(std::numeric_limits<double>::infinity()),
+	total_(std::numeric_limits<double>::infinity()) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     bool straight() const { return tails_.first.target_.last_ == tails_.second.target_.first_; }
@@ -644,6 +690,7 @@ struct ITGTree
     double      error_;
     double      total_;
     
+    tensor_type input_;
     tensor_type output_;
     tensor_type output_norm_;
     tensor_type delta_;
@@ -733,7 +780,7 @@ struct ITGTree
 	  span_pair_set_type::const_iterator siter_end = spans.end();
 	  for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
 	    heap_.push_back(error_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
-							siter->target_.first_, siter->target_.last_).error_,
+							siter->target_.first_, siter->target_.last_).total_, // use of total error?
 						 *siter));
 	    
 	    std::push_heap(heap_.begin(), heap_.end(), heap_compare());
@@ -884,14 +931,50 @@ struct ITGTree
       throw std::runtime_error("dimensin does not for the source side");
     if (titer->second.rows() != dimension)
       throw std::runtime_error("dimensin does not for the target side");
-    
-    node.error_ = 0;
-    node.total_ = 0;
+
+#if 0
+    node.error_       = 0;
+    node.total_       = 0;
 
     node.output_norm_ = tensor_type(dimension * 2, 1);
     node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
         
     agenda_[parent.size()].push_back(parent);
+#endif
+
+#if 1   
+    node.input_ = tensor_type(dimension * 2, 1);
+    node.input_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
+    
+    const tensor_type& c = node.input_;
+    
+    // actual values to be propagated
+    const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+    
+    // internal representation...
+    const tensor_type p_norm = p.normalized();
+    
+    // compute reconstruction
+    const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
+    
+    // internal representation...
+    const tensor_type y_minus_c = y.normalized() - c;
+    
+    // representation error
+    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+    
+    node.error_       = e;
+    node.total_       = e;
+    node.output_      = p;
+    node.output_norm_ = p_norm;
+    
+    node.reconstruction_ = y_minus_c.array() * theta.alpha_;
+    
+    // 1 - x * x for tanh!
+    node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
+        
+    agenda_[parent.size()].push_back(parent);
+#endif
   }
   
   // binary rules
@@ -940,16 +1023,17 @@ struct ITGTree
     
     // representation error
     const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+    const double total = e + node1.total_ + node2.total_;
     
     const double infty = std::numeric_limits<double>::infinity();
     
-    if (e < node.error_) {
+    if (total < node.total_) {
 
       if (node.error_ == infty)
 	agenda_[parent.size()].push_back(parent);
       
       node.error_       = e;
-      node.total_       = e + node1.total_ + node2.total_;
+      node.total_       = total;
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -1002,22 +1086,24 @@ struct ITGTree
 			  || (span.source_.last_ == parent.source_.last_ && span.target_.last_ == parent.target_.last_));
       const bool left(span.source_.first_ == parent.source_.first_);
       
+      const bool straight_child = node.straight();
+      
       const tensor_type& W1 = (root ? root_W1 : (straight ? theta.Ws1_ : theta.Wi1_));
-      const tensor_type& W2 = (root ? root_W2 : (straight ? theta.Ws2_ : theta.Wi2_));
       const tensor_type& reconstruction = (root ? root_reconstruction : node_parent.reconstruction_);
       
       // root behave similar to left
       
       // (pre-)termianl or non-terminal?
       if (node.terminal()) {
-	tensor_type update;
+#if 0
+	tensor_type delta;
 	
 	if (root || left)
-	  update = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		    - reconstruction.block(0, 0, dimension * 2, 1));
+	  delta = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		   - reconstruction.block(0, 0, dimension * 2, 1));
 	else
-	  update = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		    - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
+	  delta = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		   - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
 	
 	tensor_type& dsource = (! span.source_.empty()
 				? gradient.source_[source[span.source_.first_]]
@@ -1027,14 +1113,55 @@ struct ITGTree
 				: gradient.target_[vocab_type::EPSILON]);
 	
 	if (! dsource.cols() || ! dsource.rows())
-	  dsource = update.block(0, 0, dimension, 1);
-	else
-	  dsource += update.block(0, 0, dimension, 1);
-	
+	  dsource = tensor_type::Zero(dimension, 1);
 	if (! dtarget.cols() || ! dtarget.rows())
-	  dtarget = update.block(dimension, 0, dimension, 1);
+	  dtarget = tensor_type::Zero(dimension, 1);
+	
+	dsource += delta.block(0, 0, dimension, 1);
+	dtarget += delta.block(dimension, 0, dimension, 1);
+#endif
+
+#if 1
+	tensor_type delta;
+	
+	if (root || left)
+	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
+		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
+		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
-	  dtarget += update.block(dimension, 0, dimension, 1);
+	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
+		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
+		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
+		      - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
+	
+	//
+	// update based on deltas...
+	//
+	gradient.Wl1_ += delta * node.input_.transpose();
+	gradient.bl1_ += delta;
+	
+	gradient.Wl2_ += node.delta_reconstruction_ * node.output_norm_.transpose();
+	gradient.bl2_ += node.delta_reconstruction_;
+	
+	// update embedding...
+	tensor_type delta_embedding = theta.Wl1_.transpose() * delta - node.reconstruction_;
+	
+	tensor_type& dsource = (! span.source_.empty()
+				? gradient.source_[source[span.source_.first_]]
+				: gradient.source_[vocab_type::EPSILON]);
+	tensor_type& dtarget = (! span.target_.empty()
+				? gradient.target_[target[span.target_.first_]]
+				: gradient.target_[vocab_type::EPSILON]);
+	
+	if (! dsource.cols() || ! dsource.rows())
+	  dsource = tensor_type::Zero(dimension, 1);
+	if (! dtarget.cols() || ! dtarget.rows())
+	  dtarget = tensor_type::Zero(dimension, 1);
+	
+	dsource += delta_embedding.block(0, 0, dimension, 1);
+	dtarget += delta_embedding.block(dimension, 0, dimension, 1);
+#endif
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
@@ -1044,6 +1171,8 @@ struct ITGTree
 	
 	stack_.push_back(std::make_pair(child1, span));
 	stack_.push_back(std::make_pair(child2, span));
+	
+	const tensor_type& W2 = (straight_child ? theta.Ws2_ : theta.Wi2_);
 	
 	// 1.0 - x * x for tanh
 	if (root || left)
@@ -1061,20 +1190,18 @@ struct ITGTree
 	// accumulate based on the deltas
 	
 	const tensor_type& delta = node1.delta_;
-
-	const bool straight_child = node.straight();
 	
 	tensor_type& dW1 = (straight_child ? gradient.Ws1_ : gradient.Wi1_);
-	tensor_type& dW2 = (straight_child ? gradient.Ws2_ : gradient.Wi2_);
 	tensor_type& db1 = (straight_child ? gradient.bs1_ : gradient.bi1_);
+	
+	tensor_type& dW2 = (straight_child ? gradient.Ws2_ : gradient.Wi2_);
 	tensor_type& db2 = (straight_child ? gradient.bs2_ : gradient.bi2_);
 	
 	dW1.block(0, 0, dimension * 2, dimension * 2)             += delta * node1.output_norm_.transpose();
 	dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_norm_.transpose();
+	db1 += delta;
 	
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
-	
-	db1 += delta;
 	db2 += node.delta_reconstruction_;
       }
     }
@@ -1149,6 +1276,12 @@ struct LearnAdaGrad
     bs2_ = tensor_type::Zero(dimension * 4, 1);
     Wi2_ = tensor_type::Zero(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Zero(dimension * 4, 1);
+
+    Wl1_ = tensor_type::Zero(dimension * 2, dimension * 2);
+    bl1_ = tensor_type::Zero(dimension * 2, 1);
+    
+    Wl2_ = tensor_type::Zero(dimension * 2, dimension * 2);
+    bl2_ = tensor_type::Zero(dimension * 2, 1);    
   }
   
   void operator()(model_type& theta, const gradient_type& gradient) const
@@ -1208,6 +1341,12 @@ struct LearnAdaGrad
     update(theta.bs2_, bs2_, gradient.bs2_, false);
     update(theta.Wi2_, Wi2_, gradient.Wi2_, lambda_ != 0.0);
     update(theta.bi2_, bi2_, gradient.bi2_, false);
+    
+    update(theta.Wl1_, Wl1_, gradient.Wl1_, lambda_ != 0.0);
+    update(theta.bl1_, bl1_, gradient.bl1_, false);
+
+    update(theta.Wl2_, Wl2_, gradient.Wl2_, lambda_ != 0.0);
+    update(theta.bl2_, bl2_, gradient.bl2_, false);
   }
 
   struct update_visitor_regularize
@@ -1275,6 +1414,14 @@ struct LearnAdaGrad
   tensor_type bs2_;
   tensor_type Wi2_;
   tensor_type bi2_;
+
+  // Wl1 and bl1 for encoding
+  tensor_type Wl1_;
+  tensor_type bl1_;
+  
+  // Wl2 and bl2 for reconstruction
+  tensor_type Wl2_;
+  tensor_type bl2_;
 };
 
 struct LearnL2
@@ -1352,6 +1499,12 @@ struct LearnL2
     theta.bs2_.array() -= gradient.bs2_.array() * eta;
     theta.Wi2_.array() -= gradient.Wi2_.array() * eta;
     theta.bi2_.array() -= gradient.bi2_.array() * eta;
+
+    theta.Wl1_.array() -= gradient.Wl1_.array() * eta;
+    theta.bl1_.array() -= gradient.bl1_.array() * eta;
+
+    theta.Wl2_.array() -= gradient.Wl2_.array() * eta;
+    theta.bl2_.array() -= gradient.bl2_.array() * eta;
     
     // projection onto L2 norm..
     if (lambda_ != 0.0) {
