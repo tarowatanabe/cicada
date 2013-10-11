@@ -842,8 +842,6 @@ struct ITGTree
     const size_type length_max = source_size + target_size;
     double beam_curr = beam;
 
-    uniques_.clear();
-
     for (int iter = 0; iter != 10; ++ iter) {
       
       for (size_type length = 1; length != length_max; ++ length) 
@@ -873,6 +871,9 @@ struct ITGTree
 	      std::pop_heap(hiter_begin, hiter, heap_compare());
 	  } else
 	    hiter = hiter_begin;
+
+	  // clear uniques
+	  uniques_.clear();
 	  
 	  //std::cerr << "length: " << length << " beam_curr: " << (hiter_end - hiter) << std::endl;
 	  
