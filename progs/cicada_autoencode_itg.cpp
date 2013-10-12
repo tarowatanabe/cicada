@@ -66,7 +66,9 @@
 #include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/vector2.hpp"
+#include "utils/sampler.hpp"
 
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
@@ -224,6 +226,64 @@ struct Model
     : dimension_(dimension), window_(window), alpha_(0) { initialize(dimension, window); }
   Model(const size_type& dimension, const size_type& window, const double& alpha) 
     : dimension_(dimension), window_(window), alpha_(alpha) { initialize(dimension, window); }
+
+  Model& operator-=(const Model& x)
+  {
+    embedding_type::const_iterator siter_end = x.source_.end();
+    for (embedding_type::const_iterator siter = x.source_.begin(); siter != siter_end; ++ siter) {
+      embedding_type::iterator eiter = source_.find(siter->first);
+      
+      if (eiter == source_.end())
+	eiter = source_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_, 1))).first;
+      
+      for (difference_type i = 0; i != siter->second.rows(); ++ i) {
+	const double amount = - siter->second.col(0)[i] * x.scale_source_;
+	
+	norm_source_ += 2.0 * eiter->second.col(0)[i] * scale_source_ * amount + amount * amount;
+	eiter->second.col(0)[i] += amount / scale_source_;
+      }
+    }
+
+    embedding_type::const_iterator titer_end = x.target_.end();
+    for (embedding_type::const_iterator titer = x.target_.begin(); titer != titer_end; ++ titer) {
+      embedding_type::iterator eiter = target_.find(titer->first);
+      
+      if (eiter == target_.end())
+	eiter = target_.insert(std::make_pair(titer->first, tensor_type::Zero(dimension_, 1))).first;
+      
+      for (difference_type i = 0; i != titer->second.rows(); ++ i) {
+	const double amount = - titer->second.col(0)[i] * x.scale_target_;
+	
+	norm_target_ += 2.0 * eiter->second.col(0)[i] * scale_target_ * amount + amount * amount;
+	eiter->second.col(0)[i] += amount / scale_target_;
+      }
+    }
+    
+    Ws1_ -= x.Ws1_;
+    bs1_ -= x.bs1_;
+    Wi1_ -= x.Wi1_;
+    bi1_ -= x.bi1_;
+
+    Ws2_ -= x.Ws2_;
+    bs2_ -= x.bs2_;
+    Wi2_ -= x.Wi2_;
+    bi2_ -= x.bi2_;
+    
+    Wl1_ -= x.Wl1_;
+    bl1_ -= x.bl1_;
+    Wl2_ -= x.Wl2_;
+    bl2_ -= x.bl2_;
+
+    Wc1_ -= x.Wc1_;
+    bc1_ -= x.bc1_;
+    Wc2_ -= x.Wc2_;
+    bc2_ -= x.bc2_;
+    
+    Wp_ -= x.Wp_;
+    bp_ -= x.bp_;
+    
+    return *this;
+  }
   
   Model& operator+=(const Model& x)
   {
@@ -2004,6 +2064,7 @@ int batch_size = 1024;
 double beam = 0.1;
 double lambda = 1;
 double eta0 = 1;
+bool sampling = false;
 
 bool dump_mode = false;
 
@@ -2055,7 +2116,10 @@ int main(int argc, char** argv)
   
     // this is optional, but safe to set this
     ::srandom(utils::random_seed());
-
+    
+    boost::mt19937 generator;
+    generator.seed(utils::random_seed());
+    
     if (source_file.empty())
       throw std::runtime_error("no source data?");
     if (target_file.empty())
@@ -2072,19 +2136,23 @@ int main(int argc, char** argv)
     lexicon_type lexicon_source_target;
     lexicon_type lexicon_target_source;
 
+    boost::thread_group workers_read;
+
     if (! lexicon_source_target_file.empty()) {
       if (! boost::filesystem::exists(lexicon_source_target_file))
 	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_source_target_file.string());
 
-      lexicon_source_target.read(lexicon_source_target_file);
+      workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read, lexicon_source_target, lexicon_source_target_file)));
     }
 
     if (! lexicon_target_source_file.empty()) {
       if (! boost::filesystem::exists(lexicon_target_source_file))
 	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_target_source_file.string());
 
-      lexicon_target_source.read(lexicon_target_source_file);
+      workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read, lexicon_target_source, lexicon_target_source_file)));
     }
+    
+    workers_read.join_all();
     
     if (iteration > 0) {
       if (optimize_adagrad)
@@ -2504,6 +2572,7 @@ struct TaskAccumulate
 	  ++ samples_;
 	  
 	  itg_tree_.derivation(source, target, bitext_derivation.derivation_);
+	  
 	} else
 	  std::cerr << "failed parsing: " << std::endl
 		    << "source: " << source << std::endl
@@ -2906,11 +2975,12 @@ void options(int argc, char** argv)
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
-    ("iteration",         po::value<int>(&iteration)->default_value(iteration),                    "max # of iterations")
-    ("batch",             po::value<int>(&batch_size)->default_value(batch_size),                  "mini-batch size")
-    ("beam",              po::value<double>(&beam)->default_value(beam),                           "beam width for parsing")
-    ("lambda",            po::value<double>(&lambda)->default_value(lambda),                       "regularization constant")
-    ("eta0",              po::value<double>(&eta0)->default_value(eta0),                           "\\eta_0 for decay")
+    ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
+    ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
+    ("beam",              po::value<double>(&beam)->default_value(beam),          "beam width for parsing")
+    ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
+    ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
+    ("sampling",          po::bool_switch(&sampling),                             "sample negative examples")
 
     ("dump", po::bool_switch(&dump_mode), "dump intermediate derivations and alignments")
     
