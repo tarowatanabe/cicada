@@ -65,6 +65,7 @@
 #include "utils/random_seed.hpp"
 #include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/vector2.hpp"
 
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
@@ -218,11 +219,11 @@ struct Model
 
   typedef boost::filesystem::path path_type;
   
-  Model() : dimension_(0), alpha_(0) {}
-  Model(const size_type& dimension) 
-    : dimension_(dimension), alpha_(0) { initialize(dimension); }
-  Model(const size_type& dimension, const double& alpha) 
-    : dimension_(dimension), alpha_(alpha) { initialize(dimension); }
+  Model() : dimension_(0), window_(0), alpha_(0) {}
+  Model(const size_type& dimension, const size_type& window) 
+    : dimension_(dimension), window_(window), alpha_(0) { initialize(dimension, window); }
+  Model(const size_type& dimension, const size_type& window, const double& alpha) 
+    : dimension_(dimension), window_(window), alpha_(alpha) { initialize(dimension, window); }
   
   Model& operator+=(const Model& x)
   {
@@ -271,6 +272,11 @@ struct Model
     Wl2_ += x.Wl2_;
     bl2_ += x.bl2_;
 
+    Wc1_ += x.Wc1_;
+    bc1_ += x.bc1_;
+    Wc2_ += x.Wc2_;
+    bc2_ += x.bc2_;
+    
     Wp_ += x.Wp_;
     bp_ += x.bp_;
     
@@ -302,6 +308,11 @@ struct Model
     bl1_.setZero();
     Wl2_.setZero();
     bl2_.setZero();    
+
+    Wc1_.setZero();
+    bc1_.setZero();
+    Wc2_.setZero();
+    bc2_.setZero();    
 
     Wp_.setZero();
     bp_.setZero();
@@ -367,6 +378,9 @@ struct Model
 
     Wl1_ *= scaling;
     Wl2_ *= scaling;
+
+    Wc1_ *= scaling;
+    Wc2_ *= scaling;
     
     Wp_ *= scaling;
     
@@ -379,6 +393,9 @@ struct Model
 
       bl1_ *= scaling;
       bl2_ *= scaling;
+
+      bc1_ *= scaling;
+      bc2_ *= scaling;
 
       bp_ *= scaling;
     }
@@ -397,6 +414,9 @@ struct Model
     norm += Wl1_.squaredNorm();
     norm += Wl2_.squaredNorm();
 
+    norm += Wc1_.squaredNorm();
+    norm += Wc2_.squaredNorm();
+
     norm += Wp_.squaredNorm();
     
     if (! ignore_bias) {
@@ -409,16 +429,20 @@ struct Model
       norm += bl1_.squaredNorm();
       norm += bl2_.squaredNorm();
 
+      norm += bc1_.squaredNorm();
+      norm += bc2_.squaredNorm();
+
       norm += bp_.squaredNorm();
     }
     
     return norm;
   }
   
-  void initialize(const size_type dimension)
+  void initialize(const size_type dimension, const size_type window)
   {
     // intialize randomly...
     dimension_ = dimension;
+    window_    = window;
     
     // embedding
     source_.clear();
@@ -448,6 +472,14 @@ struct Model
     Wl2_ = tensor_type::Random(dimension * 2, dimension * 2);
     bl2_ = tensor_type::Random(dimension * 2, 1);
 
+    // context
+    Wc1_ = tensor_type::Random(dimension * 2, dimension * 2 * (window * 2 + 1));
+    bc1_ = tensor_type::Random(dimension * 2, 1);
+    
+    // context reconstruction
+    Wc2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), dimension * 2);
+    bc2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), 1);
+
     // probability
     Wp_ = tensor_type::Random(1, dimension * 2);
     bp_ = tensor_type::Random(1, 1);
@@ -463,12 +495,20 @@ struct Model
     
     tensor_type& epsilon_source = source_[vocab_type::EPSILON];
     tensor_type& epsilon_target = target_[vocab_type::EPSILON];
+    tensor_type& bos_source     = source_[vocab_type::BOS];
+    tensor_type& bos_target     = target_[vocab_type::BOS];
+    tensor_type& eos_source     = source_[vocab_type::EOS];
+    tensor_type& eos_target     = target_[vocab_type::EOS];
     
     epsilon_source = tensor_type::Random(dimension_, 1);
     epsilon_target = tensor_type::Random(dimension_, 1);
+    bos_source     = tensor_type::Random(dimension_, 1);
+    bos_target     = tensor_type::Random(dimension_, 1);
+    eos_source     = tensor_type::Random(dimension_, 1);
+    eos_target     = tensor_type::Random(dimension_, 1);
     
-    norm_source_ = epsilon_source.squaredNorm();
-    norm_target_ = epsilon_target.squaredNorm();
+    norm_source_ = epsilon_source.squaredNorm() + bos_source.squaredNorm() + eos_source.squaredNorm();
+    norm_target_ = epsilon_target.squaredNorm() + bos_target.squaredNorm() + eos_target.squaredNorm();
     
     for (/**/; first != last; ++ first) {
       norm_source_ += embedding(first->source_, source_);
@@ -516,6 +556,7 @@ struct Model
     repository_type rep(path, repository_type::write);
     
     rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
+    rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
     
     const path_type source_file = rep.path("source.gz");
@@ -569,6 +610,12 @@ struct Model
     write(rep.path("Wl2.txt.gz"), rep.path("Wl2.bin"), Wl2_);
     write(rep.path("bl2.txt.gz"), rep.path("bl2.bin"), bl2_);
 
+    write(rep.path("Wc1.txt.gz"), rep.path("Wc1.bin"), Wc1_);
+    write(rep.path("bc1.txt.gz"), rep.path("bc1.bin"), bc1_);
+
+    write(rep.path("Wc2.txt.gz"), rep.path("Wc2.bin"), Wc2_);
+    write(rep.path("bc2.txt.gz"), rep.path("bc2.bin"), bc2_);
+
     write(rep.path("Wp.txt.gz"), rep.path("Wp.bin"), Wp_);
     write(rep.path("bp.txt.gz"), rep.path("bp.bin"), bp_);
   }
@@ -595,6 +642,7 @@ struct Model
   
   // dimension...
   size_type dimension_;
+  size_type window_;
   
   // hyperparameter
   double alpha_;
@@ -626,6 +674,14 @@ struct Model
   // Wl2 and bl2 for reconstruction
   tensor_type Wl2_;
   tensor_type bl2_;  
+
+  // Wc1 and bc1 for encoding
+  tensor_type Wc1_;
+  tensor_type bc1_;
+  
+  // Wc2 and bc2 for reconstruction
+  tensor_type Wc2_;
+  tensor_type bc2_;  
 
   // Wp and bp for probability
   tensor_type Wp_;
@@ -804,26 +860,72 @@ struct ITGTree
     double      error_;
     double      total_;
     
-    tensor_type input_;
     tensor_type output_;
     tensor_type output_norm_;
     tensor_type delta_;
     
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
-
-    tensor_type lexicon_;
-    tensor_type delta_lexicon_;
-
+    
     tail_set_type tails_;
   };
   
   typedef Node node_type;
   typedef utils::bichart<node_type, std::allocator<node_type> > node_set_type;
+
+  struct RestCost
+  {
+    double cost_;
+    double alpha_;
+    double beta_;
+    
+    RestCost()
+      : cost_(std::numeric_limits<double>::infinity()),
+	alpha_(std::numeric_limits<double>::infinity()),
+	beta_(std::numeric_limits<double>::infinity()) {}
+  };
+  
+  typedef RestCost rest_cost_type;
+  typedef std::vector<rest_cost_type, std::allocator<rest_cost_type> > rest_cost_set_type;
+  
+  struct Leaf
+  {
+    Leaf() : error_(std::numeric_limits<double>::infinity()) {}
+    
+    double      error_;
+    
+    // input with context
+    tensor_type input_;
+    
+    // output from context + reconstruction
+    tensor_type output_context_;
+    tensor_type output_context_norm_;
+    
+    tensor_type reconstruction_context_;
+    tensor_type delta_reconstruction_context_;
+    
+    // secondary output + reconstruction
+    tensor_type output_;
+    tensor_type output_norm_;
+    
+    tensor_type reconstruction_;
+    tensor_type delta_reconstruction_;
+    
+    // for lexical reconstruction
+    tensor_type lexicon_;
+    tensor_type delta_lexicon_;
+  };
+
+  typedef Leaf leaf_type;
+  typedef utils::vector2<leaf_type, std::allocator<leaf_type> > leaf_set_type;
   
   void clear()
   {
     nodes_.clear();
+    leaves_.clear();
+
+    costs_source_.clear();
+    costs_target_.clear();
     
     agenda_.clear();
     heap_.clear();
@@ -842,6 +944,27 @@ struct ITGTree
     }
   };
 
+  void forward_backward(rest_cost_set_type& costs)
+  {
+    const size_type sentence_size = costs.size() - 1;
+    
+    // forward...
+    costs[0].alpha_ = 0;
+    for (size_type last = 1; last <= sentence_size; ++ last) {
+      const size_type first = last - 1;
+      
+      costs[last].alpha_ = std::min(costs[last].alpha_, costs[first].alpha_ + costs[first].cost_);
+    }
+    
+    // backward...
+    costs[sentence_size].beta_ = 0;
+    for (difference_type first = sentence_size - 1; first >= 0; -- first) {
+      const size_type last = first + 1;
+      
+      costs[first].beta_ = std::min(costs[first].beta_, costs[first].cost_ + costs[last].beta_);
+    }
+  }
+
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta,
@@ -857,30 +980,60 @@ struct ITGTree
     
     nodes_.reserve(source_size + 1, target_size + 1);
     nodes_.resize(source_size + 1, target_size + 1);
+
+    leaves_.reserve(source_size + 1, target_size + 1);
+    leaves_.resize(source_size + 1, target_size + 1);
+    
+    costs_source_.reserve(source_size + 1);
+    costs_target_.reserve(target_size + 1);
+
+    costs_source_.resize(source_size + 1);
+    costs_target_.resize(target_size + 1);
     
     agenda_.reserve(source_size + target_size + 1);
     agenda_.resize(source_size + target_size + 1);
     
     // initialization
+    //std::cerr << "initialize leaves" << std::endl;
+
+    forward_leaves(source, target, theta, lexicon_source_target, lexicon_target_source);
+
+    //std::cerr << "start initialization" << std::endl;
+
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = 0; trg <= target_size; ++ trg) 
 	if (src < source_size || trg < target_size) {
 
 	  // epsilon at target
-	  if (src < source_size)
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)),
-		    theta, lexicon_source_target, lexicon_target_source);
+	  if (src < source_size) {
+	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta);
+	    
+	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, double(nodes_(src, src + 1, trg, trg).error_));
+	  }
 	  
 	  // epsilon at source
-	  if (trg < target_size)
-	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)),
-		    theta, lexicon_source_target, lexicon_target_source);
+	  if (trg < target_size) {
+	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta);
+	    
+	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, double(nodes_(src, src, trg, trg + 1).error_));
+	  }
 	  
 	  // word-pair
-	  if (src < source_size && trg < target_size)
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)),
-		    theta, lexicon_source_target, lexicon_target_source);
+	  if (src < source_size && trg < target_size) {
+	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta);
+	    
+	    const double error = nodes_(src, src + 1, trg, trg + 1).error_;
+	    
+	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, error);
+	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, error);
+	  }
 	}
+
+    // estimate rest-costs
+    forward_backward(costs_source_);
+    forward_backward(costs_target_);
+
+    //std::cerr << "start parsing" << std::endl;
 
     // iterate!
     const double infty = std::numeric_limits<double>::infinity();
@@ -898,9 +1051,12 @@ struct ITGTree
 	  
 	  span_pair_set_type::const_iterator siter_end = spans.end();
 	  for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
-	    heap_.push_back(error_span_pair_type(nodes_(siter->source_.first_, siter->source_.last_,
-							siter->target_.first_, siter->target_.last_).total_, // use of total error?
-						 *siter));
+	    const double error = (nodes_(siter->source_.first_, siter->source_.last_,
+					 siter->target_.first_, siter->target_.last_).total_
+				  + std::max(costs_source_[siter->source_.first_].alpha_ + costs_source_[siter->source_.last_].beta_,
+					     costs_target_[siter->target_.first_].alpha_ + costs_target_[siter->target_.last_].beta_));
+	    
+	    heap_.push_back(error_span_pair_type(error, *siter));
 	    
 	    std::push_heap(heap_.begin(), heap_.end(), heap_compare());
 	  }
@@ -1023,139 +1179,167 @@ struct ITGTree
     }
   }
 
+  // leaves!
+  void forward_leaves(const sentence_type& source,
+		      const sentence_type& target,
+		      const model_type& theta,
+		      const lexicon_type& lexicon_source_target,
+		      const lexicon_type& lexicon_target_source)
+  {
+    typedef model_type::embedding_type embedding_type;
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const size_type dimension = theta.dimension_;
+    const size_type window    = theta.window_;
+    
+    for (size_type src = 0; src <= source_size; ++ src)
+      for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
+	leaf_type& leaf = leaves_(src, trg);
+	
+#if 0
+	// lexical probability
+	const double prob = (src == 0
+			     ? lexicon_source_target(vocab_type::EPSILON, target[trg - 1])
+			     : (trg == 0
+				? lexicon_target_source(vocab_type::EPSILON, source[src - 1])
+				: (std::sqrt(lexicon_source_target(source[src - 1], target[trg - 1]))
+				   * std::sqrt(lexicon_target_source(target[trg - 1], source[src - 1])))));
+#endif
+	
+	leaf.input_ = tensor_type(dimension * 2 * (window * 2 + 1), 1);
+
+	if (src == 0) {
+	  embedding_type::const_iterator siter = theta.source_.find(vocab_type::EPSILON);
+	  if (siter == theta.source_.end())
+	    throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	  
+	  if (siter->second.rows() != dimension)
+	    throw std::runtime_error("dimensin does not for the source side");
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i)
+	    leaf.input_.block(dimension * i, 0, dimension, 1) = siter->second * theta.scale_source_;
+	} else {
+	  for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	    const difference_type shift = difference_type(i) - window;
+	    
+	    const word_type& embedding_source = (src + shift <= 0
+						 ? vocab_type::BOS
+						 : (src + shift > source_size
+						    ? vocab_type::EOS
+						    : source[src + shift - 1]));
+	    
+	    embedding_type::const_iterator siter = theta.source_.find(embedding_source);
+	    if (siter == theta.source_.end())
+	      throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	    
+	    if (siter->second.rows() != dimension)
+	      throw std::runtime_error("dimensin does not for the source side");
+	    
+	    leaf.input_.block(dimension * i, 0, dimension, 1) = siter->second * theta.scale_source_;
+	  }
+	}
+	
+	if (trg == 0) {
+	  embedding_type::const_iterator titer = theta.target_.find(vocab_type::EPSILON);
+	  if (titer == theta.target_.end())
+	    throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	  
+	  if (titer->second.rows() != dimension)
+	    throw std::runtime_error("dimensin does not for the target side");
+	  
+	  const size_type offset = dimension * (window * 2 + 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i)
+	    leaf.input_.block(dimension * i + offset, 0, dimension, 1) = titer->second * theta.scale_target_;
+	} else {
+	  const size_type offset = dimension * (window * 2 + 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	    const difference_type shift = difference_type(i) - window;
+	    
+	    const word_type& embedding_target = (trg + shift <= 0
+						 ? vocab_type::BOS
+						 : (trg + shift > target_size
+						    ? vocab_type::EOS
+						    : target[trg + shift - 1]));
+	    
+	    embedding_type::const_iterator titer = theta.target_.find(embedding_target);
+	    if (titer == theta.target_.end())
+	      throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	    
+	    if (titer->second.rows() != dimension)
+	      throw std::runtime_error("dimensin does not for the target side");
+	    
+	    leaf.input_.block(dimension * i + offset, 0, dimension, 1) = titer->second * theta.scale_target_;
+	  }
+	}
+
+	{
+	  const tensor_type& c = leaf.input_;
+	  const tensor_type p = (theta.Wc1_ * c + theta.bc1_).array().unaryExpr(std::ptr_fun(tanhf));
+	  const tensor_type p_norm = p.normalized();
+	  const tensor_type y = (theta.Wc2_ * p_norm + theta.bc2_).array().unaryExpr(std::ptr_fun(tanhf));
+	  const tensor_type y_minus_c = y.normalized() - c;
+	  
+	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+	  
+	  leaf.error_               = e;
+	  leaf.output_context_      = p;
+	  leaf.output_context_norm_ = p_norm;
+	  
+	  leaf.reconstruction_context_       = y_minus_c.array() * theta.alpha_;
+	  leaf.delta_reconstruction_context_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_context_.array();
+	}
+	
+	{
+	  const tensor_type& c = leaf.output_context_norm_;
+	  const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	  const tensor_type p_norm = p.normalized();
+	  const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
+	  const tensor_type y_minus_c = y.normalized() - c;
+
+#if 0
+	  const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wp_ * p_norm + theta.bp_)(0, 0)))),
+					      std::log(1.0 - 1e-10));
+	  const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
+	  const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
+	  
+	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm() + cross_entropy;
+#endif
+	  
+	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+	  
+	  leaf.error_      += e;
+	  leaf.output_      = p;
+	  leaf.output_norm_ = p_norm;
+	  
+	  leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
+	  leaf.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_.array();
+	  
+	  //leaf.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
+	  //leaf.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * leaf.lexicon_(0, 0));
+	}
+      }
+  }
+
   // terminal!
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& parent,
-	       const model_type& theta,
-	       const lexicon_type& lexicon_source_target,
-	       const lexicon_type& lexicon_target_source)
+	       const model_type& theta)
   {
-    typedef model_type::embedding_type embedding_type;
-    
-    const size_type dimension = theta.dimension_;
-    
     node_type& node = nodes_(parent.source_.first_, parent.source_.last_, parent.target_.first_, parent.target_.last_);
     
-    const word_type& embedding_source = (! parent.source_.empty() ? source[parent.source_.first_] : vocab_type::EPSILON);
-    const word_type& embedding_target = (! parent.target_.empty() ? target[parent.target_.first_] : vocab_type::EPSILON);
-
-    embedding_type::const_iterator siter = theta.source_.find(embedding_source);
-    if (siter == theta.source_.end())
-      throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(embedding_source));
-
-    embedding_type::const_iterator titer = theta.target_.find(embedding_target);
-    if (titer == theta.target_.end())
-      throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(embedding_target));
+    const leaf_type& leaf = leaves_(parent.source_.empty() ? 0 : parent.source_.first_ + 1,
+				    parent.target_.empty() ? 0 : parent.target_.first_ + 1);
     
-    if (siter->second.rows() != dimension)
-      throw std::runtime_error("dimensin does not for the source side");
-    if (titer->second.rows() != dimension)
-      throw std::runtime_error("dimensin does not for the target side");
-
-#if 0
-    node.error_       = 0;
-    node.total_       = 0;
-
-    node.output_norm_ = tensor_type(dimension * 2, 1);
-    node.output_norm_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
-        
-    agenda_[parent.size()].push_back(parent);
-#endif
-
-#if 0
-    node.input_ = tensor_type(dimension * 2, 1);
-    node.input_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
-    
-    const tensor_type& c = node.input_;
-    
-    // actual values to be propagated
-    const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
-    
-    // internal representation...
-    const tensor_type p_norm = p.normalized();
-    
-    // compute reconstruction
-    const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
-    
-    // internal representation...
-    const tensor_type y_minus_c = y.normalized() - c;
-    
-    // representation error
-    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-    
-    node.error_       = e;
-    node.total_       = e;
-    node.output_      = p;
-    node.output_norm_ = p_norm;
-    
-    node.reconstruction_ = y_minus_c.array() * theta.alpha_;
-    
-    // 1 - x * x for tanh!
-    node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
-        
-    agenda_[parent.size()].push_back(parent);
-#endif
-
-#if 1
-    const double prob_source_target = lexicon_source_target(embedding_source, embedding_target);
-    const double prob_target_source = lexicon_target_source(embedding_target, embedding_source);
-    
-    const double prob = (embedding_source == vocab_type::EPSILON
-			 ? prob_source_target
-			 : (embedding_target == vocab_type::EPSILON
-			    ? prob_target_source
-			    : std::sqrt(prob_source_target) * std::sqrt(prob_target_source)));
-    
-    node.input_ = tensor_type(dimension * 2, 1);
-    node.input_ << (siter->second * theta.scale_source_), (titer->second * theta.scale_target_);
-    
-    const tensor_type& c = node.input_;
-    
-    // actual values to be propagated
-    const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
-    
-    // internal representation...
-    const tensor_type p_norm = p.normalized();
-    
-    // compute reconstruction
-    const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
-    
-    // internal representation...
-    const tensor_type y_minus_c = y.normalized() - c;
-    
-    const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wp_ * p_norm + theta.bp_)(0, 0)))),
-					std::log(1.0 - 1e-10));
-    const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
-    const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
-    
-#if 0
-    std::cerr << "prob: " << prob
-	      << " lexicon: " << std::exp(log_lexicon)
-	      << " sigmoid: " << std::exp(log_sigmoid)
-	      << " cross-entropy: " << cross_entropy
-	      << std::endl;
-#endif
-
-    // representation error
-    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm() + cross_entropy;
-    
-    node.error_       = e;
-    node.total_       = e;
-    node.output_      = p;
-    node.output_norm_ = p_norm;
-    
-    node.reconstruction_ = y_minus_c.array() * theta.alpha_;
-    
-    // 1 - x * x for tanh!
-    node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
-    
-    node.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
-    node.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * node.lexicon_(0, 0));
+    node.error_ = leaf.error_;
+    node.total_ = leaf.error_;
+    node.output_norm_ = leaf.output_norm_;
     
     agenda_[parent.size()].push_back(parent);
-#endif
-
   }
   
   // binary rules
@@ -1238,6 +1422,7 @@ struct ITGTree
 		gradient_type& gradient)
   {
     const size_type dimension = theta.dimension_;
+    const size_type window    = theta.window_;
     
     const span_pair_type span_root(0, source.size(), 0, target.size());
     
@@ -1276,121 +1461,106 @@ struct ITGTree
       
       // (pre-)termianl or non-terminal?
       if (node.terminal()) {
-#if 0
+	leaf_type& leaf = leaves_(span.source_.empty() ? 0 : span.source_.first_ + 1,
+				  span.target_.empty() ? 0 : span.target_.first_ + 1);
+	
 	tensor_type delta;
 	
 	if (root || left)
-	  delta = (W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		   - reconstruction.block(0, 0, dimension * 2, 1));
-	else
-	  delta = (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		   - reconstruction.block(dimension * 2, 0, dimension * 2, 1));
-	
-	tensor_type& dsource = (! span.source_.empty()
-				? gradient.source_[source[span.source_.first_]]
-				: gradient.source_[vocab_type::EPSILON]);
-	tensor_type& dtarget = (! span.target_.empty()
-				? gradient.target_[target[span.target_.first_]]
-				: gradient.target_[vocab_type::EPSILON]);
-	
-	if (! dsource.cols() || ! dsource.rows())
-	  dsource = tensor_type::Zero(dimension, 1);
-	if (! dtarget.cols() || ! dtarget.rows())
-	  dtarget = tensor_type::Zero(dimension, 1);
-	
-	dsource += delta.block(0, 0, dimension, 1);
-	dtarget += delta.block(dimension, 0, dimension, 1);
-#endif
-
-#if 0
-	tensor_type delta;
-	
-	if (root || left)
-	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
-		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
+	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
+		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		      //+ theta.Wp_.transpose() * leaf.delta_lexicon_
 		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
-	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
-		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
+	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
+		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		      //+ theta.Wp_.transpose() * leaf.delta_lexicon_
 		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	
-	//
-	// update based on deltas...
-	//
-	gradient.Wl1_ += delta * node.input_.transpose();
+	gradient.Wl1_ += delta * leaf.output_context_norm_.transpose();
 	gradient.bl1_ += delta;
 	
-	gradient.Wl2_ += node.delta_reconstruction_ * node.output_norm_.transpose();
-	gradient.bl2_ += node.delta_reconstruction_;
+	gradient.Wl2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
+	gradient.bl2_ += leaf.delta_reconstruction_;
 	
-	// update embedding...
-	tensor_type delta_embedding = theta.Wl1_.transpose() * delta - node.reconstruction_;
+	//gradient.Wp_ += leaf.delta_lexicon_ * leaf.output_norm_.transpose();
+	//gradient.bp_ += leaf.delta_lexicon_;
 	
-	tensor_type& dsource = (! span.source_.empty()
-				? gradient.source_[source[span.source_.first_]]
-				: gradient.source_[vocab_type::EPSILON]);
-	tensor_type& dtarget = (! span.target_.empty()
-				? gradient.target_[target[span.target_.first_]]
-				: gradient.target_[vocab_type::EPSILON]);
+	const tensor_type delta_context = (- (leaf.output_context_.array() * leaf.output_context_.array() - 1.0)
+					   * (theta.Wc2_.transpose() * leaf.delta_reconstruction_context_
+					      + theta.Wl1_.transpose() * delta
+					      - leaf.reconstruction_).array());
 	
-	if (! dsource.cols() || ! dsource.rows())
-	  dsource = tensor_type::Zero(dimension, 1);
-	if (! dtarget.cols() || ! dtarget.rows())
-	  dtarget = tensor_type::Zero(dimension, 1);
+	gradient.Wc1_ += delta_context * leaf.input_.transpose();
+	gradient.bc1_ += delta_context;
 	
-	dsource += delta_embedding.block(0, 0, dimension, 1);
-	dtarget += delta_embedding.block(dimension, 0, dimension, 1);
-#endif
+	gradient.Wc2_ += leaf.delta_reconstruction_context_ * leaf.output_context_norm_.transpose();
+	gradient.bc2_ += leaf.delta_reconstruction_context_;
 	
-#if 1
-	tensor_type delta;
-	
-	if (root || left)
-	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
-		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
-		      + theta.Wp_.transpose() * node.delta_lexicon_
-		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
-	else
-	  delta = (- (node.output_.array() * node.output_.array() - 1.0)
-		   * (theta.Wl2_.transpose() * node.delta_reconstruction_
-		      + theta.Wp_.transpose() * node.delta_lexicon_
-		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
-		      - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
-	
-	//
-	// update based on deltas...
-	//
-	gradient.Wl1_ += delta * node.input_.transpose();
-	gradient.bl1_ += delta;
-	
-	gradient.Wl2_ += node.delta_reconstruction_ * node.output_norm_.transpose();
-	gradient.bl2_ += node.delta_reconstruction_;
+	const tensor_type delta_embedding = theta.Wc1_.transpose() * delta_context - leaf.reconstruction_context_;
 
-	gradient.Wp_ += node.delta_lexicon_ * node.output_norm_.transpose();
-	gradient.bp_ += node.delta_lexicon_;
+	const difference_type source_size = source.size();
+	const difference_type target_size = target.size();
 	
-	// update embedding...
-	tensor_type delta_embedding = theta.Wl1_.transpose() * delta - node.reconstruction_;
+	if (span.source_.empty()) {
+	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
+	  
+	  if (! dsource.cols() || ! dsource.rows())
+	    dsource = tensor_type::Zero(dimension, 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i)
+	    dsource += delta_embedding.block(dimension * i, 0, dimension, 1);
+	} else {
+	  for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	    const difference_type shift = difference_type(i) - window;
+	    
+	    const word_type& word = (span.source_.first_ + shift < 0
+				     ? vocab_type::BOS
+				     : (span.source_.first_ + shift >= source_size
+					? vocab_type::EOS
+					: source[span.source_.first_ + shift]));
+	    
+	    tensor_type& dsource = gradient.source_[word];
+	    
+	    if (! dsource.cols() || ! dsource.rows())
+	      dsource = tensor_type::Zero(dimension, 1);
+	    
+	    dsource += delta_embedding.block(dimension * i, 0, dimension, 1);
+	  }
+	}
 	
-	tensor_type& dsource = (! span.source_.empty()
-				? gradient.source_[source[span.source_.first_]]
-				: gradient.source_[vocab_type::EPSILON]);
-	tensor_type& dtarget = (! span.target_.empty()
-				? gradient.target_[target[span.target_.first_]]
-				: gradient.target_[vocab_type::EPSILON]);
-	
-	if (! dsource.cols() || ! dsource.rows())
-	  dsource = tensor_type::Zero(dimension, 1);
-	if (! dtarget.cols() || ! dtarget.rows())
-	  dtarget = tensor_type::Zero(dimension, 1);
-	
-	dsource += delta_embedding.block(0, 0, dimension, 1);
-	dtarget += delta_embedding.block(dimension, 0, dimension, 1);
-#endif
+	if (span.target_.empty()) {
+	  tensor_type& dtarget = gradient.target_[vocab_type::EPSILON];
+	  
+	  if (! dtarget.cols() || ! dtarget.rows())
+	    dtarget = tensor_type::Zero(dimension, 1);
 
+	  const size_type offset = dimension * (window * 2 + 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i)
+	    dtarget += delta_embedding.block(dimension * i + offset, 0, dimension, 1);
+	} else {
+	  const size_type offset = dimension * (window * 2 + 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	    const difference_type shift = difference_type(i) - window;
+	    
+	    const word_type& word = (span.target_.first_ + shift < 0
+				     ? vocab_type::BOS
+				     : (span.target_.first_ + shift >= target_size
+					? vocab_type::EOS
+					: target[span.target_.first_ + shift]));
+	    
+	    tensor_type& dtarget = gradient.target_[word];
+	    
+	    if (! dtarget.cols() || ! dtarget.rows())
+	      dtarget = tensor_type::Zero(dimension, 1);
+	    
+	    dtarget += delta_embedding.block(dimension * i + offset, 0, dimension, 1);
+	  }
+	}
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
@@ -1467,6 +1637,10 @@ struct ITGTree
   }
   
   node_set_type nodes_;
+  leaf_set_type leaves_;
+
+  rest_cost_set_type costs_source_;
+  rest_cost_set_type costs_target_;
   
   agenda_type agenda_;
   heap_type   heap_;
@@ -1486,8 +1660,8 @@ struct LearnAdaGrad
   
   typedef model_type::tensor_type tensor_type;
   
-  LearnAdaGrad(const size_type& dimension, const double& lambda, const double& eta0)
-    : dimension_(dimension), lambda_(lambda), eta0_(eta0)
+  LearnAdaGrad(const size_type& dimension, const size_type& window, const double& lambda, const double& eta0)
+    : dimension_(dimension), window_(window), lambda_(lambda), eta0_(eta0)
   {
     if (lambda_ < 0.0)
       throw std::runtime_error("invalid regularization");
@@ -1511,6 +1685,12 @@ struct LearnAdaGrad
     
     Wl2_ = tensor_type::Zero(dimension * 2, dimension * 2);
     bl2_ = tensor_type::Zero(dimension * 2, 1);    
+    
+    Wc1_ = tensor_type::Zero(dimension * 2, dimension * 2 * (window * 2 + 1));
+    bc1_ = tensor_type::Zero(dimension * 2, 1);
+    
+    Wc2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), dimension * 2);
+    bc2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), 1);
 
     Wp_ = tensor_type::Zero(1, dimension * 2);
     bp_ = tensor_type::Zero(1, 1);
@@ -1580,6 +1760,12 @@ struct LearnAdaGrad
     update(theta.Wl2_, Wl2_, gradient.Wl2_, lambda_ != 0.0);
     update(theta.bl2_, bl2_, gradient.bl2_, false);
 
+    update(theta.Wc1_, Wc1_, gradient.Wc1_, lambda_ != 0.0);
+    update(theta.bc1_, bc1_, gradient.bc1_, false);
+
+    update(theta.Wc2_, Wc2_, gradient.Wc2_, lambda_ != 0.0);
+    update(theta.bc2_, bc2_, gradient.bc2_, false);
+
     update(theta.Wp_, Wp_, gradient.Wp_, lambda_ != 0.0);
     update(theta.bp_, bp_, gradient.bp_, false);
   }
@@ -1631,6 +1817,8 @@ struct LearnAdaGrad
   }
   
   size_type dimension_;
+  size_type window_;
+  
   double lambda_;
   double eta0_;
   
@@ -1657,6 +1845,14 @@ struct LearnAdaGrad
   // Wl2 and bl2 for reconstruction
   tensor_type Wl2_;
   tensor_type bl2_;
+
+  // Wc1 and bc1 for encoding
+  tensor_type Wc1_;
+  tensor_type bc1_;
+  
+  // Wc2 and bc2 for reconstruction
+  tensor_type Wc2_;
+  tensor_type bc2_;
 
   // Wp and bp for probability
   tensor_type Wp_;
@@ -1744,6 +1940,12 @@ struct LearnL2
 
     theta.Wl2_.array() -= gradient.Wl2_.array() * eta;
     theta.bl2_.array() -= gradient.bl2_.array() * eta;
+
+    theta.Wc1_.array() -= gradient.Wc1_.array() * eta;
+    theta.bc1_.array() -= gradient.bc1_.array() * eta;
+
+    theta.Wc2_.array() -= gradient.Wc2_.array() * eta;
+    theta.bc2_.array() -= gradient.bc2_.array() * eta;
     
     theta.Wp_.array() -= gradient.Wp_.array() * eta;
     theta.bp_.array() -= gradient.bp_.array() * eta;
@@ -1753,7 +1955,7 @@ struct LearnL2
       const double norm = theta.squared_norm(true);
       
       if (norm > 1.0 / lambda_)
-	theta.rescale(std::sqrt((1.0 / lambda_) * (1.0 / norm)), true);
+	theta.rescale(std::sqrt(1.0 / lambda_) * std::sqrt(1.0 / norm), true);
 
 #if 0
       if (theta.scale_source_ < 0.001 || theta.scale_source_ > 1000 || theta.scale_target_ < 0.001 || theta.scale_target_ > 1000)
@@ -1792,6 +1994,7 @@ path_type output_model_file;
 
 double alpha = 1.0;
 int dimension = 16;
+int window = 2;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
@@ -1829,13 +2032,23 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    threads = utils::bithack::max(threads, 1);
+    if (dimension <= 0)
+      throw std::runtime_error("dimension must be positive");
+    
+    if (window < 0)
+      throw std::runtime_error("window size should be >= 0");
+    
+    if (alpha < 0.0)
+      throw std::runtime_error("error factor should be: 0.0 <= alpha <= 1.0");
 
+    
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
-
+    
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_adagrad = true;
+    
+    threads = utils::bithack::max(threads, 1);
     
     // srand is used in Eigen
     std::srand(utils::random_seed());
@@ -1852,7 +2065,7 @@ int main(int argc, char** argv)
     
     read_data(source_file, target_file, bitexts);
     
-    model_type theta(dimension, alpha);
+    model_type theta(dimension, window, alpha);
     
     theta.embedding(bitexts.begin(), bitexts.end());
 
@@ -1875,7 +2088,7 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnAdaGrad(dimension, window, lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
       else
 	learn_online(LearnL2(lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
     }
@@ -2248,7 +2461,7 @@ struct TaskAccumulate
       counter_(counter),
       queue_derivation_(queue_derivation),
       queue_alignment_(queue_alignment),
-      gradient_(theta.dimension_),
+      gradient_(theta.dimension_, theta.window_),
       error_(0),
       samples_(0) {}
   
@@ -2688,6 +2901,7 @@ void options(int argc, char** argv)
     
     ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "model parameter")
     ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
+    ("window",    po::value<int>(&window)->default_value(window),       "context window size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
