@@ -110,93 +110,6 @@ namespace std
   }
 };
 
-struct Lexicon
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef double parameter_type;
-  
-  typedef Bitext bitext_type;
-  
-  typedef bitext_type::word_type word_type;
-  typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
-
-  typedef boost::filesystem::path path_type;
-
-  typedef utils::compact_map<word_type, parameter_type,
-			     utils::unassigned<word_type>, utils::unassigned<word_type>,
-			     boost::hash<word_type>, std::equal_to<word_type>,
-			     std::allocator<std::pair<const word_type, parameter_type> > > mapped_type;
-
-  typedef utils::alloc_vector<mapped_type, std::allocator<mapped_type> > lexicon_type;
-
-  Lexicon() : smooth(1e-7) {}
-  Lexicon(const path_type& path) : smooth(1e-7) { read(path); }
-
-  parameter_type operator()(const word_type& source, const word_type& target) const
-  {
-    if (source == vocab_type::BOS || source == vocab_type::EOS
-	|| target == vocab_type::BOS || target == vocab_type::EOS)
-      return source == target;
-    
-    if (! lexicon.exists(source.id())) return smooth;
-    
-    const mapped_type& mapped = lexicon[source.id()];
-    
-    mapped_type::const_iterator miter = mapped.find(target);
-    
-    return (miter == mapped.end() ? smooth : miter->second);
-  }
-
-  void read(const path_type& path)
-  {
-    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
-    typedef boost::spirit::istream_iterator iterator_type;
-    
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
-    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
-    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
-    
-    word   %= qi::lexeme[+(standard::char_ - standard::space)];
-    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
-    
-    smooth = 1e-7;
-    lexicon.clear();
-    
-    utils::compress_istream is(path, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
-    
-    iterator_type iter(is);
-    iterator_type iter_end;
-    
-    lexicon_parsed_type lexicon_parsed;
-    
-    while (iter != iter_end) {
-      boost::fusion::get<0>(lexicon_parsed).clear();
-      boost::fusion::get<1>(lexicon_parsed).clear();
-      
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
-	if (iter != iter_end)
-	  throw std::runtime_error("global lexicon parsing failed");
-      
-      const word_type target(boost::fusion::get<0>(lexicon_parsed));
-      const word_type source(boost::fusion::get<1>(lexicon_parsed));
-      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
-      
-      lexicon[source.id()][target] = prob;
-      smooth = std::min(smooth, prob);
-    }
-    
-    lexicon.shrink();
-  }
-
-  lexicon_type lexicon;
-  parameter_type smooth;
-};
 
 struct Model
 {
@@ -273,14 +186,9 @@ struct Model
     bl1_ -= x.bl1_;
     Wl2_ -= x.Wl2_;
     bl2_ -= x.bl2_;
-
-    Wc1_ -= x.Wc1_;
-    bc1_ -= x.bc1_;
-    Wc2_ -= x.Wc2_;
-    bc2_ -= x.bc2_;
     
-    Wp_ -= x.Wp_;
-    bp_ -= x.bp_;
+    Wc_ -= x.Wc_;
+    bc_ -= x.bc_;
     
     return *this;
   }
@@ -331,14 +239,9 @@ struct Model
     bl1_ += x.bl1_;
     Wl2_ += x.Wl2_;
     bl2_ += x.bl2_;
-
-    Wc1_ += x.Wc1_;
-    bc1_ += x.bc1_;
-    Wc2_ += x.Wc2_;
-    bc2_ += x.bc2_;
     
-    Wp_ += x.Wp_;
-    bp_ += x.bp_;
+    Wc_ += x.Wc_;
+    bc_ += x.bc_;
     
     return *this;
   }
@@ -369,13 +272,8 @@ struct Model
     Wl2_.setZero();
     bl2_.setZero();    
 
-    Wc1_.setZero();
-    bc1_.setZero();
-    Wc2_.setZero();
-    bc2_.setZero();    
-
-    Wp_.setZero();
-    bp_.setZero();
+    Wc_.setZero();
+    bc_.setZero();
   }
 
   void finalize()
@@ -439,10 +337,7 @@ struct Model
     Wl1_ *= scaling;
     Wl2_ *= scaling;
 
-    Wc1_ *= scaling;
-    Wc2_ *= scaling;
-    
-    Wp_ *= scaling;
+    Wc_ *= scaling;
     
     if (! ignore_bias) {
       bs1_ *= scaling;
@@ -454,10 +349,7 @@ struct Model
       bl1_ *= scaling;
       bl2_ *= scaling;
 
-      bc1_ *= scaling;
-      bc2_ *= scaling;
-
-      bp_ *= scaling;
+      bc_ *= scaling;
     }
   }
 
@@ -474,10 +366,7 @@ struct Model
     norm += Wl1_.squaredNorm();
     norm += Wl2_.squaredNorm();
 
-    norm += Wc1_.squaredNorm();
-    norm += Wc2_.squaredNorm();
-
-    norm += Wp_.squaredNorm();
+    norm += Wc_.squaredNorm();
     
     if (! ignore_bias) {
       norm += bs1_.squaredNorm();
@@ -489,10 +378,7 @@ struct Model
       norm += bl1_.squaredNorm();
       norm += bl2_.squaredNorm();
 
-      norm += bc1_.squaredNorm();
-      norm += bc2_.squaredNorm();
-
-      norm += bp_.squaredNorm();
+      norm += bc_.squaredNorm();
     }
     
     return norm;
@@ -525,24 +411,16 @@ struct Model
     bi2_ = tensor_type::Random(dimension * 4, 1);
     
     // lexicon
-    Wl1_ = tensor_type::Random(dimension * 2, dimension * 2);
+    Wl1_ = tensor_type::Random(dimension * 2, dimension * 2 * (window * 2 + 1));
     bl1_ = tensor_type::Random(dimension * 2, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Random(dimension * 2, dimension * 2);
-    bl2_ = tensor_type::Random(dimension * 2, 1);
+    Wl2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), dimension * 2);
+    bl2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), 1);
 
-    // context
-    Wc1_ = tensor_type::Random(dimension * 2, dimension * 2 * (window * 2 + 1));
-    bc1_ = tensor_type::Random(dimension * 2, 1);
-    
-    // context reconstruction
-    Wc2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), dimension * 2);
-    bc2_ = tensor_type::Random(dimension * 2 * (window * 2 + 1), 1);
-
-    // probability
-    Wp_ = tensor_type::Random(1, dimension * 2);
-    bp_ = tensor_type::Random(1, 1);
+    // classification
+    Wc_ = tensor_type::Random(1, dimension * 2);
+    bc_ = tensor_type::Random(1, 1);
   }
   
   template <typename Iterator>
@@ -670,14 +548,8 @@ struct Model
     write(rep.path("Wl2.txt.gz"), rep.path("Wl2.bin"), Wl2_);
     write(rep.path("bl2.txt.gz"), rep.path("bl2.bin"), bl2_);
 
-    write(rep.path("Wc1.txt.gz"), rep.path("Wc1.bin"), Wc1_);
-    write(rep.path("bc1.txt.gz"), rep.path("bc1.bin"), bc1_);
-
-    write(rep.path("Wc2.txt.gz"), rep.path("Wc2.bin"), Wc2_);
-    write(rep.path("bc2.txt.gz"), rep.path("bc2.bin"), bc2_);
-
-    write(rep.path("Wp.txt.gz"), rep.path("Wp.bin"), Wp_);
-    write(rep.path("bp.txt.gz"), rep.path("bp.bin"), bp_);
+    write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
+    write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -735,17 +607,9 @@ struct Model
   tensor_type Wl2_;
   tensor_type bl2_;  
 
-  // Wc1 and bc1 for encoding
-  tensor_type Wc1_;
-  tensor_type bc1_;
-  
-  // Wc2 and bc2 for reconstruction
-  tensor_type Wc2_;
-  tensor_type bc2_;  
-
-  // Wp and bp for probability
-  tensor_type Wp_;
-  tensor_type bp_;
+  // Wc and bc for classification
+  tensor_type Wc_;
+  tensor_type bc_;
 };
 
 
@@ -757,8 +621,6 @@ struct ITGTree
   typedef Model model_type;
   typedef Model gradient_type;
 
-  typedef Lexicon lexicon_type;
-
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
   
@@ -767,6 +629,8 @@ struct ITGTree
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
   typedef bitext_type::vocab_type vocab_type;
+
+  typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
 
   struct Span
   {
@@ -884,6 +748,9 @@ struct ITGTree
   typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > derivation_type;
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_derivation_type;
 
+  typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > hyperedge_set_type;
+  typedef std::vector<hyperedge_set_type, std::allocator<hyperedge_set_type> > tree_type;
+
   typedef std::pair<double, span_pair_type> error_span_pair_type;
   typedef std::vector<error_span_pair_type, std::allocator<error_span_pair_type> > heap_type;
 
@@ -912,17 +779,23 @@ struct ITGTree
     
     Node()
       : error_(std::numeric_limits<double>::infinity()),
+	error_classification_(0.0),	
 	total_(std::numeric_limits<double>::infinity()) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     bool straight() const { return tails_.first.target_.last_ == tails_.second.target_.first_; }
     
     double      error_;
+    double      error_classification_;
     double      total_;
     
     tensor_type output_;
     tensor_type output_norm_;
     tensor_type delta_;
+    
+    tensor_type output_classification_;
+    tensor_type output_classification_norm_;
+    tensor_type delta_classification_;
     
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
@@ -950,30 +823,28 @@ struct ITGTree
   
   struct Leaf
   {
-    Leaf() : error_(std::numeric_limits<double>::infinity()) {}
+    Leaf()
+      : error_(std::numeric_limits<double>::infinity()) {}
     
     double      error_;
     
     // input with context
     tensor_type input_;
+    tensor_type input_classification_;
     
-    // output from context + reconstruction
-    tensor_type output_context_;
-    tensor_type output_context_norm_;
-    
-    tensor_type reconstruction_context_;
-    tensor_type delta_reconstruction_context_;
-    
-    // secondary output + reconstruction
+    // output + reconstruction
     tensor_type output_;
     tensor_type output_norm_;
+
+    tensor_type output_classification_;
+    tensor_type output_classification_norm_;
     
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
     
-    // for lexical reconstruction
-    tensor_type lexicon_;
-    tensor_type delta_lexicon_;
+    // sampled classifications
+    word_type   source_classification_;
+    word_type   target_classification_;
   };
 
   typedef Leaf leaf_type;
@@ -990,6 +861,8 @@ struct ITGTree
     agenda_.clear();
     heap_.clear();
     uniques_.clear();
+
+    tree_.clear();
     
     stack_.clear();
     stack_derivation_.clear();
@@ -1028,8 +901,6 @@ struct ITGTree
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta,
-	       const lexicon_type& lexicon_source_target,
-	       const lexicon_type& lexicon_target_source,
 	       const double beam)
   {
     const size_type source_size = source.size();
@@ -1056,7 +927,7 @@ struct ITGTree
     // initialization
     //std::cerr << "initialize leaves" << std::endl;
 
-    forward_leaves(source, target, theta, lexicon_source_target, lexicon_target_source);
+    forward_leaves(source, target, theta);
 
     //std::cerr << "start initialization" << std::endl;
 
@@ -1242,9 +1113,7 @@ struct ITGTree
   // leaves!
   void forward_leaves(const sentence_type& source,
 		      const sentence_type& target,
-		      const model_type& theta,
-		      const lexicon_type& lexicon_source_target,
-		      const lexicon_type& lexicon_target_source)
+		      const model_type& theta)
   {
     typedef model_type::embedding_type embedding_type;
     
@@ -1257,16 +1126,6 @@ struct ITGTree
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
 	leaf_type& leaf = leaves_(src, trg);
-	
-#if 0
-	// lexical probability
-	const double prob = (src == 0
-			     ? lexicon_source_target(vocab_type::EPSILON, target[trg - 1])
-			     : (trg == 0
-				? lexicon_target_source(vocab_type::EPSILON, source[src - 1])
-				: (std::sqrt(lexicon_source_target(source[src - 1], target[trg - 1]))
-				   * std::sqrt(lexicon_target_source(target[trg - 1], source[src - 1])))));
-#endif
 	
 	leaf.input_ = tensor_type(dimension * 2 * (window * 2 + 1), 1);
 
@@ -1335,52 +1194,21 @@ struct ITGTree
 	    leaf.input_.block(dimension * i + offset, 0, dimension, 1) = titer->second * theta.scale_target_;
 	  }
 	}
-
-	{
-	  const tensor_type& c = leaf.input_;
-	  const tensor_type p = (theta.Wc1_ * c + theta.bc1_).array().unaryExpr(std::ptr_fun(tanhf));
-	  const tensor_type p_norm = p.normalized();
-	  const tensor_type y = (theta.Wc2_ * p_norm + theta.bc2_).array().unaryExpr(std::ptr_fun(tanhf));
-	  const tensor_type y_minus_c = y.normalized() - c;
-	  
-	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-	  
-	  leaf.error_               = e;
-	  leaf.output_context_      = p;
-	  leaf.output_context_norm_ = p_norm;
-	  
-	  leaf.reconstruction_context_       = y_minus_c.array() * theta.alpha_;
-	  leaf.delta_reconstruction_context_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_context_.array();
-	}
 	
-	{
-	  const tensor_type& c = leaf.output_context_norm_;
-	  const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
-	  const tensor_type p_norm = p.normalized();
-	  const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
-	  const tensor_type y_minus_c = y.normalized() - c;
-
-#if 0
-	  const double log_lexicon = std::min(- boost::math::log1p(std::exp(- double((theta.Wp_ * p_norm + theta.bp_)(0, 0)))),
-					      std::log(1.0 - 1e-10));
-	  const double log_sigmoid = - boost::math::log1p(std::exp(- std::exp(log_lexicon)));
-	  const double cross_entropy = - prob * log_lexicon - (1.0 - prob) * boost::math::log1p(- std::exp(log_lexicon));
-	  
-	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm() + cross_entropy;
-#endif
-	  
-	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-	  
-	  leaf.error_      += e;
-	  leaf.output_      = p;
-	  leaf.output_norm_ = p_norm;
-	  
-	  leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
-	  leaf.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_.array();
-	  
-	  //leaf.lexicon_ = tensor_type::Constant(1, 1, - prob / std::exp(log_lexicon) - (1.0 - prob) / boost::math::expm1(log_lexicon));
-	  //leaf.delta_lexicon_ = tensor_type::Constant(1, 1, - std::exp(log_sigmoid) * boost::math::expm1(log_sigmoid) * leaf.lexicon_(0, 0));
-	}
+	const tensor_type& c = leaf.input_;
+	const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type p_norm = p.normalized();
+	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type y_minus_c = y.normalized() - c;
+	
+	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+	
+	leaf.error_       = e;
+	leaf.output_      = p;
+	leaf.output_norm_ = p_norm;
+	
+	leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
+	leaf.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_.array();
       }
   }
 
@@ -1473,8 +1301,132 @@ struct ITGTree
     
   }
   
+  // additional forward loop to derive "wrong translations"
+  template <typename Gen>
+  void forward(const sentence_type& source,
+	       const sentence_type& target,
+	       const word_set_type& sources,
+	       const word_set_type& targets,
+	       const model_type& theta,
+	       Gen& gen)
+  {
+    typedef model_type::embedding_type embedding_type;
+
+    const size_type dimension = theta.dimension_;
+    const size_type window    = theta.window_;
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    tree_.reserve(source_size + target_size + 1);
+    tree_.resize(source_size + target_size + 1);
+    
+    stack_derivation_.clear();
+    stack_derivation_.push_back(span_pair_type(0, source_size, 0, target_size));
+        
+    while (! stack_derivation_.empty()) {
+      const span_pair_type span = stack_derivation_.back();
+      stack_derivation_.pop_back();
+      
+      const node_type& node = nodes_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+      
+      if (node.terminal())
+	tree_[span.size()].push_back(hyperedge_type(span));
+      else {
+	const span_pair_type& child1 = node.tails_.first;
+	const span_pair_type& child2 = node.tails_.second;
+	
+	// this is the order we push in the backward operation
+	stack_derivation_.push_back(child1);
+	stack_derivation_.push_back(child2);
+	
+	tree_[span.size()].push_back(hyperedge_type(span, child1, child2));
+      }
+    }
+    
+    // now, we are ready to enumerate tree structure in a bottom up fashion
+    const size_type length_max = source_size + target_size;
+    for (size_type length = 1; length <= length_max; ++ length) 
+      if (! tree_[length].empty()) {
+	hyperedge_set_type::const_iterator eiter_end = tree_[length].end();
+	for (hyperedge_set_type::const_iterator eiter = tree_[length].begin(); eiter != eiter_end; ++ eiter) {
+	  const hyperedge_type& edge = *eiter;
+
+	  const span_pair_type& parent = edge.span_;
+	  const span_pair_type& child1 = edge.left_;
+	  const span_pair_type& child2 = edge.right_;
+	  
+	  node_type& node = nodes_(parent.source_.first_, parent.source_.last_,
+				   parent.target_.first_, parent.target_.last_);
+	  
+	  if (edge.terminal()) {
+	    leaf_type& leaf = leaves_(edge.span_.source_.empty() ? 0 : edge.span_.source_.first_ + 1,
+				      edge.span_.target_.empty() ? 0 : edge.span_.target_.first_ + 1);
+	    
+	    leaf.input_classification_ = leaf.input_;
+	    leaf.source_classification_ = vocab_type::EPSILON;
+	    leaf.target_classification_ = vocab_type::EPSILON;
+	    
+	    if (! edge.span_.source_.empty()) {
+	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, sources.size() - 1)(gen);
+
+	      leaf.source_classification_ = sources[pos];
+	      
+	      embedding_type::const_iterator siter = theta.source_.find(sources[pos]);
+	      if (siter == theta.source_.end())
+		throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	      
+	      if (siter->second.rows() != dimension)
+		throw std::runtime_error("dimensin does not for the source side");
+	      
+	      leaf.input_classification_.block(dimension * window, 0, dimension, 1) = siter->second * theta.scale_source_;
+	    }
+	    
+	    if (! edge.span_.target_.empty()) {
+	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, targets.size() - 1)(gen);
+
+	      leaf.target_classification_ = targets[pos];
+	      
+	      embedding_type::const_iterator titer = theta.target_.find(targets[pos]);
+	      if (titer == theta.target_.end())
+		throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	      
+	      if (titer->second.rows() != dimension)
+		throw std::runtime_error("dimensin does not for the target side");
+	      
+	      const size_type offset = dimension * (window * 2 + 1);
+	      
+	      leaf.input_classification_.block(offset + dimension * window, 0, dimension, 1) = titer->second * theta.scale_target_;
+	    }
+	    
+	    const tensor_type& c = leaf.input_classification_;
+	    
+	    leaf.output_classification_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	    leaf.output_classification_norm_ = leaf.output_classification_.normalized();
+	    
+	    node.output_classification_norm_ = leaf.output_classification_norm_;
+	  } else {
+	    const bool straight = edge.straight();
+	    
+	    const node_type& node1 = nodes_(child1.source_.first_, child1.source_.last_,
+					    child1.target_.first_, child1.target_.last_);
+	    const node_type& node2 = nodes_(child2.source_.first_, child2.source_.last_,
+					    child2.target_.first_, child2.target_.last_);
+	    
+	    const tensor_type W1 = (straight ? theta.Ws1_ : theta.Wi1_);
+	    const tensor_type b1 = (straight ? theta.bs1_ : theta.bi1_);
+	    
+	    tensor_type c(dimension * 4, 1);
+	    c << node1.output_classification_norm_, node2.output_classification_norm_;
+	    
+	    node.output_classification_      = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
+	    node.output_classification_norm_ = node.output_classification_.normalized();
+	  }
+	}
+      }
+  }
+  
   // backward propagation from the goal node!
-  // we define an enum...
   
   void backward(const sentence_type& source,
 		const sentence_type& target,
@@ -1483,16 +1435,40 @@ struct ITGTree
   {
     const size_type dimension = theta.dimension_;
     const size_type window    = theta.window_;
+
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
     
-    const span_pair_type span_root(0, source.size(), 0, target.size());
+    const tensor_type root_W1 = tensor_type::Ones(dimension * 2, dimension * 4);
+    const tensor_type root_reconstruction = tensor_type::Zero(dimension * 4, 1);
     
-    tensor_type root_W1 = tensor_type::Zero(dimension * 2, dimension * 4);
-    tensor_type root_W2 = tensor_type::Zero(dimension * 4, dimension * 2);
-    tensor_type root_reconstruction = tensor_type::Zero(dimension * 4, 1);
+    const span_pair_type span_root(0, source_size, 0, target_size);
     
-    node_type& node_root = nodes_(0, source.size(), 0, target.size());
+    node_type& node_root = nodes_(0, source_size, 0, target_size);
     
-    node_root.delta_ = tensor_type::Zero(dimension * 2, 1);
+    const double y_p = std::tanh((theta.Wc_ * node_root.output_norm_ + theta.bc_)(0,0));
+    const double y_m = std::tanh((theta.Wc_ * node_root.output_classification_norm_ + theta.bc_)(0,0));
+    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+    
+    const bool suffer_classification = error > 0.0;
+    
+    node_root.error_classification_ = error;
+    
+    if (suffer_classification) {
+      // we suffered classification loss... this is reflected in node_root.delta_ and node_root.delta_classification_
+      // and we will also update error from classified result
+      const double delta_p = - (1.0 - y_p * y_p) * (1.0 - theta.alpha_);
+      const double delta_m =   (1.0 - y_m * y_m) * (1.0 - theta.alpha_);
+      
+      node_root.delta_                = theta.Wc_.transpose() * delta_p;
+      node_root.delta_classification_ = theta.Wc_.transpose() * delta_m;
+      
+      gradient.Wc_ += delta_p * node_root.output_norm_.transpose();
+      gradient.Wc_ += delta_m * node_root.output_classification_norm_.transpose();
+      gradient.bc_ += tensor_type::Constant(1, 1, delta_p);
+      gradient.bc_ += tensor_type::Constant(1, 1, delta_m);
+    } else
+      node_root.delta_ = tensor_type::Zero(dimension * 2, 1);
     
     stack_.clear();
     stack_.push_back(std::make_pair(span_root, span_root));
@@ -1529,40 +1505,21 @@ struct ITGTree
 	if (root || left)
 	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
-		      //+ theta.Wp_.transpose() * leaf.delta_lexicon_
 		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
-		      //+ theta.Wp_.transpose() * leaf.delta_lexicon_
 		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	
-	gradient.Wl1_ += delta * leaf.output_context_norm_.transpose();
+	gradient.Wl1_ += delta * leaf.input_.transpose();
 	gradient.bl1_ += delta;
 	
 	gradient.Wl2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
 	gradient.bl2_ += leaf.delta_reconstruction_;
 	
-	//gradient.Wp_ += leaf.delta_lexicon_ * leaf.output_norm_.transpose();
-	//gradient.bp_ += leaf.delta_lexicon_;
-	
-	const tensor_type delta_context = (- (leaf.output_context_.array() * leaf.output_context_.array() - 1.0)
-					   * (theta.Wc2_.transpose() * leaf.delta_reconstruction_context_
-					      + theta.Wl1_.transpose() * delta
-					      - leaf.reconstruction_).array());
-	
-	gradient.Wc1_ += delta_context * leaf.input_.transpose();
-	gradient.bc1_ += delta_context;
-	
-	gradient.Wc2_ += leaf.delta_reconstruction_context_ * leaf.output_context_norm_.transpose();
-	gradient.bc2_ += leaf.delta_reconstruction_context_;
-	
-	const tensor_type delta_embedding = theta.Wc1_.transpose() * delta_context - leaf.reconstruction_context_;
-
-	const difference_type source_size = source.size();
-	const difference_type target_size = target.size();
+	const tensor_type delta_embedding = theta.Wl1_.transpose() * delta - leaf.reconstruction_;
 	
 	if (span.source_.empty()) {
 	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
@@ -1621,6 +1578,89 @@ struct ITGTree
 	    dtarget += delta_embedding.block(dimension * i + offset, 0, dimension, 1);
 	  }
 	}
+	
+	if (suffer_classification) {
+	  tensor_type delta;
+	  
+	  if (root || left)
+	    delta = (- (leaf.output_classification_.array() * leaf.output_classification_.array() - 1.0)
+		     * (W1.block(0, 0, dimension * 2, dimension * 2).transpose()
+			* node_parent.delta_classification_).array());
+	  else
+	    delta = (- (leaf.output_classification_.array() * leaf.output_classification_.array() - 1.0)
+		     * (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
+			* node_parent.delta_classification_).array());
+	  
+	  gradient.Wl1_ += delta * leaf.input_classification_.transpose();
+	  gradient.bl1_ += delta;
+	  
+	  const tensor_type delta_embedding = theta.Wl1_.transpose() * delta;
+	  
+	  if (span.source_.empty()) {
+	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
+	  
+	  if (! dsource.cols() || ! dsource.rows())
+	    dsource = tensor_type::Zero(dimension, 1);
+	  
+	  for (size_type i = 0; i != window * 2 + 1; ++ i)
+	    dsource += delta_embedding.block(dimension * i, 0, dimension, 1);
+	  } else {
+	    for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	      const difference_type shift = difference_type(i) - window;
+	      
+	      const word_type& word = (span.source_.first_ + shift < 0
+				       ? vocab_type::BOS
+				       : (span.source_.first_ + shift >= source_size
+					  ? vocab_type::EOS
+					  : (shift == 0 
+					     ? leaf.source_classification_
+					     : source[span.source_.first_ + shift])));
+	      
+	      tensor_type& dsource = gradient.source_[word];
+	      
+	      if (! dsource.cols() || ! dsource.rows())
+		dsource = tensor_type::Zero(dimension, 1);
+	      
+	      dsource += delta_embedding.block(dimension * i, 0, dimension, 1);
+	    }
+	  }
+	  
+	  
+	  if (span.target_.empty()) {
+	    tensor_type& dtarget = gradient.target_[vocab_type::EPSILON];
+	    
+	    if (! dtarget.cols() || ! dtarget.rows())
+	      dtarget = tensor_type::Zero(dimension, 1);
+	    
+	    const size_type offset = dimension * (window * 2 + 1);
+	    
+	    for (size_type i = 0; i != window * 2 + 1; ++ i)
+	      dtarget += delta_embedding.block(dimension * i + offset, 0, dimension, 1);
+	  } else {
+	    const size_type offset = dimension * (window * 2 + 1);
+	    
+	    for (size_type i = 0; i != window * 2 + 1; ++ i) {
+	      const difference_type shift = difference_type(i) - window;
+	      
+	      const word_type& word = (span.target_.first_ + shift < 0
+				       ? vocab_type::BOS
+				       : (span.target_.first_ + shift >= target_size
+					  ? vocab_type::EOS
+					  : (shift == 0
+					     ? leaf.target_classification_
+					     : target[span.target_.first_ + shift])));
+	    
+	      tensor_type& dtarget = gradient.target_[word];
+	    
+	      if (! dtarget.cols() || ! dtarget.rows())
+		dtarget = tensor_type::Zero(dimension, 1);
+	    
+	      dtarget += delta_embedding.block(dimension * i + offset, 0, dimension, 1);
+	    }
+	  }
+	  
+	}
+
       } else {
 	const span_pair_type& child1 = node.tails_.first;
 	const span_pair_type& child2 = node.tails_.second;
@@ -1662,6 +1702,25 @@ struct ITGTree
 	
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
 	db2 += node.delta_reconstruction_;
+	
+	if (suffer_classification) {
+	  if (root || left)
+	    node1.delta_classification_ = (- (node.output_classification_.array() * node.output_classification_.array() - 1.0)
+					   * (W1.block(0, 0, dimension * 2, dimension * 2).transpose()
+					      * node_parent.delta_classification_).array());
+	  else
+	    node1.delta_classification_ = (- (node.output_classification_.array() * node.output_classification_.array() - 1.0)
+					   * (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
+					      * node_parent.delta_classification_).array());
+	  
+	  node2.delta_classification_ = node1.delta_classification_;
+	  
+	  const tensor_type& delta = node1.delta_classification_;
+	  
+	  dW1.block(0, 0, dimension * 2, dimension * 2)             += delta * node1.output_classification_norm_.transpose();
+	  dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_classification_norm_.transpose();
+	  db1 += delta;
+	}
       }
     }
   }
@@ -1698,6 +1757,8 @@ struct ITGTree
   
   node_set_type nodes_;
   leaf_set_type leaves_;
+
+  tree_type tree_;
 
   rest_cost_set_type costs_source_;
   rest_cost_set_type costs_target_;
@@ -1740,20 +1801,14 @@ struct LearnAdaGrad
     Wi2_ = tensor_type::Zero(dimension * 4, dimension * 2);
     bi2_ = tensor_type::Zero(dimension * 4, 1);
 
-    Wl1_ = tensor_type::Zero(dimension * 2, dimension * 2);
+    Wl1_ = tensor_type::Zero(dimension * 2, dimension * 2 * (window * 2 + 1));
     bl1_ = tensor_type::Zero(dimension * 2, 1);
     
-    Wl2_ = tensor_type::Zero(dimension * 2, dimension * 2);
-    bl2_ = tensor_type::Zero(dimension * 2, 1);    
+    Wl2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), dimension * 2);
+    bl2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), 1);    
     
-    Wc1_ = tensor_type::Zero(dimension * 2, dimension * 2 * (window * 2 + 1));
-    bc1_ = tensor_type::Zero(dimension * 2, 1);
-    
-    Wc2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), dimension * 2);
-    bc2_ = tensor_type::Zero(dimension * 2 * (window * 2 + 1), 1);
-
-    Wp_ = tensor_type::Zero(1, dimension * 2);
-    bp_ = tensor_type::Zero(1, 1);
+    Wc_ = tensor_type::Zero(1, dimension * 2);
+    bc_ = tensor_type::Zero(1, 1);
   }
   
   void operator()(model_type& theta, const gradient_type& gradient) const
@@ -1820,14 +1875,8 @@ struct LearnAdaGrad
     update(theta.Wl2_, Wl2_, gradient.Wl2_, lambda_ != 0.0);
     update(theta.bl2_, bl2_, gradient.bl2_, false);
 
-    update(theta.Wc1_, Wc1_, gradient.Wc1_, lambda_ != 0.0);
-    update(theta.bc1_, bc1_, gradient.bc1_, false);
-
-    update(theta.Wc2_, Wc2_, gradient.Wc2_, lambda_ != 0.0);
-    update(theta.bc2_, bc2_, gradient.bc2_, false);
-
-    update(theta.Wp_, Wp_, gradient.Wp_, lambda_ != 0.0);
-    update(theta.bp_, bp_, gradient.bp_, false);
+    update(theta.Wc_, Wc_, gradient.Wc_, lambda_ != 0.0);
+    update(theta.bc_, bc_, gradient.bc_, false);
   }
 
   struct update_visitor_regularize
@@ -1906,17 +1955,9 @@ struct LearnAdaGrad
   tensor_type Wl2_;
   tensor_type bl2_;
 
-  // Wc1 and bc1 for encoding
-  tensor_type Wc1_;
-  tensor_type bc1_;
-  
-  // Wc2 and bc2 for reconstruction
-  tensor_type Wc2_;
-  tensor_type bc2_;
-
-  // Wp and bp for probability
-  tensor_type Wp_;
-  tensor_type bp_;
+  // Wc and bc for classification
+  tensor_type Wc_;
+  tensor_type bc_;
 };
 
 struct LearnL2
@@ -2000,15 +2041,9 @@ struct LearnL2
 
     theta.Wl2_.array() -= gradient.Wl2_.array() * eta;
     theta.bl2_.array() -= gradient.bl2_.array() * eta;
-
-    theta.Wc1_.array() -= gradient.Wc1_.array() * eta;
-    theta.bc1_.array() -= gradient.bc1_.array() * eta;
-
-    theta.Wc2_.array() -= gradient.Wc2_.array() * eta;
-    theta.bc2_.array() -= gradient.bc2_.array() * eta;
     
-    theta.Wp_.array() -= gradient.Wp_.array() * eta;
-    theta.bp_.array() -= gradient.bp_.array() * eta;
+    theta.Wc_.array() -= gradient.Wc_.array() * eta;
+    theta.bc_.array() -= gradient.bc_.array() * eta;
     
     // projection onto L2 norm..
     if (lambda_ != 0.0) {
@@ -2033,9 +2068,9 @@ typedef boost::filesystem::path path_type;
 
 typedef Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
+typedef ITGTree::word_set_type word_set_type;
 
 typedef Model model_type;
-typedef Lexicon lexicon_type;
 
 static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
@@ -2044,15 +2079,12 @@ static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 path_type source_file;
 path_type target_file;
 
-path_type lexicon_source_target_file;
-path_type lexicon_target_source_file;
-
 path_type derivation_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 path_type output_model_file;
 
-double alpha = 1.0;
+double alpha = 0.01;
 int dimension = 16;
 int window = 2;
 
@@ -2064,7 +2096,6 @@ int batch_size = 1024;
 double beam = 0.1;
 double lambda = 1;
 double eta0 = 1;
-bool sampling = false;
 
 bool dump_mode = false;
 
@@ -2075,16 +2106,16 @@ int debug = 0;
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  model_type& theta,
-		  const lexicon_type& lexicon_source_target,
-		  const lexicon_type& lexicon_target_source);
+		  const word_set_type& sources,
+		  const word_set_type& targets,
+		  model_type& theta);
 void derivation(const bitext_set_type& bitexts,
-		const model_type& theta,
-		const lexicon_type& lexicon_source_target,
-		const lexicon_type& lexicon_target_source);
-void read_data(const path_type& source_file,
-	       const path_type& target_file,
-	       bitext_set_type& bitexts);
+		const model_type& theta);
+void read_bitext(const path_type& source_file,
+		 const path_type& target_file,
+		 bitext_set_type& bitexts,
+		 word_set_type& sources,
+		 word_set_type& targets);
 
 void options(int argc, char** argv);
 
@@ -2099,7 +2130,7 @@ int main(int argc, char** argv)
     if (window < 0)
       throw std::runtime_error("window size should be >= 0");
     
-    if (alpha < 0.0)
+    if (alpha < 0.0 || alpha > 1.0)
       throw std::runtime_error("error factor should be: 0.0 <= alpha <= 1.0");
 
     
@@ -2116,53 +2147,31 @@ int main(int argc, char** argv)
   
     // this is optional, but safe to set this
     ::srandom(utils::random_seed());
-    
-    boost::mt19937 generator;
-    generator.seed(utils::random_seed());
-    
+        
     if (source_file.empty())
       throw std::runtime_error("no source data?");
     if (target_file.empty())
       throw std::runtime_error("no target data?");
     
     bitext_set_type bitexts;
+    word_set_type sources;
+    word_set_type targets;
     
-    read_data(source_file, target_file, bitexts);
+    read_bitext(source_file, target_file, bitexts, sources, targets);
     
     model_type theta(dimension, window, alpha);
     
     theta.embedding(bitexts.begin(), bitexts.end());
-
-    lexicon_type lexicon_source_target;
-    lexicon_type lexicon_target_source;
-
-    boost::thread_group workers_read;
-
-    if (! lexicon_source_target_file.empty()) {
-      if (! boost::filesystem::exists(lexicon_source_target_file))
-	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_source_target_file.string());
-
-      workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read, lexicon_source_target, lexicon_source_target_file)));
-    }
-
-    if (! lexicon_target_source_file.empty()) {
-      if (! boost::filesystem::exists(lexicon_target_source_file))
-	throw std::runtime_error("no lexicon file for P(target | source)? " + lexicon_target_source_file.string());
-
-      workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read, lexicon_target_source, lexicon_target_source_file)));
-    }
-    
-    workers_read.join_all();
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, window, lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnAdaGrad(dimension, window, lambda, eta0), bitexts, sources, targets, theta);
       else
-	learn_online(LearnL2(lambda, eta0), bitexts, theta, lexicon_source_target, lexicon_target_source);
+	learn_online(LearnL2(lambda, eta0), bitexts, sources, targets, theta);
     }
     
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
-      derivation(bitexts, theta, lexicon_source_target, lexicon_target_source);
+      derivation(bitexts, theta);
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -2512,18 +2521,18 @@ struct TaskAccumulate
   typedef Counter counter_type;
 
   TaskAccumulate(const bitext_set_type& bitexts,
+		 const word_set_type& sources,
+		 const word_set_type& targets,
 		 const model_type& theta,
-		 const lexicon_type& lexicon_source_target,
-		 const lexicon_type& lexicon_target_source,
 		 const double& beam,
 		 queue_type& queue,
 		 counter_type& counter,
 		 queue_derivation_type& queue_derivation,
 		 queue_derivation_type& queue_alignment)
     : bitexts_(bitexts),
+      sources_(sources),
+      targets_(targets),
       theta_(theta),
-      lexicon_source_target_(lexicon_source_target),
-      lexicon_target_source_(lexicon_target_source),
       beam_(beam),
       queue_(queue),
       counter_(counter),
@@ -2531,6 +2540,7 @@ struct TaskAccumulate
       queue_alignment_(queue_alignment),
       gradient_(theta.dimension_, theta.window_),
       error_(0),
+      classification_(0),
       samples_(0) {}
   
   void operator()()
@@ -2538,6 +2548,9 @@ struct TaskAccumulate
     clear();
 
     bitext_derivation_type bitext_derivation;
+
+    boost::mt19937 generator;
+    generator.seed(utils::random_seed());
     
     size_type bitext_id;
     for (;;) {
@@ -2559,16 +2572,19 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, lexicon_source_target_, lexicon_target_source_, beam_);
+	itg_tree_.forward(source, target, theta_, beam_);
 
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 
 	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
 	
 	if (parsed) {
+	  itg_tree_.forward(source, target, sources_, targets_, theta_, generator);
+	  
 	  itg_tree_.backward(source, target, theta_, gradient_);
 	  
 	  error_ += root.total_;
+	  classification_ += root.error_classification_;
 	  ++ samples_;
 	  
 	  itg_tree_.derivation(source, target, bitext_derivation.derivation_);
@@ -2590,13 +2606,14 @@ struct TaskAccumulate
   {
     gradient_.clear();
     error_ = 0.0;
+    classification_ = 0.0;
     samples_ = 0;
   }
 
   const bitext_set_type& bitexts_;
+  const word_set_type& sources_;
+  const word_set_type& targets_;
   const model_type& theta_;
-  const lexicon_type& lexicon_source_target_;
-  const lexicon_type& lexicon_target_source_;
   const double beam_;
   
   queue_type&            queue_;
@@ -2608,6 +2625,7 @@ struct TaskAccumulate
 
   gradient_type gradient_;
   double        error_;
+  double        classification_;
   size_type     samples_;
 };
 
@@ -2640,9 +2658,9 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  model_type& theta,
-		  const lexicon_type& lexicon_source_target,
-		  const lexicon_type& lexicon_target_source)
+		  const word_set_type& sources,
+		  const word_set_type& targets,
+		  model_type& theta)
 {
   typedef TaskAccumulate task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -2662,9 +2680,9 @@ void learn_online(const Learner& learner,
   output_map_reduce_type::queue_type queue_alignment;
   
   task_set_type tasks(threads, task_type(bitexts,
+					 sources,
+					 targets,
 					 theta,
-					 lexicon_source_target,
-					 lexicon_target_source,
 					 beam,
 					 mapper,
 					 reducer,
@@ -2701,6 +2719,7 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter_end = ids.end();
 
     double error = 0.0;
+    double classification = 0.0;
     size_type samples = 0;
     size_type num_bitext = 0;
     
@@ -2731,12 +2750,14 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      error   += tasks.front().error_;
-      samples += tasks.front().samples_;
+      error          += tasks.front().error_;
+      classification += tasks.front().classification_;
+      samples        += tasks.front().samples_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_ += tasks[i].gradient_;
-	error   += tasks[i].error_;
-	samples += tasks[i].samples_;
+	error          += tasks[i].error_;
+	classification += tasks[i].classification_;
+	samples        += tasks[i].samples_;
       }
       
       // update model parameters
@@ -2752,7 +2773,8 @@ void learn_online(const Learner& learner,
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
 
     if (debug)
-      std::cerr << "average error: " << (error / samples) << std::endl
+      std::cerr << "reconstruction error: " << (error / samples) << std::endl
+		<< "classification error: " << (classification / samples) << std::endl
 		<< "parsed: " << samples << std::endl;
     
     // shuffle bitexts!
@@ -2795,16 +2817,12 @@ struct TaskDerivation
   
   TaskDerivation(const bitext_set_type& bitexts,
 		 const model_type& theta,
-		 const lexicon_type& lexicon_source_target,
-		 const lexicon_type& lexicon_target_source,
 		 const double& beam,
 		 queue_type& queue,
 		 queue_derivation_type& queue_derivation,
 		 queue_derivation_type& queue_alignment)
     : bitexts_(bitexts),
       theta_(theta),
-      lexicon_source_target_(lexicon_source_target),
-      lexicon_target_source_(lexicon_target_source),
       beam_(beam),
       queue_(queue),
       queue_derivation_(queue_derivation),
@@ -2834,7 +2852,7 @@ struct TaskDerivation
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, lexicon_source_target_, lexicon_target_source_, beam_);
+	itg_tree_.forward(source, target, theta_, beam_);
 	
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 	
@@ -2855,8 +2873,6 @@ struct TaskDerivation
 
   const bitext_set_type& bitexts_;
   const model_type& theta_;
-  const lexicon_type& lexicon_source_target_;
-  const lexicon_type& lexicon_target_source_;
   const double beam_;
   
   queue_type&            queue_;
@@ -2867,9 +2883,7 @@ struct TaskDerivation
 };
 
 void derivation(const bitext_set_type& bitexts,
-		const model_type& theta,
-		const lexicon_type& lexicon_source_target,
-		const lexicon_type& lexicon_target_source)
+		const model_type& theta)
 {
   typedef TaskDerivation task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -2886,8 +2900,6 @@ void derivation(const bitext_set_type& bitexts,
   
   task_set_type tasks(threads, task_type(bitexts,
 					 theta,
-					 lexicon_source_target,
-					 lexicon_target_source,
 					 beam,
 					 mapper,
 					 queue_derivation,
@@ -2925,11 +2937,21 @@ void derivation(const bitext_set_type& bitexts,
   workers_dump.join_all();
 }
 
-void read_data(const path_type& source_file,
-	       const path_type& target_file,
-	       bitext_set_type& bitexts)
+void read_bitext(const path_type& source_file,
+		 const path_type& target_file,
+		 bitext_set_type& bitexts,
+		 word_set_type& sources,
+		 word_set_type& targets)
 {
+  typedef utils::compact_set<bitext_type::word_type,
+			     utils::unassigned<bitext_type::word_type>, utils::unassigned<bitext_type::word_type>,
+			     boost::hash<bitext_type::word_type>, std::equal_to<bitext_type::word_type>,
+			     std::allocator<bitext_type::word_type> > unique_set_type;
+  
   bitexts.clear();
+
+  unique_set_type uniques_source;
+  unique_set_type uniques_target;
   
   utils::compress_istream src(source_file, 1024 * 1024);
   utils::compress_istream trg(target_file, 1024 * 1024);
@@ -2944,10 +2966,19 @@ void read_data(const path_type& source_file,
     if (! src || ! trg) break;
     
     bitexts.push_back(bitext_type(source, target));
+
+    uniques_source.insert(source.begin(), source.end());
+    uniques_target.insert(target.begin(), target.end());
   }
   
   if (src || trg)
     throw std::runtime_error("# of sentnces do not match");
+
+  sources.clear();
+  targets.clear();
+  
+  sources.insert(sources.end(), uniques_source.begin(), uniques_source.end());
+  targets.insert(targets.end(), uniques_target.begin(), uniques_target.end());
 }
 
 void options(int argc, char** argv)
@@ -2959,9 +2990,6 @@ void options(int argc, char** argv)
     ("source",    po::value<path_type>(&source_file),    "source file")
     ("target",    po::value<path_type>(&target_file),    "target file")
     
-    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),  "lexicon model for P(target | source)")
-    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),  "lexicon model for P(source | target)")
-        
     ("derivation",               po::value<path_type>(&derivation_file),               "output derivation")
     ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "output alignemnt for P(target | source)")
     ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "output alignemnt for P(source | target)")
@@ -2980,7 +3008,6 @@ void options(int argc, char** argv)
     ("beam",              po::value<double>(&beam)->default_value(beam),          "beam width for parsing")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
-    ("sampling",          po::bool_switch(&sampling),                             "sample negative examples")
 
     ("dump", po::bool_switch(&dump_mode), "dump intermediate derivations and alignments")
     
