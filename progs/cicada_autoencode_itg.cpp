@@ -438,12 +438,12 @@ struct Model
     tensor_type& eos_source     = source_[vocab_type::EOS];
     tensor_type& eos_target     = target_[vocab_type::EOS];
     
-    epsilon_source = tensor_type::Random(dimension_, 1);
-    epsilon_target = tensor_type::Random(dimension_, 1);
-    bos_source     = tensor_type::Random(dimension_, 1);
-    bos_target     = tensor_type::Random(dimension_, 1);
-    eos_source     = tensor_type::Random(dimension_, 1);
-    eos_target     = tensor_type::Random(dimension_, 1);
+    epsilon_source = tensor_type::Random(dimension_, 1).normalized();
+    epsilon_target = tensor_type::Random(dimension_, 1).normalized();
+    bos_source     = tensor_type::Random(dimension_, 1).normalized();
+    bos_target     = tensor_type::Random(dimension_, 1).normalized();
+    eos_source     = tensor_type::Random(dimension_, 1).normalized();
+    eos_target     = tensor_type::Random(dimension_, 1).normalized();
     
     norm_source_ = epsilon_source.squaredNorm() + bos_source.squaredNorm() + eos_source.squaredNorm();
     norm_target_ = epsilon_target.squaredNorm() + bos_target.squaredNorm() + eos_target.squaredNorm();
@@ -465,7 +465,7 @@ struct Model
       if (eiter == embedding.end()) {
 	tensor_type& we = embedding[*siter];
 	
-	we = tensor_type::Random(dimension_, 1);
+	we = tensor_type::Random(dimension_, 1).normalized();
 	norm += we.squaredNorm();
       }
     }
@@ -779,26 +779,37 @@ struct ITGTree
     
     Node()
       : error_(std::numeric_limits<double>::infinity()),
-	error_classification_(0.0),	
-	total_(std::numeric_limits<double>::infinity()) {}
+	total_(std::numeric_limits<double>::infinity()),
+	error_classification_(0.0),
+	total_classification_(0.0) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     bool straight() const { return tails_.first.target_.last_ == tails_.second.target_.first_; }
     
     double      error_;
-    double      error_classification_;
     double      total_;
+    
+    double      error_classification_;
+    double      total_classification_;
     
     tensor_type output_;
     tensor_type output_norm_;
     tensor_type delta_;
     
-    tensor_type output_classification_;
-    tensor_type output_classification_norm_;
-    tensor_type delta_classification_;
+    // sampled alternative
+    tensor_type output_sampled_;
+    tensor_type output_sampled_norm_;
+    tensor_type delta_sampled_;
     
+    // recosntruction
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
+    
+    // classification (p for plus, m for minus)
+    double classification_p_;
+    double classification_m_;
+    double delta_classification_p_;
+    double delta_classification_m_;
     
     tail_set_type tails_;
   };
@@ -824,27 +835,37 @@ struct ITGTree
   struct Leaf
   {
     Leaf()
-      : error_(std::numeric_limits<double>::infinity()) {}
+      : error_(std::numeric_limits<double>::infinity()),
+	error_classification_(0.0) {}
     
     double      error_;
+    double      error_classification_;
     
     // input with context
     tensor_type input_;
-    tensor_type input_classification_;
+    tensor_type input_sampled_;
     
     // output + reconstruction
     tensor_type output_;
     tensor_type output_norm_;
-
-    tensor_type output_classification_;
-    tensor_type output_classification_norm_;
     
+    // sampled alternative
+    tensor_type output_sampled_;
+    tensor_type output_sampled_norm_;
+    
+    // reconstruction
     tensor_type reconstruction_;
     tensor_type delta_reconstruction_;
     
+    // classification (p for plus, m for minus)
+    double classification_p_;
+    double classification_m_;
+    double delta_classification_p_;
+    double delta_classification_m_;
+
     // sampled classifications
-    word_type   source_classification_;
-    word_type   target_classification_;
+    word_type   source_sampled_;
+    word_type   target_sampled_;
   };
 
   typedef Leaf leaf_type;
@@ -1363,14 +1384,14 @@ struct ITGTree
 	    leaf_type& leaf = leaves_(edge.span_.source_.empty() ? 0 : edge.span_.source_.first_ + 1,
 				      edge.span_.target_.empty() ? 0 : edge.span_.target_.first_ + 1);
 	    
-	    leaf.input_classification_ = leaf.input_;
-	    leaf.source_classification_ = vocab_type::EPSILON;
-	    leaf.target_classification_ = vocab_type::EPSILON;
+	    leaf.input_sampled_ = leaf.input_;
+	    leaf.source_sampled_ = vocab_type::EPSILON;
+	    leaf.target_sampled_ = vocab_type::EPSILON;
 	    
 	    if (! edge.span_.source_.empty()) {
 	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, sources.size() - 1)(gen);
 
-	      leaf.source_classification_ = sources[pos];
+	      leaf.source_sampled_ = sources[pos];
 	      
 	      embedding_type::const_iterator siter = theta.source_.find(sources[pos]);
 	      if (siter == theta.source_.end())
@@ -1379,13 +1400,13 @@ struct ITGTree
 	      if (siter->second.rows() != dimension)
 		throw std::runtime_error("dimensin does not for the source side");
 	      
-	      leaf.input_classification_.block(dimension * window, 0, dimension, 1) = siter->second * theta.scale_source_;
+	      leaf.input_sampled_.block(dimension * window, 0, dimension, 1) = siter->second * theta.scale_source_;
 	    }
 	    
 	    if (! edge.span_.target_.empty()) {
 	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, targets.size() - 1)(gen);
 
-	      leaf.target_classification_ = targets[pos];
+	      leaf.target_sampled_ = targets[pos];
 	      
 	      embedding_type::const_iterator titer = theta.target_.find(targets[pos]);
 	      if (titer == theta.target_.end())
@@ -1396,15 +1417,29 @@ struct ITGTree
 	      
 	      const size_type offset = dimension * (window * 2 + 1);
 	      
-	      leaf.input_classification_.block(offset + dimension * window, 0, dimension, 1) = titer->second * theta.scale_target_;
+	      leaf.input_sampled_.block(offset + dimension * window, 0, dimension, 1) = titer->second * theta.scale_target_;
 	    }
 	    
-	    const tensor_type& c = leaf.input_classification_;
+	    const tensor_type& c = leaf.input_sampled_;
 	    
-	    leaf.output_classification_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
-	    leaf.output_classification_norm_ = leaf.output_classification_.normalized();
+	    leaf.output_sampled_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	    leaf.output_sampled_norm_ = leaf.output_sampled_.normalized();
 	    
-	    node.output_classification_norm_ = leaf.output_classification_norm_;
+	    node.output_sampled_norm_ = leaf.output_sampled_norm_;
+	    
+	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
+	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+	    
+	    leaf.error_classification_ = error;
+	    node.error_classification_ = error;
+	    node.total_classification_ = error;
+	    
+	    leaf.classification_p_ = - (1.0 - theta.alpha_) * (error > 0.0);
+	    leaf.classification_m_ =   (1.0 - theta.alpha_) * (error > 0.0);
+	    
+	    leaf.delta_classification_p_ = (1.0 - y_p * y_p) * leaf.classification_p_;
+	    leaf.delta_classification_p_ = (1.0 - y_m * y_m) * leaf.classification_m_;
 	  } else {
 	    const bool straight = edge.straight();
 	    
@@ -1417,10 +1452,23 @@ struct ITGTree
 	    const tensor_type b1 = (straight ? theta.bs1_ : theta.bi1_);
 	    
 	    tensor_type c(dimension * 4, 1);
-	    c << node1.output_classification_norm_, node2.output_classification_norm_;
+	    c << node1.output_sampled_norm_, node2.output_sampled_norm_;
 	    
-	    node.output_classification_      = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
-	    node.output_classification_norm_ = node.output_classification_.normalized();
+	    node.output_sampled_      = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
+	    node.output_sampled_norm_ = node.output_sampled_.normalized();
+	    
+	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
+	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+	    
+	    node.error_classification_ = error;
+	    node.total_classification_ = error + node1.total_classification_ + node2.total_classification_;
+	    
+	    node.classification_p_ = - (1.0 - theta.alpha_) * (error > 0.0);
+	    node.classification_m_ =   (1.0 - theta.alpha_) * (error > 0.0);
+	    
+	    node.delta_classification_p_ = (1.0 - y_p * y_p) * node.classification_p_;
+	    node.delta_classification_p_ = (1.0 - y_m * y_m) * node.classification_m_;
 	  }
 	}
       }
@@ -1446,29 +1494,8 @@ struct ITGTree
     
     node_type& node_root = nodes_(0, source_size, 0, target_size);
     
-    const double y_p = std::tanh((theta.Wc_ * node_root.output_norm_ + theta.bc_)(0,0));
-    const double y_m = std::tanh((theta.Wc_ * node_root.output_classification_norm_ + theta.bc_)(0,0));
-    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
-    
-    const bool suffer_classification = error > 0.0;
-    
-    node_root.error_classification_ = error;
-    
-    if (suffer_classification) {
-      // we suffered classification loss... this is reflected in node_root.delta_ and node_root.delta_classification_
-      // and we will also update error from classified result
-      const double delta_p = - (1.0 - y_p * y_p) * (1.0 - theta.alpha_);
-      const double delta_m =   (1.0 - y_m * y_m) * (1.0 - theta.alpha_);
-      
-      node_root.delta_                = theta.Wc_.transpose() * delta_p;
-      node_root.delta_classification_ = theta.Wc_.transpose() * delta_m;
-      
-      gradient.Wc_ += delta_p * node_root.output_norm_.transpose();
-      gradient.Wc_ += delta_m * node_root.output_classification_norm_.transpose();
-      gradient.bc_ += tensor_type::Constant(1, 1, delta_p);
-      gradient.bc_ += tensor_type::Constant(1, 1, delta_m);
-    } else
-      node_root.delta_ = tensor_type::Zero(dimension * 2, 1);
+    node_root.delta_         = tensor_type::Zero(dimension * 2, 1);
+    node_root.delta_sampled_ = tensor_type::Zero(dimension * 2, 1);
     
     stack_.clear();
     stack_.push_back(std::make_pair(span_root, span_root));
@@ -1505,11 +1532,13 @@ struct ITGTree
 	if (root || left)
 	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	
@@ -1518,6 +1547,9 @@ struct ITGTree
 	
 	gradient.Wl2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
 	gradient.bl2_ += leaf.delta_reconstruction_;
+	
+	gradient.Wc_ += leaf.delta_classification_p_ * leaf.output_norm_.transpose();
+	gradient.bc_.array() += leaf.delta_classification_p_;
 	
 	const tensor_type delta_embedding = theta.Wl1_.transpose() * delta - leaf.reconstruction_;
 	
@@ -1579,20 +1611,25 @@ struct ITGTree
 	  }
 	}
 	
-	if (suffer_classification) {
+	{
 	  tensor_type delta;
 	  
 	  if (root || left)
-	    delta = (- (leaf.output_classification_.array() * leaf.output_classification_.array() - 1.0)
-		     * (W1.block(0, 0, dimension * 2, dimension * 2).transpose()
-			* node_parent.delta_classification_).array());
+	    delta = (- (leaf.output_sampled_.array() * leaf.output_sampled_.array() - 1.0)
+		     * (theta.Wc_.transpose() * leaf.delta_classification_m_
+			+ W1.block(0, 0, dimension * 2, dimension * 2).transpose()
+			* node_parent.delta_sampled_).array());
 	  else
-	    delta = (- (leaf.output_classification_.array() * leaf.output_classification_.array() - 1.0)
-		     * (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
-			* node_parent.delta_classification_).array());
+	    delta = (- (leaf.output_sampled_.array() * leaf.output_sampled_.array() - 1.0)
+		     * (theta.Wc_.transpose() * leaf.delta_classification_m_
+			+ W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
+			* node_parent.delta_sampled_).array());
 	  
-	  gradient.Wl1_ += delta * leaf.input_classification_.transpose();
+	  gradient.Wl1_ += delta * leaf.input_sampled_.transpose();
 	  gradient.bl1_ += delta;
+	  
+	  gradient.Wc_ += leaf.delta_classification_m_ * leaf.output_sampled_norm_.transpose();
+	  gradient.bc_.array() += leaf.delta_classification_m_;
 	  
 	  const tensor_type delta_embedding = theta.Wl1_.transpose() * delta;
 	  
@@ -1613,7 +1650,7 @@ struct ITGTree
 				       : (span.source_.first_ + shift >= source_size
 					  ? vocab_type::EOS
 					  : (shift == 0 
-					     ? leaf.source_classification_
+					     ? leaf.source_sampled_
 					     : source[span.source_.first_ + shift])));
 	      
 	      tensor_type& dsource = gradient.source_[word];
@@ -1647,7 +1684,7 @@ struct ITGTree
 				       : (span.target_.first_ + shift >= target_size
 					  ? vocab_type::EOS
 					  : (shift == 0
-					     ? leaf.target_classification_
+					     ? leaf.target_sampled_
 					     : target[span.target_.first_ + shift])));
 	    
 	      tensor_type& dtarget = gradient.target_[word];
@@ -1677,11 +1714,13 @@ struct ITGTree
 	if (root || left)
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
+			     + theta.Wc_.transpose() * node.delta_classification_p_
 			     + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 			     - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
 	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
 			  * (W2.transpose() * node.delta_reconstruction_
+			     + theta.Wc_.transpose() * node.delta_classification_p_
 			     + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 			     - reconstruction.block(dimension * 2, 0, dimension * 2, 1)).array());
 	node2.delta_ = node1.delta_;
@@ -1703,23 +1742,31 @@ struct ITGTree
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
 	db2 += node.delta_reconstruction_;
 	
-	if (suffer_classification) {
+	gradient.Wc_ += node.delta_classification_p_ * node.output_norm_.transpose();
+	gradient.bc_.array() += node.delta_classification_p_;
+	
+	{
 	  if (root || left)
-	    node1.delta_classification_ = (- (node.output_classification_.array() * node.output_classification_.array() - 1.0)
-					   * (W1.block(0, 0, dimension * 2, dimension * 2).transpose()
-					      * node_parent.delta_classification_).array());
+	    node1.delta_sampled_ = (- (node.output_sampled_.array() * node.output_sampled_.array() - 1.0)
+				    * (theta.Wc_.transpose() * node.delta_classification_m_
+				       + W1.block(0, 0, dimension * 2, dimension * 2).transpose()
+				       * node_parent.delta_sampled_).array());
 	  else
-	    node1.delta_classification_ = (- (node.output_classification_.array() * node.output_classification_.array() - 1.0)
-					   * (W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
-					      * node_parent.delta_classification_).array());
+	    node1.delta_sampled_ = (- (node.output_sampled_.array() * node.output_sampled_.array() - 1.0)
+				    * (theta.Wc_.transpose() * node.delta_classification_m_
+				       + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
+				       * node_parent.delta_sampled_).array());
 	  
-	  node2.delta_classification_ = node1.delta_classification_;
+	  node2.delta_sampled_ = node1.delta_sampled_;
 	  
-	  const tensor_type& delta = node1.delta_classification_;
+	  const tensor_type& delta = node1.delta_sampled_;
 	  
-	  dW1.block(0, 0, dimension * 2, dimension * 2)             += delta * node1.output_classification_norm_.transpose();
-	  dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_classification_norm_.transpose();
+	  dW1.block(0, 0, dimension * 2, dimension * 2)             += delta * node1.output_sampled_norm_.transpose();
+	  dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_sampled_norm_.transpose();
 	  db1 += delta;
+
+	  gradient.Wc_ += node.delta_classification_m_ * node.output_sampled_norm_.transpose();
+	  gradient.bc_.array() += node.delta_classification_m_;
 	}
       }
     }
@@ -2583,8 +2630,8 @@ struct TaskAccumulate
 	  
 	  itg_tree_.backward(source, target, theta_, gradient_);
 	  
-	  error_ += root.total_;
-	  classification_ += root.error_classification_;
+	  error_          += root.total_;
+	  classification_ += root.total_classification_;
 	  ++ samples_;
 	  
 	  itg_tree_.derivation(source, target, bitext_derivation.derivation_);
