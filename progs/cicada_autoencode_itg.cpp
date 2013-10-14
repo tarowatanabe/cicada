@@ -3024,6 +3024,9 @@ void read_bitext(const path_type& source_file,
   sources.clear();
   targets.clear();
   
+  sources.reserve(uniques_source.size());
+  targets.reserve(uniques_target.size());
+  
   sources.insert(sources.end(), uniques_source.begin(), uniques_source.end());
   targets.insert(targets.end(), uniques_target.begin(), uniques_target.end());
 }
