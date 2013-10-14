@@ -1278,7 +1278,12 @@ struct ITGTree
 	const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
 	const tensor_type p_norm = p.normalized();
 	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
-	const tensor_type y_minus_c = y.normalized() - c;
+	
+	tensor_type y_normalized = y;
+	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
+	  y_normalized.block(i * dimension, 0, dimension, 1).normalize();
+	
+	const tensor_type y_minus_c = y_normalized - c;
 	
 	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
 	
@@ -1349,9 +1354,13 @@ struct ITGTree
       
     // compute reconstruction
     const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
+
+    tensor_type y_normalized = y;
+    y_normalized.block(0, 0, dimension * 2, 1).normalize();
+    y_normalized.block(dimension * 2, 0, dimension * 2, 1).normalize();
     
     // internal representation...
-    const tensor_type y_minus_c = y.normalized() - c;
+    const tensor_type y_minus_c = y_normalized - c;
     
     // representation error
     const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();

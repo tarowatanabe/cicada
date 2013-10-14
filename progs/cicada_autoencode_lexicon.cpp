@@ -734,7 +734,12 @@ struct Lexicon
 	const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
 	const tensor_type p_norm = p.normalized();
 	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
-	const tensor_type y_minus_c = y.normalized() - input;
+	
+	tensor_type y_normalized = y;
+	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
+	  y_normalized.block(i * dimension, 0, dimension, 1).normalize();
+	
+	const tensor_type y_minus_c = y_normalized - input;
 	
 	const tensor_type p_sampled = (theta.Wl1_ * input_sampled + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
 	const tensor_type p_sampled_norm = p_sampled.normalized();
