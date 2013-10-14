@@ -663,6 +663,11 @@ struct Lexicon
 	  
 	  input_sampled.block(offset + dimension * window, 0, dimension, 1) = titer->second * theta.scale_target_;
 	}
+
+#if 0
+	std::cerr << "input:   rows: " << input.rows() << " cols: " << input.cols() << std::endl
+		  << "sampled: rows: " << input_sampled.rows() << " cols: " << input_sampled.cols() << std::endl;
+#endif
 	
 	const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
 	const tensor_type p_norm = p.normalized();
@@ -673,6 +678,8 @@ struct Lexicon
 	const tensor_type p_sampled_norm = p_sampled.normalized();
 	
 	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+
+	//std::cerr << "error: " << e << std::endl;
 	
 	const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
 	const tensor_type delta_reconstruction = - (y.array() * y.array() - 1.0) * reconstruction.array();
@@ -681,6 +688,8 @@ struct Lexicon
 	const double y_m = std::tanh((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
 	
 	const double e_classification = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+
+	//std::cerr << "classification: " << e_classification << std::endl;
 	
 	const double delta_classification_p = - (1.0 - y_p * y_p) * (1.0 - theta.alpha_) * (e_classification > 0.0);
 	const double delta_classification_m =   (1.0 - y_m * y_m) * (1.0 - theta.alpha_) * (e_classification > 0.0);
@@ -698,20 +707,29 @@ struct Lexicon
 	const tensor_type delta_sampled = (- (p_sampled.array() * p_sampled.array() - 1.0)
 					   * (theta.Wc_.transpose() * delta_classification_m).array());
 	
-	gradient.Wl1_ += delta * p.transpose();
+#if 0
+	std::cerr << "delta:   rows: " << delta.rows() << " cols: " << delta.cols() << std::endl
+		  << "sampled: rows: " << delta_sampled.rows() << " cols: " << delta_sampled.cols() << std::endl;
+#endif
+	
+	gradient.Wl1_ += delta * input.transpose();
 	gradient.bl1_ += delta;
 	
-	gradient.Wl1_ += delta_sampled * p_sampled.transpose();
+	gradient.Wl1_ += delta_sampled * input_sampled.transpose();
 	gradient.bl1_ += delta_sampled;
 	
 	gradient.Wl2_ += delta_reconstruction * p_norm.transpose();
 	gradient.bl2_ += delta_reconstruction;
+
+	//std::cerr << "update classification" << std::endl;
 	
 	gradient.Wc_         += delta_classification_p * p_norm.transpose();
 	gradient.bc_.array() += delta_classification_p;
 	
 	gradient.Wc_         += delta_classification_m * p_sampled_norm.transpose();
 	gradient.bc_.array() += delta_classification_m;
+	
+	//std::cerr << "update embedding" << std::endl;
 	
 	// update embedding
 	const tensor_type delta_embedding_p = theta.Wl1_.transpose() * delta - reconstruction;
@@ -779,7 +797,7 @@ struct Lexicon
 				     ? vocab_type::BOS
 				     : (trg + shift > target_size
 					? vocab_type::EOS
-					: target[trg + shift]));
+					: target[trg + shift - 1]));
 	    
 	    tensor_type& dtarget = gradient.target_[word];
 	    
@@ -845,7 +863,7 @@ struct LearnAdaGrad
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
       if (eiter == theta.source_.end()) {
-	std::cerr << "WARNING: this should not happen" << std::endl;
+	std::cerr << "WARNING: this should not happen: source: " << siter->first << std::endl;
 	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
       }
       
@@ -867,7 +885,7 @@ struct LearnAdaGrad
       embedding_type::iterator eiter = theta.target_.find(titer->first);
       
       if (eiter == theta.target_.end()) {
-	std::cerr << "WARNING: this should not happen" << std::endl;
+	std::cerr << "WARNING: this should not happen: target: "  << titer->first << std::endl;
 	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type::Zero(theta.dimension_, 1))).first;
       }
       
@@ -1000,7 +1018,7 @@ struct LearnL2
       embedding_type::iterator eiter = theta.source_.find(siter->first);
       
       if (eiter == theta.source_.end()) {
-	std::cerr << "WARNING: this should not happen" << std::endl;
+	std::cerr << "WARNING: this should not happen: source: " << siter->first << std::endl;
 	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
       }
       
@@ -1017,7 +1035,7 @@ struct LearnL2
       embedding_type::iterator eiter = theta.target_.find(titer->first);
       
       if (eiter == theta.target_.end()) {
-	std::cerr << "WARNING: this should not happen" << std::endl;
+	std::cerr << "WARNING: this should not happen: target" << titer->first << std::endl;
 	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type::Zero(theta.dimension_, 1))).first;
       }
       
