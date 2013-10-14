@@ -423,54 +423,42 @@ struct Model
     bc_ = tensor_type::Random(1, 1);
   }
   
-  template <typename Iterator>
-  void embedding(Iterator first, Iterator last)
+  template <typename IteratorSource, typename IteratorTarget>
+  void embedding(IteratorSource sfirst, IteratorSource slast,
+		 IteratorTarget tfirst, IteratorTarget tlast)
   {
-    source_.clear();
-    target_.clear();
-    scale_source_ = 1.0;
-    scale_target_ = 1.0;
-    
-    tensor_type& epsilon_source = source_[vocab_type::EPSILON];
-    tensor_type& epsilon_target = target_[vocab_type::EPSILON];
-    tensor_type& bos_source     = source_[vocab_type::BOS];
-    tensor_type& bos_target     = target_[vocab_type::BOS];
-    tensor_type& eos_source     = source_[vocab_type::EOS];
-    tensor_type& eos_target     = target_[vocab_type::EOS];
-    
-    epsilon_source = tensor_type::Random(dimension_, 1).normalized();
-    epsilon_target = tensor_type::Random(dimension_, 1).normalized();
-    bos_source     = tensor_type::Random(dimension_, 1).normalized();
-    bos_target     = tensor_type::Random(dimension_, 1).normalized();
-    eos_source     = tensor_type::Random(dimension_, 1).normalized();
-    eos_target     = tensor_type::Random(dimension_, 1).normalized();
-    
-    norm_source_ = epsilon_source.squaredNorm() + bos_source.squaredNorm() + eos_source.squaredNorm();
-    norm_target_ = epsilon_target.squaredNorm() + bos_target.squaredNorm() + eos_target.squaredNorm();
-    
-    for (/**/; first != last; ++ first) {
-      norm_source_ += embedding(first->source_, source_);
-      norm_target_ += embedding(first->target_, target_);
-    }
+    embedding(sfirst, slast, source_, scale_source_, norm_source_);
+    embedding(tfirst, tlast, target_, scale_target_, norm_target_);
   }
   
-  double embedding(const sentence_type& sentence, embedding_type& embedding)
+  template <typename Iterator>
+  void embedding(Iterator first, Iterator last, embedding_type& embedding, double& scale, double& norm)
   {
-    double norm = 0.0;
+    tensor_type& eps = embedding[vocab_type::EPSILON];
+    tensor_type& bos = embedding[vocab_type::BOS];
+    tensor_type& eos = embedding[vocab_type::EOS];
     
-    sentence_type::const_iterator siter_end = sentence.end();
-    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-      embedding_type::iterator eiter = embedding.find(*siter);
+    if (! eps.rows() || ! eps.cols())
+      eps = tensor_type::Random(dimension_, 1).normalized();
+    if (! bos.rows() || ! bos.cols())
+      bos = tensor_type::Random(dimension_, 1).normalized();
+    if (! eos.rows() || ! eos.cols())
+      eos = tensor_type::Random(dimension_, 1).normalized();
+    
+    for (/**/; first != last; ++ first) {
+      tensor_type& we = embedding[*first];
       
-      if (eiter == embedding.end()) {
-	tensor_type& we = embedding[*siter];
-	
+      if (! we.rows() || ! we.cols())
 	we = tensor_type::Random(dimension_, 1).normalized();
-	norm += we.squaredNorm();
-      }
     }
     
-    return norm;
+    // compute norm...
+    scale = 1.0;
+    norm  = 0.0;
+    
+    embedding_type::const_iterator siter_end = embedding.end();
+    for (embedding_type::const_iterator siter = embedding.begin(); siter != siter_end; ++ siter)
+      norm += siter->second.squaredNorm();
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -482,6 +470,80 @@ struct Model
   };
 
   boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+
+  void read_embedding(const path_type& source_file, const path_type& target_file)
+  {
+    // we will overwrite embedding... thus we will not clear embedding_
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
+    typedef boost::fusion::tuple<std::string, parameter_set_type > embedding_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    qi::rule<iterator_type, std::string(), standard::blank_type>           word;
+    qi::rule<iterator_type, embedding_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> *qi::double_ >> (qi::eol | qi::eoi);
+
+    if (! source_file.empty()) {
+      
+      if (source_file != "-" && ! boost::filesystem::exists(source_file))
+	throw std::runtime_error("no embedding: " + source_file.string());
+      
+      utils::compress_istream is(source_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+    
+      iterator_type iter(is);
+      iterator_type iter_end;
+      
+      embedding_parsed_type parsed;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<0>(parsed).clear();
+	boost::fusion::get<1>(parsed).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, parsed))
+	  if (iter != iter_end)
+	    throw std::runtime_error("embedding parsing failed");
+	
+	if (boost::fusion::get<1>(parsed).size() != dimension_)
+	  throw std::runtime_error("invalid embedding size");
+	
+	source_[boost::fusion::get<0>(parsed)] = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), dimension_, 1);
+      }
+    }
+
+    if (! target_file.empty()) {
+      
+      if (target_file != "-" && ! boost::filesystem::exists(target_file))
+	throw std::runtime_error("no embedding: " + target_file.string());
+      
+      utils::compress_istream is(target_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+    
+      iterator_type iter(is);
+      iterator_type iter_end;
+      
+      embedding_parsed_type parsed;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<0>(parsed).clear();
+	boost::fusion::get<1>(parsed).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, parsed))
+	  if (iter != iter_end)
+	    throw std::runtime_error("embedding parsing failed");
+	
+	if (boost::fusion::get<1>(parsed).size() != dimension_)
+	  throw std::runtime_error("invalid embedding size");
+	
+	target_[boost::fusion::get<0>(parsed)] = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), dimension_, 1);
+      }
+    }
+  }
   
   void write(const path_type& path) const
   {
@@ -2116,6 +2178,9 @@ static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 path_type source_file;
 path_type target_file;
 
+path_type embedding_source_file;
+path_type embedding_target_file;
+
 path_type derivation_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
@@ -2198,7 +2263,17 @@ int main(int argc, char** argv)
     
     model_type theta(dimension, window, alpha);
     
-    theta.embedding(bitexts.begin(), bitexts.end());
+    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
+      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
+	throw std::runtime_error("no embedding: " + embedding_source_file.string());
+
+      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
+	throw std::runtime_error("no embedding: " + embedding_target_file.string());
+      
+      theta.read_embedding(embedding_source_file, embedding_target_file);
+    }
+
+    theta.embedding(sources.begin(), sources.end(), targets.begin(), targets.end());
     
     if (iteration > 0) {
       if (optimize_adagrad)
@@ -3030,6 +3105,9 @@ void options(int argc, char** argv)
     ("source",    po::value<path_type>(&source_file),    "source file")
     ("target",    po::value<path_type>(&target_file),    "target file")
     
+    ("embedding-source", po::value<path_type>(&embedding_source_file), "initial source embedding")
+    ("embedding-target", po::value<path_type>(&embedding_target_file), "initial target embedding")
+
     ("derivation",               po::value<path_type>(&derivation_file),               "output derivation")
     ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "output alignemnt for P(target | source)")
     ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "output alignemnt for P(source | target)")

@@ -255,30 +255,28 @@ struct Model
   template <typename Iterator>
   void embedding(Iterator first, Iterator last)
   {
-    embedding_.clear();
-    scale_ = 1.0;
-    
     tensor_type& bos     = embedding_[vocab_type::BOS];
     tensor_type& eos     = embedding_[vocab_type::EOS];
     
-    bos = tensor_type::Random(dimension_, 1).normalized();
-    eos = tensor_type::Random(dimension_, 1).normalized();
-    
-    norm_ = bos.squaredNorm() + eos.squaredNorm();
+    if (! bos.rows() || ! bos.cols())
+      bos = tensor_type::Random(dimension_, 1).normalized();
+    if (! eos.rows() || ! eos.cols())
+      eos = tensor_type::Random(dimension_, 1).normalized();
     
     for (/**/; first != last; ++ first) {
-      sentence_type::const_iterator siter_end = first->end();
-      for (sentence_type::const_iterator siter = first->begin(); siter != siter_end; ++ siter) {
-	embedding_type::iterator eiter = embedding_.find(*siter);
-	
-	if (eiter == embedding_.end()) {
-	  tensor_type& we = embedding_[*siter];
-	  
-	  we = tensor_type::Random(dimension_, 1).normalized();
-	  norm_ += we.squaredNorm();
-	}
-      }
+      tensor_type& we = embedding_[*first];
+
+      if (! we.rows() || ! we.cols())
+	we = tensor_type::Random(dimension_, 1).normalized();
     }
+    
+    // compute norm...
+    scale_ = 1.0;
+    norm_ = 0.0;
+    
+    embedding_type::const_iterator siter_end = embedding_.end();
+    for (embedding_type::const_iterator siter = embedding_.begin(); siter != siter_end; ++ siter)
+      norm_ += siter->second.squaredNorm();
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -290,6 +288,47 @@ struct Model
   };
 
   boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+
+
+  void read_embedding(const path_type& path)
+  {
+    // we will overwrite embedding... thus we will not clear embedding_
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
+    typedef boost::fusion::tuple<std::string, parameter_set_type > embedding_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    qi::rule<iterator_type, std::string(), standard::blank_type>           word;
+    qi::rule<iterator_type, embedding_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> *qi::double_ >> (qi::eol | qi::eoi);
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iterator_type iter(is);
+    iterator_type iter_end;
+    
+    embedding_parsed_type parsed;
+    
+    while (iter != iter_end) {
+      boost::fusion::get<0>(parsed).clear();
+      boost::fusion::get<1>(parsed).clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, parsed))
+	if (iter != iter_end)
+	  throw std::runtime_error("embedding parsing failed");
+      
+      if (boost::fusion::get<1>(parsed).size() != dimension_)
+	throw std::runtime_error("invalid embedding size");
+      
+      embedding_[boost::fusion::get<0>(parsed)] = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), dimension_, 1);
+    }
+  }
   
   void write(const path_type& path) const
   {
@@ -763,6 +802,7 @@ static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type input_file;
+path_type embedding_file;
 path_type output_model_file;
 
 double alpha = 0.001;
@@ -831,8 +871,15 @@ int main(int argc, char** argv)
     read_data(input_file, sentences, words);
     
     model_type theta(dimension, order, alpha);
+
+    if (! embedding_file.empty()) {
+      if (embedding_file != "-" && ! boost::filesystem::exists(embedding_file))
+	throw std::runtime_error("no embedding: " + embedding_file.string());
+      
+      theta.read_embedding(embedding_file);
+    }
     
-    theta.embedding(sentences.begin(), sentences.end());
+    theta.embedding(words.begin(), words.end());
     
     if (iteration > 0) {
       if (optimize_adagrad)
@@ -1160,6 +1207,8 @@ void options(int argc, char** argv)
   po::options_description opts_command("command line options");
   opts_command.add_options()
     ("input",    po::value<path_type>(&input_file),    "input file")
+    
+    ("embedding", po::value<path_type>(&embedding_file), "initial embedding")
     
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
