@@ -806,8 +806,6 @@ struct ITGTree
     tensor_type delta_reconstruction_;
     
     // classification (p for plus, m for minus)
-    double classification_p_;
-    double classification_m_;
     double delta_classification_p_;
     double delta_classification_m_;
     
@@ -858,8 +856,6 @@ struct ITGTree
     tensor_type delta_reconstruction_;
     
     // classification (p for plus, m for minus)
-    double classification_p_;
-    double classification_m_;
     double delta_classification_p_;
     double delta_classification_m_;
 
@@ -1429,17 +1425,14 @@ struct ITGTree
 	    
 	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
 	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
-	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
 	    
 	    leaf.error_classification_ = error;
 	    node.error_classification_ = error;
 	    node.total_classification_ = error;
 	    
-	    leaf.classification_p_ = - (1.0 - theta.alpha_) * (error > 0.0);
-	    leaf.classification_m_ =   (1.0 - theta.alpha_) * (error > 0.0);
-	    
-	    leaf.delta_classification_p_ = (1.0 - y_p * y_p) * leaf.classification_p_;
-	    leaf.delta_classification_p_ = (1.0 - y_m * y_m) * leaf.classification_m_;
+	    leaf.delta_classification_p_ = - (1.0 - y_p * y_p) * (error > 0.0);
+	    leaf.delta_classification_m_ =   (1.0 - y_m * y_m) * (error > 0.0);
 	  } else {
 	    const bool straight = edge.straight();
 	    
@@ -1459,16 +1452,13 @@ struct ITGTree
 	    
 	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
 	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
-	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
 	    
 	    node.error_classification_ = error;
 	    node.total_classification_ = error + node1.total_classification_ + node2.total_classification_;
 	    
-	    node.classification_p_ = - (1.0 - theta.alpha_) * (error > 0.0);
-	    node.classification_m_ =   (1.0 - theta.alpha_) * (error > 0.0);
-	    
-	    node.delta_classification_p_ = (1.0 - y_p * y_p) * node.classification_p_;
-	    node.delta_classification_p_ = (1.0 - y_m * y_m) * node.classification_m_;
+	    node.delta_classification_p_ = - (1.0 - y_p * y_p) * (error > 0.0);
+	    node.delta_classification_m_ =   (1.0 - y_m * y_m) * (error > 0.0);
 	  }
 	}
       }

@@ -687,12 +687,12 @@ struct Lexicon
 	const double y_p = std::tanh((theta.Wc_ * p_norm + theta.bc_)(0,0));
 	const double y_m = std::tanh((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
 	
-	const double e_classification = std::max(1.0 - (y_p - y_m), 0.0) * (1.0 - theta.alpha_);
+	const double e_classification = std::max(1.0 - (y_p - y_m), 0.0);
 
 	//std::cerr << "classification: " << e_classification << std::endl;
 	
-	const double delta_classification_p = - (1.0 - y_p * y_p) * (1.0 - theta.alpha_) * (e_classification > 0.0);
-	const double delta_classification_m =   (1.0 - y_m * y_m) * (1.0 - theta.alpha_) * (e_classification > 0.0);
+	const double delta_classification_p = - (1.0 - y_p * y_p) * (e_classification > 0.0);
+	const double delta_classification_m =   (1.0 - y_m * y_m) * (e_classification > 0.0);
 
 	// update error...
 	error                += e;
@@ -1062,11 +1062,6 @@ struct LearnL2
       
       if (norm > 1.0 / lambda_)
 	theta.rescale(std::sqrt(1.0 / lambda_) * std::sqrt(1.0 / norm), true);
-
-#if 0
-      if (theta.scale_source_ < 0.001 || theta.scale_source_ > 1000 || theta.scale_target_ < 0.001 || theta.scale_target_ > 1000)
-	theta.finalize();
-#endif
     }
   }
   
@@ -1092,7 +1087,7 @@ path_type target_file;
 
 path_type output_model_file;
 
-double alpha = 0.01;
+double alpha = 0.001;
 int dimension = 16;
 int window = 2;
 
