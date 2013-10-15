@@ -511,7 +511,7 @@ struct NGram
       const tensor_type p_sampled_norm = p_sampled.normalized();
       
       const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-      
+            
       const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
       const tensor_type delta_reconstruction = y.array().unaryExpr(deriv) * reconstruction.array();
       
@@ -993,6 +993,30 @@ struct TaskAccumulate
       classification_(0),
       samples_(0) {}
 
+  struct sigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+      return (expx == std::numeric_limits<double>::infinity() ? 0.0 : 1.0 / (expx + 1.0));
+    }
+  };
+
+  struct dsigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+
+      if (expx == std::numeric_limits<double>::infinity())
+	return 0.0;
+      else {
+	const double m = 1.0 / (expx + 1.0);
+	return m * (1.0 - m);
+      }
+    }
+  };
+
   struct tanh
   {
     double operator()(const double& x) const
@@ -1003,25 +1027,46 @@ struct TaskAccumulate
   
   struct dtanh
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return 1.0 - x * x;
+      return Tp(1) - x * x;
+    }
+  };
+
+  struct htanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return std::min(std::max(x, Tp(- 1)), Tp(1));
+    }
+  };
+  
+  struct dhtanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(- 1) <= x && x <= Tp(1);
     }
   };
   
   struct hinge
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return std::max(x, 0.0);
+      return std::max(x, Tp(0));
     }
   };
-
+  
   struct dhinge
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return x > 0.0;
+      return x >= Tp(0);
     }
   };
 
@@ -1041,7 +1086,7 @@ struct TaskAccumulate
       const sentence_type& sentence = sentences_[sentence_id];
       
       if (! sentence.empty()) {
-	std::pair<double, double> errors = ngram_(sentence, words_, theta_, gradient_, hinge(), dhinge(), generator);
+	std::pair<double, double> errors = ngram_(sentence, words_, theta_, gradient_, tanh(), dtanh(), generator);
 	  
 	error_          += errors.first;
 	classification_ += errors.second;

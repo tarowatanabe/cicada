@@ -1352,6 +1352,30 @@ struct TaskAccumulate
       classification_(0),
       samples_(0) {}
   
+  struct sigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+      return (expx == std::numeric_limits<double>::infinity() ? 0.0 : 1.0 / (expx + 1.0));
+    }
+  };
+
+  struct dsigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+
+      if (expx == std::numeric_limits<double>::infinity())
+	return 0.0;
+      else {
+	const double m = 1.0 / (expx + 1.0);
+	return m * (1.0 - m);
+      }
+    }
+  };
+
   struct tanh
   {
     double operator()(const double& x) const
@@ -1362,25 +1386,46 @@ struct TaskAccumulate
   
   struct dtanh
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return 1.0 - x * x;
+      return Tp(1) - x * x;
     }
   };
   
-  struct hinge
+  struct htanh
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return std::max(x, 0.0);
+      return std::min(std::max(x, Tp(- 1)), Tp(1));
+    }
+  };
+  
+  struct dhtanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(- 1) <= x && x <= Tp(1);
     }
   };
 
+  struct hinge
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return std::max(x, Tp(0));
+    }
+  };
+  
   struct dhinge
   {
-    double operator()(const double& x) const
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
     {
-      return x > 0.0;
+      return x >= Tp(0);
     }
   };
 
@@ -1407,7 +1452,7 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	std::pair<double, double> errors = lexicon_(source, target, sources_, targets_, theta_, gradient_, hinge(), dhinge(),
+	std::pair<double, double> errors = lexicon_(source, target, sources_, targets_, theta_, gradient_, tanh(), dtanh(),
 						    generator);
 	  
 	error_          += errors.first;

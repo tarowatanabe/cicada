@@ -110,6 +110,87 @@ namespace std
   }
 };
 
+namespace nn
+{
+  struct sigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+      return (expx == std::numeric_limits<double>::infinity() ? 0.0 : 1.0 / (expx + 1.0));
+    }
+  };
+
+  struct dsigmoid
+  {
+    double operator()(const double& x) const
+    {
+      const double expx = std::exp(- x);
+
+      if (expx == std::numeric_limits<double>::infinity())
+	return 0.0;
+      else {
+	const double m = 1.0 / (expx + 1.0);
+	return m * (1.0 - m);
+      }
+    }
+  };
+  
+  struct tanh
+  {
+    double operator()(const double& x) const
+    {
+      return std::tanh(x);
+    }
+  };
+
+  struct dtanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(1) - x * x;
+    }
+  };
+
+  struct htanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return std::min(std::max(x, Tp(- 1)), Tp(1));
+    }
+  };
+  
+  struct dhtanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(- 1) <= x && x <= Tp(1);
+    }
+  };
+  
+  struct hinge
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return std::max(x, Tp(0));
+    }
+  };
+  
+  struct dhinge
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return x >= Tp(0);
+    }
+  };
+
+};
+
 
 struct Model
 {
@@ -845,7 +926,8 @@ struct ITGTree
       : error_(std::numeric_limits<double>::infinity()),
 	total_(std::numeric_limits<double>::infinity()),
 	error_classification_(0.0),
-	total_classification_(0.0) {}
+	total_classification_(0.0),
+	cost_(std::numeric_limits<double>::infinity()) {}
     
     bool terminal() const { return tails_.first.empty() && tails_.second.empty(); }
     bool straight() const { return tails_.first.target_.last_ == tails_.second.target_.first_; }
@@ -855,6 +937,8 @@ struct ITGTree
     
     double      error_classification_;
     double      total_classification_;
+    
+    double      cost_;
     
     tensor_type output_;
     tensor_type output_norm_;
@@ -898,10 +982,13 @@ struct ITGTree
   {
     Leaf()
       : error_(std::numeric_limits<double>::infinity()),
-	error_classification_(0.0) {}
+	error_classification_(0.0),
+	cost_(std::numeric_limits<double>::infinity()) {}
     
     double      error_;
     double      error_classification_;
+
+    double      cost_;
     
     // input with context
     tensor_type input_;
@@ -989,6 +1076,10 @@ struct ITGTree
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    //
+    // TODO: revise this to compute "score" in addition to reconstruction error....
+    //
 
     // initialization
     clear();
@@ -1296,6 +1387,8 @@ struct ITGTree
 	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
 	
 	leaf.error_       = e;
+	leaf.cost_        = e - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
+	
 	leaf.output_      = p;
 	leaf.output_norm_ = p_norm;
 	
@@ -1320,6 +1413,8 @@ struct ITGTree
     
     node.error_ = leaf.error_;
     node.total_ = leaf.error_;
+    node.cost_  = leaf.cost_;
+
     node.output_norm_ = leaf.output_norm_;
     
     agenda_[parent.size()].push_back(parent);
@@ -1377,18 +1472,21 @@ struct ITGTree
     const tensor_type y_minus_c = y_normalized - c;
     
     // representation error
-    const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+    const double e     = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
     const double total = e + node1.total_ + node2.total_;
+    const double cost  = node1.cost_ + node2.cost_ + e - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
     
     const double infty = std::numeric_limits<double>::infinity();
     
-    if (total < node.total_) {
+    if (cost < node.cost_) {
 
       if (node.error_ == infty)
 	agenda_[parent.size()].push_back(parent);
       
       node.error_       = e;
       node.total_       = total;
+      node.cost_        = cost;
+
       node.output_      = p;
       node.output_norm_ = p_norm;
       
@@ -2680,37 +2778,6 @@ struct TaskAccumulate
       classification_(0),
       samples_(0) {}
 
-  struct tanh
-  {
-    double operator()(const double& x) const
-    {
-      return std::tanh(x);
-    }
-  };
-  
-  struct dtanh
-  {
-    double operator()(const double& x) const
-    {
-      return 1.0 - x * x;
-    }
-  };
-  
-  struct hinge
-  {
-    double operator()(const double& x) const
-    {
-      return std::max(x, 0.0);
-    }
-  };
-
-  struct dhinge
-  {
-    double operator()(const double& x) const
-    {
-      return x > 0.0;
-    }
-  };
   
   void operator()()
   {
@@ -2741,16 +2808,16 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, beam_, hinge(), dhinge());
+	itg_tree_.forward(source, target, theta_, beam_, nn::tanh(), nn::dtanh());
 
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 
 	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
 	
 	if (parsed) {
-	  itg_tree_.forward(source, target, sources_, targets_, theta_, hinge(), dhinge(), generator);
+	  itg_tree_.forward(source, target, sources_, targets_, theta_, nn::tanh(), nn::dtanh(), generator);
 	  
-	  itg_tree_.backward(source, target, theta_, gradient_, hinge(), dhinge());
+	  itg_tree_.backward(source, target, theta_, gradient_, nn::tanh(), nn::dtanh());
 	  
 	  error_          += root.total_;
 	  classification_ += root.total_classification_;
@@ -2997,37 +3064,6 @@ struct TaskDerivation
       queue_derivation_(queue_derivation),
       queue_alignment_(queue_alignment) {}
 
-  struct tanh
-  {
-    double operator()(const double& x) const
-    {
-      return std::tanh(x);
-    }
-  };
-  
-  struct dtanh
-  {
-    double operator()(const double& x) const
-    {
-      return 1.0 - x * x;
-    }
-  };
-  
-  struct hinge
-  {
-    double operator()(const double& x) const
-    {
-      return std::max(x, 0.0);
-    }
-  };
-
-  struct dhinge
-  {
-    double operator()(const double& x) const
-    {
-      return x > 0.0;
-    }
-  };
   
   void operator()()
   {
@@ -3053,7 +3089,7 @@ struct TaskDerivation
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, beam_, hinge(), dhinge());
+	itg_tree_.forward(source, target, theta_, beam_, nn::tanh(), nn::dtanh());
 	
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 	
