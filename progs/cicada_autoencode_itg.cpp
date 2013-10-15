@@ -134,11 +134,11 @@ struct Model
 
   typedef boost::filesystem::path path_type;
   
-  Model() : dimension_(0), window_(0), alpha_(0) {}
+  Model() : dimension_(0), window_(0), alpha_(0), beta_(0) {}
   Model(const size_type& dimension, const size_type& window) 
-    : dimension_(dimension), window_(window), alpha_(0) { initialize(dimension, window); }
-  Model(const size_type& dimension, const size_type& window, const double& alpha) 
-    : dimension_(dimension), window_(window), alpha_(alpha) { initialize(dimension, window); }
+    : dimension_(dimension), window_(window), alpha_(0), beta_(0) { initialize(dimension, window); }
+  Model(const size_type& dimension, const size_type& window, const double& alpha, const double& beta) 
+    : dimension_(dimension), window_(window), alpha_(alpha), beta_(beta) { initialize(dimension, window); }
 
   Model& operator-=(const Model& x)
   {
@@ -558,6 +558,7 @@ struct Model
     rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
+    rep["beta"]      = utils::lexical_cast<std::string>(beta_);
     
     const path_type source_file = rep.path("source.gz");
     const path_type target_file = rep.path("target.gz");
@@ -640,6 +641,7 @@ struct Model
   
   // hyperparameter
   double alpha_;
+  double beta_;
   
   // Embedding
   embedding_type source_;
@@ -1508,14 +1510,14 @@ struct ITGTree
 	    
 	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
 	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
-	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
 	    
 	    leaf.error_classification_ = error;
 	    node.error_classification_ = error;
 	    node.total_classification_ = error;
 	    
-	    leaf.delta_classification_p_ = - deriv(y_p) * (error > 0.0);
-	    leaf.delta_classification_m_ =   deriv(y_m) * (error > 0.0);
+	    leaf.delta_classification_p_ = - deriv(y_p) * (error > 0.0) * theta.beta_;
+	    leaf.delta_classification_m_ =   deriv(y_m) * (error > 0.0) * theta.beta_;
 	  } else {
 	    const bool straight = edge.straight();
 	    
@@ -1535,13 +1537,13 @@ struct ITGTree
 	    
 	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
 	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
-	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
+	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
 	    
 	    node.error_classification_ = error;
 	    node.total_classification_ = error + node1.total_classification_ + node2.total_classification_;
 	    
-	    node.delta_classification_p_ = - deriv(y_p) * (error > 0.0);
-	    node.delta_classification_m_ =   deriv(y_m) * (error > 0.0);
+	    node.delta_classification_p_ = - deriv(y_p) * (error > 0.0) * theta.beta_;
+	    node.delta_classification_m_ =   deriv(y_m) * (error > 0.0) * theta.beta_;
 	  }
 	}
       }
@@ -2209,6 +2211,7 @@ path_type alignment_target_source_file;
 path_type output_model_file;
 
 double alpha = 0.01;
+double beta = 1;
 int dimension = 16;
 int window = 2;
 
@@ -2250,13 +2253,13 @@ int main(int argc, char** argv)
 
     if (dimension <= 0)
       throw std::runtime_error("dimension must be positive");
-    
     if (window < 0)
       throw std::runtime_error("window size should be >= 0");
     
-    if (alpha < 0.0 || alpha > 1.0)
-      throw std::runtime_error("error factor should be: 0.0 <= alpha <= 1.0");
-
+    if (alpha < 0.0)
+      throw std::runtime_error("alpha should be >= 0.0");
+    if (beta < 0.0)
+      throw std::runtime_error("beta should be >= 0.0");
     
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
@@ -2283,7 +2286,7 @@ int main(int argc, char** argv)
     
     read_bitext(source_file, target_file, bitexts, sources, targets);
     
-    model_type theta(dimension, window, alpha);
+    model_type theta(dimension, window, alpha, beta);
     
     if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
       if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
@@ -3200,7 +3203,8 @@ void options(int argc, char** argv)
 
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
-    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "model parameter")
+    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "parameter for reconstruction error")
+    ("beta",      po::value<double>(&beta)->default_value(beta),        "parameter for classificaiton error")
     ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
     ("window",    po::value<int>(&window)->default_value(window),       "context window size")
     

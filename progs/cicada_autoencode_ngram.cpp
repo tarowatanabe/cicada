@@ -82,11 +82,11 @@ struct Model
 
   typedef boost::filesystem::path path_type;
   
-  Model() : dimension_(0), order_(0), alpha_(0) {}
+  Model() : dimension_(0), order_(0), alpha_(0), beta_(0) {}
   Model(const size_type& dimension, const size_type& order) 
-    : dimension_(dimension), order_(order), alpha_(0) { initialize(dimension, order); }
-  Model(const size_type& dimension, const size_type& order, const double& alpha) 
-    : dimension_(dimension), order_(order), alpha_(alpha) { initialize(dimension, order); }
+    : dimension_(dimension), order_(order), alpha_(0), beta_(0) { initialize(dimension, order); }
+  Model(const size_type& dimension, const size_type& order, const double& alpha, const double beta) 
+    : dimension_(dimension), order_(order), alpha_(alpha), beta_(beta) { initialize(dimension, order); }
   
   Model& operator-=(const Model& x)
   {
@@ -343,6 +343,7 @@ struct Model
     rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
     rep["order"]     = utils::lexical_cast<std::string>(order_);
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
+    rep["beta"]      = utils::lexical_cast<std::string>(beta_);
     
     const path_type embedding_file = rep.path("embedding.gz");
     
@@ -396,6 +397,7 @@ struct Model
   
   // hyperparameter
   double alpha_;
+  double beta_;
   
   // Embedding
   embedding_type embedding_;
@@ -516,10 +518,10 @@ struct NGram
       const double y_p = func((theta.Wc_ * p_norm + theta.bc_)(0,0));
       const double y_m = func((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
       
-      const double e_classification = std::max(1.0 - (y_p - y_m), 0.0);
+      const double e_classification = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
       
-      const double delta_classification_p = - deriv(y_p) * (e_classification > 0.0);
-      const double delta_classification_m =   deriv(y_m) * (e_classification > 0.0);
+      const double delta_classification_p = - deriv(y_p) * (e_classification > 0.0) * theta.beta_;
+      const double delta_classification_m =   deriv(y_m) * (e_classification > 0.0) * theta.beta_;
       
       // update error...
       error                += e;
@@ -812,6 +814,7 @@ path_type embedding_file;
 path_type output_model_file;
 
 double alpha = 0.001;
+double beta = 1;
 int dimension = 16;
 int order = 3;
 
@@ -846,13 +849,13 @@ int main(int argc, char** argv)
 
     if (dimension <= 0)
       throw std::runtime_error("dimension must be positive");
-    
     if (order <= 0)
       throw std::runtime_error("order size should be positive");
     
-    if (alpha < 0.0 || alpha > 1.0)
-      throw std::runtime_error("error factor should be: 0.0 <= alpha <= 1.0");
-
+    if (alpha < 0.0)
+      throw std::runtime_error("alpha should be >= 0.0");
+    if (beta < 0.0)
+      throw std::runtime_error("beta should be >= 0.0");
     
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
@@ -876,7 +879,7 @@ int main(int argc, char** argv)
     
     read_data(input_file, sentences, words);
     
-    model_type theta(dimension, order, alpha);
+    model_type theta(dimension, order, alpha, beta);
 
     if (! embedding_file.empty()) {
       if (embedding_file != "-" && ! boost::filesystem::exists(embedding_file))
@@ -1250,7 +1253,8 @@ void options(int argc, char** argv)
     
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
-    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "model parameter")
+    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "parameter for reconstruction error")
+    ("beta",      po::value<double>(&beta)->default_value(beta),        "parameter for classificaiton error")
     ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
     ("order",     po::value<int>(&order)->default_value(order),         "context order size")
     
