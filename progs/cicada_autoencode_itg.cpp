@@ -977,10 +977,13 @@ struct ITGTree
     }
   }
 
+  template <typename Function, typename Derivative>
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta,
-	       const double beam)
+	       const double beam,
+	       Function   func,
+	       Derivative deriv)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -1006,7 +1009,7 @@ struct ITGTree
     // initialization
     //std::cerr << "initialize leaves" << std::endl;
 
-    forward_leaves(source, target, theta);
+    forward_leaves(source, target, theta, func, deriv);
 
     //std::cerr << "start initialization" << std::endl;
 
@@ -1016,21 +1019,21 @@ struct ITGTree
 
 	  // epsilon at target
 	  if (src < source_size) {
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta);
+	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta, func, deriv);
 	    
 	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, double(nodes_(src, src + 1, trg, trg).error_));
 	  }
 	  
 	  // epsilon at source
 	  if (trg < target_size) {
-	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta);
+	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta, func, deriv);
 	    
 	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, double(nodes_(src, src, trg, trg + 1).error_));
 	  }
 	  
 	  // word-pair
 	  if (src < source_size && trg < target_size) {
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta);
+	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta, func, deriv);
 	    
 	    const double error = nodes_(src, src + 1, trg, trg + 1).error_;
 	    
@@ -1121,7 +1124,7 @@ struct ITGTree
 		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
 		// compute score and add hyperedge
-		forward(span_pair_type(S, t, U, v), span1, span2, theta);
+		forward(span_pair_type(S, t, U, v), span1, span2, theta, func, deriv);
 	      }
 
 	      // inversion
@@ -1138,7 +1141,7 @@ struct ITGTree
 		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
 		// compute score and add hyperedge
-		forward(span_pair_type(S, t, u, U), span1, span2, theta);
+		forward(span_pair_type(S, t, u, U), span1, span2, theta, func, deriv);
 	      }
 	    }
 	  
@@ -1159,7 +1162,7 @@ struct ITGTree
 		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
 		// compute score and add hyperedge
-		forward(span_pair_type(s, S, U, v), span1, span2, theta);
+		forward(span_pair_type(s, S, U, v), span1, span2, theta, func, deriv);
 	      }
 	    
 	      // straight
@@ -1175,7 +1178,7 @@ struct ITGTree
 	      
 		if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
 	      
-		forward(span_pair_type(s, S, u, U), span1, span2, theta);
+		forward(span_pair_type(s, S, u, U), span1, span2, theta, func, deriv);
 	      }
 	    }
 	  }
@@ -1190,9 +1193,12 @@ struct ITGTree
   }
 
   // leaves!
+  template <typename Function, typename Derivative>
   void forward_leaves(const sentence_type& source,
 		      const sentence_type& target,
-		      const model_type& theta)
+		      const model_type& theta,
+		      Function   func,
+		      Derivative deriv)
   {
     typedef model_type::embedding_type embedding_type;
     
@@ -1275,9 +1281,9 @@ struct ITGTree
 	}
 	
 	const tensor_type& c = leaf.input_;
-	const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(func);
 	const tensor_type p_norm = p.normalized();
-	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(func);
 	
 	tensor_type y_normalized = y;
 	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
@@ -1292,15 +1298,18 @@ struct ITGTree
 	leaf.output_norm_ = p_norm;
 	
 	leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
-	leaf.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * leaf.reconstruction_.array();
+	leaf.delta_reconstruction_ = y.array().unaryExpr(deriv) * leaf.reconstruction_.array();
       }
   }
 
   // terminal!
+  template <typename Function, typename Derivative>
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& parent,
-	       const model_type& theta)
+	       const model_type& theta,
+	       Function   func,
+	       Derivative deriv)
   {
     node_type& node = nodes_(parent.source_.first_, parent.source_.last_, parent.target_.first_, parent.target_.last_);
     
@@ -1315,10 +1324,13 @@ struct ITGTree
   }
   
   // binary rules
+  template <typename Function, typename Derivative>
   void forward(const span_pair_type& parent,
 	       const span_pair_type& child1,
 	       const span_pair_type& child2,
-	       const model_type& theta)
+	       const model_type& theta,
+	       Function   func,
+	       Derivative deriv)
   {
     const size_type dimension = theta.dimension_;
     const bool straight = (child1.target_.last_ == child2.target_.first_);
@@ -1347,13 +1359,13 @@ struct ITGTree
     c << node1.output_norm_, node2.output_norm_;
 
     // actual values to be propagated
-    const tensor_type p = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
+    const tensor_type p = (W1 * c + b1).array().unaryExpr(func);
       
     // internal representation...
     const tensor_type p_norm = p.normalized();
       
     // compute reconstruction
-    const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(std::ptr_fun(tanhf));
+    const tensor_type y = (W2 * p_norm + b2).array().unaryExpr(func);
 
     tensor_type y_normalized = y;
     y_normalized.block(0, 0, dimension * 2, 1).normalize();
@@ -1379,9 +1391,7 @@ struct ITGTree
       node.output_norm_ = p_norm;
       
       node.reconstruction_ = y_minus_c.array() * theta.alpha_;
-      
-      // 1 - x * x for tanh!
-      node.delta_reconstruction_ = - (y.array() * y.array() - 1.0) * node.reconstruction_.array();
+      node.delta_reconstruction_ = y.array().unaryExpr(deriv) * node.reconstruction_.array();
       
       node.tails_.first  = child1;
       node.tails_.second = child2;
@@ -1390,12 +1400,14 @@ struct ITGTree
   }
   
   // additional forward loop to derive "wrong translations"
-  template <typename Gen>
+  template <typename Function, typename Derivative, typename Gen>
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const word_set_type& sources,
 	       const word_set_type& targets,
 	       const model_type& theta,
+	       Function   func,
+	       Derivative deriv,
 	       Gen& gen)
   {
     typedef model_type::embedding_type embedding_type;
@@ -1489,21 +1501,21 @@ struct ITGTree
 	    
 	    const tensor_type& c = leaf.input_sampled_;
 	    
-	    leaf.output_sampled_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	    leaf.output_sampled_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(func);
 	    leaf.output_sampled_norm_ = leaf.output_sampled_.normalized();
 	    
 	    node.output_sampled_norm_ = leaf.output_sampled_norm_;
 	    
-	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
-	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
+	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
 	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
 	    
 	    leaf.error_classification_ = error;
 	    node.error_classification_ = error;
 	    node.total_classification_ = error;
 	    
-	    leaf.delta_classification_p_ = - (1.0 - y_p * y_p) * (error > 0.0);
-	    leaf.delta_classification_m_ =   (1.0 - y_m * y_m) * (error > 0.0);
+	    leaf.delta_classification_p_ = - deriv(y_p) * (error > 0.0);
+	    leaf.delta_classification_m_ =   deriv(y_m) * (error > 0.0);
 	  } else {
 	    const bool straight = edge.straight();
 	    
@@ -1518,29 +1530,31 @@ struct ITGTree
 	    tensor_type c(dimension * 4, 1);
 	    c << node1.output_sampled_norm_, node2.output_sampled_norm_;
 	    
-	    node.output_sampled_      = (W1 * c + b1).array().unaryExpr(std::ptr_fun(tanhf));
+	    node.output_sampled_      = (W1 * c + b1).array().unaryExpr(func);
 	    node.output_sampled_norm_ = node.output_sampled_.normalized();
 	    
-	    const double y_p = std::tanh((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
-	    const double y_m = std::tanh((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
+	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
 	    const double error = std::max(1.0 - (y_p - y_m), 0.0);
 	    
 	    node.error_classification_ = error;
 	    node.total_classification_ = error + node1.total_classification_ + node2.total_classification_;
 	    
-	    node.delta_classification_p_ = - (1.0 - y_p * y_p) * (error > 0.0);
-	    node.delta_classification_m_ =   (1.0 - y_m * y_m) * (error > 0.0);
+	    node.delta_classification_p_ = - deriv(y_p) * (error > 0.0);
+	    node.delta_classification_m_ =   deriv(y_m) * (error > 0.0);
 	  }
 	}
       }
   }
   
   // backward propagation from the goal node!
-  
+  template <typename Function, typename Derivative>
   void backward(const sentence_type& source,
 		const sentence_type& target,
 		const model_type& theta,
-		gradient_type& gradient)
+		gradient_type& gradient,
+		Function   func,
+		Derivative deriv)
   {
     const size_type dimension = theta.dimension_;
     const size_type window    = theta.window_;
@@ -1591,13 +1605,13 @@ struct ITGTree
 	tensor_type delta;
 	
 	if (root || left)
-	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
+	  delta = (leaf.output_.array().unaryExpr(deriv)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
 		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 		      - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
-	  delta = (- (leaf.output_.array() * leaf.output_.array() - 1.0)
+	  delta = (leaf.output_.array().unaryExpr(deriv)
 		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
 		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
@@ -1609,7 +1623,7 @@ struct ITGTree
 	gradient.Wl2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
 	gradient.bl2_ += leaf.delta_reconstruction_;
 	
-	gradient.Wc_ += leaf.delta_classification_p_ * leaf.output_norm_.transpose();
+	gradient.Wc_         += leaf.delta_classification_p_ * leaf.output_norm_.transpose();
 	gradient.bc_.array() += leaf.delta_classification_p_;
 	
 	const tensor_type delta_embedding = theta.Wl1_.transpose() * delta - leaf.reconstruction_;
@@ -1676,12 +1690,12 @@ struct ITGTree
 	  tensor_type delta;
 	  
 	  if (root || left)
-	    delta = (- (leaf.output_sampled_.array() * leaf.output_sampled_.array() - 1.0)
+	    delta = (leaf.output_sampled_.array().unaryExpr(deriv)
 		     * (theta.Wc_.transpose() * leaf.delta_classification_m_
 			+ W1.block(0, 0, dimension * 2, dimension * 2).transpose()
 			* node_parent.delta_sampled_).array());
 	  else
-	    delta = (- (leaf.output_sampled_.array() * leaf.output_sampled_.array() - 1.0)
+	    delta = (leaf.output_sampled_.array().unaryExpr(deriv)
 		     * (theta.Wc_.transpose() * leaf.delta_classification_m_
 			+ W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
 			* node_parent.delta_sampled_).array());
@@ -1689,7 +1703,7 @@ struct ITGTree
 	  gradient.Wl1_ += delta * leaf.input_sampled_.transpose();
 	  gradient.bl1_ += delta;
 	  
-	  gradient.Wc_ += leaf.delta_classification_m_ * leaf.output_sampled_norm_.transpose();
+	  gradient.Wc_         += leaf.delta_classification_m_ * leaf.output_sampled_norm_.transpose();
 	  gradient.bc_.array() += leaf.delta_classification_m_;
 	  
 	  const tensor_type delta_embedding = theta.Wl1_.transpose() * delta;
@@ -1771,15 +1785,14 @@ struct ITGTree
 	
 	const tensor_type& W2 = (straight_child ? theta.Ws2_ : theta.Wi2_);
 	
-	// 1.0 - x * x for tanh
 	if (root || left)
-	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
+	  node1.delta_ = (node.output_.array().unaryExpr(deriv)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + theta.Wc_.transpose() * node.delta_classification_p_
 			     + W1.block(0, 0, dimension * 2, dimension * 2).transpose() * node_parent.delta_
 			     - reconstruction.block(0, 0, dimension * 2, 1)).array());
 	else
-	  node1.delta_ = (- (node.output_.array() * node.output_.array() - 1.0)
+	  node1.delta_ = (node.output_.array().unaryExpr(deriv)
 			  * (W2.transpose() * node.delta_reconstruction_
 			     + theta.Wc_.transpose() * node.delta_classification_p_
 			     + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose() * node_parent.delta_
@@ -1803,17 +1816,17 @@ struct ITGTree
 	dW2 += node.delta_reconstruction_ * node.output_norm_.transpose();
 	db2 += node.delta_reconstruction_;
 	
-	gradient.Wc_ += node.delta_classification_p_ * node.output_norm_.transpose();
+	gradient.Wc_         += node.delta_classification_p_ * node.output_norm_.transpose();
 	gradient.bc_.array() += node.delta_classification_p_;
 	
 	{
 	  if (root || left)
-	    node1.delta_sampled_ = (- (node.output_sampled_.array() * node.output_sampled_.array() - 1.0)
+	    node1.delta_sampled_ = (node.output_sampled_.array().unaryExpr(deriv)
 				    * (theta.Wc_.transpose() * node.delta_classification_m_
 				       + W1.block(0, 0, dimension * 2, dimension * 2).transpose()
 				       * node_parent.delta_sampled_).array());
 	  else
-	    node1.delta_sampled_ = (- (node.output_sampled_.array() * node.output_sampled_.array() - 1.0)
+	    node1.delta_sampled_ = (node.output_sampled_.array().unaryExpr(deriv)
 				    * (theta.Wc_.transpose() * node.delta_classification_m_
 				       + W1.block(0, dimension * 2, dimension * 2, dimension * 2).transpose()
 				       * node_parent.delta_sampled_).array());
@@ -1826,7 +1839,7 @@ struct ITGTree
 	  dW1.block(0, dimension * 2, dimension * 2, dimension * 2) += delta * node2.output_sampled_norm_.transpose();
 	  db1 += delta;
 
-	  gradient.Wc_ += node.delta_classification_m_ * node.output_sampled_norm_.transpose();
+	  gradient.Wc_         += node.delta_classification_m_ * node.output_sampled_norm_.transpose();
 	  gradient.bc_.array() += node.delta_classification_m_;
 	}
       }
@@ -2663,6 +2676,38 @@ struct TaskAccumulate
       error_(0),
       classification_(0),
       samples_(0) {}
+
+  struct tanh
+  {
+    double operator()(const double& x) const
+    {
+      return std::tanh(x);
+    }
+  };
+  
+  struct dtanh
+  {
+    double operator()(const double& x) const
+    {
+      return 1.0 - x * x;
+    }
+  };
+  
+  struct hinge
+  {
+    double operator()(const double& x) const
+    {
+      return std::max(x, 0.0);
+    }
+  };
+
+  struct dhinge
+  {
+    double operator()(const double& x) const
+    {
+      return x > 0.0;
+    }
+  };
   
   void operator()()
   {
@@ -2693,16 +2738,16 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, beam_);
+	itg_tree_.forward(source, target, theta_, beam_, hinge(), dhinge());
 
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 
 	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
 	
 	if (parsed) {
-	  itg_tree_.forward(source, target, sources_, targets_, theta_, generator);
+	  itg_tree_.forward(source, target, sources_, targets_, theta_, hinge(), dhinge(), generator);
 	  
-	  itg_tree_.backward(source, target, theta_, gradient_);
+	  itg_tree_.backward(source, target, theta_, gradient_, hinge(), dhinge());
 	  
 	  error_          += root.total_;
 	  classification_ += root.total_classification_;
@@ -2948,6 +2993,38 @@ struct TaskDerivation
       queue_(queue),
       queue_derivation_(queue_derivation),
       queue_alignment_(queue_alignment) {}
+
+  struct tanh
+  {
+    double operator()(const double& x) const
+    {
+      return std::tanh(x);
+    }
+  };
+  
+  struct dtanh
+  {
+    double operator()(const double& x) const
+    {
+      return 1.0 - x * x;
+    }
+  };
+  
+  struct hinge
+  {
+    double operator()(const double& x) const
+    {
+      return std::max(x, 0.0);
+    }
+  };
+
+  struct dhinge
+  {
+    double operator()(const double& x) const
+    {
+      return x > 0.0;
+    }
+  };
   
   void operator()()
   {
@@ -2973,7 +3050,7 @@ struct TaskDerivation
 		  << "target: " << target << std::endl;
 #endif
 	
-	itg_tree_.forward(source, target, theta_, beam_);
+	itg_tree_.forward(source, target, theta_, beam_, hinge(), dhinge());
 	
 	const itg_tree_type::node_type& root = itg_tree_.nodes_(0, source.size(), 0, target.size());
 	

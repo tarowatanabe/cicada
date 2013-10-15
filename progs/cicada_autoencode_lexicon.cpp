@@ -593,13 +593,15 @@ struct Lexicon
 
   typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
   
-  template <typename Gen>
+  template <typename Function, typename Derivative, typename Gen>
   std::pair<double, double> operator()(const sentence_type& source,
 				       const sentence_type& target,
 				       const word_set_type& sources,
 				       const word_set_type& targets,
 				       const model_type& theta,
 				       gradient_type& gradient,
+				       Function   func,
+				       Derivative deriv,
 				       Gen& gen)
   {
     typedef model_type::embedding_type embedding_type;
@@ -731,9 +733,9 @@ struct Lexicon
 		  << "sampled: rows: " << input_sampled.rows() << " cols: " << input_sampled.cols() << std::endl;
 #endif
 	
-	const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(func);
 	const tensor_type p_norm = p.normalized();
-	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(func);
 	
 	tensor_type y_normalized = y;
 	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
@@ -741,7 +743,7 @@ struct Lexicon
 	
 	const tensor_type y_minus_c = y_normalized - input;
 	
-	const tensor_type p_sampled = (theta.Wl1_ * input_sampled + theta.bl1_).array().unaryExpr(std::ptr_fun(tanhf));
+	const tensor_type p_sampled = (theta.Wl1_ * input_sampled + theta.bl1_).array().unaryExpr(func);
 	const tensor_type p_sampled_norm = p_sampled.normalized();
 	
 	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
@@ -749,17 +751,17 @@ struct Lexicon
 	//std::cerr << "error: " << e << std::endl;
 	
 	const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
-	const tensor_type delta_reconstruction = - (y.array() * y.array() - 1.0) * reconstruction.array();
+	const tensor_type delta_reconstruction = -y.array().unaryExpr(deriv) * reconstruction.array();
 	
-	const double y_p = std::tanh((theta.Wc_ * p_norm + theta.bc_)(0,0));
-	const double y_m = std::tanh((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
+	const double y_p = func((theta.Wc_ * p_norm + theta.bc_)(0,0));
+	const double y_m = func((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
 	
 	const double e_classification = std::max(1.0 - (y_p - y_m), 0.0);
 
 	//std::cerr << "classification: " << e_classification << std::endl;
 	
-	const double delta_classification_p = - (1.0 - y_p * y_p) * (e_classification > 0.0);
-	const double delta_classification_m =   (1.0 - y_m * y_m) * (e_classification > 0.0);
+	const double delta_classification_p = - deriv(y_p) * (e_classification > 0.0);
+	const double delta_classification_m =   deriv(y_m) * (e_classification > 0.0);
 
 	// update error...
 	error                += e;
@@ -767,11 +769,11 @@ struct Lexicon
 
 	// backward...
 	
-	const tensor_type delta = (- (p.array() * p.array() - 1.0)
+	const tensor_type delta = (p.array().unaryExpr(deriv)
 				   * (theta.Wl2_.transpose() * delta_reconstruction
 				      + theta.Wc_.transpose() * delta_classification_p).array());
-
-	const tensor_type delta_sampled = (- (p_sampled.array() * p_sampled.array() - 1.0)
+	
+	const tensor_type delta_sampled = (p_sampled.array().unaryExpr(deriv)
 					   * (theta.Wc_.transpose() * delta_classification_m).array());
 	
 #if 0
@@ -1347,6 +1349,38 @@ struct TaskAccumulate
       classification_(0),
       samples_(0) {}
   
+  struct tanh
+  {
+    double operator()(const double& x) const
+    {
+      return std::tanh(x);
+    }
+  };
+  
+  struct dtanh
+  {
+    double operator()(const double& x) const
+    {
+      return 1.0 - x * x;
+    }
+  };
+  
+  struct hinge
+  {
+    double operator()(const double& x) const
+    {
+      return std::max(x, 0.0);
+    }
+  };
+
+  struct dhinge
+  {
+    double operator()(const double& x) const
+    {
+      return x > 0.0;
+    }
+  };
+
   void operator()()
   {
     clear();
@@ -1370,7 +1404,8 @@ struct TaskAccumulate
 		  << "target: " << target << std::endl;
 #endif
 	
-	std::pair<double, double> errors = lexicon_(source, target, sources_, targets_, theta_, gradient_, generator);
+	std::pair<double, double> errors = lexicon_(source, target, sources_, targets_, theta_, gradient_, hinge(), dhinge(),
+						    generator);
 	  
 	error_          += errors.first;
 	classification_ += errors.second;
