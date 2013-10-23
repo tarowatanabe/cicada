@@ -520,17 +520,17 @@ struct Model
     tensor_type& eos = embedding[vocab_type::EOS];
     
     if (! eps.rows() || ! eps.cols())
-      eps = tensor_type::Random(dimension_, 1).normalized();
+      eps = tensor_type::Random(dimension_, 1);
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Random(dimension_, 1).normalized();
+      bos = tensor_type::Random(dimension_, 1);
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Random(dimension_, 1).normalized();
+      eos = tensor_type::Random(dimension_, 1);
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding[*first];
       
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Random(dimension_, 1).normalized();
+	we = tensor_type::Random(dimension_, 1);
     }
     
     // compute norm...
@@ -625,6 +625,33 @@ struct Model
       }
     }
   }
+
+  template <typename Rep, typename Tp>
+  inline
+  void key_value(const Rep& rep, const std::string& key, Tp& value)
+  {
+    typename Rep::const_iterator iter = rep.find(key);
+    if (iter == rep.end())
+      throw std::runtime_error("no key? " + key);
+    value = utils::lexical_cast<Tp>(iter->second);
+  }
+
+  void read(const path_type& path)
+  {
+    // we use a repository structure...
+    typedef utils::repository repository_type;
+    
+    repository_type rep(path, repository_type::read);
+
+    key_value(rep, "dimension", dimension_);
+    key_value(rep, "window",    window_);
+    key_value(rep, "alpha",     alpha_);
+    key_value(rep, "beta",      beta_);
+    
+    read_embedding(rep.path("source.gz"), rep.path("target.gz"));
+    
+    
+  }
   
   void write(const path_type& path) const
   {
@@ -694,6 +721,28 @@ struct Model
 
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
+  }
+
+  void read(const path_type& path,
+	    tensor_type& matrix,
+	    const tensor_type::Index rows_expected,
+	    const tensor_type::Index cols_expected)
+  {
+    utils::compress_istream is(path, 1024 * 1024);
+    
+    tensor_type::Index rows;
+    tensor_type::Index cols;
+    
+    is.read((char*) &rows, sizeof(tensor_type::Index));
+    is.read((char*) &cols, sizeof(tensor_type::Index));
+
+    if (rows != rows_expected)
+      throw std::runtime_error("rows does noe match for " + path.string());
+    if (cols != cols_expected)
+      throw std::runtime_error("rows does noe match for " + path.string());
+    
+    matrix.resize(rows, cols);
+    is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -1076,10 +1125,6 @@ struct ITGTree
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-
-    //
-    // TODO: revise this to compute "score" in addition to reconstruction error....
-    //
 
     // initialization
     clear();

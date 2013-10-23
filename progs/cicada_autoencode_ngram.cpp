@@ -3,7 +3,7 @@
 //
 
 // 
-// Lexical autoencoder
+// ngram autoencoder
 //
 //  reconstruction
 //    internal ------ sampled loss
@@ -85,8 +85,9 @@ struct Model
   Model() : dimension_(0), order_(0), alpha_(0), beta_(0) {}
   Model(const size_type& dimension, const size_type& order) 
     : dimension_(dimension), order_(order), alpha_(0), beta_(0) { initialize(dimension, order); }
-  Model(const size_type& dimension, const size_type& order, const double& alpha, const double beta) 
-    : dimension_(dimension), order_(order), alpha_(alpha), beta_(beta) { initialize(dimension, order); }
+  template <typename Gen>
+  Model(const size_type& dimension, const size_type& order, const double& alpha, const double beta, Gen& gen) 
+    : dimension_(dimension), order_(order), alpha_(alpha), beta_(beta) { initialize(dimension, order, gen); }
   
   Model& operator-=(const Model& x)
   {
@@ -222,7 +223,51 @@ struct Model
     
     return norm;
   }
+
+  template <typename Gen>
+  struct randomize
+  {
+    randomize(Gen& gen) : gen_(gen) {}
+
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return boost::random::uniform_real_distribution<Tp>(-0.1, 0.1)(const_cast<Gen&>(gen_));
+    }
+
+    Gen& gen_;
+  };
   
+  template <typename Gen>
+  void initialize(const size_type dimension, const size_type order, Gen& gen)
+  {
+    if (dimension <= 0)
+      throw std::runtime_error("invalid dimension");
+    if (order <= 0)
+      throw std::runtime_error("invalid order");
+    
+    // intialize randomly...
+    dimension_ = dimension;
+    order_     = order;
+        
+    // embedding
+    embedding_.clear();
+    scale_ = 1.0;
+    norm_ = 0.0;
+        
+    // lexicon
+    Wl1_ = tensor_type::Zero(dimension, dimension * order).array().unaryExpr(randomize<Gen>(gen));
+    bl1_ = tensor_type::Zero(dimension, 1).array().unaryExpr(randomize<Gen>(gen));
+    
+    // lexicon reconstruction
+    Wl2_ = tensor_type::Zero(dimension * order, dimension).array().unaryExpr(randomize<Gen>(gen));
+    bl2_ = tensor_type::Zero(dimension * order, 1).array().unaryExpr(randomize<Gen>(gen));
+    
+    // classification
+    Wc_ = tensor_type::Zero(1, dimension).array().unaryExpr(randomize<Gen>(gen));
+    bc_ = tensor_type::Zero(1, 1).array().unaryExpr(randomize<Gen>(gen));
+  }
+
   void initialize(const size_type dimension, const size_type order)
   {
     if (dimension <= 0)
@@ -240,34 +285,34 @@ struct Model
     norm_ = 0.0;
         
     // lexicon
-    Wl1_ = tensor_type::Random(dimension, dimension * order);
-    bl1_ = tensor_type::Random(dimension, 1);
+    Wl1_ = tensor_type::Zero(dimension, dimension * order);
+    bl1_ = tensor_type::Zero(dimension, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Random(dimension * order, dimension);
-    bl2_ = tensor_type::Random(dimension * order, 1);
+    Wl2_ = tensor_type::Zero(dimension * order, dimension);
+    bl2_ = tensor_type::Zero(dimension * order, 1);
     
     // classification
-    Wc_ = tensor_type::Random(1, dimension);
-    bc_ = tensor_type::Random(1, 1);
+    Wc_ = tensor_type::Zero(1, dimension);
+    bc_ = tensor_type::Zero(1, 1);
   }
   
-  template <typename Iterator>
-  void embedding(Iterator first, Iterator last)
+  template <typename Iterator, typename Gen>
+  void embedding(Iterator first, Iterator last, Gen& gen)
   {
     tensor_type& bos     = embedding_[vocab_type::BOS];
     tensor_type& eos     = embedding_[vocab_type::EOS];
     
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Random(dimension_, 1).normalized();
+      bos = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Random(dimension_, 1).normalized();
+      eos = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding_[*first];
 
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Random(dimension_, 1).normalized();
+	we = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
     }
     
     // compute norm...
@@ -831,11 +876,12 @@ int threads = 2;
 
 int debug = 0;
 
-template <typename Learner>
+template <typename Learner, typename Gen>
 void learn_online(const Learner& learner,
 		  const sentence_set_type& sentences,
 		  const word_set_type& words,
-		  model_type& theta);
+		  model_type& theta,
+		  Gen& gen);
 void read_data(const path_type& input_file,
 	       sentence_set_type& sentences,
 	       word_set_type& words);
@@ -870,7 +916,10 @@ int main(int argc, char** argv)
   
     // this is optional, but safe to set this
     ::srandom(utils::random_seed());
-        
+
+    boost::mt19937 generator;
+    generator.seed(utils::random_seed());
+    
     if (input_file.empty())
       throw std::runtime_error("no data?");
     
@@ -879,7 +928,7 @@ int main(int argc, char** argv)
     
     read_data(input_file, sentences, words);
     
-    model_type theta(dimension, order, alpha, beta);
+    model_type theta(dimension, order, alpha, beta, generator);
 
     if (! embedding_file.empty()) {
       if (embedding_file != "-" && ! boost::filesystem::exists(embedding_file))
@@ -888,13 +937,13 @@ int main(int argc, char** argv)
       theta.read_embedding(embedding_file);
     }
     
-    theta.embedding(words.begin(), words.end());
+    theta.embedding(words.begin(), words.end(), generator);
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, order, lambda, eta0), sentences, words, theta);
+	learn_online(LearnAdaGrad(dimension, order, lambda, eta0), sentences, words, theta, generator);
       else
-	learn_online(LearnL2(lambda, eta0), sentences, words, theta);
+	learn_online(LearnL2(lambda, eta0), sentences, words, theta, generator);
     }
     
     if (! output_model_file.empty())
@@ -1147,11 +1196,12 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
   return path_added;
 }
 
-template <typename Learner>
+template <typename Learner, typename Gen>
 void learn_online(const Learner& learner,
 		  const sentence_set_type& sentences,
 		  const word_set_type& words,
-		  model_type& theta)
+		  model_type& theta,
+		  Gen& gen)
 {
   typedef TaskAccumulate task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -1159,6 +1209,8 @@ void learn_online(const Learner& learner,
   typedef task_type::size_type size_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
+
+  boost::random_number_generator<Gen> g(gen);
   
   task_type::queue_type   mapper(256 * threads);
   task_type::counter_type reducer;
@@ -1244,7 +1296,8 @@ void learn_online(const Learner& learner,
 		<< "parsed: " << samples << std::endl;
     
     // shuffle bitexts!
-    std::random_shuffle(ids.begin(), ids.end());
+    
+    std::random_shuffle(ids.begin(), ids.end(), g);
   }
 
   // termination

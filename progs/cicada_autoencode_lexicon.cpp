@@ -361,17 +361,17 @@ struct Model
     tensor_type& eos = embedding[vocab_type::EOS];
     
     if (! eps.rows() || ! eps.cols())
-      eps = tensor_type::Random(dimension_, 1).normalized();
+      eps = tensor_type::Random(dimension_, 1);
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Random(dimension_, 1).normalized();
+      bos = tensor_type::Random(dimension_, 1);
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Random(dimension_, 1).normalized();
+      eos = tensor_type::Random(dimension_, 1);
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding[*first];
       
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Random(dimension_, 1).normalized();
+	we = tensor_type::Random(dimension_, 1);
     }
     
     // compute norm...
