@@ -16,7 +16,7 @@ Compile
 .. code:: bash
 
    ./autogen.sh (required when you get the code by git clone)
-   ./configure
+   env CFLAGS="-O3" CXXFLAGS="-O3" ./configure
    make
    make install (optional)
 
