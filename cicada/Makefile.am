@@ -774,8 +774,9 @@ span_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
 stemmer_main_SOURCES = stemmer_main.cpp
 stemmer_main_LDADD = libcicada.la
 
-symbol_main_SOURCES = symbol_main.cpp
-symbol_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
+symbol_main_SOURCES  = symbol_main.cpp symbol.cpp vocab.cpp
+symbol_main_CPPFLAGS = $(AM_CPPFLAGS)
+symbol_main_LDADD    = $(LIBUTILS) $(MSGPACK_LDFLAGS)
 
 symbol_vector_main_SOURCES = symbol_vector_main.cpp
 symbol_vector_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
