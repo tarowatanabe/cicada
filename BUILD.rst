@@ -48,6 +48,9 @@ In addition to configuration options, it is better to set ``-O3`` for
 the ``CFLAGS`` and ``CXXFLAGS`` environment variables for faster
 execution, when compiled by gcc and clang.
 
+Note that we do not support libc++ with clang at this moment. Thus, to
+compile under OS X, add ``-stdlib=libstdc++`` in the ``CXXFLAGS``.
+
 Requirements
 ------------
 

@@ -261,3 +261,7 @@ Very messy mac os x (due by swithing into clang/llvm)
   - Mac OS X 10.9: gcc (actually clang) uses libc++ and clang uses libc++
   - Mac OS X 10.8: gcc (actually clang) uses libstdc++ and clang uses libstdc++
   - Mac OS X 10.7: gcc uses libstdc++ and clang uses libstdc++
+
+Bugfix when compiled with libc++:
+  - Caught segfault in many places, which may be caused by the
+    difference of libstdc++ and libc++.
