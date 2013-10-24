@@ -636,10 +636,27 @@ AC_MSG_RESULT([no])
 AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h time.h sys/time.h unistd.h])
 
 # hasn_{map,set}
-AC_CHECK_HEADERS([tr1/unordered_map tr1/unordered_set ext/hash_map ext/hash_set hash_map hash_set])
+AC_CHECK_HEADERS([unordered_map unordered_set tr1/unordered_map tr1/unordered_set ext/hash_map ext/hash_set hash_map hash_set])
 
 # cmath, tr1/cmath
-AC_CHECK_HEADERS([cmath, tr1/cmath])
+AC_CHECK_HEADERS([cmath tr1/cmath])
+
+if test "x$ac_cv_header_cmath" = "xyes"; then
+  AC_MSG_CHECKING([for std::log1p])
+  AC_TRY_COMPILE([#include <cmath>],
+     [ std::log1p(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_STD_LOG1P], 1, [Define to 1 if you have the std::log1p.])],
+     [AC_MSG_RESULT([no])])
+
+  AC_MSG_CHECKING([for std::lgamma])
+  AC_TRY_COMPILE([#include <cmath>],
+     [ std::lgamma(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_STD_LOG1P], 1, [Define to 1 if you have the std::lgamma.])],
+     [AC_MSG_RESULT([no])])
+
+fi
 
 ## SSE related...
 AC_CHECK_HEADERS([mm_malloc.h xmmintrin.h nmmintrin.h emmintrin.h tmmintrin.h ammintrin.h bmmintrin.h])

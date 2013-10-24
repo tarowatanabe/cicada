@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2012-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__UNORDERED_SET__HPP__
@@ -10,7 +10,9 @@
 
 #include <boost/functional/hash.hpp>
 
-#if defined(HAVE_TR1_UNORDERED_SET)
+#if defined(HAVE_UNORDERED_SET)
+  #include <unordered_set>
+#elif defined(HAVE_TR1_UNORDERED_SET)
   #if defined(__GNUC__) && ( (__GNUC__ > 4) || ((__GNUC__ >= 4) && (__GNUC_MINOR__ >= 1)) )
     #include <tr1/unordered_set>
   #else
@@ -18,7 +20,7 @@
   #endif
 #endif
 
-#ifndef HAVE_TR1_UNORDERED_SET
+#if ! defined(HAVE_TR1_UNORDERED_SET) && ! defined(HAVE_UNORDERED_SET)
   #if defined(HAVE_EXT_HASH_SET)
     #include <ext/hash_set>
     #if __GNUC__ == 3 && __GNUC_MINOR__ == 0
@@ -44,7 +46,9 @@ namespace utils
 	    typename _Alloc=std::allocator<_Value> >
   struct unordered_set
   {
-#ifdef HAVE_TR1_UNORDERED_SET
+#if defined(HAVE_UNORDERED_SET)
+    typedef std::unordered_set<_Value,_Hash,_Pred,_Alloc> type;
+#elif defined(HAVE_TR1_UNORDERED_SET)
     typedef std::tr1::unordered_set<_Value,_Hash,_Pred,_Alloc> type;
 #else
     typedef sgi::hash_set<_Value,_Hash,_Pred,_Alloc> type;
@@ -57,7 +61,9 @@ namespace utils
 	    typename _Alloc=std::allocator<_Value> >
   struct unordered_multiset
   {
-#ifdef HAVE_TR1_UNORDERED_SET
+#if defined(HAVE_UNORDERED_SET)
+    typedef std::unordered_multiset<_Value,_Hash,_Pred,_Alloc> type;
+#elif defined(HAVE_TR1_UNORDERED_SET)
     typedef std::tr1::unordered_multiset<_Value,_Hash,_Pred,_Alloc> type;
 #else
     typedef sgi::hash_multiset<_Value,_Hash,_Pred,_Alloc> type;

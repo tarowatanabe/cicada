@@ -80,7 +80,8 @@ namespace utils
     basic_piece(const char* __first, const char* __last) : first_(__first), last_(__last) {}
     basic_piece(std::string::const_iterator __first, std::string::const_iterator __last)
       : first_(&(*__first)), last_(&(*__last)) {}
-    basic_piece(std::vector<char>::const_iterator __first, std::vector<char>::const_iterator __last)
+    template <typename Iterator>
+    basic_piece(Iterator __first, Iterator __last)
       : first_(&(*__first)), last_(&(*__last)) {}
     
     pointer data() const { return first_; }
@@ -150,7 +151,8 @@ namespace utils
       last_  = &(*__last);
     }
 
-    void assign(std::vector<char>::const_iterator __first, std::vector<char>::const_iterator __last)
+    template <typename Iterator>
+    void assign(Iterator __first, Iterator __last)
     {
       first_ = &(*__first);
       last_  = &(*__last);

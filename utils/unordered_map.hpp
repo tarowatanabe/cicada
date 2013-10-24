@@ -10,7 +10,9 @@
 
 #include <boost/functional/hash.hpp>
 
-#if defined(HAVE_TR1_UNORDERED_MAP)
+#if defined(HAVE_UNORDERED_MAP)
+  #include <unordered_map>
+#elif defined(HAVE_TR1_UNORDERED_MAP)
   #if defined(__GNUC__) && ( (__GNUC__ > 4) || ((__GNUC__ >= 4) && (__GNUC_MINOR__ >= 1)) )
     #include <tr1/unordered_map>
   #else
@@ -18,7 +20,7 @@
   #endif
 #endif
 
-#if ! defined(HAVE_TR1_UNORDERED_MAP)
+#if ! defined(HAVE_TR1_UNORDERED_MAP) && ! defined(HAVE_UNORDERED_MAP)
   #if defined(HAVE_EXT_HASH_MAP)
     #include <ext/hash_map>
     #if __GNUC__ == 3 && __GNUC_MINOR__ == 0
@@ -44,7 +46,9 @@ namespace utils
 	    typename _Alloc=std::allocator<std::pair<const _Key, _Tp> > >
   struct unordered_map
   {
-#ifdef HAVE_TR1_UNORDERED_MAP
+#if defined(HAVE_UNORDERED_MAP)
+    typedef std::unordered_map<_Key,_Tp,_Hash,_Pred,_Alloc> type;
+#elif defined(HAVE_TR1_UNORDERED_MAP)
     typedef std::tr1::unordered_map<_Key,_Tp,_Hash,_Pred,_Alloc> type;
 #else
     typedef sgi::hash_map<_Key,_Tp,_Hash,_Pred,_Alloc> type;
@@ -57,7 +61,9 @@ namespace utils
 	    typename _Alloc=std::allocator<std::pair<const _Key, _Tp> > >
   struct unordered_multimap
   {
-#ifdef HAVE_TR1_UNORDERED_MAP
+#if defined(HAVE_UNORDERED_MAP)
+    typedef std::unordered_multimap<_Key,_Tp,_Hash,_Pred,_Alloc> type;
+#elif defined(HAVE_TR1_UNORDERED_MAP)
     typedef std::tr1::unordered_multimap<_Key,_Tp,_Hash,_Pred,_Alloc> type;
 #else
     typedef sgi::hash_multimap<_Key,_Tp,_Hash,_Pred,_Alloc> type;
