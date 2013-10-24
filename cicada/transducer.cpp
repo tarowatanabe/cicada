@@ -94,7 +94,7 @@ format: ICU's number/date format rules\n\
     typedef boost::filesystem::path path_type;
     
     const parameter_type param(parameter);
-    
+
     if (utils::ipiece(param.name()) == "glue") {
       symbol_type goal;
       symbol_type non_terminal;
@@ -119,10 +119,11 @@ format: ICU's number/date format rules\n\
       
       if (int(inverted) + straight == 0)
 	throw std::runtime_error("no insetion or straight glue rules?");
+      
       if (goal.empty() || ! goal.is_non_terminal())
 	throw std::runtime_error("invalid goal for glue rules? " + static_cast<const std::string&>(goal));
 
-      if (! non_terminal.empty() && ! non_terminal.is_non_terminal())
+      if (non_terminal.empty() || ! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
       
       if (! fallback_file.empty()) {
