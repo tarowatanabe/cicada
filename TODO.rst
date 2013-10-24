@@ -256,3 +256,8 @@ Add head-node annotator for each edge:
  - This can be used to identify the pruning bin, so that we do not
    rely on the "prune-bin" attribute assigned during feature
    application.
+
+Very messy mac os x (due by swithing into clang/llvm)
+  - Mac OS X 10.9: gcc (actually clang) uses libc++ and clang uses libc++
+  - Mac OS X 10.8: gcc (actually clang) uses libstdc++ and clang uses libstdc++
+  - Mac OS X 10.7: gcc uses libstdc++ and clang uses libstdc++
