@@ -44,12 +44,10 @@ You can set several options. For details see the requirement section.
   --with-profiler=DIR     profiler in DIR
   --with-boost=DIR        prefix of Boost 1.42 [guess]
 
-In addition to configuration options, it is better to set ``-O3`` for
-the ``CFLAGS`` and ``CXXFLAGS`` environment variables for faster
-execution, when compiled by gcc and clang.
-
-Note that we do not support libc++ with clang at this moment. Thus, to
-compile under OS X, add ``-stdlib=libstdc++`` in the ``CXXFLAGS``.
+In addition to the configuration options, it is better to set ``-O3``
+for the ``CFLAGS`` and ``CXXFLAGS`` environment variables for faster
+execution, when compiled by **gcc**. For **clang** with **libc++**, it
+is still better to use the default of ``-O2``.
 
 Requirements
 ------------
