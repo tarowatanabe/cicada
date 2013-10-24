@@ -116,6 +116,7 @@ namespace cicada
     
     void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
 
     void resize(size_type size) { lattice.resize(size); }
     

@@ -40,10 +40,20 @@ namespace cicada
     return qi::phrase_parse(iter, end, *(qi::lexeme[qi::int_ >> '-' >> qi::int_]), standard::space, __align);
   }
 
+  bool Alignment::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    clear();
+    
+    return qi::phrase_parse(iter, end, *(qi::lexeme[qi::int_ >> '-' >> qi::int_]), standard::space, __align);
+  }
+
   void Alignment::assign(const utils::piece& line)
   {
-    std::string::const_iterator iter(line.begin());
-    std::string::const_iterator end(line.end());
+    utils::piece::const_iterator iter(line.begin());
+    utils::piece::const_iterator end(line.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)
@@ -55,8 +65,8 @@ namespace cicada
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
     const bool result = qi::phrase_parse(iter, end, qi::lexeme[qi::int_ >> '-' >> qi::int_], standard::space, *this);
     if (! result || iter != end)

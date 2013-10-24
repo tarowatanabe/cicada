@@ -33,10 +33,20 @@ namespace cicada
     return qi::phrase_parse(iter, end, *(qi::lexeme[qi::int_]), standard::space, __dep);
   }
 
+  bool Dependency::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    clear();
+    
+    return qi::phrase_parse(iter, end, *(qi::lexeme[qi::int_]), standard::space, __dep);
+  }
+
   void Dependency::assign(const utils::piece& line)
   {
-    std::string::const_iterator iter(line.begin());
-    std::string::const_iterator end(line.end());
+    utils::piece::const_iterator iter(line.begin());
+    utils::piece::const_iterator end(line.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

@@ -48,6 +48,7 @@ namespace cicada
   public:
     void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
     
   public:
     void push_back(const sentence_type& sentence) { __sents.push_back(sentence); }

@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "eval/decode.hpp"
@@ -41,16 +41,29 @@ namespace cicada
 
     Score::score_ptr_type Score::decode(std::string::const_iterator& iter, std::string::const_iterator end)
     {
+      const char* citer_begin = &(*iter);
+      const char* citer       = &(*iter);
+      const char* citer_end   = &(*end);
+      
+      score_ptr_type result = decode(citer, citer_end);
+      
+      iter += citer - citer_begin;
+      
+      return result;
+    }
+
+    Score::score_ptr_type Score::decode(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+    {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      boost::spirit::qi::rule<std::string::const_iterator, std::string(), standard::space_type> quoted;
+      boost::spirit::qi::rule<utils::piece::const_iterator, std::string(), standard::space_type> quoted;
       
       quoted %= "\"" >> qi::lexeme[+(~standard::char_('\"'))] >> "\"";
       
       std::pair<std::string, std::string> scorer;
 
-      std::string::const_iterator iter_saved = iter;
+      utils::piece::const_iterator iter_saved = iter;
       
       const bool result = qi::phrase_parse(iter, end, (qi::lit('{') >> quoted >> qi::lit(':') >> quoted), standard::space, scorer);
       if (! result || scorer.first != "eval" || scorer.second.empty())
@@ -92,8 +105,8 @@ namespace cicada
 
     Score::score_ptr_type Score::decode(const utils::piece& encoded)
     {
-      std::string::const_iterator iter(encoded.begin());
-      std::string::const_iterator iter_end(encoded.end());
+      utils::piece::const_iterator iter(encoded.begin());
+      utils::piece::const_iterator iter_end(encoded.end());
       
       return decode(iter, iter_end);
     }

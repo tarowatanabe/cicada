@@ -172,6 +172,7 @@ namespace cicada
   public:
     void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
 
     friend
     std::ostream& operator<<(std::ostream& os, const HyperGraph& x);

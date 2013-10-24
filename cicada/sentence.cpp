@@ -33,11 +33,26 @@ namespace cicada
     
     return qi::phrase_parse(iter, end, *(word), standard::space, __sent);
   }
+
+  bool Sentence::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+  {
+    typedef utils::piece::const_iterator iter_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    clear();
+    
+    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[+(standard::char_ - standard::space) - ("|||" >> (standard::space | qi::eoi))];
+    
+    
+    return qi::phrase_parse(iter, end, *(word), standard::space, __sent);
+  }
   
   void Sentence::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     

@@ -601,7 +601,7 @@ struct ExtractSCFG
   
   struct ExtractCategoryBase
   {
-    typedef utils::chart<symbol_type, std::allocator<std::string> > label_chart_type;
+    typedef utils::chart<symbol_type, std::allocator<symbol_type> > label_chart_type;
     
     typedef utils::unordered_map<span_type, symbol_type, utils::hashmurmur3<size_t>, std::equal_to<span_type>,
 				 std::allocator<std::pair<const span_type, symbol_type> > >::type label_map_type;

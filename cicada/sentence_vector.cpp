@@ -48,16 +48,17 @@ namespace cicada
 
   void SentenceVector::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)
       throw std::runtime_error("sentence vector format parsing failed...");
   }
   
-  namespace sentence_vector_impl {
-    typedef sentence_vector_parser<std::string::const_iterator> grammar_type;
+  namespace sentence_vector_impl
+  {
+    typedef sentence_vector_parser<utils::piece::const_iterator> grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
@@ -83,8 +84,20 @@ namespace cicada
 #endif
     }
   };
-  
+
   bool SentenceVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    const char* citer_begin = &(*iter);
+    const char* citer       = &(*iter);
+    const char* citer_end   = &(*end);
+    const bool result = assign(citer, citer_end);
+    
+    iter += citer - citer_begin;
+    
+    return result;
+  }
+  
+  bool SentenceVector::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;

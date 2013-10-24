@@ -136,6 +136,7 @@ Internally, cicada-extract.py calls following binaries:
 cicada_extract_phrase{,_mpi}
 	Extract phrase
 	Output scores:
+
 	       lhs ||| rhs ||| count(lhs, rhs) \
 	       	   count(prev, mono, lhs, rhs) \
 		   count(prev, swap, lhs, rhs) \
@@ -146,16 +147,21 @@ cicada_extract_rule{,_mpi}
 	Extract synchronous-CFG + syntax augmentation (aka SAMT) when extracted with "span" data.
 	You can generate span by "cicada_filter_penntreebank"
 	Output scores:
+
 	       root lhs ||| root rhs ||| count(lhs, rhs)
 
 cicada_extract_ghkm{,_mpi}
 	Extract tree-to-string or string-to-tree rules by GHKM
 	Output scores:
+
 	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
 
 cicada_extract_tree{,_mpi}
 	Extract tree-to-tree rules by GHKM
 	Output scores:
+
+::
+
 	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
 
 After counts collection, you can summarize them by cicada_extract_counts{,_mpi}

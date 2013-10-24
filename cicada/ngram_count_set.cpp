@@ -87,7 +87,7 @@ namespace cicada
   
   namespace ngram_count_set_parser_impl
   {
-    typedef std::string::const_iterator iterator_type;
+    typedef utils::piece::const_iterator iterator_type;
     typedef ngram_count_set_parser<iterator_type> grammar_type;
     
 #ifdef HAVE_TLS
@@ -147,8 +147,8 @@ namespace cicada
 
   void NGramCountSet::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)
@@ -156,6 +156,19 @@ namespace cicada
   }
 
   bool NGramCountSet::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    const char* citer_begin = &(*iter);
+    const char* citer       = &(*iter);
+    const char* citer_end   = &(*end);
+    
+    const bool result = assign(citer, citer_end);
+    
+    iter += citer - citer_begin;
+    
+    return result;
+  }
+
+  bool NGramCountSet::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;

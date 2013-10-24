@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EVAL__WER__HPP__
@@ -119,6 +119,7 @@ namespace cicada
       std::string encode() const;
 
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
+      static score_ptr_type decode(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
       static score_ptr_type decode(const utils::piece& encoded);
       
     private:

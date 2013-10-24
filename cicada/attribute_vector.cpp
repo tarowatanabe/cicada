@@ -94,7 +94,7 @@ namespace cicada
   
   namespace attribute_vector_parser_impl
   {
-    typedef attribute_vector_parser<std::string::const_iterator > grammar_type;
+    typedef attribute_vector_parser<utils::piece::const_iterator > grammar_type;
 
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
@@ -124,6 +124,23 @@ namespace cicada
 
   bool AttributeVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
+    clear();
+    
+    // empty attribute vector...
+    if (iter == end) return true;
+    
+    const char* citer_begin = &(*iter);
+    const char* citer       = &(*iter);
+    const char* citer_end   = &(*end);
+    const bool result = assign(citer, citer_end);
+    
+    iter += citer - citer_begin;
+    
+    return result;
+  }
+
+  bool AttributeVector::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+  {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
@@ -143,8 +160,8 @@ namespace cicada
 
   void AttributeVector::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
 
     const bool result = assign(iter, end);
     if (! result || iter != end)

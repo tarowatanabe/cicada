@@ -145,7 +145,7 @@ namespace cicada
   
   namespace tree_rule_parser_impl
   {
-    typedef tree_rule_parser_grammar<std::string::const_iterator> grammar_type;
+    typedef tree_rule_parser_grammar<utils::piece::const_iterator> grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
@@ -172,8 +172,20 @@ namespace cicada
     }
   };
 
-
   bool TreeRule::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    const char* citer_begin = &(*iter);
+    const char* citer       = &(*iter);
+    const char* citer_end   = &(*end);
+    
+    const bool result = assign(citer, citer_end);
+    
+    iter += citer - citer_begin;
+    
+    return result;
+  }
+
+  bool TreeRule::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
@@ -195,8 +207,8 @@ namespace cicada
     
     if (x.empty()) return;
     
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.61])
 
-AC_INIT([cicada], [0.2.4], [taro.watanabe@nict.go.jp])
+AC_INIT([cicada], [0.2.5], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config])
@@ -20,7 +20,7 @@ AM_INIT_AUTOMAKE([])
 CICADA_LTVERSION=0:2:0
 AC_SUBST(CICADA_LTVERSION)
 
-CICADA_VERSION=0.2.4
+CICADA_VERSION=0.2.5
 AC_SUBST(CICADA_VERSION)
 
 AC_CONFIG_HEADERS(utils/config.h)
@@ -653,7 +653,7 @@ if test "x$ac_cv_header_cmath" = "xyes"; then
   AC_TRY_COMPILE([#include <cmath>],
      [ std::lgamma(1.0); ],
      [AC_MSG_RESULT([yes])
-      AC_DEFINE([HAVE_STD_LOG1P], 1, [Define to 1 if you have the std::lgamma.])],
+      AC_DEFINE([HAVE_STD_LGAMMA], 1, [Define to 1 if you have the std::lgamma.])],
      [AC_MSG_RESULT([no])])
 
 fi

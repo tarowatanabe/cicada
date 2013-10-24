@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
  
 #include <iterator>
@@ -56,7 +56,7 @@ namespace cicada
   namespace span_vector_impl
   {
     typedef std::vector<SpanVector::span_type, std::allocator<SpanVector::span_type> > spans_type;
-    typedef span_vector_parser<std::string::const_iterator, spans_type> grammar_type;
+    typedef span_vector_parser<utils::piece::const_iterator, spans_type> grammar_type;
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static utils::thread_specific_ptr<grammar_type > __grammar;
@@ -82,7 +82,7 @@ namespace cicada
     }
   };
   
-  bool SpanVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  bool SpanVector::assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
@@ -92,12 +92,25 @@ namespace cicada
     return qi::parse(iter, end, span_vector_impl::instance(), __spans);
   }
   
+  bool SpanVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    const char* citer_begin = &(*iter);
+    const char* citer       = &(*iter);
+    const char* citer_end   = &(*end);
+    
+    const bool result = assign(citer, citer_end);
+    
+    iter += citer - citer_begin;
+    
+    return result;
+  }
+
   void SpanVector::assign(const utils::piece& line)
   {
     clear();
     
-    std::string::const_iterator iter(line.begin());
-    std::string::const_iterator end(line.end());
+    utils::piece::const_iterator iter(line.begin());
+    utils::piece::const_iterator end(line.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)
@@ -139,10 +152,10 @@ namespace cicada
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    std::string::const_iterator iter(x.begin());
-    std::string::const_iterator end(x.end());
+    utils::piece::const_iterator iter(x.begin());
+    utils::piece::const_iterator end(x.end());
     
-    qi::rule<std::string::const_iterator, std::string()> label = qi::lexeme[+(standard::char_ - standard::space)];
+    qi::rule<utils::piece::const_iterator, std::string()> label = qi::lexeme[+(standard::char_ - standard::space)];
     
     const bool result = qi::parse(iter, end,
 				  qi::omit[*standard::space] >> qi::int_ >> '-' >> qi::int_ >> -(':' >> label) >> qi::omit[*standard::space],

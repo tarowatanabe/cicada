@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__MATHOP__HPP__
@@ -12,7 +12,10 @@
 #include <tr1/cmath>
 #endif
 
+#ifdef HAVE_CMATH
 #include <cmath>
+#endif
+
 #include <cfloat>
 
 #include <algorithm>
@@ -89,7 +92,9 @@ namespace utils
     inline
     Tp log1p(Tp x)
     {
-#ifdef HAVE_TR1_CMATH
+#if defined(HAVE_CMATH) && defined(HAVE_STD_LOG1P)
+      return std::log1p(x);
+#elif defined(HAVE_TR1_CMATH)
       return std::tr1::log1p(x);
 #else
       using namespace boost::math::policies;
@@ -137,7 +142,9 @@ namespace utils
     inline
     Tp lgamma(Tp x)
     {
-#ifdef HAVE_TR1_CMATH
+#if defined(HAVE_CMATH) && defined(HAVE_STD_LGAMMA)
+      return std::lgamma(x);
+#elif defined(HAVE_TR1_CMATH)
       return std::tr1::lgamma(x);
 #else
       return boost::math::lgamma(x);

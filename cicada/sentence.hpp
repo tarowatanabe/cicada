@@ -53,6 +53,7 @@ namespace cicada
     void assign(const utils::piece& x);
     
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
     
     // insert/erase...
     iterator insert(iterator pos, const word_type& word) { return __sent.insert(pos, word); }

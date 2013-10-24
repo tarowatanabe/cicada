@@ -1,6 +1,8 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#include <unistd.h>
 
 #include <iostream>
 #include <vector>

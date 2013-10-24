@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__SPAN_VECTOR__HPP__
@@ -116,6 +116,7 @@ namespace cicada
     
     void assign(const utils::piece& line);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
     
     // insert/erase...
     iterator insert(iterator pos, const value_type& value) { return __spans.insert(pos, value); }

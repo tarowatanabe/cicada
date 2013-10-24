@@ -618,7 +618,7 @@ struct ViterbiTask
   typedef cicada::semiring::Logprob<double> weight_type;
 
   typedef utils::lockfree_list_queue<int, std::allocator<int> >  queue_type;
-  typedef std::vector<scorer_type::score_ptr_type, std::allocator<scorer_type::scorer_ptr_type> > score_set_type;
+  typedef std::vector<scorer_type::score_ptr_type, std::allocator<scorer_type::score_ptr_type> > score_set_type;
   
   ViterbiTask(queue_type&                 __queue,
 	      const weight_set_type&      __weights,

@@ -457,15 +457,15 @@ struct ExtractAlignment
     boost::spirit::qi::rule<Iterator, alignment_set_type(), boost::spirit::standard::space_type> alignments;
   };
 
-  align_parser<std::string::const_iterator> parser;
+  align_parser<utils::piece::const_iterator> parser;
   
   void operator()(const utils::piece& align, alignment_set_type& alignments)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    std::string::const_iterator iter(align.begin());
-    std::string::const_iterator end(align.end());
+    utils::piece::const_iterator iter(align.begin());
+    utils::piece::const_iterator end(align.end());
     
     alignments.clear();
     

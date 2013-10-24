@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "decode.hpp"
@@ -72,7 +72,20 @@ namespace cicada
 
     Score::score_ptr_type PER::decode(std::string::const_iterator& iter, std::string::const_iterator end)
     {
-      typedef std::string::const_iterator iterator_type;
+      const char* citer_begin = &(*iter);
+      const char* citer       = &(*iter);
+      const char* citer_end   = &(*end);
+      
+      score_ptr_type result = decode(citer, citer_end);
+      
+      iter += citer - citer_begin;
+      
+      return result;
+    }
+
+    Score::score_ptr_type PER::decode(utils::piece::const_iterator& iter, utils::piece::const_iterator end)
+    {
+      typedef utils::piece::const_iterator iterator_type;
       
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
@@ -95,8 +108,8 @@ namespace cicada
     
     Score::score_ptr_type PER::decode(const utils::piece& encoded)
     {
-      std::string::const_iterator iter(encoded.begin());
-      std::string::const_iterator iter_end(encoded.end());
+      utils::piece::const_iterator iter(encoded.begin());
+      utils::piece::const_iterator iter_end(encoded.end());
       
       return decode(iter, iter_end);
     }

@@ -1,3 +1,7 @@
+2013-10-25
+----------
+ - Supports OS X 10.9 (with libc++ and libstdc++)
+
 2013-10-24
 ----------
  - Temporarily removed neural networks (thanks to the problem reported by Hiroshi Umemoto)

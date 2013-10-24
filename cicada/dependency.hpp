@@ -52,6 +52,7 @@ namespace cicada
     Dependency(Iterator first, Iterator last) : __dep(first, last) {}
     
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    bool assign(utils::piece::const_iterator& iter, utils::piece::const_iterator end);
     void assign(const utils::piece& line);
     void assign(size_type __n, const value_type& __value) { __dep.assign(__n, __value); }
     template <typename Iterator>
