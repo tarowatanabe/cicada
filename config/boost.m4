@@ -1092,11 +1092,9 @@ m4_define([_BOOST_clang_test],
 # _BOOST_apple_clang_test(MAJOR, MINOR)
 #
 #
-m4_define([_BOOST_apple_clang_libc_test],
-["defined __APPLE_CC__ && defined __clang__ && __GNUC__ == $1 && __GNUC_MINOR__ == $2 && defined(_LIBCPP_VERSION) @ clang-darwin$1$2"])dnl
+m4_define([_BOOST_apple_clang_test],
+["defined __APPLE_CC__ && defined __clang__ && __GNUC__ == $1 && __GNUC_MINOR__ == $2 @ xgcc$1$2 -clang-darwin$1$2 "])dnl
 
-m4_define([_BOOST_apple_clang_libstdc_test],
-["defined __APPLE_CC__ && defined __clang__ && __GNUC__ == $1 && __GNUC_MINOR__ == $2 && defined(__GLIBCXX__) @ xgcc$1$2"])dnl
 
 
 # _BOOST_FIND_COMPILER_TAG()
@@ -1125,8 +1123,7 @@ if test x$boost_cv_inc_path != xno; then
   # I'm not sure about my test for `il' (be careful: Intel's ICC pre-defines
   # the same defines as GCC's).
   for i in \
-    _BOOST_apple_clang_libc_test(4, 2) \
-    _BOOST_apple_clang_libstdc_test(4, 2) \
+    _BOOST_apple_clang_test(4, 2) \
     _BOOST_clang_test(3, 4) \
     _BOOST_clang_test(3, 3) \
     _BOOST_clang_test(3, 2) \
