@@ -5,7 +5,7 @@ perftools_LDADD = $(JEMALLOC_LDFLAGS) $(TCMALLOC_LDFLAGS) $(PROFILER_LDFLAGS)
 
 LIBUTILS=libutils.la
 
-lib_LTLIBRARIES = libutils.la
+noinst_LTLIBRARIES = libutils.la
 
 libutils_la_SOURCES = \
 	bitpack8.cpp \

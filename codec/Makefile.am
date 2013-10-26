@@ -2,7 +2,7 @@ AM_CPPFLAGS = -I.. $(BOOST_CPPFLAGS) $(SNAPPY_CPPFLAGS)
 
 LIBCODEC=libcodec.la
 
-lib_LTLIBRARIES = libcodec.la
+noinst_LTLIBRARIES = libcodec.la
 
 libcodec_la_SOURCES = \
 fastlz.c \
