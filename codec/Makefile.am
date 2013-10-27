@@ -19,13 +19,14 @@ libcodec_la_LIBADD = \
 	$(BOOST_IOSTREAMS_LDFLAGS) $(BOOST_IOSTREAMS_LIBS) \
 	$(SNAPPY_LDFLAGS)
 
-libcodecincludedir = $(pkgincludedir)/codec
-libcodecinclude_HEADERS = \
-fastlz.hpp \
-lz4.hpp \
-quicklz.hpp
+#libcodecincludedir = $(pkgincludedir)/codec
+#libcodecinclude_HEADERS =
 
 noinst_HEADERS = \
+fastlz.hpp \
+lz4.hpp \
+quicklz.hpp \
+\
 codec_impl.hpp \
 fastlz.h \
 lz4.h \
@@ -48,7 +49,8 @@ snappy_decompress_main
 
 if WITH_SNAPPY
 libcodec_la_SOURCES += snappy_codec.cpp
-libcodecinclude_HEADERS += snappy.hpp
+#libcodecinclude_HEADERS += snappy.hpp
+noinst_HEADERS += snappy.hpp
 noinst_PROGRAMS += $(SNAPPY_MAIN)
 endif WITH_SNAPPY
 
