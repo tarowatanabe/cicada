@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.61])
 
-AC_INIT([cicada], [0.2.6], [taro.watanabe@nict.go.jp])
+AC_INIT([cicada], [0.3.0], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config])
@@ -17,10 +17,10 @@ AM_INIT_AUTOMAKE([])
 # 5. If any interfaces have been added since the last public release, then increment age.
 # 6. If any interfaces have been removed or changed since the last public release, then set age to 0.
 
-CICADA_LTVERSION=0:2:0
+CICADA_LTVERSION=0:3:0
 AC_SUBST(CICADA_LTVERSION)
 
-CICADA_VERSION=0.2.6
+CICADA_VERSION=0.3.0
 AC_SUBST(CICADA_VERSION)
 
 AC_CONFIG_HEADERS(utils/config.h)
