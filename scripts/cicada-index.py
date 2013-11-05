@@ -129,7 +129,7 @@ opt_parser = OptionParser(
                 metavar="OPTION", help="additional MPI options"),    
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
-    make_option("--pbs-queue", default="ltg", action="store", type="string",
+    make_option("--pbs-queue", default="", action="store", type="string",
                 help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages

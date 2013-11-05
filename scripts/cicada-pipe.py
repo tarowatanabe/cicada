@@ -39,7 +39,7 @@ opt_parser = OptionParser(
     
     ## max-malloc
     make_option("--max-malloc", default=4, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB (default: 4)"),
+                metavar="MALLOC", help="maximum memory in GB (default: %default)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -62,9 +62,9 @@ opt_parser = OptionParser(
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-name", default="cicada-pipe", action="store", type="string",
-                help="PBS process name (up to 15 characters!) (default: cicada-pipe)", metavar="NAME"),
-    make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+                help="PBS process name (up to 15 characters!) (default: %default)", metavar="NAME"),
+    make_option("--pbs-queue", default="", action="store", type="string",
+                help="PBS queue for launching processes (default: %default)", metavar="NAME"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
