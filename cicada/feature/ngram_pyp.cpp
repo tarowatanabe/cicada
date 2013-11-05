@@ -69,6 +69,15 @@ namespace cicada
       typedef utils::array_power2<cache_context_type,  1024 * 128, std::allocator<cache_context_type> >  cache_context_set_type;
       
       typedef boost::filesystem::path path_type;
+
+      struct result_type
+      {
+	result_type() : prob_(0), bound_(0), oov_(0) {}
+	
+	double prob_;
+	double bound_;
+	int    oov_;
+      };
       
     public:
       // we will use -2, since -1 may be used for OOV
@@ -78,7 +87,7 @@ namespace cicada
     public:
       NGramPYPImpl(const path_type& __path, const int __order, const bool populate)
 	: ngram(&ngram_type::create(__path)),
-	  order(__order), no_bos_eos(false), skip_sgml_tag(false)
+	  order(__order), no_bos_eos(false), skip_sgml_tag(false), split_estimate(false)
       {
 	order = utils::bithack::min(order, ngram->order());
 
@@ -97,8 +106,10 @@ namespace cicada
 	  order(x.order),
 	  no_bos_eos(x.no_bos_eos),
 	  skip_sgml_tag(x.skip_sgml_tag),
+	  split_estimate(x.split_estimate),
 	  feature_name(x.feature_name),
 	  feature_name_oov(x.feature_name_oov),
+	  feature_name_estimate(x.feature_name_estimate),
 	  id_oov(x.id_oov),
 	  id_bos(x.id_bos),
 	  id_eos(x.id_eos)
@@ -111,11 +122,15 @@ namespace cicada
       {
 	ngram = &ngram_type::create(x.ngram->path());
 	order = x.order;
-	no_bos_eos = x.no_bos_eos;
-	skip_sgml_tag = x.skip_sgml_tag;
 	
-	feature_name     = x.feature_name;
-	feature_name_oov = x.feature_name_oov;
+	no_bos_eos     = x.no_bos_eos;
+	skip_sgml_tag  = x.skip_sgml_tag;
+	split_estimate = x.split_estimate;
+	
+	feature_name          = x.feature_name;
+	feature_name_oov      = x.feature_name_oov;
+	feature_name_estimate = x.feature_name_estimate;
+	
 	id_oov           = x.id_oov;
 	id_bos           = x.id_bos;
 	id_eos           = x.id_eos;
@@ -232,32 +247,32 @@ namespace cicada
 	}
       };
       
-      double ngram_score(state_ptr_type& state,
-			 const state_ptr_set_type& states,
-			 const edge_type& edge,
-			 int& oov) const
+      void ngram_score(state_ptr_type& state,
+		       const state_ptr_set_type& states,
+		       const edge_type& edge,
+		       result_type& result) const
       {
 	if (skip_sgml_tag)
-	  return ngram_score(state, states, edge, oov, extract_word(), skipper_sgml());
+	  ngram_score(state, states, edge, result, extract_word(), skipper_sgml());
 	else
-	  return ngram_score(state, states, edge, oov, extract_word(), skipper_epsilon());
+	  ngram_score(state, states, edge, result, extract_word(), skipper_epsilon());
       }
 
-      double ngram_estimate(const edge_type& edge, int& oov) const
+      void ngram_estimate(const edge_type& edge, result_type& result) const
       {
 	if (skip_sgml_tag)
-	  return ngram_estimate(edge, oov, extract_word(), skipper_sgml());
+	  ngram_estimate(edge, result, extract_word(), skipper_sgml());
 	else
-	  return ngram_estimate(edge, oov, extract_word(), skipper_epsilon());
+	  ngram_estimate(edge, result, extract_word(), skipper_epsilon());
       }
       
       template <typename Extract, typename Skipper>
-      double ngram_score(state_ptr_type& state,
-			 const state_ptr_set_type& states,
-			 const edge_type& edge,
-			 int& oov,
-			 Extract extract,
-			 Skipper skipper) const
+      void ngram_score(state_ptr_type& state,
+		       const state_ptr_set_type& states,
+		       const edge_type& edge,
+		       result_type& result,
+		       Extract extract,
+		       Skipper skipper) const
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
@@ -276,7 +291,7 @@ namespace cicada
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	    if (! skipper(*titer)) {
 	      buffer.push_back(ngram->vocab()[extract(*titer)]);
-	      oov += (buffer.back() == id_oov);
+	      result.oov_ += (buffer.back() == id_oov);
 	    }
 	  
 	  symbol_type::id_type* context = reinterpret_cast<symbol_type::id_type*>(state);
@@ -285,7 +300,7 @@ namespace cicada
 	  if (static_cast<int>(buffer.size()) <= context_size) {
 	    std::fill(std::copy(buffer.begin(), buffer.end(), context), context_end, id_empty);
 	    
-	    return ngram_estimate(buffer.begin(), buffer.end());
+	    result.bound_ += ngram_estimate(buffer.begin(), buffer.end());
 	  } else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
 	    buffer_type::const_iterator biter_end   = buffer.end();
@@ -297,11 +312,10 @@ namespace cicada
 	    context[prefix.second - prefix.first] = id_star;
 	    std::fill(std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1), context_end, id_empty);
 	    
-	    return ngram_estimate(prefix.first, prefix.second) + ngram_score(prefix.first, prefix.second, biter_end);
+	    result.bound_ += ngram_estimate(prefix.first, prefix.second);
+	    result.prob_  += ngram_score(prefix.first, prefix.second, biter_end);
 	  }
 	} else {
-	  double score = 0.0;
-	  
 	  int star_first = -1;
 	  int star_last  = -1;
 	  
@@ -320,13 +334,13 @@ namespace cicada
 	      const symbol_type::id_type* context_star = std::find(context, context_end, id_star);
 
 	      // adjust antecedent context
-	      score -= ngram_estimate(context, context_star);
+	      result.bound_ -= ngram_estimate(context, context_star);
 	      
 	      buffer.insert(buffer.end(), context, context_star);
 	      if (biter - biter_first >= context_size || star_first >= 0)
-		score += ngram_score(biter_first, biter, buffer.end());
+		result.prob_ += ngram_score(biter_first, biter, buffer.end());
 	      else
-		score += ngram_score(biter_first, std::min(biter_first + context_size, buffer.end()), buffer.end());
+		result.prob_ += ngram_score(biter_first, std::min(biter_first + context_size, buffer.end()), buffer.end());
 	      biter = buffer.end();
 	      
 	      if (context_star != context_end) {
@@ -340,15 +354,15 @@ namespace cicada
 	      
 	    } else if (! skipper(*titer)) {
 	      buffer.push_back(ngram->vocab()[extract(*titer)]);
-	      oov += (buffer.back() == id_oov);
+	      result.oov_ += (buffer.back() == id_oov);
 	    }
 	  }
 	  
 	  if (biter != buffer.end()) {
 	    if (biter - biter_first >= context_size || star_first >= 0)
-	      score += ngram_score(biter_first, biter, buffer.end());
+	      result.prob_ += ngram_score(biter_first, biter, buffer.end());
 	    else
-	      score += ngram_score(biter_first, std::min(biter_first + context_size, buffer.end()), buffer.end());
+	      result.prob_ += ngram_score(biter_first, std::min(biter_first + context_size, buffer.end()), buffer.end());
 	  }
 	  
 	  // construct state vector..
@@ -374,13 +388,13 @@ namespace cicada
 	    context[prefix.second - prefix.first] = id_star;
 	    std::fill(std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1), context_end, id_empty);
 	    
-	    score += ngram_estimate(prefix.first, prefix.second);
-	    score += ngram_score(prefix.first, prefix.second, biter_begin + prefix_size);
+	    result.bound_ += ngram_estimate(prefix.first, prefix.second);
+	    result.prob_  += ngram_score(prefix.first, prefix.second, biter_begin + prefix_size);
 	  } else {
 	    if (static_cast<int>(buffer.size()) <= context_size) {
 	      std::fill(std::copy(buffer.begin(), buffer.end(), context), context_end, id_empty);
 	      
-	      score += ngram_estimate(buffer.begin(), buffer.end());
+	      result.bound_ += ngram_estimate(buffer.begin(), buffer.end());
 	    } else {
 	      buffer_type::const_iterator biter_begin = buffer.begin();
 	      buffer_type::const_iterator biter_end   = buffer.end();
@@ -392,17 +406,15 @@ namespace cicada
 	      context[prefix.second - prefix.first] = id_star;
 	      std::fill(std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1), context_end, id_empty);
 	      
-	      score += ngram_estimate(prefix.first, prefix.second);
-	      score += ngram_score(prefix.first, prefix.second, biter_begin + context_size);
+	      result.bound_ += ngram_estimate(prefix.first, prefix.second);
+	      result.prob_  += ngram_score(prefix.first, prefix.second, biter_begin + context_size);
 	    }
 	  }
-	  
-	  return score;
 	}
       }
       
       template <typename Extract, typename Skipper>
-      double ngram_estimate(const edge_type& edge, int& oov, Extract extract, Skipper skipper) const
+      void ngram_estimate(const edge_type& edge, result_type& result, Extract extract, Skipper skipper) const
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
@@ -416,7 +428,6 @@ namespace cicada
 	buffer.clear();
 	buffer.reserve(titer_end - titer_begin);
 	
-	double score = 0.0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	  if (titer->is_non_terminal()) {
 	    if (! buffer.empty()) {
@@ -424,14 +435,14 @@ namespace cicada
 	      buffer_type::iterator biter_end   = buffer.end();
 	      buffer_type::iterator biter       = std::min(biter_begin + context_size, biter_end);
 	      
-	      score += ngram_estimate(biter_begin, biter);
-	      score += ngram_score(biter_begin, biter, biter_end);
+	      result.bound_ += ngram_estimate(biter_begin, biter);
+	      result.prob_  += ngram_score(biter_begin, biter, biter_end);
 	    }
 	    
 	    buffer.clear();
 	  } else if (! skipper(*titer)) {
 	    buffer.push_back(ngram->vocab()[extract(*titer)]);
-	    oov += (buffer.back() == id_oov);
+	    result.oov_ += (buffer.back() == id_oov);
 	  }
 	}
 	
@@ -440,14 +451,12 @@ namespace cicada
 	  buffer_type::iterator biter_end   = buffer.end();
 	  buffer_type::iterator biter       = std::min(biter_begin + context_size, biter_end);
 	  
-	  score += ngram_estimate(biter_begin, biter);
-	  score += ngram_score(biter_begin, biter, biter_end);
+	  result.bound_ += ngram_estimate(biter_begin, biter);
+	  result.prob_  += ngram_score(biter_begin, biter, biter_end);
 	}
-	
-	return score;
       }
       
-      double ngram_final_score(const state_ptr_type& state) const
+      void ngram_final_score(const state_ptr_type& state, result_type& result) const
       {
 	const symbol_type::id_type* context      = reinterpret_cast<const symbol_type::id_type*>(state);
 	const symbol_type::id_type* context_end  = std::find(context, context + order * 2, id_empty);
@@ -459,16 +468,16 @@ namespace cicada
 	if (no_bos_eos) {
 	  buffer.insert(buffer.end(), context, context_star);
 	  
-	  return ((! buffer.empty()
-		   ? ngram_score(buffer.begin(), buffer.begin() + (buffer.front() == id_bos), buffer.end())
-		   : 0.0)
-		  - ngram_estimate(buffer.begin(), buffer.end()));
+	  if (! buffer.empty())
+	    result.prob_ += ngram_score(buffer.begin(), buffer.begin() + (buffer.front() == id_bos), buffer.end());
+	  
+	  result.bound_ -= ngram_estimate(buffer.begin(), buffer.end());
 	} else {
 	  buffer.push_back(id_bos);
 	  buffer.insert(buffer.end(), context, context_star);
-	  
-	  double score = (ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end())
-			  - ngram_estimate(buffer.begin() + 1, buffer.end()));
+
+	  result.prob_  += ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end());
+	  result.bound_ -= ngram_estimate(buffer.begin() + 1, buffer.end());
 	  
 	  if (context_star != context_end) {
 	    buffer.clear();
@@ -477,13 +486,11 @@ namespace cicada
 	  
 	  buffer.push_back(id_eos);
 	  
-	  score += ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
-	  
-	  return score;
+	  result.prob_ += ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
 	}
       }
             
-      double ngram_predict_score(const state_ptr_type& state)
+      void ngram_predict_score(const state_ptr_type& state, result_type& result)
       {
 	symbol_type::id_type* context = reinterpret_cast<symbol_type::id_type*>(state);
 	
@@ -492,28 +499,26 @@ namespace cicada
 	// for no-bos-eos, we need to keep track of whether P(bos) was scored or not...
 	if (! no_bos_eos)
 	  context[0] = id_bos;
-	
-	return 0.0;
       }
 
-      double ngram_scan_score(state_ptr_type& state,
-			      const edge_type& edge,
-			      const int dot,
-			      int& oov)
+      void ngram_scan_score(state_ptr_type& state,
+			    const edge_type& edge,
+			    const int dot,
+			    result_type& result)
       {
 	if (skip_sgml_tag)
-	  return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_sgml());
+	  ngram_scan_score(state, edge, dot, result, extract_word(), skipper_sgml());
 	else
-	  return ngram_scan_score(state, edge, dot, oov, extract_word(), skipper_epsilon());
+	  ngram_scan_score(state, edge, dot, result, extract_word(), skipper_epsilon());
       }
       
       template <typename Extract, typename Skipper>
-      double ngram_scan_score(state_ptr_type& state,
-			      const edge_type& edge,
-			      const int dot,
-			      int& oov,
-			      Extract extract,
-			      Skipper skipper)
+      void ngram_scan_score(state_ptr_type& state,
+			    const edge_type& edge,
+			    const int dot,
+			    result_type& result,
+			    Extract extract,
+			    Skipper skipper)
       {
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& phrase = rule.rhs;
@@ -530,33 +535,32 @@ namespace cicada
 	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
 	  if (! skipper(*piter)) {
 	    buffer.push_back(ngram->vocab()[extract(*piter)]);
-	    oov += (buffer.back() == id_oov);
+	    result.oov_ += (buffer.back() == id_oov);
 	  }
 	
 	std::pair<buffer_type::iterator, buffer_type::iterator> suffix = ngram->ngram_suffix(buffer.begin(), buffer.end());
 	std::fill(std::copy(suffix.first, suffix.second, context), context + order * 2, id_empty);
 	
 	if (no_bos_eos && context == context_end && ! buffer.empty() && buffer.front() == id_bos)
-	  return ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end());
+	  result.prob_ += ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end());
 	else
-	  return ngram_score(buffer.begin(), buffer.begin() + (context_end - context), buffer.end());
+	  result.prob_ += ngram_score(buffer.begin(), buffer.begin() + (context_end - context), buffer.end());
       }
       
-      double ngram_complete_score(state_ptr_type& state)
+      void ngram_complete_score(state_ptr_type& state, result_type& result)
       {
 	if (no_bos_eos)
-	  return 0.0;
-	else {
-	  symbol_type::id_type* context = reinterpret_cast<symbol_type::id_type*>(state);
-	  symbol_type::id_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
-	  
-	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	  buffer.clear();
-	  buffer.insert(buffer.end(), context, context_end);
-	  buffer.push_back(id_eos);
-	  
-	  return ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
-	}
+	  return;
+	
+	symbol_type::id_type* context = reinterpret_cast<symbol_type::id_type*>(state);
+	symbol_type::id_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
+	
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
+	buffer.insert(buffer.end(), context, context_end);
+	buffer.push_back(id_eos);
+	
+	result.prob_ += ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
       }
       
       // caching...
@@ -573,10 +577,12 @@ namespace cicada
       
       bool no_bos_eos;
       bool skip_sgml_tag;
+      bool split_estimate;
       
       // names...
       feature_type feature_name;
       feature_type feature_name_oov;
+      feature_type feature_name_estimate;
       
       symbol_type::id_type id_oov;
       symbol_type::id_type id_bos;
@@ -600,6 +606,7 @@ namespace cicada
       bool        populate = false;
       int         order = 3;
       bool        skip_sgml_tag = false;
+      bool        split_estimate = false;
       bool        no_bos_eos = false;
       
       path_type   coarse_path;
@@ -619,6 +626,8 @@ namespace cicada
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-bos-eos")
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "split-estimate")
+	  split_estimate = utils::lexical_cast<bool>(piter->second);	
 	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-populate")
@@ -644,8 +653,9 @@ namespace cicada
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
       
-      ngram_impl->no_bos_eos = no_bos_eos;
-      ngram_impl->skip_sgml_tag = skip_sgml_tag;
+      ngram_impl->no_bos_eos     = no_bos_eos;
+      ngram_impl->skip_sgml_tag  = skip_sgml_tag;
+      ngram_impl->split_estimate = split_estimate;
       
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type::id_type) * ngram_impl->order * 2;
@@ -653,6 +663,8 @@ namespace cicada
       
       ngram_impl->feature_name     = base_type::__feature_name;
       ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov-penalty";
+      if (split_estimate)
+	ngram_impl->feature_name_estimate = static_cast<const std::string&>(base_type::__feature_name) + ":estimate";
       
       pimpl = ngram_impl.release();
       
@@ -717,18 +729,33 @@ namespace cicada
 			 feature_set_type& features,
 			 const bool final) const
     {
-      int oov = 0;
-      double score = pimpl->ngram_score(state, states, edge, oov);
+      impl_type::result_type result;
+      
+      pimpl->ngram_score(state, states, edge, result);
       if (final)
-	score += pimpl->ngram_final_score(state);
+	pimpl->ngram_final_score(state, result);
       
-      if (score != 0.0)
-	features[pimpl->feature_name] = score;
-      else
-	features.erase(pimpl->feature_name);
-      
-      if (oov)
-	features[pimpl->feature_name_oov] = - oov;
+      if (pimpl->split_estimate) {
+	if (result.prob_ != 0.0)
+	  features[pimpl->feature_name] = result.prob_;
+	else
+	  features.erase(pimpl->feature_name);
+	
+	if (result.bound_ != 0.0)
+	  features[pimpl->feature_name_estimate] = result.bound_;
+	else
+	  features.erase(pimpl->feature_name_estimate);
+      } else {
+	const double score = result.prob_ + result.bound_;
+	
+	if (score != 0.0)
+	  features[pimpl->feature_name] = score;
+	else
+	  features.erase(pimpl->feature_name);
+      }
+
+      if (result.oov_)
+	features[pimpl->feature_name_oov] = - result.oov_;
       else
 	features.erase(pimpl->feature_name_oov);
     }
@@ -739,36 +766,38 @@ namespace cicada
 				feature_set_type& features,
 				const bool final) const
     {
-      if (pimpl_coarse) {
-	int oov = 0;
-	double score = pimpl_coarse->ngram_score(state, states, edge, oov);
-	if (final)
-	  score += pimpl_coarse->ngram_final_score(state);
-      
-	if (score != 0.0)
-	  features[pimpl->feature_name] = score;
-	else
-	  features.erase(pimpl->feature_name);
-	
-	if (oov)
-	  features[pimpl->feature_name_oov] = - oov;
-	else
-	  features.erase(pimpl->feature_name_oov);
-      } else {
-	// state-less.
-	int oov = 0;
-	const double score = pimpl->ngram_estimate(edge, oov);
-	
-	if (score != 0.0)
-	  features[pimpl->feature_name] = score;
-	else
-	  features.erase(pimpl->feature_name);
+      impl_type::result_type result;
 
-	if (oov)
-	  features[pimpl->feature_name_oov] = - oov;
+      if (pimpl_coarse) {
+	pimpl_coarse->ngram_score(state, states, edge, result);
+	if (final)
+	  pimpl_coarse->ngram_final_score(state, result);
+      } else
+	pimpl->ngram_estimate(edge, result);
+      
+      if (pimpl->split_estimate) {
+	if (result.prob_ != 0.0)
+	  features[pimpl->feature_name] = result.prob_;
 	else
-	  features.erase(pimpl->feature_name_oov);
+	  features.erase(pimpl->feature_name);
+	
+	if (result.bound_ != 0.0)
+	  features[pimpl->feature_name_estimate] = result.bound_;
+	else
+	  features.erase(pimpl->feature_name_estimate);
+      } else {
+	const double score = result.prob_ + result.bound_;
+	
+	if (score != 0.0)
+	  features[pimpl->feature_name] = score;
+	else
+	  features.erase(pimpl->feature_name);
       }
+
+      if (result.oov_)
+	features[pimpl->feature_name_oov] = - result.oov_;
+      else
+	features.erase(pimpl->feature_name_oov);      
     }
 
     // temporarily assigned feature function...
@@ -780,8 +809,11 @@ namespace cicada
 				 const bool final) const
     {
       // add <s>
-      if (final)
-	pimpl->ngram_predict_score(state);
+      if (final) {
+	impl_type::result_type result;
+	
+	pimpl->ngram_predict_score(state, result);
+      }
     }
     
     void NGramPYP::apply_scan(state_ptr_type& state,
@@ -791,16 +823,17 @@ namespace cicada
 			      feature_set_type& features,
 			      const bool final) const
     {
-      int oov = 0;
-      const double score = pimpl->ngram_scan_score(state, edge, dot, oov);
+      impl_type::result_type result;
       
-      if (score != 0.0)
-	features[pimpl->feature_name] = score;
+      pimpl->ngram_scan_score(state, edge, dot, result);
+      
+      if (result.prob_ != 0.0)
+	features[pimpl->feature_name] = result.prob_;
       else
 	features.erase(pimpl->feature_name);
       
-      if (oov)
-	features[pimpl->feature_name_oov] = - oov;
+      if (result.oov_)
+	features[pimpl->feature_name_oov] = - result.oov_;
       else
 	features.erase(pimpl->feature_name_oov);
     }
@@ -814,10 +847,12 @@ namespace cicada
       // if final, add scoring for </s>
       
       if (final) {
-	const double score = pimpl->ngram_complete_score(state);
+	impl_type::result_type result;
 	
-	if (score != 0.0)
-	  features[pimpl->feature_name] = score;
+	pimpl->ngram_complete_score(state, result);
+	
+	if (result.prob_ != 0.0)
+	  features[pimpl->feature_name] = result.prob_;
 	else
 	  features.erase(pimpl->feature_name);
       }
