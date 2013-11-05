@@ -159,6 +159,7 @@ ngram: ngram language model\n\
 \tname=feature-name(default: ngram)\n\
 \tapproximate=[true|false] approximated upper-bound estimates\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
+\tsplit-estimate=[true|false] split estimated ngram score\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-populate=[true|false] \"populate\" by pre-fetching\n\
