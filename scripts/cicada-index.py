@@ -21,9 +21,6 @@ import UserList
 import UserString
 import cStringIO
 
-### for find_executable!
-import distutils.spawn
-
 from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
@@ -139,6 +136,25 @@ opt_parser = OptionParser(
     make_option("--debug", default=0, action="store", type="int"),
     ])
 
+def find_executable(executable, paths=[]):
+    ### taken from distutils.spawn
+    
+    paths += os.environ['PATH'].split(os.pathsep)
+    
+    base, ext = os.path.splitext(executable)
+
+    if (sys.platform == 'win32' or os.name == 'os2') and (ext != '.exe'):
+        executable = executable + '.exe'
+
+    if not os.path.isfile(executable):
+        for p in paths:
+            f = os.path.join(p, executable)
+            if os.path.isfile(f):
+                # the file exists, we have a shot at spawn working
+                return f
+        return None
+    else:
+        return executable
 
 def run_command(command):
     try:
@@ -203,6 +219,10 @@ class Program:
 class QSUB:
     def __init__(self, script=""):
         self.script = script
+        self.qsub = find_executable('qsub')
+        
+        if not self.qsub:
+            raise ValueError, "no qsub in your executable path?"
 
     def start(self):
         self.run()
@@ -212,7 +232,7 @@ class QSUB:
         
     ### actual implementations
     def run(self):
-        self.popen = subprocess.Popen(['qsub', '-S', '/bin/sh'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.popen = subprocess.Popen([self.qsub, '-S', '/bin/sh'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         
         ### reader therad
         self.stdout = threading.Thread(target=self._reader, args=[self.popen.stdout])
@@ -232,12 +252,6 @@ class QSUB:
 class PBS:
     def __init__(self, queue=""):
         self.queue = queue
-        self.qsub = 'qsub'
-
-        self.workers = []
-
-        if not distutils.spawn.find_executable('qsub'):
-            raise ValueError, "no qsub in your executable path?"
 
     def wait(self):
         for worker in self.workers:
@@ -325,17 +339,18 @@ class MPI:
 
         self.bindir = self.dir
 	
-        for binprog in ['mpirun']:
-            if self.bindir:
-                prog = os.path.join(self.bindir, 'bin', binprog)
-                if not os.path.exists(prog):
-                    prog = os.path.join(self.bindir, binprog)
-                    if not os.path.exists(prog):
-                        raise ValueError, prog + " does not exist at " + self.bindir
-                    
-                setattr(self, binprog, prog)
-            else:
-                setattr(self, binprog, binprog)
+        paths = []
+        if self.bindir:
+            paths = [os.path.join(self.bindir, 'bin'), self.bindir]
+        
+        binprog = find_executable('openmpirun', paths)
+        if not binprog:
+            binprog = find_executable('mpirun', paths)
+
+        if not binprog:
+            raise ValueError, "no openmpirun nor mpirun?"
+
+        setattr(self, 'mpirun', binprog)
         
         command = self.mpirun
         if self.number > 0:
@@ -406,18 +421,12 @@ class CICADA:
                         'thrsh', ### thread-launcher
                         ### launchers
                         ):
-	    
-	    for bindir in bindirs:
-		prog = os.path.join(bindir, binprog)
+
+            prog = find_executable(binprog, bindirs)
+            if not prog:
+                raise ValueError, binprog + ' does not exist'
                 
-                if not os.path.exists(prog): continue
-                if os.path.isdir(prog): continue
-                
-                setattr(self, binprog, prog)
-                break
-            
-	    if not hasattr(self, binprog):
-		raise ValueError, binprog + ' does not exist'
+            setattr(self, binprog, prog)
 
 class IndexPhrase:
     def __init__(self,

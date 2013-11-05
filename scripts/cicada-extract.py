@@ -16,8 +16,6 @@ import string
 import re
 import subprocess
 
-### for find_executable!
-import distutils.spawn
 
 from optparse import OptionParser, make_option
 
@@ -164,6 +162,25 @@ opt_parser = OptionParser(
     make_option("--debug", default=0, action="store", type="int"),
     ])
 
+def find_executable(executable, paths=[]):
+    ### taken from distutils.spawn
+    
+    paths += os.environ['PATH'].split(os.pathsep)
+    
+    base, ext = os.path.splitext(executable)
+
+    if (sys.platform == 'win32' or os.name == 'os2') and (ext != '.exe'):
+        executable = executable + '.exe'
+
+    if not os.path.isfile(executable):
+        for p in paths:
+            f = os.path.join(p, executable)
+            if os.path.isfile(f):
+                # the file exists, we have a shot at spawn working
+                return f
+        return None
+    else:
+        return executable
 
 def run_command(command):
     try:
@@ -229,14 +246,14 @@ class Program:
 class PBS:
     def __init__(self, queue=""):
         self.queue = queue
-        self.pbs = 'pbs'
-
-        if not distutils.spawn.find_executable('qsub'):
+        self.qsub = find_executable('qsub')
+        
+        if not self.qsub:
             raise ValueError, "no qsub in your executable path?"
 
     def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
         
-        popen = subprocess.Popen(['qsub', '-S', '/bin/sh'], stdin=subprocess.PIPE)
+        popen = subprocess.Popen([self.qsub, '-S', '/bin/sh'], stdin=subprocess.PIPE)
         pipe = popen.stdin
         
         pipe.write("#!/bin/sh\n")
@@ -319,17 +336,18 @@ class MPI:
 
         self.bindir = self.dir
 	
-        for binprog in ['mpirun']:
-            if self.bindir:
-                prog = os.path.join(self.bindir, 'bin', binprog)
-                if not os.path.exists(prog):
-                    prog = os.path.join(self.bindir, binprog)
-                    if not os.path.exists(prog):
-                        raise ValueError, prog + " does not exist at " + self.bindir
-                    
-                setattr(self, binprog, prog)
-            else:
-                setattr(self, binprog, binprog)
+        paths = []
+        if self.bindir:
+            paths = [os.path.join(self.bindir, 'bin'), self.bindir]
+        
+        binprog = find_executable('openmpirun', paths)
+        if not binprog:
+            binprog = find_executable('mpirun', paths)
+
+        if not binprog:
+            raise ValueError, "no openmpirun nor mpirun?"
+
+        setattr(self, 'mpirun', binprog)
                 
     def run(self, command, logfile=None):
         mpirun = self.mpirun
@@ -419,18 +437,12 @@ class CICADA:
                         'cicada_extract_tree',   'cicada_extract_tree_mpi',
                         ## step3
                         'cicada_extract_score', 'cicada_extract_score_mpi',):
-	    
-	    for bindir in bindirs:
-		prog = os.path.join(bindir, binprog)
-                
-                if not os.path.exists(prog): continue
-                if os.path.isdir(prog): continue
-                
-                setattr(self, binprog, prog)
-                break
 
-	    if not hasattr(self, binprog):
-		raise ValueError, binprog + ' does not exist'
+            prog = find_executable(binprog, bindirs)
+            if not prog:
+                raise ValueError, binprog + ' does not exist'
+                
+            setattr(self, binprog, prog)
         
 class Corpus:
 
