@@ -107,13 +107,14 @@ namespace cicada
       
       state_type state;  // current state
       
-      logprob_type prob;  // probability w/o backoff
+      logprob_type prob;  // probability
       logprob_type bound; // upper bound w/o backoff
+      logprob_type prev;  // previous upper bound w/o backoff
       
-      uint32_t length;   // mathed ngram length
-      uint32_t complete; // complete implies a complete ngram w/o further context
+      uint16_t length;   // mathed ngram length
+      uint16_t complete; // complete implies a complete ngram w/o further context
 
-      Result() : state(), prob(0), bound(0), length(0), complete(false) {}
+      Result() : state(), prob(0), bound(0), prev(0), length(0), complete(false) {}
     };
     typedef Result result_type;
 
@@ -165,7 +166,7 @@ namespace cicada
     }
 
     template <typename Iterator>
-    double ngram_score_update(Iterator first, Iterator last, int order) const
+    double ngram_update_score(Iterator first, Iterator last, int order) const
     {
       double adjust = 0.0;
 
@@ -184,6 +185,24 @@ namespace cicada
       }
       
       return adjust;
+    }
+
+    template <typename Iterator, typename Prob>
+    void ngram_update_score(Iterator first, Iterator last, int order, Prob& prob, Prob& bound) const
+    {
+      for (/**/; first != last; ++ first, ++ order) {
+	if (first->is_root_node()) continue;
+	
+	const size_type shard_index = utils::bithack::branch(first->is_root_shard(), size_type(0), first->shard());
+	const size_type shard_node = first->node();
+	
+	const logprob_type logprob = logprobs[shard_index](shard_node, order);
+	
+	prob  += logprob;
+	bound -= (! logbounds.empty() && shard_node < logbounds[shard_index].size()
+		  ? logbounds[shard_index](shard_node, order)
+		  : logprob);
+      }
     }
     
     template <typename Word_>
@@ -359,8 +378,7 @@ namespace cicada
       lookup_result(state, order, result);
       
       // make an adjustment to the score...
-      result.prob  -= adjust;
-      result.bound -= adjust;
+      result.prev = adjust;
       
       return result;
     }

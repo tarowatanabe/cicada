@@ -63,11 +63,11 @@ namespace cicada
     typedef std::vector<char, std::allocator<char> > buffer_type;
 
     NGramScorer()
-      : ngram_state_(), ngram_(), state_(0), prob_(0.0), complete_(false)
+      : ngram_state_(), ngram_(), state_(0), prob_(0), bound_(0), complete_(false)
     { }
 
     NGramScorer(const ngram_type& ngram)
-      : ngram_state_(ngram.index.order()), ngram_(&ngram), state_(0), prob_(0.0), complete_(false)
+      : ngram_state_(ngram.index.order()), ngram_(&ngram), state_(0), prob_(0), bound_(0), complete_(false)
     {
       buffer1_.reserve(ngram_state_.suffix_.buffer_size());
       buffer2_.reserve(ngram_state_.suffix_.buffer_size());
@@ -77,7 +77,7 @@ namespace cicada
     }
     
     NGramScorer(const ngram_type& ngram, void* state)
-      : ngram_state_(ngram.index.order()), ngram_(&ngram), state_(state), prob_(0.0), complete_(false)
+      : ngram_state_(ngram.index.order()), ngram_(&ngram), state_(state), prob_(0), bound_(0), complete_(false)
     {
       ngram_state_.size_prefix(state_) = 0;
       ngram_state_.size_suffix(state_) = 0;
@@ -109,6 +109,7 @@ namespace cicada
     {
       state_    = state;
       prob_     = 0.0;
+      bound_    = 0.0;
       complete_ = false;
       
       ngram_state_.size_prefix(state_) = 0;
@@ -150,7 +151,7 @@ namespace cicada
 	
 	complete_ = true;
       } else {
-	prob_ += result.bound;
+	bound_ += result.bound;
 	
 	ngram_state_.state(state_)[ngram_state_.size_prefix(state_)] = result.state;
 	++ ngram_state_.size_prefix(state_);
@@ -202,9 +203,11 @@ namespace cicada
 	  // since we are a complete state, all the bound scoring in the antecedent's prefix should
 	  // be upgraded to probability scoring, and complete it.
 	  
-	  prob_ += ngram_->ngram_score_update(ngram_state_.state(antecedent),
-					      ngram_state_.state(antecedent) + ngram_state_.size_prefix(antecedent),
-					      1);
+	  ngram_->ngram_update_score(ngram_state_.state(antecedent),
+				     ngram_state_.state(antecedent) + ngram_state_.size_prefix(antecedent),
+				     1,
+				     prob_,
+				     bound_);
 	} else if (ngram_state_.size_prefix(state_) == 0) {
 	  // if prefix is empty, we aill also copy from antecedent
 	  ngram_state_.copy_prefix(antecedent, state_);
@@ -230,11 +233,13 @@ namespace cicada
 									   suffix_next);
 	
 	if (complete_ || result.complete) {
-	  prob_ += result.prob;
+	  prob_  += result.prob;
+	  bound_ -= result.prev;
 	  
 	  complete_ = true;
 	} else {
-	  prob_ += result.bound;
+	  bound_ += result.bound;
+	  bound_ -= result.prev;
 	  
 	  ngram_state_.state(state_)[ngram_state_.size_prefix(state_)] = result.state;
 	  ++ ngram_state_.size_prefix(state_);
@@ -253,9 +258,11 @@ namespace cicada
 	    
 	    // adjust rest-cost from antecedent.states + order, antecedent.states + length!
 
-	    prob_ += ngram_->ngram_score_update(ngram_state_.state(antecedent) + order,
-						ngram_state_.state(antecedent) + ngram_state_.size_prefix(antecedent),
-						order + 1);
+	    ngram_->ngram_update_score(ngram_state_.state(antecedent) + order,
+				       ngram_state_.state(antecedent) + ngram_state_.size_prefix(antecedent),
+				       order + 1,
+				       prob_,
+				       bound_);
 	    
 	    return;
 	  }
@@ -298,7 +305,7 @@ namespace cicada
       // fill the state
       ngram_state_.fill(state_);
       
-      return prob_;
+      return prob_ + bound_;
     }
     
     ngram_state_type  ngram_state_;
@@ -306,6 +313,7 @@ namespace cicada
     const ngram_type* ngram_;
     void*             state_;
     double            prob_;
+    double            bound_;
     bool              complete_;
     
     buffer_type buffer1_;
