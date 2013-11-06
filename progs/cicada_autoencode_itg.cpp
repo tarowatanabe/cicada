@@ -1312,24 +1312,24 @@ struct ITGTree
 	  if (src < source_size) {
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta, func, deriv);
 	    
-	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, double(nodes_(src, src + 1, trg, trg).error_));
+	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, nodes_(src, src + 1, trg, trg).cost_);
 	  }
 	  
 	  // epsilon at source
 	  if (trg < target_size) {
 	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta, func, deriv);
 	    
-	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, double(nodes_(src, src, trg, trg + 1).error_));
+	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, nodes_(src, src, trg, trg + 1).cost_);
 	  }
 	  
 	  // word-pair
 	  if (src < source_size && trg < target_size) {
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta, func, deriv);
 	    
-	    const double error = nodes_(src, src + 1, trg, trg + 1).error_;
+	    const double cost = nodes_(src, src + 1, trg, trg + 1).cost_;
 	    
-	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, error);
-	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, error);
+	    costs_source_[src].cost_ = std::min(costs_source_[src].cost_, cost);
+	    costs_target_[trg].cost_ = std::min(costs_target_[trg].cost_, cost);
 	  }
 	}
 
@@ -1356,7 +1356,7 @@ struct ITGTree
 	  span_pair_set_type::const_iterator siter_end = spans.end();
 	  for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)  {
 	    const double error = (nodes_(siter->source_.first_, siter->source_.last_,
-					 siter->target_.first_, siter->target_.last_).total_
+					 siter->target_.first_, siter->target_.last_).cost_
 				  + std::max(costs_source_[siter->source_.first_].alpha_ + costs_source_[siter->source_.last_].beta_,
 					     costs_target_[siter->target_.first_].alpha_ + costs_target_[siter->target_.last_].beta_));
 	    
