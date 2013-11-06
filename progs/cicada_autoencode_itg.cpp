@@ -1184,6 +1184,18 @@ struct ITGTree
     tensor_type input_;
     tensor_type input_sampled_;
     
+    // hidden
+    tensor_type hidden_;
+    tensor_type hidden_norm_;
+    
+    // sampled hidden
+    tensor_type hidden_sampled_;
+    tensor_type hidden_sampled_norm_;
+    
+    // hidden reconstruction
+    tensor_type hidden_reconstruction_;
+    tensor_type hidden_delta_reconstruction_;
+    
     // output + reconstruction
     tensor_type output_;
     tensor_type output_norm_;
@@ -1561,27 +1573,49 @@ struct ITGTree
 	  }
 	}
 	
-	const tensor_type& c = leaf.input_;
-	const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(func);
-	const tensor_type p_norm = p.normalized();
-	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(func);
+	{
+	  const tensor_type& c = leaf.input_;
+	  const tensor_type p = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(func);
+	  const tensor_type p_norm = p.normalized();
+	  const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(func);
+	  
+	  tensor_type y_normalized = y;
+	  for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
+	    y_normalized.block(i * dimension_embedding, 0, dimension_embedding, 1).normalize();
+	  
+	  const tensor_type y_minus_c = y_normalized - c;
+	  
+	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+	  
+	  leaf.error_       = e;
+	  leaf.cost_        = e;
+	  
+	  leaf.hidden_      = p;
+	  leaf.hidden_norm_ = p_norm;
+	  
+	  leaf.hidden_reconstruction_       = y_minus_c.array() * theta.alpha_;
+	  leaf.hidden_delta_reconstruction_ = y.array().unaryExpr(deriv) * leaf.hidden_reconstruction_.array();
+	}
 	
-	tensor_type y_normalized = y;
-	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
-	  y_normalized.block(i * dimension_embedding, 0, dimension_embedding, 1).normalize();
-	
-	const tensor_type y_minus_c = y_normalized - c;
-	
-	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
-	
-	leaf.error_       = e;
-	leaf.cost_        = e - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
-	
-	leaf.output_      = p;
-	leaf.output_norm_ = p_norm;
-	
-	leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
-	leaf.delta_reconstruction_ = y.array().unaryExpr(deriv) * leaf.reconstruction_.array();
+	{
+	  const tensor_type& c = leaf.hidden_norm_;
+	  const tensor_type p = (theta.Wp1_ * c + theta.bp1_).array().unaryExpr(func);
+	  const tensor_type p_norm = p.normalized();
+	  const tensor_type y = (theta.Wp2_ * p_norm + theta.bp2_).array().unaryExpr(func);
+	  const tensor_type y_minus_c = y.normalized() - c;
+	  
+	  const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
+	  
+	  leaf.error_ += e;
+	  leaf.cost_  += e;
+	  leaf.cost_  += - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
+	  
+	  leaf.output_      = p;
+	  leaf.output_norm_ = p_norm;
+	  
+	  leaf.reconstruction_       = y_minus_c.array() * theta.alpha_;
+	  leaf.delta_reconstruction_ = y.array().unaryExpr(deriv) * leaf.reconstruction_.array();
+	}
       }
   }
 
@@ -1602,7 +1636,7 @@ struct ITGTree
     node.error_ = leaf.error_;
     node.total_ = leaf.error_;
     node.cost_  = leaf.cost_;
-
+    
     node.output_norm_ = leaf.output_norm_;
     
     agenda_[parent.size()].push_back(parent);
@@ -1715,7 +1749,7 @@ struct ITGTree
     
     stack_derivation_.clear();
     stack_derivation_.push_back(span_pair_type(0, source_size, 0, target_size));
-        
+    
     while (! stack_derivation_.empty()) {
       const span_pair_type span = stack_derivation_.back();
       stack_derivation_.pop_back();
@@ -1791,9 +1825,10 @@ struct ITGTree
 	      leaf.input_sampled_.block(offset + dimension_embedding * window, 0, dimension_embedding, 1) = titer->second * theta.scale_target_;
 	    }
 	    
-	    const tensor_type& c = leaf.input_sampled_;
+	    leaf.hidden_sampled_      = (theta.Wl1_ * leaf.input_sampled_ + theta.bl1_).array().unaryExpr(func);
+	    leaf.hidden_sampled_norm_ = leaf.hidden_sampled_.normalized();
 	    
-	    leaf.output_sampled_      = (theta.Wl1_ * c + theta.bl1_).array().unaryExpr(func);
+	    leaf.output_sampled_      = (theta.Wp1_ * leaf.hidden_sampled_ + theta.bp1_).array().unaryExpr(func);
 	    leaf.output_sampled_norm_ = leaf.output_sampled_.normalized();
 	    
 	    node.output_sampled_norm_ = leaf.output_sampled_norm_;
@@ -1900,27 +1935,38 @@ struct ITGTree
 	
 	if (root || left)
 	  delta = (leaf.output_.array().unaryExpr(deriv)
-		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		   * (theta.Wp2_.transpose() * leaf.delta_reconstruction_
 		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, 0, dimension_itg, dimension_itg).transpose() * node_parent.delta_
 		      - reconstruction.block(0, 0, dimension_itg, 1)).array());
 	else
 	  delta = (leaf.output_.array().unaryExpr(deriv)
-		   * (theta.Wl2_.transpose() * leaf.delta_reconstruction_
+		   * (theta.Wp2_.transpose() * leaf.delta_reconstruction_
 		      + theta.Wc_.transpose() * leaf.delta_classification_p_
 		      + W1.block(0, dimension_itg, dimension_itg, dimension_itg).transpose() * node_parent.delta_
 		      - reconstruction.block(dimension_itg, 0, dimension_itg, 1)).array());
 	
-	gradient.Wl1_ += delta * leaf.input_.transpose();
-	gradient.bl1_ += delta;
+	gradient.Wp1_ += delta * leaf.hidden_.transpose();
+	gradient.bp1_ += delta;
 	
-	gradient.Wl2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
-	gradient.bl2_ += leaf.delta_reconstruction_;
+	gradient.Wp2_ += leaf.delta_reconstruction_ * leaf.output_norm_.transpose();
+	gradient.bp2_ += leaf.delta_reconstruction_;
 	
 	gradient.Wc_         += leaf.delta_classification_p_ * leaf.output_norm_.transpose();
 	gradient.bc_.array() += leaf.delta_classification_p_;
 	
-	const tensor_type delta_embedding = theta.Wl1_.transpose() * delta - leaf.reconstruction_;
+	const tensor_type delta_hidden = (leaf.hidden_.array().unaryExpr(deriv)
+					  * (theta.Wl2_.transpose() * leaf.hidden_delta_reconstruction_
+					     + theta.Wp1_.transpose() * delta
+					     - leaf.reconstruction_).array());
+	
+	gradient.Wl1_ += delta_hidden * leaf.input_.transpose();
+	gradient.bl1_ += delta_hidden;
+	
+	gradient.Wl2_ += leaf.hidden_delta_reconstruction_ * leaf.hidden_norm_.transpose();
+	gradient.bl2_ += leaf.hidden_delta_reconstruction_;
+	
+	const tensor_type delta_embedding = theta.Wl1_.transpose() * delta_hidden - leaf.hidden_reconstruction_;
 	
 	if (span.source_.empty()) {
 	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
@@ -1994,13 +2040,18 @@ struct ITGTree
 			+ W1.block(0, dimension_itg, dimension_itg, dimension_itg).transpose()
 			* node_parent.delta_sampled_).array());
 	  
-	  gradient.Wl1_ += delta * leaf.input_sampled_.transpose();
-	  gradient.bl1_ += delta;
+	  gradient.Wp1_ += delta * leaf.hidden_sampled_.transpose();
+	  gradient.bp1_ += delta;
 	  
 	  gradient.Wc_         += leaf.delta_classification_m_ * leaf.output_sampled_norm_.transpose();
 	  gradient.bc_.array() += leaf.delta_classification_m_;
 	  
-	  const tensor_type delta_embedding = theta.Wl1_.transpose() * delta;
+	  const tensor_type delta_hidden = (leaf.hidden_.array().unaryExpr(deriv) * (theta.Wp1_.transpose() * delta).array());
+	  
+	  gradient.Wl1_ += delta_hidden * leaf.input_sampled_.transpose();
+	  gradient.bl1_ += delta_hidden;
+	  
+	  const tensor_type delta_embedding = theta.Wl1_.transpose() * delta_hidden;
 	  
 	  if (span.source_.empty()) {
 	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
@@ -2528,10 +2579,10 @@ path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 path_type output_model_file;
 
-double alpha = 0.01;
-double beta = 1;
+double alpha = 0.99;
+double beta = 0.01;
 int dimension_embedding = 16;
-int dimension_hidden = 64;
+int dimension_hidden = 128;
 int dimension_itg = 64;
 int window = 2;
 
@@ -2541,7 +2592,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 double beam = 0.1;
-double lambda = 1;
+double lambda = 1e-5;
 double eta0 = 1;
 
 bool dump_mode = false;
