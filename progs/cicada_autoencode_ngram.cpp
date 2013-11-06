@@ -82,12 +82,20 @@ struct Model
 
   typedef boost::filesystem::path path_type;
   
-  Model() : dimension_(0), order_(0), alpha_(0), beta_(0) {}
-  Model(const size_type& dimension, const size_type& order) 
-    : dimension_(dimension), order_(order), alpha_(0), beta_(0) { initialize(dimension, order); }
+  Model() : dimension_embedding_(0), dimension_hidden_(0), order_(0), alpha_(0), beta_(0) {}
+  Model(const size_type& dimension_embedding,
+	const size_type& dimension_hidden,
+	const size_type& order) 
+    : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden),
+      order_(order), alpha_(0), beta_(0) { initialize(dimension_embedding, dimension_hidden, order); }
   template <typename Gen>
-  Model(const size_type& dimension, const size_type& order, const double& alpha, const double beta, Gen& gen) 
-    : dimension_(dimension), order_(order), alpha_(alpha), beta_(beta) { initialize(dimension, order, gen); }
+  Model(const size_type& dimension_embedding, const size_type& dimension_hidden,
+	const size_type& order,
+	const double& alpha,
+	const double beta,
+	Gen& gen) 
+    : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden),
+      order_(order), alpha_(alpha), beta_(beta) { initialize(dimension_embedding, dimension_hidden, order, gen); }
   
   Model& operator-=(const Model& x)
   {
@@ -96,7 +104,7 @@ struct Model
       embedding_type::iterator eiter = embedding_.find(siter->first);
       
       if (eiter == embedding_.end())
-	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_, 1))).first;
+	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_embedding_, 1))).first;
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = - siter->second.col(0)[i] * x.scale_;
@@ -124,7 +132,7 @@ struct Model
       embedding_type::iterator eiter = embedding_.find(siter->first);
       
       if (eiter == embedding_.end())
-	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_, 1))).first;
+	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_embedding_, 1))).first;
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
 	const double amount = siter->second.col(0)[i] * x.scale_;
@@ -239,61 +247,72 @@ struct Model
   };
   
   template <typename Gen>
-  void initialize(const size_type dimension, const size_type order, Gen& gen)
+  void initialize(const size_type dimension_embedding,
+		  const size_type dimension_hidden,
+		  const size_type order,
+		  Gen& gen)
   {
-    if (dimension <= 0)
+    if (dimension_embedding <= 0)
+      throw std::runtime_error("invalid dimension");
+    if (dimension_hidden <= 0)
       throw std::runtime_error("invalid dimension");
     if (order <= 0)
       throw std::runtime_error("invalid order");
     
-    // intialize randomly...
-    dimension_ = dimension;
-    order_     = order;
-        
+    dimension_embedding_ = dimension_embedding;
+    dimension_hidden_    = dimension_hidden;
+    order_               = order;
+    
     // embedding
     embedding_.clear();
     scale_ = 1.0;
     norm_ = 0.0;
-        
+    
+    // intialize randomly...
+
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension, dimension * order).array().unaryExpr(randomize<Gen>(gen));
-    bl1_ = tensor_type::Zero(dimension, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order).array().unaryExpr(randomize<Gen>(gen));
+    bl1_ = tensor_type::Zero(dimension_hidden, 1).array().unaryExpr(randomize<Gen>(gen));
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Zero(dimension * order, dimension).array().unaryExpr(randomize<Gen>(gen));
-    bl2_ = tensor_type::Zero(dimension * order, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wl2_ = tensor_type::Zero(dimension_embedding * order, dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
+    bl2_ = tensor_type::Zero(dimension_embedding * order, 1).array().unaryExpr(randomize<Gen>(gen));
     
     // classification
-    Wc_ = tensor_type::Zero(1, dimension).array().unaryExpr(randomize<Gen>(gen));
+    Wc_ = tensor_type::Zero(1, dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
     bc_ = tensor_type::Zero(1, 1).array().unaryExpr(randomize<Gen>(gen));
   }
-
-  void initialize(const size_type dimension, const size_type order)
+  
+  void initialize(const size_type dimension_embedding,
+		  const size_type dimension_hidden,
+		  const size_type order)
   {
-    if (dimension <= 0)
+    if (dimension_embedding <= 0)
+      throw std::runtime_error("invalid dimension");
+    if (dimension_hidden <= 0)
       throw std::runtime_error("invalid dimension");
     if (order <= 0)
       throw std::runtime_error("invalid order");
     
-    // intialize randomly...
-    dimension_ = dimension;
-    order_     = order;
-        
+    dimension_embedding_ = dimension_embedding;
+    dimension_hidden_    = dimension_hidden;
+    order_               = order;
+    
     // embedding
     embedding_.clear();
     scale_ = 1.0;
     norm_ = 0.0;
         
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension, dimension * order);
-    bl1_ = tensor_type::Zero(dimension, 1);
+    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order);
+    bl1_ = tensor_type::Zero(dimension_hidden, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Zero(dimension * order, dimension);
-    bl2_ = tensor_type::Zero(dimension * order, 1);
+    Wl2_ = tensor_type::Zero(dimension_embedding * order, dimension_hidden);
+    bl2_ = tensor_type::Zero(dimension_embedding * order, 1);
     
     // classification
-    Wc_ = tensor_type::Zero(1, dimension);
+    Wc_ = tensor_type::Zero(1, dimension_hidden);
     bc_ = tensor_type::Zero(1, 1);
   }
   
@@ -304,15 +323,15 @@ struct Model
     tensor_type& eos     = embedding_[vocab_type::EOS];
     
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
+      bos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
+      eos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding_[*first];
 
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen));
+	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
     }
     
     // compute norm...
@@ -368,10 +387,10 @@ struct Model
 	if (iter != iter_end)
 	  throw std::runtime_error("embedding parsing failed");
       
-      if (boost::fusion::get<1>(parsed).size() != dimension_)
+      if (boost::fusion::get<1>(parsed).size() != dimension_embedding_)
 	throw std::runtime_error("invalid embedding size");
       
-      embedding_[boost::fusion::get<0>(parsed)] = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), dimension_, 1);
+      embedding_[boost::fusion::get<0>(parsed)] = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), dimension_embedding_, 1);
     }
   }
   
@@ -385,7 +404,8 @@ struct Model
     
     repository_type rep(path, repository_type::write);
     
-    rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
+    rep["dimension-embedding"] = utils::lexical_cast<std::string>(dimension_embedding_);
+    rep["dimension-hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);
     rep["order"]     = utils::lexical_cast<std::string>(order_);
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
     rep["beta"]      = utils::lexical_cast<std::string>(beta_);
@@ -437,7 +457,8 @@ struct Model
   }
   
   // dimension...
-  size_type dimension_;
+  size_type dimension_embedding_;
+  size_type dimension_hidden_;
   size_type order_;
   
   // hyperparameter
@@ -493,30 +514,31 @@ struct NGram
     
     const size_type sentence_size = sentence.size();
     
-    const size_type dimension = theta.dimension_;
-    const size_type order     = theta.order_;
+    const size_type dimension_embedding = theta.dimension_embedding_;
+    const size_type dimension_hidden    = theta.dimension_hidden_;
+    const size_type order               = theta.order_;
     
     double error = 0.0;
     double error_classification = 0.0;
     
-    tensor_type input(dimension * order, 1);
-    tensor_type input_prev(dimension * order, 1);
-    tensor_type input_sampled(dimension * order, 1);
+    tensor_type input(dimension_embedding * order, 1);
+    tensor_type input_prev(dimension_embedding * order, 1);
+    tensor_type input_sampled(dimension_embedding * order, 1);
     
     // fill with BOS...
     embedding_type::const_iterator biter = theta.embedding_.find(vocab_type::BOS);
     if (biter == theta.embedding_.end())
       throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::BOS));
     
-    if (biter->second.rows() != dimension)
+    if (biter->second.rows() != dimension_embedding)
       throw std::runtime_error("dimension does not match");
     
     for (size_type i = 0; i != order; ++ i)
-      input_prev.block(dimension * i, 0, dimension, 1) = biter->second * theta.scale_;
+      input_prev.block(dimension_embedding * i, 0, dimension_embedding, 1) = biter->second * theta.scale_;
     
     for (size_type pos = 0; pos <= sentence_size; ++ pos) {
       // copy previous input as a history
-      input.block(0, 0, dimension * (order - 1), 1) = input_prev.block(dimension, 0, dimension * (order - 1), 1);
+      input.block(0, 0, dimension_embedding * (order - 1), 1) = input_prev.block(dimension_embedding, 0, dimension_embedding * (order - 1), 1);
       input_sampled = input;
       
       const word_type& word = (pos == sentence_size ? vocab_type::EOS : sentence[pos]);
@@ -529,18 +551,18 @@ struct NGram
       if (piter == theta.embedding_.end())
 	throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(word));
       
-      if (piter->second.rows() != dimension)
+      if (piter->second.rows() != dimension_embedding)
 	throw std::runtime_error("wrong dimension");
 
       embedding_type::const_iterator miter = theta.embedding_.find(word_sampled);
       if (miter == theta.embedding_.end())
 	throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(word_sampled));
       
-      if (miter->second.rows() != dimension)
+      if (miter->second.rows() != dimension_embedding)
 	throw std::runtime_error("wrong dimension");
       
-      input.block(dimension * (order - 1), 0, dimension, 1)         = piter->second * theta.scale_;
-      input_sampled.block(dimension * (order - 1), 0, dimension, 1) = miter->second * theta.scale_;
+      input.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1)         = piter->second * theta.scale_;
+      input_sampled.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1) = miter->second * theta.scale_;
       
       const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(func);
       const tensor_type p_norm = p.normalized();
@@ -548,7 +570,7 @@ struct NGram
       
       tensor_type y_normalized = y;
       for (size_type i = 0; i != order; ++ i)
-	y_normalized.block(i * dimension, 0, dimension, 1).normalize();
+	y_normalized.block(i * dimension_embedding, 0, dimension_embedding, 1).normalize();
       
       const tensor_type y_minus_c = y_normalized - input;
       
@@ -609,22 +631,22 @@ struct NGram
 	  tensor_type& dembedding = gradient.embedding_[word];
 	  
 	  if (! dembedding.cols() || ! dembedding.rows())
-	    dembedding = tensor_type::Zero(dimension, 1);
+	    dembedding = tensor_type::Zero(dimension_embedding, 1);
 	  
-	  dembedding += delta_embedding_p.block(dimension * i, 0, dimension, 1);
-	  dembedding += delta_embedding_m.block(dimension * i, 0, dimension, 1);
+	  dembedding += delta_embedding_p.block(dimension_embedding * i, 0, dimension_embedding, 1);
+	  dembedding += delta_embedding_m.block(dimension_embedding * i, 0, dimension_embedding, 1);
 	} else {
 	  tensor_type& dembedding_p = gradient.embedding_[word];
 	  tensor_type& dembedding_m = gradient.embedding_[word_sampled];
 
 	  if (! dembedding_p.cols() || ! dembedding_p.rows())
-	    dembedding_p = tensor_type::Zero(dimension, 1);
+	    dembedding_p = tensor_type::Zero(dimension_embedding, 1);
 
 	  if (! dembedding_m.cols() || ! dembedding_m.rows())
-	    dembedding_m = tensor_type::Zero(dimension, 1);
+	    dembedding_m = tensor_type::Zero(dimension_embedding, 1);
 	  
-	  dembedding_p += delta_embedding_p.block(dimension * i, 0, dimension, 1);
-	  dembedding_m += delta_embedding_m.block(dimension * i, 0, dimension, 1);
+	  dembedding_p += delta_embedding_p.block(dimension_embedding * i, 0, dimension_embedding, 1);
+	  dembedding_m += delta_embedding_m.block(dimension_embedding * i, 0, dimension_embedding, 1);
 	}
       }
       
@@ -645,8 +667,13 @@ struct LearnAdaGrad
   
   typedef model_type::tensor_type tensor_type;
   
-  LearnAdaGrad(const size_type& dimension, const size_type& order, const double& lambda, const double& eta0)
-    : dimension_(dimension), order_(order), lambda_(lambda), eta0_(eta0)
+  LearnAdaGrad(const size_type& dimension_embedding,
+	       const size_type& dimension_hidden,
+	       const size_type& order, 
+	       const double& lambda,
+	       const double& eta0)
+    : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden),
+      order_(order), lambda_(lambda), eta0_(eta0)
   {
     if (lambda_ < 0.0)
       throw std::runtime_error("invalid regularization");
@@ -655,13 +682,13 @@ struct LearnAdaGrad
       throw std::runtime_error("invalid learning rate");
     
     // initialize...
-    Wl1_ = tensor_type::Zero(dimension, dimension * order);
-    bl1_ = tensor_type::Zero(dimension, 1);
+    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order);
+    bl1_ = tensor_type::Zero(dimension_hidden, 1);
     
-    Wl2_ = tensor_type::Zero(dimension * order, dimension);
-    bl2_ = tensor_type::Zero(dimension * order, 1);
+    Wl2_ = tensor_type::Zero(dimension_embedding * order, dimension_hidden);
+    bl2_ = tensor_type::Zero(dimension_embedding * order, 1);
     
-    Wc_ = tensor_type::Zero(1, dimension);
+    Wc_ = tensor_type::Zero(1, dimension_hidden);
     bc_ = tensor_type::Zero(1, 1);
   }
   
@@ -675,7 +702,7 @@ struct LearnAdaGrad
       
       if (eiter == theta.embedding_.end()) {
 	std::cerr << "WARNING: this should not happen: embedding: " << siter->first << std::endl;
-	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
+	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
       }
       
       if (siter->first.id() >= embedding_.cols()) {
@@ -684,8 +711,8 @@ struct LearnAdaGrad
 
 	tensor_type& matrix = const_cast<tensor_type&>(embedding_);
 	
-	matrix.conservativeResize(dimension_, pos_last);
-	matrix.block(0, pos_first, dimension_, pos_last - pos_first).setZero();
+	matrix.conservativeResize(dimension_embedding_, pos_last);
+	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
       }
       
       update(eiter->second, embedding_.col(siter->first.id()), siter->second, lambda_ != 0.0);
@@ -747,7 +774,8 @@ struct LearnAdaGrad
     }
   }
   
-  size_type dimension_;
+  size_type dimension_embedding_;
+  size_type dimension_hidden_;
   size_type order_;
   
   double lambda_;
@@ -807,7 +835,7 @@ struct LearnL2
       
       if (eiter == theta.embedding_.end()) {
 	std::cerr << "WARNING: this should not happen: " << siter->first << std::endl;
-	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_, 1))).first;
+	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
       }
       
       for (difference_type i = 0; i != siter->second.rows(); ++ i) {
@@ -858,9 +886,10 @@ path_type input_file;
 path_type embedding_file;
 path_type output_model_file;
 
-double alpha = 0.001;
-double beta = 1;
-int dimension = 16;
+double alpha = 0.99;
+double beta = 0.01;
+int dimension_embedding = 16;
+int dimension_hidden = 128;
 int order = 3;
 
 bool optimize_sgd = false;
@@ -868,8 +897,7 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 1024;
-double beam = 0.1;
-double lambda = 1;
+double lambda = 1e-5;
 double eta0 = 1;
 
 int threads = 2;
@@ -893,7 +921,9 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (dimension <= 0)
+    if (dimension_embedding <= 0)
+      throw std::runtime_error("dimension must be positive");
+    if (dimension_hidden <= 0)
       throw std::runtime_error("dimension must be positive");
     if (order <= 0)
       throw std::runtime_error("order size should be positive");
@@ -928,7 +958,7 @@ int main(int argc, char** argv)
     
     read_data(input_file, sentences, words);
     
-    model_type theta(dimension, order, alpha, beta, generator);
+    model_type theta(dimension_embedding, dimension_hidden, order, alpha, beta, generator);
 
     if (! embedding_file.empty()) {
       if (embedding_file != "-" && ! boost::filesystem::exists(embedding_file))
@@ -941,7 +971,7 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, order, lambda, eta0), sentences, words, theta, generator);
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, words, theta, generator);
       else
 	learn_online(LearnL2(lambda, eta0), sentences, words, theta, generator);
     }
@@ -1028,16 +1058,14 @@ struct TaskAccumulate
   TaskAccumulate(const sentence_set_type& sentences,
 		 const word_set_type& words,
 		 const model_type& theta,
-		 const double& beam,
 		 queue_type& queue,
 		 counter_type& counter)
     : sentences_(sentences),
       words_(words),
       theta_(theta),
-      beam_(beam),
       queue_(queue),
       counter_(counter),
-      gradient_(theta.dimension_, theta.order_),
+      gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.order_),
       error_(0),
       classification_(0),
       samples_(0) {}
@@ -1157,7 +1185,6 @@ struct TaskAccumulate
   const sentence_set_type& sentences_;
   const word_set_type& words_;
   const model_type& theta_;
-  const double beam_;
   
   queue_type&            queue_;
   counter_type&          counter_;
@@ -1218,7 +1245,6 @@ void learn_online(const Learner& learner,
   task_set_type tasks(threads, task_type(sentences,
 					 words,
 					 theta,
-					 beam,
 					 mapper,
 					 reducer));
   
@@ -1353,15 +1379,16 @@ void options(int argc, char** argv)
     
     ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "parameter for reconstruction error")
     ("beta",      po::value<double>(&beta)->default_value(beta),        "parameter for classificaiton error")
-    ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
-    ("order",     po::value<int>(&order)->default_value(order),         "context order size")
+    
+    ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
+    ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
+    ("order",               po::value<int>(&order)->default_value(order),                             "context order size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
-    ("beam",              po::value<double>(&beam)->default_value(beam),          "beam width for parsing")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
