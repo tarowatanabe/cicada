@@ -260,17 +260,20 @@ struct Model
   typedef cicada::Vocab    vocab_type;
   
   typedef boost::filesystem::path path_type;
+
+  typedef std::vector<bool, std::allocator<bool> > unique_set_type;
   
   Model() : dimension_embedding_(0), dimension_hidden_(0), order_(0) {}  
-  template <typename Gen>
+  template <typename Unigram, typename Gen>
   Model(const size_type& dimension_embedding,
 	const size_type& dimension_hidden,
 	const int order,
+	const Unigram& unigram,
 	Gen& gen) 
     : dimension_embedding_(dimension_embedding),
       dimension_hidden_(dimension_hidden),
       order_(order)
-  { initialize(dimension_embedding, dimension_hidden, order, gen); }
+  { initialize(dimension_embedding, dimension_hidden, order, unigram, gen); }
   
   
   void clear()
@@ -303,10 +306,11 @@ struct Model
     Gen& gen_;
   };
   
-  template <typename Gen>
+  template <typename Unigram, typename Gen>
   void initialize(const size_type dimension_embedding,
 		  const size_type dimension_hidden,
 		  const int order,
+		  const Unigram& unigram,
 		  Gen& gen)
   {
     if (dimension_hidden <= 0)
@@ -322,17 +326,39 @@ struct Model
     order_ = order;
     
     clear();
-
+    
     const size_type vocabulary_size = word_type::allocated();
     
     embedding_input_  = tensor_type::Zero(dimension_embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
     embedding_output_ = tensor_type::Zero(dimension_embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
     
+    words_ = unique_set_type(vocabulary_size, false);
+    
+    for (size_type pos = 0; pos != unigram.words_.size(); ++ pos)
+      if (unigram.words_[pos] != vocab_type::EOS)
+	words_[unigram.words_[pos].id()] = true;
+    
+    words_[vocab_type::BOS.id()] = false;
+    words_[vocab_type::EOS.id()] = false;
+
     Wc_ = tensor_type::Zero(dimension_hidden_, dimension_embedding_ * (order - 1)).array().unaryExpr(randomize<Gen>(gen));
     bc_ = tensor_type::Zero(dimension_hidden_, 1).array().unaryExpr(randomize<Gen>(gen));
     
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_).array().unaryExpr(randomize<Gen>(gen));
     bh_ = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+  }
+
+  void finalize()
+  {
+    embedding_input_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_, 1);
+    embedding_output_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
+
+    const double factor = 1.0 / std::accumulate(words_.begin(), words_.end(), size_type(0));
+    
+    for (size_type pos = 0; pos != words_.size(); ++ pos) {
+      embedding_input_.col(vocab_type::EPSILON.id())  += embedding_input_.col(pos) * factor;
+      embedding_output_.col(vocab_type::EPSILON.id()) += embedding_output_.col(pos) * factor;
+    }
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -359,8 +385,8 @@ struct Model
     rep["hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);    
     rep["order"]     = utils::lexical_cast<std::string>(order_);
     
-    write_embedding(rep.path("input.gz"),  rep.path("input.bin"), embedding_input_);
-    write_embedding(rep.path("output.gz"), rep.path("output.bin"), embedding_output_);
+    write_embedding(rep.path("input.gz"),  rep.path("input.bin"), embedding_input_, vocab_type::BOS);
+    write_embedding(rep.path("output.gz"), rep.path("output.bin"), embedding_output_, vocab_type::EOS);
     
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
@@ -372,7 +398,7 @@ struct Model
     word_type::write(rep.path("vocab"));
   }
   
-  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
+  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix, const word_type& add) const
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
@@ -385,7 +411,7 @@ struct Model
       for (word_type::id_type i = 0; i != id_max; ++ i) {
 	const word_type word(i);
 	
-	if (! word.empty()) {
+	if (! word.empty() && (words_[word.id()] || word == vocab_type::EPSILON || word == add)) {
 	  karma::generate(iter, standard::string, word);
 	  
 	  for (difference_type j = 0; j != matrix.rows(); ++ j)
@@ -436,6 +462,8 @@ struct Model
   // embedding
   tensor_type embedding_input_;
   tensor_type embedding_output_;
+
+  unique_set_type words_;
   
   // Wc and bc for context layer
   tensor_type Wc_;
@@ -960,7 +988,7 @@ int main(int argc, char** argv)
     
     unigram_type unigram(sentences.begin(), sentences.end());
     
-    model_type theta(dimension_embedding, dimension_hidden, order, generator);
+    model_type theta(dimension_embedding, dimension_hidden, order, unigram, generator);
     
     if (iteration > 0)
       learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta);
@@ -1237,6 +1265,9 @@ void learn_online(const Learner& learner,
     mapper.push(size_type(-1));
 
   workers.join_all();
+
+  // finalize model...
+  theta.finalize();
 }
 
 
