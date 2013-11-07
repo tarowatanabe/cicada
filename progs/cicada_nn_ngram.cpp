@@ -556,8 +556,10 @@ struct NGram
   
   tensor_type layer_input_;
   tensor_type layer_context_;
+  tensor_type layer_context_activated_;
   tensor_type layer_hidden_;
-  
+  tensor_type layer_hidden_activated_;  
+
   tensor_type delta_input_;
   tensor_type delta_context_;
   tensor_type delta_hidden_;
@@ -633,10 +635,12 @@ struct NGram
     const size_type dimension = theta.dimension_embedding_;
     const size_type order     = theta.order_;
     
-    layer_context_ = (theta.Wc_ * layer_input_  + theta.bc_).array().unaryExpr(hinge());
-    layer_hidden_  = (theta.Wh_ * layer_context_ + theta.bh_).array().unaryExpr(hinge());
-
-    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
+    layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_);
+    layer_context_activated_ = layer_context_.array().unaryExpr(hinge());
+    layer_hidden_            = (theta.Wh_ * layer_context_activated_ + theta.bh_);
+    layer_hidden_activated_  = layer_hidden_.array().unaryExpr(hinge());
+    
+    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_activated_
 			  + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
     const double score_noise = log_samples_ + unigram_.logprob(word);
     const double z = utils::mathop::logsum(score, score_noise);
@@ -646,11 +650,11 @@ struct NGram
     // we suffer loss...
     const double loss = - 1.0 + std::exp(logprob);
     double log_likelihood = logprob;
-    
+          
     // updated output embedding...
     tensor_type& dembedding = gradient.embedding_output(word);
     
-    dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_.array();
+    dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_activated_.array();
     dembedding.block(dimension, 0, 1, 1).array() += loss;
     
     // backward...
@@ -660,7 +664,7 @@ struct NGram
     for (size_type k = 0; k != samples_; ++ k) {
       const word_type word = unigram_.draw(gen);
 
-      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
+      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_activated_
 			    + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
       const double score_noise = log_samples_ + unigram_.logprob(word);
       const double z = utils::mathop::logsum(score, score_noise);
@@ -671,17 +675,17 @@ struct NGram
       
       // we suffer loss...
       const double loss = std::exp(logprob);
-      
+            
       tensor_type& dembedding = gradient.embedding_output(word);
       
-      dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_.array();
+      dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_activated_.array();
       dembedding.block(dimension, 0, 1, 1).array() += loss;
       
       delta_hidden_.array() += (layer_hidden_.array().unaryExpr(dhinge())
 				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss).array());
     }
     
-    gradient.Wh_ += delta_hidden_ * layer_context_.transpose();
+    gradient.Wh_ += delta_hidden_ * layer_context_activated_.transpose();
     gradient.bh_ += delta_hidden_;
     
     delta_context_ = (layer_context_.array().unaryExpr(dhinge()) * (theta.Wh_.transpose() * delta_hidden_).array());
@@ -689,12 +693,12 @@ struct NGram
     gradient.Wc_ += delta_context_ * layer_input_.transpose();
     gradient.bc_ += delta_context_;
     
-    delta_input_ = (layer_input_.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * delta_context_).array());
+    delta_input_ = theta.Wc_.transpose() * delta_context_;
     
     // finally, input embedding...
     for (int i = 0; i != order - 1; ++ i)
       *gradient_embedding_[i] += delta_input_.block(dimension * i, 0, dimension, 1);
-    
+
     return log_likelihood;
   }
 };
@@ -735,7 +739,7 @@ struct LearnAdaGrad
     
     // initialize...
     Wc_ = tensor_type::Zero(dimension_hidden_, dimension_embedding_ * (order - 1));
-    bc_ = tensor_type::Zero(dimension_hidden_, 1).array();
+    bc_ = tensor_type::Zero(dimension_hidden_, 1);
     
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_);
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
@@ -751,7 +755,8 @@ struct LearnAdaGrad
 	     theta.embedding_input_,
 	     const_cast<tensor_type&>(embedding_input_),
 	     iiter->second,
-	     lambda_ != 0.0);
+	     lambda_ != 0.0,
+	     false);
 
     embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
     for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
@@ -759,7 +764,8 @@ struct LearnAdaGrad
 	     theta.embedding_output_,
 	     const_cast<tensor_type&>(embedding_output_),
 	     oiter->second,
-	     lambda_ != 0.0);
+	     lambda_ != 0.0,
+	     true);
     
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, false);
@@ -785,11 +791,11 @@ struct LearnAdaGrad
     
     void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
     {
-      G_(i, j) += g_(i, j) * g_(i, j);
+      G_(i, j) = std::max(std::min(G_(i, j) + g_(i, j) * g_(i, j), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
       
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
-      
+
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
     
@@ -812,7 +818,7 @@ struct LearnAdaGrad
       
       theta.visit(visitor);
     } else {
-      G.array() += g.array() * g.array();
+      G.array() = (G.array() + g.array().square()).min(1e+30).max(1e-30);
       theta.array() -= eta0_ * g.array() / G.array().sqrt();
     }
   }
@@ -822,19 +828,27 @@ struct LearnAdaGrad
 	      Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
-	      const bool regularize=true) const
+	      const bool regularize=true,
+	      const bool bias_last=false) const
   {
     if (regularize) {
-      for (int row = 0; row != g.rows(); ++ row) {
-	G(row, word.id()) += g(row, 0) * g(row, 0);
+      for (int row = 0; row != g.rows() - bias_last; ++ row) {
+	G(row, word.id()) = std::max(std::min(G(row, word.id()) + g(row, 0) * g(row, 0), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
 	
 	const double rate = eta0_ / std::sqrt(G(row, word.id()));
 	const double f = theta(row, word.id()) - rate * g(row, 0);
 	
 	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
       }
+      
+      if (bias_last) {
+	const int row = g.rows() - 1;
+	
+	G(row, word.id()) = std::max(std::min(G(row, word.id()) + g(row, 0) * g(row, 0), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
+	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+      }
     } else {
-      G.col(word.id()).array() += g.array() * g.array();
+      G.col(word.id()).array() = (G.col(word.id()).array() + g.array().square()).min(1e+30).max(1e-30);
       theta.col(word.id()).array() -= eta0_ * g.array() / G.col(word.id()).array().sqrt();
     }
   }
@@ -886,7 +900,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 int samples = 100;
-double lambda = 1;
+double lambda = 1e-5;
 double eta0 = 1;
 
 int threads = 2;
