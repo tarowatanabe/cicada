@@ -1512,7 +1512,7 @@ struct TaskAccumulate
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return Tp(- 1) <= x && x <= Tp(1);
+      return Tp(- 1) < x && x < Tp(1);
     }
   };
 
@@ -1530,7 +1530,7 @@ struct TaskAccumulate
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return x >= Tp(0);
+      return x > Tp(0);
     }
   };
 
