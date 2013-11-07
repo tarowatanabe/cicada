@@ -1608,7 +1608,7 @@ struct ITGTree
 	  
 	  leaf.error_ += e;
 	  leaf.cost_  += e;
-	  leaf.cost_  += - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
+	  //leaf.cost_  += - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
 	  
 	  leaf.output_      = p;
 	  leaf.output_norm_ = p_norm;
@@ -1698,7 +1698,8 @@ struct ITGTree
     // representation error
     const double e     = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
     const double total = e + node1.total_ + node2.total_;
-    const double cost  = node1.cost_ + node2.cost_ + e - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
+    //const double cost  = node1.cost_ + node2.cost_ + e - func((theta.Wc_ * p_norm + theta.bc_)(0,0)) * theta.beta_;
+    const double cost  = node1.cost_ + node2.cost_ + e;
     
     const double infty = std::numeric_limits<double>::infinity();
     

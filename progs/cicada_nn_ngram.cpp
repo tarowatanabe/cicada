@@ -584,9 +584,7 @@ struct NGram
   
   tensor_type layer_input_;
   tensor_type layer_context_;
-  tensor_type layer_context_activated_;
   tensor_type layer_hidden_;
-  tensor_type layer_hidden_activated_;  
 
   tensor_type delta_input_;
   tensor_type delta_context_;
@@ -663,12 +661,10 @@ struct NGram
     const size_type dimension = theta.dimension_embedding_;
     const size_type order     = theta.order_;
     
-    layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_);
-    layer_context_activated_ = layer_context_.array().unaryExpr(hinge());
-    layer_hidden_            = (theta.Wh_ * layer_context_activated_ + theta.bh_);
-    layer_hidden_activated_  = layer_hidden_.array().unaryExpr(hinge());
+    layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_).array().unaryExpr(hinge());
+    layer_hidden_            = (theta.Wh_ * layer_context_ + theta.bh_).array().unaryExpr(hinge());
     
-    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_activated_
+    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
 			  + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
     const double score_noise = log_samples_ + unigram_.logprob(word);
     const double z = utils::mathop::logsum(score, score_noise);
@@ -682,7 +678,7 @@ struct NGram
     // updated output embedding...
     tensor_type& dembedding = gradient.embedding_output(word);
     
-    dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_activated_.array();
+    dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_.array();
     dembedding.block(dimension, 0, 1, 1).array() += loss;
     
     // backward...
@@ -692,7 +688,7 @@ struct NGram
     for (size_type k = 0; k != samples_; ++ k) {
       const word_type word = unigram_.draw(gen);
 
-      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_activated_
+      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
 			    + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
       const double score_noise = log_samples_ + unigram_.logprob(word);
       const double z = utils::mathop::logsum(score, score_noise);
@@ -706,14 +702,14 @@ struct NGram
             
       tensor_type& dembedding = gradient.embedding_output(word);
       
-      dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_activated_.array();
+      dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_.array();
       dembedding.block(dimension, 0, 1, 1).array() += loss;
       
       delta_hidden_.array() += (layer_hidden_.array().unaryExpr(dhinge())
 				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss).array());
     }
     
-    gradient.Wh_ += delta_hidden_ * layer_context_activated_.transpose();
+    gradient.Wh_ += delta_hidden_ * layer_context_.transpose();
     gradient.bh_ += delta_hidden_;
     
     delta_context_ = (layer_context_.array().unaryExpr(dhinge()) * (theta.Wh_.transpose() * delta_hidden_).array());
