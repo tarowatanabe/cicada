@@ -256,3 +256,6 @@ Add head-node annotator for each edge:
  - This can be used to identify the pruning bin, so that we do not
    rely on the "prune-bin" attribute assigned during feature
    application.
+
+NCE for autoencoding
+- re-implement by perform classification and sampling using the lexicon model

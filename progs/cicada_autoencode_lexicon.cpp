@@ -971,6 +971,8 @@ struct LearnAdaGrad
   
   typedef Model model_type;
   typedef Model gradient_type;
+
+  typedef cicada::Symbol   word_type;
   
   typedef model_type::tensor_type tensor_type;
   
@@ -1022,7 +1024,7 @@ struct LearnAdaGrad
 	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, source_.col(siter->first.id()), siter->second, lambda_ != 0.0);
+      update(siter->first, eiter->second, const_cast<tensor_type&>(source_), siter->second, lambda_ != 0.0);
     }
 
     embedding_type::const_iterator titer_end = gradient.target_.end();
@@ -1044,24 +1046,25 @@ struct LearnAdaGrad
 	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
       }
       
-      update(eiter->second, target_.col(titer->first.id()), titer->second, lambda_ != 0.0);
+      update(titer->first, eiter->second, const_cast<tensor_type&>(target_), titer->second, lambda_ != 0.0);
     }
     
-    update(theta.Wl1_, Wl1_, gradient.Wl1_, lambda_ != 0.0);
-    update(theta.bl1_, bl1_, gradient.bl1_, false);
+    update(theta.Wl1_, const_cast<tensor_type&>(Wl1_), gradient.Wl1_, lambda_ != 0.0);
+    update(theta.bl1_, const_cast<tensor_type&>(bl1_), gradient.bl1_, false);
 
-    update(theta.Wl2_, Wl2_, gradient.Wl2_, lambda_ != 0.0);
-    update(theta.bl2_, bl2_, gradient.bl2_, false);
+    update(theta.Wl2_, const_cast<tensor_type&>(Wl2_), gradient.Wl2_, lambda_ != 0.0);
+    update(theta.bl2_, const_cast<tensor_type&>(bl2_), gradient.bl2_, false);
 
-    update(theta.Wc_, Wc_, gradient.Wc_, lambda_ != 0.0);
-    update(theta.bc_, bc_, gradient.bc_, false);
+    update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, lambda_ != 0.0);
+    update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, false);
   }
 
+  template <typename Theta, typename GradVar, typename Grad>
   struct update_visitor_regularize
   {
-    update_visitor_regularize(tensor_type& theta,
-			      tensor_type& G,
-			      const tensor_type& g,
+    update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
+			      Eigen::MatrixBase<GradVar>& G,
+			      const Eigen::MatrixBase<Grad>& g,
 			      const double& lambda,
 			      const double& eta0)
       : theta_(theta), G_(G), g_(g), lambda_(lambda), eta0_(eta0) {}
@@ -1081,25 +1084,49 @@ struct LearnAdaGrad
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
     
-    tensor_type& theta_;
-    tensor_type& G_;
-    const tensor_type& g_;
+    Eigen::MatrixBase<Theta>&      theta_;
+    Eigen::MatrixBase<GradVar>&    G_;
+    const Eigen::MatrixBase<Grad>& g_;
     
     const double lambda_;
     const double eta0_;
   };
   
-  void update(tensor_type& theta, const tensor_type& __G, const tensor_type& g, const bool regularize=true) const
+  template <typename Theta, typename GradVar, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const bool regularize=true) const
   {
-    tensor_type& G = const_cast<tensor_type&>(__G);
-
     if (regularize) {
-      update_visitor_regularize visitor(theta, G, g, lambda_, eta0_);
+      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, lambda_, eta0_);
       
       theta.visit(visitor);
     } else {
       G.array() += g.array() * g.array();
       theta.array() -= eta0_ * g.array() / G.array().sqrt();
+    }
+  }
+
+  template <typename Theta, typename GradVar, typename Grad>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const bool regularize=true) const
+  {
+    if (regularize) {
+      for (int row = 0; row != g.rows(); ++ row) {
+	G(row, word.id()) += g(row, 0) * g(row, 0);
+	
+	const double rate = eta0_ / std::sqrt(G(row, word.id()));
+	const double f = theta(row, 0) - rate * g(row, 0);
+	
+	theta(row, 0) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      }
+    } else {
+      G.col(word.id()).array() += g.array() * g.array();
+      theta.array() -= eta0_ * g.array() / G.col(word.id()).array().sqrt();
     }
   }
   
