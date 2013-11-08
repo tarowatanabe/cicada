@@ -262,6 +262,7 @@ struct Model
   typedef boost::filesystem::path path_type;
 
   typedef std::vector<bool, std::allocator<bool> > unique_set_type;
+  typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
   
   Model() : dimension_embedding_(0), dimension_hidden_(0), order_(0) {}  
   template <typename Unigram, typename Gen>
@@ -332,15 +333,30 @@ struct Model
     embedding_input_  = tensor_type::Zero(dimension_embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
     embedding_output_ = tensor_type::Zero(dimension_embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
     
-    words_ = unique_set_type(vocabulary_size, false);
+    uniques_ = unique_set_type(vocabulary_size, false);
+    
+    // assign id... which is used to compute the final word embeddings...
+    words_.clear();
+    words_.push_back(vocab_type::BOS);
+    words_.push_back(vocab_type::EOS);
+    words_.push_back(vocab_type::EPSILON);
+    words_.push_back(vocab_type::UNK);
     
     for (size_type pos = 0; pos != unigram.words_.size(); ++ pos)
-      if (unigram.words_[pos] != vocab_type::EOS)
-	words_[unigram.words_[pos].id()] = true;
-    
-    words_[vocab_type::BOS.id()] = false;
-    words_[vocab_type::EOS.id()] = false;
+      if (unigram.words_[pos] != vocab_type::EOS) {
+	uniques_[unigram.words_[pos].id()] = true;
 
+	if (unigram.words_[pos] != vocab_type::BOS
+	    && unigram.words_[pos] != vocab_type::EPSILON
+	    && unigram.words_[pos] != vocab_type::UNK)
+	  words_.push_back(unigram.words_[pos]);
+      }
+    
+    word_set_type(words_).swap(words_);
+    
+    uniques_[vocab_type::BOS.id()] = false;
+    uniques_[vocab_type::EOS.id()] = false;
+    
     Wc_ = tensor_type::Zero(dimension_hidden_, dimension_embedding_ * (order - 1)).array().unaryExpr(randomize<Gen>(gen));
     bc_ = tensor_type::Zero(dimension_hidden_, 1).array().unaryExpr(randomize<Gen>(gen));
     
@@ -350,14 +366,38 @@ struct Model
 
   void finalize()
   {
-    embedding_input_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_, 1);
+    // clear general embedding
+    embedding_input_.col(vocab_type::EPSILON.id())  = tensor_type::Zero(dimension_embedding_, 1);
     embedding_output_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
-
-    const double factor = 1.0 / std::accumulate(words_.begin(), words_.end(), size_type(0));
     
-    for (size_type pos = 0; pos != words_.size(); ++ pos) {
-      embedding_input_.col(vocab_type::EPSILON.id())  += embedding_input_.col(pos) * factor;
-      embedding_output_.col(vocab_type::EPSILON.id()) += embedding_output_.col(pos) * factor;
+    // clear unused entries
+    embedding_input_.col(vocab_type::EOS.id())  = tensor_type::Zero(dimension_embedding_, 1);
+    embedding_output_.col(vocab_type::BOS.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
+    
+    const double factor = 1.0 / std::accumulate(uniques_.begin(), uniques_.end(), size_type(0));
+    
+    tensor_type epsilon_input  = tensor_type::Zero(dimension_embedding_, 1);
+    tensor_type epsilon_output = tensor_type::Zero(dimension_embedding_ + 1, 1);
+    
+    bool has_unk = false;
+    
+    for (size_type pos = 0; pos != uniques_.size(); ++ pos) 
+      if (uniques_[pos]) {
+	epsilon_input  += embedding_input_.col(pos) * factor;
+	epsilon_output += embedding_output_.col(pos) * factor;
+	
+	has_unk |= (word_type(pos) == vocab_type::UNK);
+      }
+    
+    embedding_input_.col(vocab_type::EPSILON.id())  = epsilon_input;
+    embedding_output_.col(vocab_type::EPSILON.id()) = epsilon_output;
+    
+    embedding_input_.col(vocab_type::EOS.id())  = epsilon_input;
+    embedding_output_.col(vocab_type::BOS.id()) = epsilon_output;
+    
+    if (! has_unk) {
+      embedding_input_.col(vocab_type::UNK.id())  = epsilon_input;
+      embedding_output_.col(vocab_type::UNK.id()) = epsilon_output;
     }
   }
   
@@ -384,9 +424,10 @@ struct Model
     rep["embedding"] = utils::lexical_cast<std::string>(dimension_embedding_);
     rep["hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);    
     rep["order"]     = utils::lexical_cast<std::string>(order_);
+    rep["size"]      = utils::lexical_cast<std::string>(words_.size());
     
-    write_embedding(rep.path("input.gz"),  rep.path("input.bin"), embedding_input_, vocab_type::BOS);
-    write_embedding(rep.path("output.gz"), rep.path("output.bin"), embedding_output_, vocab_type::EOS);
+    write_embedding(rep.path("input.gz"),  rep.path("input.bin"), embedding_input_);
+    write_embedding(rep.path("output.gz"), rep.path("output.bin"), embedding_output_);
     
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
@@ -395,43 +436,40 @@ struct Model
     write(rep.path("bh.txt.gz"), rep.path("bh.bin"), bh_);
     
     // vocabulary...
-    word_type::write(rep.path("vocab"));
+    vocab_type vocab;
+    
+    vocab.open(rep.path("vocab"), words_.size() >> 1);
+
+    word_set_type::const_iterator witer_end = words_.end();
+    for (word_set_type::const_iterator witer = words_.begin(); witer != witer_end; ++ witer)
+      vocab.insert(*witer);
+    
+    vocab.close();
   }
   
-  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix, const word_type& add) const
+  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
-    {
-      utils::compress_ostream os(path_text, 1024 * 1024);
-      std::ostream_iterator<char> iter(os);
-
-      const word_type::id_type id_max = matrix.cols();
-      for (word_type::id_type i = 0; i != id_max; ++ i) {
-	const word_type word(i);
-	
-	if (! word.empty() && (words_[word.id()] || word == vocab_type::EPSILON || word == add)) {
-	  karma::generate(iter, standard::string, word);
-	  
-	  for (difference_type j = 0; j != matrix.rows(); ++ j)
-	    karma::generate(iter, karma::lit(' ') << float10, matrix(j, i));
-	  
-	  karma::generate(iter, karma::lit('\n'));
-	}
-      }
-    }
+    const tensor_type::Index rows = matrix.rows();
+    const tensor_type::Index cols = matrix.cols();
     
-    {
-      utils::compress_ostream os(path_binary, 1024 * 1024);
+    utils::compress_ostream os_txt(path_text, 1024 * 1024);
+    utils::compress_ostream os_bin(path_binary, 1024 * 1024);
+    std::ostream_iterator<char> iter(os_txt);
+    
+    word_set_type::const_iterator witer_end = words_.end();
+    for (word_set_type::const_iterator witer = words_.begin(); witer != witer_end; ++ witer) {
+      karma::generate(iter, standard::string, *witer);
       
-      const tensor_type::Index rows = matrix.rows();
-      const tensor_type::Index cols = matrix.cols();
+      for (difference_type j = 0; j != rows; ++ j)
+	karma::generate(iter, karma::lit(' ') << float10, matrix(j, witer->id()));
       
-      os.write((char*) &rows, sizeof(tensor_type::Index));
-      os.write((char*) &cols, sizeof(tensor_type::Index));
-      os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
-    }    
+      karma::generate(iter, karma::lit('\n'));
+
+      os_bin.write((char*) matrix.col(witer->id()).data(), sizeof(tensor_type::Scalar) * rows);
+    }
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -448,8 +486,6 @@ struct Model
       const tensor_type::Index rows = matrix.rows();
       const tensor_type::Index cols = matrix.cols();
       
-      os.write((char*) &rows, sizeof(tensor_type::Index));
-      os.write((char*) &cols, sizeof(tensor_type::Index));
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
   }
@@ -463,7 +499,8 @@ struct Model
   tensor_type embedding_input_;
   tensor_type embedding_output_;
 
-  unique_set_type words_;
+  unique_set_type uniques_;
+  word_set_type   words_;
   
   // Wc and bc for context layer
   tensor_type Wc_;
@@ -482,62 +519,55 @@ struct Unigram
   typedef Model    model_type;
   typedef Gradient gradient_type;
 
+  typedef uint64_t count_type;
+
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
+
+  typedef std::vector<double, std::allocator<double> >         logprob_set_type;
+  typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
+  typedef std::vector<word_type, std::allocator<word_type> >   word_map_type;
   
-  typedef std::vector<double, std::allocator<double> > logprob_set_type;
-  typedef std::vector<word_type, std::allocator<word_type> > word_map_type;
-
   typedef boost::random::discrete_distribution<> distribution_type;
-
+  
+  template <typename Tp>
+  struct compare_pair
+  {
+    bool operator()(const Tp& x, const Tp& y) const
+    {
+      return (x.second > y.second
+	      || (x.second == y.second
+		  && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
+    }
+  };
+  
   template <typename Iterator>
   Unigram(Iterator first, Iterator last)
   {
-    typedef utils::indexed_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > word_set_type;
-    typedef std::vector<size_type, std::allocator<size_type> > count_set_type;
+    typedef std::pair<word_type, count_type> word_count_type;
+    typedef std::vector<word_count_type, std::allocator<word_count_type> > word_count_set_type;
     
-    word_set_type  uniques;
+    word_count_set_type word_counts(first, last);
+    std::sort(word_counts.begin(), word_counts.end(), compare_pair<word_count_type>());
 
-    word_set_type::iterator iter = uniques.insert(vocab_type::EOS).first;
-    const int index_eos = (iter - uniques.begin());
-    
-    count_set_type counts(index_eos + 1);
-    
-    for (/**/; first != last; ++ first) {
-      accumulate(first->begin(), first->end(), uniques, counts);
-      
-      ++ counts[index_eos];
-    }
-    
+    words_.reserve(word_counts.size());
+    counts_.reserve(word_counts.size());
     logprobs_.reserve(word_type::allocated());
-    logprobs_.resize(word_type::allocated());
-    words_.reserve(uniques.size());
-    words_.resize(uniques.size());
+    
+    word_count_set_type::const_iterator witer_end = word_counts.end();
+    for (word_count_set_type::const_iterator witer = word_counts.begin(); witer != witer_end; ++ witer) {
+      words_.push_back(witer->first);
+      counts_.push_back(witer->second);
+    }
     
     // initialize logprobs and words
-    const double norm = 1.0 / std::accumulate(counts.begin(), counts.end(), double(0));
-    for (word_type::id_type id = 0; id != counts.size(); ++ id) {
-      words_[id] = uniques[id];
-      logprobs_[words_[id].id()] = std::log(norm * counts[id]);
-    }
+    const double norm = 1.0 / std::accumulate(counts_.begin(), counts_.end(), double(0));
+    for (word_type::id_type id = 0; id != counts_.size(); ++ id)
+      logprobs_[words_[id].id()] = std::log(norm * counts_[id]);
     
     // initialize distribution
-    distribution_ = distribution_type(counts.begin(), counts.end());
-  }
-  
-  template <typename Iterator, typename Uniques, typename Counts>
-  void accumulate(Iterator first, Iterator last, Uniques& uniques, Counts& counts)
-  {
-    for (/**/; first != last; ++ first) {
-      typename Uniques::iterator iter = uniques.insert(*first).first;
-      const int index = iter - uniques.begin();
-      
-      if (index >= counts.size())
-	counts.resize(index + 1);
-      
-      ++ counts[index];
-    }
+    distribution_ = distribution_type(counts_.begin(), counts_.end());
   }
   
   double logprob(const word_type& word) const
@@ -552,6 +582,7 @@ struct Unigram
   }
   
   logprob_set_type  logprobs_;
+  count_set_type    counts_;
   word_map_type     words_;
   distribution_type distribution_;
 };
@@ -815,7 +846,9 @@ struct LearnAdaGrad
     
     void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
     {
-      G_(i, j) = std::max(std::min(G_(i, j) + g_(i, j) * g_(i, j), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
+      if (g_(i, j) == 0) return;
+      
+      G_(i, j) += g_(i, j) * g_(i, j);
       
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
@@ -830,6 +863,15 @@ struct LearnAdaGrad
     const double lambda_;
     const double eta0_;
   };
+
+  struct learning_rate
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return (x == 0.0 ? 0.0 : 1.0 / std::sqrt(x));
+    }
+  };
   
   template <typename Theta, typename GradVar, typename Grad>
   void update(Eigen::MatrixBase<Theta>& theta,
@@ -842,8 +884,8 @@ struct LearnAdaGrad
       
       theta.visit(visitor);
     } else {
-      G.array() = (G.array() + g.array().square()).min(1e+30).max(1e-30);
-      theta.array() -= eta0_ * g.array() / G.array().sqrt();
+      G.array() += g.array().square();
+      theta.array() -= eta0_ * g.array() * G.array().unaryExpr(learning_rate());
     }
   }
 
@@ -856,24 +898,27 @@ struct LearnAdaGrad
 	      const bool bias_last=false) const
   {
     if (regularize) {
-      for (int row = 0; row != g.rows() - bias_last; ++ row) {
-	G(row, word.id()) = std::max(std::min(G(row, word.id()) + g(row, 0) * g(row, 0), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
-	
-	const double rate = eta0_ / std::sqrt(G(row, word.id()));
-	const double f = theta(row, word.id()) - rate * g(row, 0);
-	
-	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
-      }
+      for (int row = 0; row != g.rows() - bias_last; ++ row) 
+	if (g(row, 0) != 0) {
+	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
+	  
+	  const double rate = eta0_ / std::sqrt(G(row, word.id()));
+	  const double f = theta(row, word.id()) - rate * g(row, 0);
+	  
+	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	}
       
       if (bias_last) {
 	const int row = g.rows() - 1;
 	
-	G(row, word.id()) = std::max(std::min(G(row, word.id()) + g(row, 0) * g(row, 0), tensor_type::Scalar(1e+30)), tensor_type::Scalar(1e-30));
-	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+	if (g(row, 0) != 0) {
+	  G(row, word.id()) += g(row, 0) * g(row, 0);
+	  theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+	}
       }
     } else {
-      G.col(word.id()).array() = (G.col(word.id()).array() + g.array().square()).min(1e+30).max(1e-30);
-      theta.col(word.id()).array() -= eta0_ * g.array() / G.col(word.id()).array().sqrt();
+      G.col(word.id()).array() += g.array().square();
+      theta.col(word.id()).array() -= eta0_ * g.array() * G.col(word.id()).array().unaryExpr(learning_rate());
     }
   }
   
@@ -906,6 +951,12 @@ typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_
 typedef Model    model_type;
 typedef Unigram  unigram_type;
 
+typedef uint64_t count_type;
+typedef utils::unordered_map<unigram_type::word_type, count_type,
+			     boost::hash<unigram_type::word_type>, std::equal_to<unigram_type::word_type>,
+			     std::allocator<std::pair<const unigram_type::word_type, count_type> > >::type word_set_type;
+
+
 static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
@@ -937,7 +988,8 @@ void learn_online(const Learner& learner,
 		  const unigram_type& unigram,
 		  model_type& theta);
 void read_data(const path_type& input_file,
-	       sentence_set_type& sentences);
+	       sentence_set_type& sentences,
+	       word_set_type& words);
 
 void options(int argc, char** argv);
 
@@ -979,10 +1031,11 @@ int main(int argc, char** argv)
       throw std::runtime_error("no data?");
     
     sentence_set_type sentences;
+    word_set_type     words;
     
-    read_data(input_file, sentences);
+    read_data(input_file, sentences, words);
     
-    unigram_type unigram(sentences.begin(), sentences.end());
+    unigram_type unigram(words.begin(), words.end());
     
     model_type theta(dimension_embedding, dimension_hidden, order, unigram, generator);
     
@@ -1268,17 +1321,28 @@ void learn_online(const Learner& learner,
 
 
 void read_data(const path_type& input_file,
-	       sentence_set_type& sentences)
+	       sentence_set_type& sentences,
+	       word_set_type& words)
 {
+  typedef cicada::Vocab vocab_type;
+
   sentences.clear();
+  words.clear();
   
   utils::compress_istream is(input_file, 1024 * 1024);
   
   sentence_type sentence;
   
-  while (is >> sentence)
+  while (is >> sentence) {
     sentences.push_back(sentence);
-
+    
+    sentence_type::const_iterator siter_end = sentence.end();
+    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+      ++ words[*siter];
+    
+    ++ words[vocab_type::EOS];
+  }
+  
   sentence_set_type(sentences).swap(sentences);
 }
 

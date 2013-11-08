@@ -185,7 +185,7 @@ public:
   {
     double& grad2 = const_cast<weight_set_type&>(grads2_).operator[](feat);
     grad2 += grad * grad;
-    return eta0_ / utils::mathop::sqrt(grad2);
+    return (grad2 == 0.0 ? 0.0 : eta0_ / utils::mathop::sqrt(grad2));
   }
 };
 
