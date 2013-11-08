@@ -27,6 +27,8 @@
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 
+#include <boost/algorithm/string/trim.hpp>
+
 #include <Eigen/Core>
 
 #include "cicada/symbol.hpp"
@@ -962,6 +964,7 @@ static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type input_file;
+path_type list_file;
 path_type embedding_file;
 path_type output_model_file;
 
@@ -988,6 +991,7 @@ void learn_online(const Learner& learner,
 		  const unigram_type& unigram,
 		  model_type& theta);
 void read_data(const path_type& input_file,
+	       const path_type& list_file,
 	       sentence_set_type& sentences,
 	       word_set_type& words);
 
@@ -1027,13 +1031,21 @@ int main(int argc, char** argv)
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
 
-    if (input_file.empty())
+    if (input_file.empty() && list_file.empty())
       throw std::runtime_error("no data?");
+
+    if (! input_file.empty())
+      if (input_file != "-" && ! boost::filesystem::exists(input_file))
+	throw std::runtime_error("no input file? " + input_file.string());
+    
+    if (! list_file.empty())
+      if (list_file != "-" && ! boost::filesystem::exists(list_file))
+	throw std::runtime_error("no list file? " + list_file.string());
     
     sentence_set_type sentences;
     word_set_type     words;
     
-    read_data(input_file, sentences, words);
+    read_data(input_file, list_file, sentences, words);
     
     unigram_type unigram(words.begin(), words.end());
     
@@ -1319,8 +1331,85 @@ void learn_online(const Learner& learner,
   theta.finalize();
 }
 
+struct Reader
+{
+  void operator()(const sentence_type& sentence)
+  {
+    typedef cicada::Vocab vocab_type;
+    
+    if (sentence.empty()) return;
+    
+    sentences_.push_back(sentence);
+    
+    sentence_type::const_iterator siter_end = sentence.end();
+    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+      ++ words_[*siter];
+    
+    ++ words_[vocab_type::EOS];
+  }
+  
+  sentence_set_type sentences_;
+  word_set_type     words_;
+};
+
+struct ReaderFile : public Reader
+{
+  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
+  
+  ReaderFile(queue_type& queue) : queue_(queue) {}
+  
+  void operator()()
+  {
+    sentence_type sentence;
+    path_type path;
+    
+    for (;;) {
+      queue_.pop_swap(path);
+      
+      if (path.empty()) break;
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      while (is >> sentence)
+	Reader::operator()(sentence);
+    }
+  }
+  
+  queue_type& queue_;
+};
+      
+struct ReaderLines : public Reader
+{
+  typedef std::vector<std::string, std::allocator<std::string> > line_set_type;
+  typedef utils::lockfree_list_queue<line_set_type, std::allocator<line_set_type> > queue_type;
+  
+  ReaderLines(queue_type& queue) : queue_(queue) {}
+  
+  void operator()() 
+  {
+    line_set_type lines;
+    sentence_type sentence;
+    path_type path;
+    
+    for (;;) {
+      queue_.pop_swap(lines);
+      
+      if (lines.empty()) break;
+      
+      line_set_type::const_iterator liter_end = lines.end();
+      for (line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	sentence.assign(*liter);
+	
+	Reader::operator()(sentence);
+      }
+    }
+  }
+  
+  queue_type& queue_;
+};
 
 void read_data(const path_type& input_file,
+	       const path_type& list_file,
 	       sentence_set_type& sentences,
 	       word_set_type& words)
 {
@@ -1329,21 +1418,97 @@ void read_data(const path_type& input_file,
   sentences.clear();
   words.clear();
   
-  utils::compress_istream is(input_file, 1024 * 1024);
-  
-  sentence_type sentence;
-  
-  while (is >> sentence) {
-    sentences.push_back(sentence);
+  if (! input_file.empty()) {
+    if (input_file != "-" && ! boost::filesystem::exists(input_file))
+      throw std::runtime_error("no input file? " + input_file.string());
+
+    ReaderLines::queue_type queue;
+
+    std::vector<ReaderLines> tasks(threads, ReaderLines(queue));
     
-    sentence_type::const_iterator siter_end = sentence.end();
-    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
-      ++ words[*siter];
+    boost::thread_group workers;
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    ++ words[vocab_type::EOS];
+    std::string                line;
+    ReaderLines::line_set_type lines;
+    
+    utils::compress_istream is(input_file, 1024 * 1024);
+    
+    while (std::getline(is, line)) {
+      if (line.empty()) continue;
+      
+      lines.push_back(line);
+
+      if (lines.size() == 1024) {
+	queue.push_swap(lines);
+	lines.clear();
+      }
+    }
+    
+    if (! lines.empty())
+      queue.push_swap(lines);
+    
+    // termination
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      queue.push(ReaderLines::line_set_type());
+    
+    workers.join_all();
+    
+    // join data...
+    for (size_t i = 0; i != tasks.size(); ++ i) {
+      sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
+      
+      word_set_type::const_iterator witer_end = tasks[i].words_.end();
+      for (word_set_type::const_iterator witer = tasks[i].words_.begin(); witer != witer_end; ++ witer)
+	words[witer->first] += witer->second;
+    }
   }
   
-  sentence_set_type(sentences).swap(sentences);
+  if (! list_file.empty()) {
+    if (list_file != "-" && ! boost::filesystem::exists(list_file))
+	throw std::runtime_error("no list file? " + list_file.string());
+    
+    ReaderFile::queue_type queue;
+    
+    std::vector<ReaderFile> tasks(threads, ReaderFile(queue));
+    
+    boost::thread_group workers;
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    std::string line;
+    
+    utils::compress_istream is(list_file, 1024 * 1024);
+    
+    while (std::getline(is, line)) {
+      boost::algorithm::trim(line);
+      
+      if (line.empty()) continue;
+
+      if (boost::filesystem::exists(line))
+	queue.push(line);
+      else if (boost::filesystem::exists(list_file.parent_path() / line))
+	queue.push(list_file.parent_path() / line);
+      else
+	throw std::runtime_error(std::string("no file? ") + line);
+    }
+    
+     // termination
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      queue.push(path_type());
+    
+    workers.join_all();
+    
+    // join data...
+    for (size_t i = 0; i != tasks.size(); ++ i) {
+      sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
+      
+      word_set_type::const_iterator witer_end = tasks[i].words_.end();
+      for (word_set_type::const_iterator witer = tasks[i].words_.begin(); witer != witer_end; ++ witer)
+	words[witer->first] += witer->second;
+    }
+  }
 }
 
 void options(int argc, char** argv)
@@ -1352,7 +1517,8 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("input",    po::value<path_type>(&input_file),    "input file")
+    ("input",    po::value<path_type>(&input_file),  "input file")
+    ("list",    po::value<path_type>(&list_file),    "list file")
     
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
@@ -1381,7 +1547,7 @@ void options(int argc, char** argv)
   po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
   
   po::notify(variables);
-
+  
   if (variables.count("help")) {
     std::cout << argv[0] << " [options] [operations]\n"
 	      << opts_command << std::endl;
