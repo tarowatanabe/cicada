@@ -503,6 +503,7 @@ ngram_scorer.hpp \
 ngram_state.hpp \
 ngram_state_chart.hpp \
 ngram_count_set.hpp \
+ngram_nn.hpp \
 ngram_pyp.hpp \
 operation.hpp \
 operation_set.hpp \
@@ -606,6 +607,7 @@ model.cpp \
 ngram.cpp \
 ngram_count_set.cpp \
 ngram_index.cpp \
+ngram_nn.cpp \
 ngram_pyp.cpp \
 operation.cpp \
 operation_set.cpp \
