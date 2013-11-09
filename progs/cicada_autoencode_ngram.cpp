@@ -101,17 +101,12 @@ struct Model
   {
     embedding_type::const_iterator siter_end = x.embedding_.end();
     for (embedding_type::const_iterator siter = x.embedding_.begin(); siter != siter_end; ++ siter) {
-      embedding_type::iterator eiter = embedding_.find(siter->first);
+      tensor_type& embedding = embedding_[siter->first];
       
-      if (eiter == embedding_.end())
-	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_embedding_, 1))).first;
-      
-      for (difference_type i = 0; i != siter->second.rows(); ++ i) {
-	const double amount = - siter->second.col(0)[i] * x.scale_;
-	
-	norm_ += 2.0 * eiter->second.col(0)[i] * scale_ * amount + amount * amount;
-	eiter->second.col(0)[i] += amount / scale_;
-      }
+      if (! embedding.rows())
+	embedding = - siter->second;
+      else
+	embedding -= siter->second;
     }
         
     Wl1_ -= x.Wl1_;
@@ -129,17 +124,12 @@ struct Model
   {
     embedding_type::const_iterator siter_end = x.embedding_.end();
     for (embedding_type::const_iterator siter = x.embedding_.begin(); siter != siter_end; ++ siter) {
-      embedding_type::iterator eiter = embedding_.find(siter->first);
+      tensor_type& embedding = embedding_[siter->first];
       
-      if (eiter == embedding_.end())
-	eiter = embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(dimension_embedding_, 1))).first;
-      
-      for (difference_type i = 0; i != siter->second.rows(); ++ i) {
-	const double amount = siter->second.col(0)[i] * x.scale_;
-	
-	norm_ += 2.0 * eiter->second.col(0)[i] * scale_ * amount + amount * amount;
-	eiter->second.col(0)[i] += amount / scale_;
-      }
+      if (! embedding.rows())
+	embedding = siter->second;
+      else
+	embedding += siter->second;
     }
     
     Wl1_ += x.Wl1_;
@@ -157,8 +147,6 @@ struct Model
   {
     // embedding
     embedding_.clear();
-    scale_ = 1.0;
-    norm_ = 0.0;
     
     // matrices
     Wl1_.setZero();
@@ -172,64 +160,7 @@ struct Model
 
   void finalize()
   {
-    if (scale_ != 1.0) {
-      norm_ = 0.0;
-      
-      embedding_type::iterator siter_end = embedding_.end();
-      for (embedding_type::iterator siter = embedding_.begin(); siter != siter_end; ++ siter) {
-	siter->second *= scale_;
-	norm_ += siter->second.squaredNorm();
-      }
-      
-      scale_ = 1.0;
-    }
-  }
-  
-  void rescale(const double scaling, const bool ignore_bias)
-  {
-    scale_ *= scaling;
-
-    if (scale_ == 0.0) {
-      embedding_type::iterator siter_end = embedding_.end();
-      for (embedding_type::iterator siter = embedding_.begin(); siter != siter_end; ++ siter)
-	siter->second.setZero();
-      
-      scale_ = 1.0;
-      norm_  = 0.0;
-    } else
-      norm_ *= scaling * scaling;
-
     
-    Wl1_ *= scaling;
-    Wl2_ *= scaling;
-
-    Wc_ *= scaling;
-    
-    if (! ignore_bias) {
-      bl1_ *= scaling;
-      bl2_ *= scaling;
-
-      bc_ *= scaling;
-    }
-  }
-
-  double squared_norm(bool ignore_bias) const
-  {
-    double norm = norm_;
-    
-    norm += Wl1_.squaredNorm();
-    norm += Wl2_.squaredNorm();
-
-    norm += Wc_.squaredNorm();
-    
-    if (! ignore_bias) {
-      norm += bl1_.squaredNorm();
-      norm += bl2_.squaredNorm();
-
-      norm += bc_.squaredNorm();
-    }
-    
-    return norm;
   }
 
   template <typename Gen>
@@ -265,8 +196,6 @@ struct Model
     
     // embedding
     embedding_.clear();
-    scale_ = 1.0;
-    norm_ = 0.0;
     
     // intialize randomly...
 
@@ -300,8 +229,6 @@ struct Model
     
     // embedding
     embedding_.clear();
-    scale_ = 1.0;
-    norm_ = 0.0;
         
     // lexicon
     Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order);
@@ -333,14 +260,6 @@ struct Model
       if (! we.rows() || ! we.cols())
 	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
     }
-    
-    // compute norm...
-    scale_ = 1.0;
-    norm_ = 0.0;
-    
-    embedding_type::const_iterator siter_end = embedding_.end();
-    for (embedding_type::const_iterator siter = embedding_.begin(); siter != siter_end; ++ siter)
-      norm_ += siter->second.squaredNorm();
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -467,8 +386,6 @@ struct Model
   
   // Embedding
   embedding_type embedding_;
-  double scale_;
-  double norm_;
   
   // Wl1 and bl1 for encoding
   tensor_type Wl1_;
@@ -534,7 +451,7 @@ struct NGram
       throw std::runtime_error("dimension does not match");
     
     for (size_type i = 0; i != order; ++ i)
-      input_prev.block(dimension_embedding * i, 0, dimension_embedding, 1) = biter->second * theta.scale_;
+      input_prev.block(dimension_embedding * i, 0, dimension_embedding, 1) = biter->second;
     
     for (size_type pos = 0; pos <= sentence_size; ++ pos) {
       // copy previous input as a history
@@ -561,8 +478,8 @@ struct NGram
       if (miter->second.rows() != dimension_embedding)
 	throw std::runtime_error("wrong dimension");
       
-      input.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1)         = piter->second * theta.scale_;
-      input_sampled.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1) = miter->second * theta.scale_;
+      input.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1)         = piter->second;
+      input_sampled.block(dimension_embedding * (order - 1), 0, dimension_embedding, 1) = miter->second;
       
       const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(func);
       const tensor_type p_norm = p.normalized();
@@ -747,6 +664,8 @@ struct LearnAdaGrad
     
     void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
     {
+      if (g_(i, j) == 0) return;
+      
       G_(i, j) += g_(i, j) * g_(i, j);
       
       const double rate = eta0_ / std::sqrt(G_(i, j));
@@ -763,6 +682,15 @@ struct LearnAdaGrad
     const double eta0_;
   };
   
+  struct learning_rate
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return (x == 0.0 ? 0.0 : 1.0 / std::sqrt(x));
+    }
+  };
+
   template <typename Theta, typename GradVar, typename Grad>
   void update(Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
@@ -774,8 +702,8 @@ struct LearnAdaGrad
       
       theta.visit(visitor);
     } else {
-      G.array() += g.array() * g.array();
-      theta.array() -= eta0_ * g.array() / G.array().sqrt();
+      G.array() += g.array().square();
+      theta.array() -= eta0_ * g.array() * G.array().unaryExpr(learning_rate());
     }
   }
 
@@ -787,17 +715,18 @@ struct LearnAdaGrad
 	      const bool regularize=true) const
   {
     if (regularize) {
-      for (int row = 0; row != g.rows(); ++ row) {
-	G(row, word.id()) += g(row, 0) * g(row, 0);
-	
-	const double rate = eta0_ / std::sqrt(G(row, word.id()));
-	const double f = theta(row, 0) - rate * g(row, 0);
-	
-	theta(row, 0) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
-      }
+      for (int row = 0; row != g.rows(); ++ row)
+	if (g(row, 0) != 0) {
+	  G(row, word.id()) += g(row, 0) * g(row, 0);
+	  
+	  const double rate = eta0_ / std::sqrt(G(row, word.id()));
+	  const double f = theta(row, 0) - rate * g(row, 0);
+	  
+	  theta(row, 0) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	}
     } else {
-      G.col(word.id()).array() += g.array() * g.array();
-      theta.array() -= eta0_ * g.array() / G.col(word.id()).array().sqrt();
+      G.col(word.id()).array() += g.array().square();
+      theta.array() -= eta0_ * g.array() * G.col(word.id()).array().unaryExpr(learning_rate());
     }
   }
   
@@ -824,78 +753,6 @@ struct LearnAdaGrad
   tensor_type bc_;
 };
 
-struct LearnL2
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  typedef Model model_type;
-  typedef Model gradient_type;
-  
-  typedef model_type::tensor_type tensor_type;
-
-  LearnL2(const double& lambda, const double& eta0)
-    : lambda_(lambda), eta0_(eta0), epoch_(0)
-  {
-    if (lambda_ <= 0.0)
-      throw std::runtime_error("invalid regularization");
-
-    if (eta0_ <= 0.0)
-      throw std::runtime_error("invalid learning rate");
-  }
-  
-  void operator()(model_type& theta, const gradient_type& gradient) const
-  {
-    typedef model_type::embedding_type embedding_type;
-
-    const double eta = eta0_ / (epoch_ + 1);
-    ++ const_cast<size_type&>(epoch_);
-
-    // suffer L2 regularizer... actually, we should not rescale bias
-    if (lambda_ != 0.0)
-      theta.rescale(1.0 - eta * lambda_, true);
-    
-    // update...
-    embedding_type::const_iterator siter_end = gradient.embedding_.end();
-    for (embedding_type::const_iterator siter = gradient.embedding_.begin(); siter != siter_end; ++ siter) {
-      embedding_type::iterator eiter = theta.embedding_.find(siter->first);
-      
-      if (eiter == theta.embedding_.end()) {
-	std::cerr << "WARNING: this should not happen: " << siter->first << std::endl;
-	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
-      }
-      
-      for (difference_type i = 0; i != siter->second.rows(); ++ i) {
-	const double amount = - siter->second.col(0)[i] * gradient.scale_ * eta;
-	
-	theta.norm_ += 2.0 * eiter->second.col(0)[i] * theta.scale_ * amount + amount * amount;
-	eiter->second.col(0)[i] += amount / theta.scale_;
-      }
-    }
-
-
-    theta.Wl1_.array() -= gradient.Wl1_.array() * eta;
-    theta.bl1_.array() -= gradient.bl1_.array() * eta;
-
-    theta.Wl2_.array() -= gradient.Wl2_.array() * eta;
-    theta.bl2_.array() -= gradient.bl2_.array() * eta;
-    
-    theta.Wc_.array() -= gradient.Wc_.array() * eta;
-    theta.bc_.array() -= gradient.bc_.array() * eta;
-    
-    // projection onto L2 norm..
-    if (lambda_ != 0.0) {
-      const double norm = theta.squared_norm(true);
-      
-      if (norm > 1.0 / lambda_)
-	theta.rescale(std::sqrt(1.0 / lambda_) * std::sqrt(1.0 / norm), true);
-    }
-  }
-  
-  double lambda_;
-  double eta0_;
-  size_type epoch_;
-};
 
 typedef boost::filesystem::path path_type;
 
@@ -996,12 +853,8 @@ int main(int argc, char** argv)
     
     theta.embedding(words.begin(), words.end(), generator);
     
-    if (iteration > 0) {
-      if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, words, theta, generator);
-      else
-	learn_online(LearnL2(lambda, eta0), sentences, words, theta, generator);
-    }
+    if (iteration > 0)
+      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, words, theta, generator);
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -1190,7 +1043,7 @@ struct TaskAccumulate
       const sentence_type& sentence = sentences_[sentence_id];
       
       if (! sentence.empty()) {
-	std::pair<double, double> errors = ngram_(sentence, words_, theta_, gradient_, tanh(), dtanh(), generator);
+	std::pair<double, double> errors = ngram_(sentence, words_, theta_, gradient_, htanh(), dhtanh(), generator);
 	  
 	error_          += errors.first;
 	classification_ += errors.second;
