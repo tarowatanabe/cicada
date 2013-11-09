@@ -1461,7 +1461,7 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
-    size_t data_size = sentences.sizes();
+    size_t data_size = sentences.size();
     for (size_t i = 0; i != tasks.size(); ++ i)
       data_size += tasks[i].sentences_.size();
     
@@ -1512,7 +1512,7 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
-    size_t data_size = sentences.sizes();
+    size_t data_size = sentences.size();
     for (size_t i = 0; i != tasks.size(); ++ i)
       data_size += tasks[i].sentences_.size();
     
