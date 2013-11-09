@@ -125,14 +125,21 @@ public:
   
   void preprocess(weight_set_type& weights, const double& eta)
   {
-    penalty_ += eta * lambda_;
+    //penalty_ += eta * lambda_;
   }
 
   void update(weight_set_type& weights, const feature_type& feature, const double& amount, const double& eta)
   {
     double& x = weights[feature];
-    double& penalty = penalties_[feature];
+    //double& penalty = penalties_[feature];
     
+    // we use FOBOS, which is far simpler...
+    
+    const double f = x - eta * amount;
+    
+    x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - eta * lambda_);
+
+#if 0
     // update...
     x -= amount * eta;
     
@@ -145,6 +152,7 @@ public:
       x = std::min(0.0, x - penalty + penalty_);
     
     penalty += x - x_half;
+#endif
   }
 
   void postprocess(weight_set_type& weights, const double& eta)
@@ -194,16 +202,23 @@ public:
       std::fill(weights.begin(), weights.end(), 0.0);
     }
     
-    penalty_ += eta * lambda1_;
+    //penalty_ += eta * lambda1_;
   }
 
   void update(weight_set_type& weights, const feature_type& feature, const double& amount, const double& eta)
   {
-    weights[feature] -= amount * eta / scale_;
+    double& x = weights[feature];
+    
+    const double f = x * scale_ - eta * amount;
+    
+    x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - eta * lambda1_) / scale_;
+    
+    //weights[feature] -= amount * eta / scale_;
   }
   
   void postprocess(weight_set_type& weights, const double& eta)
   {
+#if 0
     typedef feature_type::id_type id_type;
     
     const double factor = 1.0 / scale_;
@@ -223,6 +238,7 @@ public:
 	
 	penalty += (x - x_half) * scale_;
       }
+#endif
 
     if (scale_ < 0.001 || 1000 < scale_)
       finalize(weights);
