@@ -627,19 +627,22 @@ struct NGram
   
   struct hinge
   {
+    // 50 for numerical stability...
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return std::max(x, Tp(0));
+      return std::min(std::max(x, Tp(0)), Tp(50));
     }
   };
   
   struct dhinge
   {
+    // 50 for numerical stability...
+    
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return x > Tp(0);
+      return Tp(0) < x && x < Tp(50);
     }
   };
   
