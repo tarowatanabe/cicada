@@ -674,6 +674,7 @@ lattice_main \
 lexicon_main \
 matcher_main \
 ngram_count_set_main \
+ngram_nn_main \
 ngram_pyp_main \
 optimize_qp_main \
 parameter_main \
@@ -748,6 +749,9 @@ matcher_main_LDADD = libcicada.la
 
 ngram_count_set_main_SOURCES = ngram_count_set_main.cpp
 ngram_count_set_main_LDADD = libcicada.la $(MSGPACK_LDFLAGS)
+
+ngram_nn_main_SOURCES = ngram_nn_main.cpp
+ngram_nn_main_LDADD = libcicada.la
 
 ngram_pyp_main_SOURCES = ngram_pyp_main.cpp
 ngram_pyp_main_LDADD = libcicada.la

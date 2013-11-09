@@ -211,7 +211,7 @@ namespace cicada
       
       if (! cache_.equal_to(pos, first, last)) {
 	const_cast<cache_type&>(cache_).assign(pos, first, last);
-	const_cast<cache_type&>(cache_)[pos] = logprob(first, last, &(*buffer_.begin(pos % (buffer_.size1() - 1))));
+	const_cast<cache_type&>(cache_)[pos] = logprob_buffer(first, last, const_cast<float*>(&(*buffer_.begin(pos % (buffer_.size1() - 1)))));
       }
       
       return cache_[pos];
