@@ -29,6 +29,7 @@
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_pyp.hpp"
+#include "feature/ngram_nn.hpp"
 #include "feature/ngram_tree.hpp"
 #include "feature/parent.hpp"
 #include "feature/penalty.hpp"
@@ -165,6 +166,17 @@ ngram: ngram language model\n\
 \tcoarse-populate=[true|false] \"populate\" by pre-fetching\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
 \tcoarse-approximate=[true|false] approximated upper-bound estimates\n\
+ngram-nn: neural network ngram language model\n\
+\tfile=<file>\n\
+\tpopulate=[true|false] \"populate\" by pre-fetching\n\
+\torder=<order>\n\
+\tname=feature-name(default: ngram-nn)\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tsplit-estimate=[true|false] split estimated ngram score\n\
+\tcoarse-order=<order> ngram order for coarse heuristic\n\
+\tcoarse-file=<file>   ngram for coarrse heuristic\n\
+\tcoarse-populate=[true|false] \"populate\" by pre-fetching\n\
 ngram-pyp: Pitman-Yor Process ngram language model\n\
 \tfile=<file>\n\
 \tpopulate=[true|false] \"populate\" by pre-fetching\n\
@@ -265,6 +277,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::NGram(parameter));
     else if (param_name == "kenlm")
       return feature::KenLMFactory().create(parameter);
+    else if (param_name == "ngram-nn")
+      return feature_function_ptr_type(new feature::NGramNN(parameter));
     else if (param_name == "ngram-pyp")
       return feature_function_ptr_type(new feature::NGramPYP(parameter));
     else if (param_name == "neighbours" || param_name == "neighbors")

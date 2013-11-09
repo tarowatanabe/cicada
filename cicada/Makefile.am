@@ -155,6 +155,7 @@ feature/lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
 feature/ngram_pyp.hpp \
+feature/ngram_nn.hpp \
 feature/ngram_tree.hpp \
 feature/parent.hpp \
 feature/penalty.hpp \
@@ -192,6 +193,7 @@ feature/lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_pyp.cpp \
+feature/ngram_nn.cpp \
 feature/ngram_tree.cpp \
 feature/parent.cpp \
 feature/penalty.cpp \
