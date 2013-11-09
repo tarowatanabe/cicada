@@ -53,6 +53,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/vector2.hpp"
 #include "utils/sampler.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
@@ -962,7 +963,7 @@ typedef utils::unordered_map<unigram_type::word_type, count_type,
 			     std::allocator<std::pair<const unigram_type::word_type, count_type> > >::type word_set_type;
 
 
-static const size_t DEBUG_DOT  = 10000;
+static const size_t DEBUG_DOT  = 100000;
 static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
@@ -1273,6 +1274,8 @@ void learn_online(const Learner& learner,
     size_type samples = 0;
     size_type words = 0;
     size_type num_text = 0;
+
+    utils::resource start;
     
     while (biter < biter_end) {
       // clear gradients...
@@ -1314,6 +1317,8 @@ void learn_online(const Learner& learner,
       // update model parameters
       learner(theta, tasks.front().gradient_);
     }
+
+    utils::resource end;
     
     if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
@@ -1323,6 +1328,11 @@ void learn_online(const Learner& learner,
 		<< "log_likelihood (per word): "     << (log_likelihood / words) << std::endl
 		<< "# of sentences: " << samples << std::endl
 		<< "# of words: " << words << std::endl;
+
+    if (debug)
+      std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
+		<< "user time:   " << end.user_time() - start.user_time() << std::endl
+		<< "thread time: " << end.thread_time() - start.thread_time() << std::endl;
     
     // shuffle bitexts!
     std::random_shuffle(ids.begin(), ids.end());
