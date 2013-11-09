@@ -1046,6 +1046,10 @@ int main(int argc, char** argv)
     word_set_type     words;
     
     read_data(input_file, list_file, sentences, words);
+
+    if (debug)
+      std::cerr << "# of sentences: " << sentences.size() << std::endl
+		<< "vocabulary: " << (words.size() - 1) << std::endl;
     
     unigram_type unigram(words.begin(), words.end());
     
@@ -1448,6 +1452,7 @@ void read_data(const path_type& input_file,
     
     if (! lines.empty())
       queue.push_swap(lines);
+    lines.clear();
     
     // termination
     for (size_t i = 0; i != tasks.size(); ++ i)
@@ -1456,6 +1461,12 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
+    size_t data_size = sentences.sizes();
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      data_size += tasks[i].sentences_.size();
+    
+    sentences.reserve(data_size);
+
     for (size_t i = 0; i != tasks.size(); ++ i) {
       sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
       
@@ -1501,6 +1512,12 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
+    size_t data_size = sentences.sizes();
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      data_size += tasks[i].sentences_.size();
+    
+    sentences.reserve(data_size);
+    
     for (size_t i = 0; i != tasks.size(); ++ i) {
       sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
       
