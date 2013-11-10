@@ -210,7 +210,7 @@ namespace cicada
       const size_type hash = hasher_type::operator()(first, last, 0);
       const size_type pos = hash & (cache_type::cache_size - 1);
       const size_type pos_cache = hash & (locks_.size() - 1);
-	
+      
       spinlock_type::lock_type lock(const_cast<spinlock_type&>(locks_[pos_cache]).mutex_);
 
       cache_type& cache = const_cast<cache_type&>(cache_[pos_cache]);
