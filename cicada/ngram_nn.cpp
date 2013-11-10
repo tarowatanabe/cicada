@@ -56,8 +56,10 @@ namespace cicada
     id_eps_ = vocab_[vocab_type::EPSILON];
     id_unk_ = vocab_[vocab_type::UNK];
     
-    buffer_ = buffer_type(16, dimension_embedding_ * (order_ - 1));
-    cache_ = cache_type(order_);
+    buffer_ = buffer_type(locks_.size(), dimension_embedding_ * (order_ - 1));
+    
+    for (size_type i = 0; i != cache_.size(); ++ i)
+      cache_[i] = cache_type(order_);
   }
   
   typedef utils::unordered_map<std::string, NGramNN, boost::hash<utils::piece>, std::equal_to<std::string>,

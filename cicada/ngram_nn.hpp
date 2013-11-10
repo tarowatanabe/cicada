@@ -44,7 +44,8 @@ namespace cicada
     typedef double             prob_type;
     
     typedef boost::filesystem::path   path_type;
-
+    
+    typedef utils::hashmurmur3<size_t> hasher_type;
 
   private:
     typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic>    tensor_type;
@@ -110,6 +111,7 @@ namespace cicada
     
     typedef utils::vector2<parameter_type, std::allocator<parameter_type> > buffer_type;
     typedef cicada::NGramCache<id_type, logprob_type>                       cache_type;
+    typedef utils::array_power2<cache_type, 16, std::allocator<cache_type> > cache_set_type;
     
   public:
     NGramNN() { clear(); }
@@ -205,16 +207,20 @@ namespace cicada
     template <typename Iterator>
     logprob_type logprob_dispatch(Iterator first, Iterator last, id_type) const
     {
-      const size_type pos = cache_(first, last);
+      const size_type hash = hasher_type::operator()(first, last, 0);
+      const size_type pos = hash & (cache_type::cache_size - 1);
+      const size_type pos_cache = hash & (locks_.size() - 1);
+	
+      spinlock_type::lock_type lock(const_cast<spinlock_type&>(locks_[pos_cache]).mutex_);
+
+      cache_type& cache = const_cast<cache_type&>(cache_[pos_cache]);
       
-      spinlock_type::lock_type lock(const_cast<spinlock_type&>(locks_[pos % (locks_.size() - 1)]).mutex_);
-      
-      if (! cache_.equal_to(pos, first, last)) {
-	const_cast<cache_type&>(cache_).assign(pos, first, last);
-	const_cast<cache_type&>(cache_)[pos] = logprob_buffer(first, last, const_cast<float*>(&(*buffer_.begin(pos % (buffer_.size1() - 1)))));
+      if (! cache.equal_to(pos, first, last)) {
+	cache.assign(pos, first, last);
+	cache[pos] = logprob_buffer(first, last, const_cast<float*>(&(*buffer_.begin(pos_cache))));
       }
       
-      return cache_[pos];
+      return cache[pos];
     }
 
     struct hinge
@@ -283,7 +289,7 @@ namespace cicada
     path_type path_;
     
     buffer_type       buffer_;
-    cache_type        cache_;
+    cache_set_type    cache_;
     spinlock_set_type locks_;
   };
 };
