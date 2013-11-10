@@ -1332,8 +1332,7 @@ void learn_online(const Learner& learner,
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
-		<< "user time:   " << end.user_time() - start.user_time() << std::endl
-		<< "thread time: " << end.thread_time() - start.thread_time() << std::endl;
+		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
     // shuffle bitexts!
     std::random_shuffle(ids.begin(), ids.end());
