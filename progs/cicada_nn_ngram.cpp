@@ -982,6 +982,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 int samples = 100;
+int cutoff = 1;
 double lambda = 1e-5;
 double eta0 = 1;
 
@@ -1539,6 +1540,32 @@ void read_data(const path_type& input_file,
 	words[witer->first] += witer->second;
     }
   }
+  
+  if (cutoff > 1) {
+    word_set_type words_new;
+    count_type count_unk = 0;
+    
+    word_set_type::const_iterator witer_end = words.end();
+    for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer)
+      if (witer->second >= cutoff)
+	words_new.insert(*witer);
+      else
+	count_unk += witer->second;
+    
+    words_new[vocab_type::UNK] = count_unk;
+    words_new.swap(words);
+    words_new.clear();
+    
+    // enumerate sentences and replace by UNK
+    
+    sentence_set_type::iterator siter_end = sentences.end();
+    for (sentence_set_type::iterator siter = sentences.begin(); siter != siter_end; ++ siter) {
+      sentence_type::iterator iter_end = siter->end();
+      for (sentence_type::iterator iter = siter->begin(); iter != iter_end; ++ iter)
+	if (words.find(*iter) == words.end())
+	  *iter = vocab_type::UNK;
+    }
+  }
 }
 
 void options(int argc, char** argv)
@@ -1562,6 +1589,7 @@ void options(int argc, char** argv)
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
     ("samples",           po::value<int>(&samples)->default_value(samples),       "# of NCE samples")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
