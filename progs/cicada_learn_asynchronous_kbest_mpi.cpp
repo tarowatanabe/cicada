@@ -144,7 +144,6 @@ bool rate_adagrad = false;
 bool rda_mode = false;
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
-bool project_weight = false;
 bool merge_oracle_mode = false;
 int merge_history = 0;
 bool mix_none_mode = false;
@@ -1831,7 +1830,6 @@ void options(int argc, char** argv)
 
     ("loss-rank",           po::bool_switch(&loss_rank),            "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),       "softmax margin")
-    ("project-weight",      po::bool_switch(&project_weight),       "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
     ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")

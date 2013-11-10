@@ -148,7 +148,6 @@ bool rate_adagrad = false;
 bool rda_mode = false;
 bool loss_rank = false; // loss by rank
 bool softmax_margin = false;
-bool project_weight = false;
 bool merge_oracle_mode = false;
 bool mert_search_mode = false;    // perform MERT search
 int  mix_kbest_features = 0;
@@ -1719,7 +1718,6 @@ void options(int argc, char** argv)
 
     ("loss-rank",           po::bool_switch(&loss_rank),          "rank loss")
     ("softmax-margin",      po::bool_switch(&softmax_margin),     "softmax margin")
-    ("project-weight",      po::bool_switch(&project_weight),     "project L2 weight")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),  "merge oracle forests")
     ("mert-search",         po::bool_switch(&mert_search_mode),   "perform mert search")
     ("mix-kbest-features",  po::value<int>(&mix_kbest_features),  "mix k-best features")
