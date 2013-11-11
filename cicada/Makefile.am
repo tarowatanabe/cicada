@@ -445,6 +445,7 @@ binarize_cyk.hpp \
 binarize_dependency.hpp \
 binarize_left.hpp \
 binarize_right.hpp \
+bitext.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
 compose.hpp \
@@ -552,7 +553,6 @@ rule.hpp \
 sample.hpp \
 sample_uniform.hpp \
 semiring.hpp \
-sentence.hpp \
 sentence_vector.hpp \
 signature.hpp \
 sort.hpp \
