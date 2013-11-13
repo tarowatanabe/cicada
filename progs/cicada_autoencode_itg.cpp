@@ -2880,10 +2880,10 @@ struct TaskAccumulate
 		    << "target: " << target << std::endl;
       }
       
-      counter_.increment();
-      
       queue_derivation_.push(bitext_derivation);
       queue_alignment_.push(bitext_derivation);
+
+      counter_.increment();
     }
   }
 

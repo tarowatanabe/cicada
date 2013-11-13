@@ -461,6 +461,9 @@ cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp cicada_maxlike_impl.hpp cic
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
+#cicada_nn_alignment_SOURCES = cicada_nn_alignment.cpp
+#cicada_nn_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp
 cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 

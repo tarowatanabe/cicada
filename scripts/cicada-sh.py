@@ -178,6 +178,7 @@ class QSUB:
         
 class PBS:
     def __init__(self, queue=""):
+        self.workers = []
         self.queue = queue
 
     def wait(self):
