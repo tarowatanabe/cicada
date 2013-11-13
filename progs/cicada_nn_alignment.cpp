@@ -81,7 +81,7 @@ struct Gradient
   Gradient() : embedding_(0), hidden_(0), alignment_(0) {}
   Gradient(const size_type& embedding,
 	   const size_type& hidden,
-	   const int alignemnt) 
+	   const int alignment) 
     : embedding_(embedding),
       hidden_(hidden),
       alignment_(alignment)
@@ -188,7 +188,7 @@ struct Gradient
     ba_ += x.ba_;
 
     Wn_ += x.Wn_;
-    bn_ += x.n_;
+    bn_ += x.bn_;
     
     Wi_ += x.Wi_;
 
@@ -252,7 +252,7 @@ struct Gradient
     Wt_ = tensor_type::Zero(embedding_, hidden_ + embedding_);
     bt_ = tensor_type::Zero(embedding_, 1);
     
-    Wa_ = tensor_type::Zero(hidden_ * (alignemnt * 2 + 1), hidden_ + embedding_);
+    Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), hidden_ + embedding_);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
 
     Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
@@ -480,7 +480,7 @@ struct Model
   // dimension...
   size_type embedding_;
   size_type hidden_;
-  int       alignemnt_;
+  int       alignment_;
   
   // embedding
   tensor_type source_;
@@ -588,6 +588,8 @@ struct HMM
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type    tensor_type;
 
+  typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> back_type;
+
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
   typedef cicada::Bitext    bitext_type;
@@ -623,6 +625,27 @@ struct HMM
   
   gradient_embedding_type gradient_embedding_;
   
+  struct hinge
+  {
+    // 50 for numerical stability...
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return std::min(std::max(x, Tp(0)), Tp(50));
+    }
+  };
+  
+  struct dhinge
+  {
+    // 50 for numerical stability...
+    
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(0) < x && x < Tp(50);
+    }
+  };
+
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta)
@@ -650,7 +673,7 @@ struct HMM
     alpha_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
     accu_(0, 0) = 0.0;
 
-    layer_alpha0_.block(0, 0, theta.embedding_, 1) = theta_.source_.col(vocab_type::NONE.id());
+    layer_alpha0_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
     
     for (size_type trg = 1; trg != target_size + 2; ++ trg) {
       const word_type target_next = (trg == 0
@@ -667,9 +690,9 @@ struct HMM
       const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 2 - 1);
       
       const size_type prev2_first = source_size + 2 + (source_size + 2 - 1) * (trg == 1);
-      const size_type prev2_last  = soruce_size + 2 + source_size + 2 - 1;
+      const size_type prev2_last  = source_size + 2 + source_size + 2 - 1;
       
-      const size_type none_first = utils::bithack::branch(trg == target_size + 1, source_size + 2 - 1, 0);
+      const size_type none_first = utils::bithack::branch(trg == target_size + 1, source_size + 2 - 1, size_type(0));
       const size_type none_last  = source_size + 2 - 1;
       
       // alignment into aligned...
@@ -680,7 +703,7 @@ struct HMM
 					  ? vocab_type::EOS
 					  : source[next - 1]));
 	
-	layer_alpha_.block(0, 0, theta.embedding_, 1) = theta_.source_.col(source_next.id());
+	layer_alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
 
 	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) {
 	  const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
@@ -710,15 +733,15 @@ struct HMM
 	}
 	
 	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2) {
-	  const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next) + source_size + 2
-									   - difference_type(prev1))
-									  + theta.alignment_,
+	  const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next + source_size + 2)
+									   - difference_type(prev2))
+									  + difference_type(theta.alignment_),
 									  difference_type(0)),
 						      difference_type(theta.alignment_ * 2));
 	  
 	  layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
 	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-	       * alpha_.block(state_size * prev1, trg - 1, state_size, 1)
+	       * alpha_.block(state_size * prev2, trg - 1, state_size, 1)
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	  
 	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
@@ -801,7 +824,7 @@ struct HMM
     alignment.clear();
     
     size_type src = source_size + 1;
-    for (difference_type trg = target_size + 1; trg > 0; -- trg) {
+    for (size_type trg = target_size + 1; trg > 0; -- trg) {
       const size_type src_prev = back_(src, trg);
       
       log_likelihood += backward(source, target, theta, gradient, gen,
@@ -817,7 +840,7 @@ struct HMM
     
     // propabate delta_beta_ to BOS and Wi_;
     gradient.source(vocab_type::BOS) += delta_beta_.block(0, 0, theta.embedding_, 1);
-    Wi_ += delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1);
+    gradient.Wi_ += delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1);
     
     return log_likelihood;
   }
@@ -827,7 +850,6 @@ struct HMM
 		  const sentence_type& target,
 		  const model_type& theta,
 		  gradient_type& gradient,
-		  alignment_type& alignment,
 		  Gen& gen,
 		  const size_type target_pos,
 		  const size_type source_pos,
@@ -838,7 +860,7 @@ struct HMM
     
     const size_type state_size = theta.embedding_ + theta.hidden_;
     
-    const bool is_none = (souorce_pos >= source_size + 2);
+    const bool is_none = (source_pos >= source_size + 2);
     
     // compute the error at the EOS...
     const word_type word_source(is_none
@@ -878,7 +900,7 @@ struct HMM
 				 1).array().unaryExpr(dhinge())
 		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
     
-    for (size_type k = 0; k != samples; ++ k) {
+    for (size_type k = 0; k != samples_; ++ k) {
       const word_type word_target = target_.draw(gen);
       
       const double score = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose()
@@ -932,14 +954,14 @@ struct HMM
       
       const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(source_pos)
 								       - (difference_type(source_prev)
-									  - utils::bithack::branch(source_prev >= source_size + 2,
-												   source_size + 2,
-												   size_type(0))))
-								      + theta.alignment_,
+									  - difference_type(utils::bithack::branch(source_prev >= source_size + 2,
+														   source_size + 2,
+														   size_type(0)))))
+								      + difference_type(theta.alignment_),
 								      difference_type(0)),
 						  difference_type(theta.alignment_ * 2));
       
-      egradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
+      gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 	+= delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose();
       gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
 	+= delta_alpha_;
@@ -948,7 +970,7 @@ struct HMM
       delta_beta_ = theta.Wn_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose() * delta_alpha_;
     }
     
-    return log_likelihoo;
+    return log_likelihood;
   }
 };
 
@@ -1190,6 +1212,8 @@ int cutoff = 2;
 double lambda = 1e-5;
 double eta0 = 1;
 
+bool dump_mode = false;
+
 int threads = 2;
 
 int debug = 0;
@@ -1204,8 +1228,8 @@ void learn_online(const Learner& learner,
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
 	       bitext_set_type& bitexts,
-	       unigram_type& sources,
-	       unigram_type& targets);
+	       word_set_type& sources,
+	       word_set_type& targets);
 
 void options(int argc, char** argv);
 
@@ -1404,7 +1428,7 @@ struct OutputAlignment : OutputMapReduce
 	if (bitext.id_ == size_type(-1)) break;
 
 	if (bitext.id_ == id) {
-	  os << bitext.alignemnt_ << '\n';
+	  os << bitext.alignment_ << '\n';
 	  ++ id;
 	} else
 	  bitexts.insert(bitext);
@@ -1450,7 +1474,7 @@ struct TaskAccumulate
   
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
 
-  typedef output_map_reduce_type::queu_type queue_alignment_type;
+  typedef output_map_reduce_type::queue_type queue_alignment_type;
   typedef output_map_reduce_type::value_type bitext_alignment_type;
   
   struct Counter
@@ -1492,8 +1516,8 @@ struct TaskAccumulate
 		 const model_type& theta_source_target,
 		 const model_type& theta_target_source,
 		 queue_type& queue,
-		 queue_type& queue_source_target,
-		 queue_type& queue_target_source,
+		 queue_alignment_type& queue_source_target,
+		 queue_alignment_type& queue_target_source,
 		 counter_type& counter)
     : bitexts_(bitexts),
       theta_source_target_(theta_source_target),
@@ -1504,11 +1528,11 @@ struct TaskAccumulate
       counter_(counter),
       hmm_source_target_(sources, targets, samples),
       hmm_target_source_(targets, sources, samples),
-      gradient_source_target_(theta_source_target.dimension_embedding_,
-			      theta_source_target.dimension_hidden_,
+      gradient_source_target_(theta_source_target.embedding_,
+			      theta_source_target.hidden_,
 			      theta_source_target.alignment_),
-      gradient_target_source_(theta_target_source.dimension_embedding_,
-			      theta_target_source.dimension_hidden_,
+      gradient_target_source_(theta_target_source.embedding_,
+			      theta_target_source.hidden_,
 			      theta_target_source.alignment_),
       log_likelihood_source_target_(0),
       log_likelihood_target_source_(0) {}
@@ -1533,7 +1557,7 @@ struct TaskAccumulate
       
       bitext_source_target.bitext_.source_ = bitext.source_;
       bitext_source_target.bitext_.target_ = bitext.target_;
-      bitext_source_target.alignemnt_.clear();
+      bitext_source_target.alignment_.clear();
       
       bitext_target_source.bitext_.source_ = bitext.target_;
       bitext_target_source.bitext_.target_ = bitext.source_;
@@ -1571,7 +1595,8 @@ struct TaskAccumulate
 
   void clear()
   {
-    gradient_.clear();
+    gradient_source_target_.clear();
+    gradient_target_source_.clear();
     log_likelihood_source_target_ = 0;
     log_likelihood_target_source_ = 0;
   }
@@ -1651,7 +1676,7 @@ void learn_online(const Learner& learner,
 					 theta_source_target,
 					 theta_target_source,
 					 mapper,
-					 queue_source_taget,
+					 queue_source_target,
 					 queue_target_source,
 					 reducer));
   
@@ -1770,7 +1795,8 @@ void learn_online(const Learner& learner,
   workers.join_all();
 
   // finalize model...
-  theta.finalize();
+  theta_source_target.finalize();
+  theta_target_source.finalize();
 }
 
 
@@ -1780,6 +1806,8 @@ void read_data(const path_type& source_file,
 	       word_set_type& sources,
 	       word_set_type& targets)
 {
+  typedef cicada::Vocab vocab_type;
+
   bitexts.clear();
   sources.clear();
   targets.clear();
@@ -1843,14 +1871,14 @@ void read_data(const path_type& source_file,
     bitext_set_type::iterator biter_end = bitexts.end();
     for (bitext_set_type::iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
       
-      sentence_type::const_iterator siter_end = biter->source_.end();
-      for (sentence_type::const_iterator siter = biter->source_.begin(); siter != siter_end; ++ siter)
-	if (sources.find(*suter) == sources.end())
+      sentence_type::iterator siter_end = biter->source_.end();
+      for (sentence_type::iterator siter = biter->source_.begin(); siter != siter_end; ++ siter)
+	if (sources.find(*siter) == sources.end())
 	  *siter = vocab_type::UNK;
       
-      sentence_type::const_iterator titer_end = biter->target_.end();
-      for (sentence_type::const_iterator titer = biter->target_.begin(); titer != titer_end; ++ titer)
-	if (targets.find(*suter) == targets.end())
+      sentence_type::iterator titer_end = biter->target_.end();
+      for (sentence_type::iterator titer = biter->target_.begin(); titer != titer_end; ++ titer)
+	if (targets.find(*titer) == targets.end())
 	  *titer = vocab_type::UNK;
     }
   }
@@ -1873,7 +1901,7 @@ void options(int argc, char** argv)
     
     ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
-    ("alignment",           po::value<int>(&alignment)->default_value(alignemnt),                     "alignment model size")
+    ("alignment",           po::value<int>(&alignment)->default_value(alignment),                     "alignment model size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
@@ -1884,7 +1912,9 @@ void options(int argc, char** argv)
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
-
+    
+    ("dump", po::bool_switch(&dump_mode), "dump intermediate alignments")
+    
     ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
