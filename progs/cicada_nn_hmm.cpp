@@ -3,13 +3,9 @@
 //
 
 //
-// an implementation for neural network alignment model
-//
-// we will try four learning algorithms:
-//
-// SGD with L2 regularizer inspired by AdaGrad (default)
-//
-// an implementation of NCE estimate for hiden markov alignment model...
+// an implementation for neural network alignment model with NCE estimate...
+// 
+// we will try SGD with L2 regularizer inspired by AdaGrad (default)
 //
 
 #include <cstdlib>
@@ -280,6 +276,49 @@ struct Gradient
   tensor_type bn_;
 
   tensor_type Wi_;
+};
+
+struct Embedding
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef float parameter_type;
+  typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
+
+  typedef cicada::Symbol    word_type;
+  
+  typedef Gradient gradient_type;
+
+  Embedding(const size_type& embedding) : embedding_(embedding) { initialize(embedding); }
+
+  void initialize(const size_type& embedding)
+  {
+    embedding_ = embedding;
+    
+    const size_type vocabulary_size = word_type::allocated();
+    
+    source_ = tensor_type::Zero(embedding_,     vocabulary_size);
+    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size);
+  }
+
+  void assign(const gradient_type& x)
+  {
+    typedef gradient_type::embedding_type gradient_embedding_type;
+
+    gradient_embedding_type::const_iterator siter_end = x.source_.end();
+    for (gradient_embedding_type::const_iterator siter = x.source_.begin(); siter != siter_end; ++ siter)
+      source_.col(siter->first.id()) = siter->second;
+    
+    gradient_embedding_type::const_iterator titer_end = x.target_.end();
+    for (gradient_embedding_type::const_iterator titer = x.target_.begin(); titer != titer_end; ++ titer)
+      target_.col(titer->first.id()) = titer->second;
+  }
+  
+  size_type embedding_;
+  
+  tensor_type source_;
+  tensor_type target_;
 };
 
 struct Model
@@ -596,9 +635,6 @@ struct HMM
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
   
-  typedef std::vector<tensor_type*, std::allocator<tensor_type*> > gradient_embedding_type;
-  
-  
   HMM(const unigram_type& source,
       const unigram_type& target,
       const size_type samples)
@@ -622,8 +658,6 @@ struct HMM
   tensor_type delta_beta_;
   tensor_type delta_alpha_;
   tensor_type delta_trans_;
-  
-  gradient_embedding_type gradient_embedding_;
   
   struct hinge
   {
@@ -656,6 +690,12 @@ struct HMM
     const size_type state_size = theta.embedding_ + theta.hidden_;
 
     const parameter_type zero = - std::numeric_limits<parameter_type>::infinity();
+#if 0
+    std::cerr << "forward source: " << source << std::endl
+	      << "forward taregt: " << target << std::endl;
+#endif
+    
+    //std::cerr << "source size: " << source_size << " target size: " << target_size << std::endl;
     
     alpha_.resize((source_size + 2) * 2 * state_size, target_size + 2);
     trans_.resize((source_size + 2) * 2 * theta.embedding_, target_size + 2);
@@ -673,6 +713,11 @@ struct HMM
     alpha_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
     accu_(0, 0) = 0.0;
 
+    if (! layer_alpha0_.cols())
+      layer_alpha0_ = tensor_type(state_size, 1);
+    if (! layer_alpha_.cols())
+      layer_alpha_ = tensor_type(state_size, 1);
+
     layer_alpha0_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
     
     for (size_type trg = 1; trg != target_size + 2; ++ trg) {
@@ -681,19 +726,27 @@ struct HMM
 				     : (trg == target_size + 1
 					? vocab_type::EOS
 					: target[trg - 1]));
-      
+
       // for EOS, we need to match with EOS, otherwise, do not match..
       const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
       const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
       
       const size_type prev1_first = utils::bithack::branch(trg == 1, 0, 1);
-      const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 2 - 1);
+      const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
       
-      const size_type prev2_first = source_size + 2 + (source_size + 2 - 1) * (trg == 1);
-      const size_type prev2_last  = source_size + 2 + source_size + 2 - 1;
+      const size_type prev2_first = source_size + 2 + (source_size + 1) * (trg == 1);
+      const size_type prev2_last  = source_size + 2 + source_size + 1;
       
-      const size_type none_first = utils::bithack::branch(trg == target_size + 1, source_size + 2 - 1, size_type(0));
-      const size_type none_last  = source_size + 2 - 1;
+      const size_type none_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(0));
+      const size_type none_last  = source_size + 1;
+
+#if 0
+      std::cerr << "target pos: " << trg << " word: " << target_next 
+		<< " next: [" << next_first << ", " << next_last << ")"
+		<< " prev1: [" << prev1_first << ", " << prev1_last << ")"
+		<< " prev2: [" << prev2_first << ", " << prev2_last << ")"
+		<< " none: [" << none_first << ", " << none_last << ")" << std::endl;
+#endif
       
       // alignment into aligned...
       for (size_type next = next_first; next != next_last; ++ next) {
@@ -702,66 +755,72 @@ struct HMM
 				       : (next == source_size + 1
 					  ? vocab_type::EOS
 					  : source[next - 1]));
+
+	//std::cerr << "source next: " << next << " word: " << source_next << std::endl;
 	
 	layer_alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
 
-	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) {
-	  const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
-									   - difference_type(prev1))
-									  + theta.alignment_,
-									  difference_type(0)),
-						      difference_type(theta.alignment_ * 2));
-	  
-	  layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-	       * alpha_.block(state_size * prev1, trg - 1, state_size, 1)
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
-	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
-	  
-	  const parameter_type score
-	    = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-	       + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	  
-	  if (score + accu_(prev1, trg - 1) > accu_(next, trg)) {
-	    alpha_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	    trans_.block(theta.embedding_ * next, trg, theta.embedding_, 1) = layer_trans_;
-	    back_(next, trg) = prev1;
-	    accu_(next, trg) = score + accu_(prev1, trg - 1);
-	    score_(next, trg) = score;
+	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
+	  if (accu_(prev1, trg - 1) > zero) {
+	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
+									     - difference_type(prev1))
+									    + theta.alignment_,
+									    difference_type(0)),
+							difference_type(theta.alignment_ * 2));
+	    
+	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
+	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
+		 * alpha_.block(state_size * prev1, trg - 1, state_size, 1)
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
+	    
+	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
+	    
+	    const parameter_type score
+	      = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+		 + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	    
+	    if (score + accu_(prev1, trg - 1) > accu_(next, trg)) {
+	      alpha_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
+	      trans_.block(theta.embedding_ * next, trg, theta.embedding_, 1) = layer_trans_;
+	      back_(next, trg) = prev1;
+	      accu_(next, trg) = score + accu_(prev1, trg - 1);
+	      score_(next, trg) = score;
+	    }
 	  }
-	}
 	
-	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2) {
-	  const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next + source_size + 2)
-									   - difference_type(prev2))
-									  + difference_type(theta.alignment_),
-									  difference_type(0)),
-						      difference_type(theta.alignment_ * 2));
-	  
-	  layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-	       * alpha_.block(state_size * prev2, trg - 1, state_size, 1)
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
-	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
-	  
-	  const parameter_type score
-	    = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-	       + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	  
-	  if (score + accu_(prev2, trg - 1) > accu_(next, trg)) {
-	    alpha_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	    trans_.block(theta.embedding_ * next, trg, theta.embedding_, 1) = layer_trans_;
-	    back_(next, trg) = prev2;
-	    accu_(next, trg) = score + accu_(prev2, trg - 1);
-	    score_(next, trg) = score;
+	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2) 
+	  if (accu_(prev2, trg - 1) > zero) {
+	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next + source_size + 2)
+									     - difference_type(prev2))
+									    + difference_type(theta.alignment_),
+									    difference_type(0)),
+							difference_type(theta.alignment_ * 2));
+	    
+	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
+	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
+		 * alpha_.block(state_size * prev2, trg - 1, state_size, 1)
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
+	    
+	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
+	    
+	    const parameter_type score
+	      = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+		 + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	    
+	    if (score + accu_(prev2, trg - 1) > accu_(next, trg)) {
+	      alpha_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
+	      trans_.block(theta.embedding_ * next, trg, theta.embedding_, 1) = layer_trans_;
+	      back_(next, trg) = prev2;
+	      accu_(next, trg) = score + accu_(prev2, trg - 1);
+	      score_(next, trg) = score;
+	    }
 	  }
-	}
       }
       
       // alingment into none..
       for (size_type none = none_first; none != none_last; ++ none) {
+	//std::cerr << "source none: " << none << std::endl;
+	
 	const size_type next  = none + source_size + 2;
 	const size_type prev1 = none;
 	const size_type prev2 = none + source_size + 2;
@@ -815,13 +874,25 @@ struct HMM
 		  alignment_type& alignment,
 		  Gen& gen)
   {
+#if 0
+    std::cerr << "backward source: " << source << std::endl
+	      << "backward taregt: " << target << std::endl;
+#endif
+    
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    const size_type state_size = theta.embedding_ + theta.hidden_;
 
     double log_likelihood = 0.0;
     
     // one-to-many alignment...
     alignment.clear();
+
+    if (! delta_beta_.cols())
+      delta_beta_ = tensor_type(state_size, 1);
+
+    delta_beta_.setZero();
     
     size_type src = source_size + 1;
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
@@ -832,7 +903,7 @@ struct HMM
 				 src,
 				 src_prev);
       
-      if (trg > 0 && trg <= target_size && src < source_size + 2)
+      if (trg && trg <= target_size && src && src <= source_size)
 	alignment.push_back(std::make_pair(src - 1, trg - 1));
       
       src = src_prev;
@@ -876,6 +947,13 @@ struct HMM
 				   ? vocab_type::EOS
 				   : target[target_pos - 1]));
     
+#if 0
+    std::cerr << "source: " << source_pos << " word: " << word_source << std::endl
+	      << "target: " << target_pos << " word: " << word_target << std::endl;
+#endif
+    
+    double log_likelihood = 0;
+    
     const double score = score_(source_pos, target_pos);
     const double score_noise = log_samples_ + target_.logprob(word_target);
     const double z = utils::mathop::logsum(score, score_noise);
@@ -884,7 +962,9 @@ struct HMM
     
     // we suffer loss...
     const double loss = - 1.0 + std::exp(logprob);
-    double log_likelihood = logprob;
+    log_likelihood += logprob;
+    
+    //std::cerr << "target: " << word_target << " logprob: " << logprob << " noise: " << logprob_noise << std::endl;
     
     tensor_type& dembedding = gradient.target(word_target);
     
@@ -914,6 +994,8 @@ struct HMM
       const double logprob = score - z;
       const double logprob_noise = score_noise - z;
       
+      //std::cerr << "NCE target: " << word_target << " logprob: " << logprob << " noise: " << logprob_noise << std::endl;
+      
       const double loss = std::exp(logprob);
       log_likelihood += logprob_noise;
       
@@ -938,36 +1020,42 @@ struct HMM
     delta_alpha_ = (alpha_.block(state_size * source_pos, target_pos, state_size, 1).array().unaryExpr(dhinge())
 		    * (delta_beta_ // propagate backward!
 		       + theta.Wt_.transpose() * delta_trans_).array());
-    
+
     if (is_none) {
       // word embedding...
       gradient.source(vocab_type::NONE) += delta_alpha_.block(0, 0, theta.embedding_, 1);
 
-      gradient.Wn_ += delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose();
-      gradient.bn_ += delta_alpha_;
+      gradient.Wn_ += (delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
+		       * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose());
+      gradient.bn_ += delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1);
       
       // this will be propagated backward!
-      delta_beta_ = theta.Wn_.transpose() * delta_alpha_;
+      delta_beta_ = (theta.Wn_.transpose()
+		     * delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1));
     } else {
       // accumulate for word embedding
       gradient.source(word_source) += delta_alpha_.block(0, 0, theta.embedding_, 1);
       
-      const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(source_pos)
-								       - (difference_type(source_prev)
-									  - difference_type(utils::bithack::branch(source_prev >= source_size + 2,
-														   source_size + 2,
-														   size_type(0)))))
+      const size_type shift = utils::bithack::min(utils::bithack::max(difference_type(source_pos)
+								      - difference_type(source_prev
+											- utils::bithack::branch(source_prev >= source_size + 2,
+														 source_size + 2,
+														 size_type(0)))
 								      + difference_type(theta.alignment_),
 								      difference_type(0)),
 						  difference_type(theta.alignment_ * 2));
-      
+
+      //std::cerr << "shift: " << shift << std::endl;
+
       gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-	+= delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose();
+	+= (delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
+	    * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose());
       gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
-	+= delta_alpha_;
+	+= delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1);
       
       // this will be propagated backward!
-      delta_beta_ = theta.Wn_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose() * delta_alpha_;
+      delta_beta_ = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose()
+		     * delta_alpha_.block(theta.embedding_, 0, theta.hidden_, 1));
     }
     
     return log_likelihood;
@@ -980,8 +1068,9 @@ struct LearnAdaGrad
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  typedef Model    model_type;
-  typedef Gradient gradient_type;
+  typedef Model     model_type;
+  typedef Gradient  gradient_type;
+  typedef Embedding embedding_type;
 
   typedef cicada::Symbol   word_type;
   
@@ -991,14 +1080,19 @@ struct LearnAdaGrad
 	       const size_type& hidden,
 	       const int alignment,
 	       const double& lambda,
+	       const double& lambda2,
 	       const double& eta0)
     : embedding_(embedding),
       hidden_(hidden),
       alignment_(alignment),
       lambda_(lambda),
+      lambda2_(lambda2),
       eta0_(eta0)
   {
     if (lambda_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+
+    if (lambda2_ < 0.0)
       throw std::runtime_error("invalid regularization");
     
     if (eta0_ <= 0.0)
@@ -1021,26 +1115,28 @@ struct LearnAdaGrad
     Wi_ = tensor_type::Zero(hidden_, 1);
   }
   
-  void operator()(model_type& theta, const gradient_type& gradient) const
+  void operator()(model_type& theta,
+		  const gradient_type& gradient,
+		  const embedding_type& embedding) const
   {
-    typedef gradient_type::embedding_type embedding_type;
+    typedef gradient_type::embedding_type gradient_embedding_type;
 
-    embedding_type::const_iterator siter_end = gradient.source_.end();
-    for (embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
+    gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
+    for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
       update(siter->first,
 	     theta.source_,
 	     const_cast<tensor_type&>(source_),
 	     siter->second,
-	     lambda_ != 0.0,
+	     embedding.target_.col(siter->first.id()),
 	     false);
     
-    embedding_type::const_iterator titer_end = gradient.target_.end();
-    for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
+    gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
+    for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first,
 	     theta.target_,
 	     const_cast<tensor_type&>(target_),
 	     titer->second,
-	     lambda_ != 0.0,
+	     embedding.source_.col(titer->first.id()),
 	     true);
     
     update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, lambda_ != 0.0);
@@ -1115,36 +1211,31 @@ struct LearnAdaGrad
     }
   }
 
-  template <typename Theta, typename GradVar, typename Grad>
+  template <typename Theta, typename GradVar, typename Grad, typename GradCross>
   void update(const word_type& word,
 	      Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
-	      const bool regularize=true,
+	      const Eigen::MatrixBase<GradCross>& c,
 	      const bool bias_last=false) const
   {
-    if (regularize) {
-      for (int row = 0; row != g.rows() - bias_last; ++ row) 
-	if (g(row, 0) != 0) {
-	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
-	  
-	  const double rate = eta0_ / std::sqrt(G(row, word.id()));
-	  const double f = theta(row, word.id()) - rate * g(row, 0);
-	  
-	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
-	}
-      
-      if (bias_last) {
-	const int row = g.rows() - 1;
+    for (int row = 0; row != g.rows() - bias_last; ++ row) 
+      if (g(row, 0) != 0) {
+	G(row, word.id()) +=  g(row, 0) * g(row, 0);
 	
-	if (g(row, 0) != 0) {
-	  G(row, word.id()) += g(row, 0) * g(row, 0);
-	  theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
-	}
+	const double rate = eta0_ / std::sqrt(G(row, word.id()));
+	const double f = theta(row, word.id()) - rate * g(row, 0);
+	
+	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
       }
-    } else {
-      G.col(word.id()).array() += g.array().square();
-      theta.col(word.id()).array() -= eta0_ * g.array() * G.col(word.id()).array().unaryExpr(learning_rate());
+    
+    if (bias_last) {
+      const int row = g.rows() - 1;
+      
+      if (g(row, 0) != 0) {
+	G(row, word.id()) += g(row, 0) * g(row, 0);
+	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+      }
     }
   }
   
@@ -1153,6 +1244,7 @@ struct LearnAdaGrad
   int       alignment_;
   
   double lambda_;
+  double lambda2_;
   double eta0_;
   
   // embedding
@@ -1210,6 +1302,7 @@ int batch_size = 128;
 int samples = 100;
 int cutoff = 2;
 double lambda = 1e-5;
+double lambda2 = 1e-2;
 double eta0 = 1;
 
 bool dump_mode = false;
@@ -1294,7 +1387,7 @@ int main(int argc, char** argv)
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, generator);
     
     if (iteration > 0)
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, eta0),
+      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
 		   bitexts,
 		   unigram_sources,
 		   unigram_targets,
@@ -1555,10 +1648,12 @@ struct TaskAccumulate
       
       const bitext_type& bitext = bitexts_[sentence_id];
       
+      bitext_source_target.id_ = sentence_id;
       bitext_source_target.bitext_.source_ = bitext.source_;
       bitext_source_target.bitext_.target_ = bitext.target_;
       bitext_source_target.alignment_.clear();
       
+      bitext_target_source.id_ = sentence_id;
       bitext_target_source.bitext_.source_ = bitext.target_;
       bitext_target_source.bitext_.target_ = bitext.source_;
       bitext_target_source.alignment_.clear();
@@ -1668,6 +1763,12 @@ void learn_online(const Learner& learner,
   
   output_map_reduce_type::queue_type queue_source_target;
   output_map_reduce_type::queue_type queue_target_source;
+
+  Learner learner_source_target = learner;
+  Learner learner_target_source = learner;
+
+  Embedding embedding_source_target(theta_source_target.embedding_);
+  Embedding embedding_target_source(theta_target_source.embedding_);
   
   task_set_type tasks(threads, task_type(bitexts,
 					 sources,
@@ -1757,10 +1858,13 @@ void learn_online(const Learner& learner,
 	log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
 	log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
       }
+
+      embedding_source_target.assign(tasks.front().gradient_source_target_);
+      embedding_target_source.assign(tasks.front().gradient_target_source_);
       
       // update model parameters
-      learner(theta_source_target, tasks.front().gradient_source_target_);
-      learner(theta_target_source, tasks.front().gradient_target_source_);
+      learner_source_target(theta_source_target, tasks.front().gradient_source_target_, embedding_target_source);
+      learner_target_source(theta_target_source, tasks.front().gradient_target_source_, embedding_source_target);
     }
     
     utils::resource end;
@@ -1774,7 +1878,7 @@ void learn_online(const Learner& learner,
     if (debug)
       std::cerr << "log_likelihood P(target | source) (per sentence): " << (log_likelihood_source_target / samples) << std::endl
 		<< "log_likelihood P(target | source) (per word): "     << (log_likelihood_source_target / words_target) << std::endl
-		<< "log_likelihood P(source | target) (per sentence): " << (log_likelihood_source_target / samples) << std::endl
+		<< "log_likelihood P(source | target) (per sentence): " << (log_likelihood_target_source / samples) << std::endl
 		<< "log_likelihood P(source | target) (per word): "     << (log_likelihood_target_source / words_source) << std::endl;
 
     if (debug)
@@ -1817,6 +1921,7 @@ void read_data(const path_type& source_file,
   
   sentence_type source;
   sentence_type target;
+  size_t samples = 0;
   
   for (;;) {
     src >> source;
@@ -1831,11 +1936,17 @@ void read_data(const path_type& source_file,
     sentence_type::const_iterator siter_end = source.end();
     for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
       ++ sources[*siter];
-    
+
     sentence_type::const_iterator titer_end = target.end();
     for (sentence_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-      ++ targets[*titer];    
+      ++ targets[*titer];
+
+    ++ samples;
   }
+
+  // EOS...
+  sources[vocab_type::EOS] = samples;
+  targets[vocab_type::EOS] = samples;
   
   if (src || trg)
     throw std::runtime_error("# of sentences does not match");
@@ -1911,6 +2022,7 @@ void options(int argc, char** argv)
     ("samples",           po::value<int>(&samples)->default_value(samples),       "# of NCE samples")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
+    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
     
     ("dump", po::bool_switch(&dump_mode), "dump intermediate alignments")
