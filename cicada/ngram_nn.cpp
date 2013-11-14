@@ -34,6 +34,8 @@ namespace cicada
     clear();
     
     repository_type rep(path, repository_type::read);
+
+    path_ = path;
     
     embedding_size_      = repository_value<size_type>(rep, "size");
     dimension_embedding_ = repository_value<size_type>(rep, "embedding");

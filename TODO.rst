@@ -259,3 +259,6 @@ Add head-node annotator for each edge:
 
 NCE for autoencoding
 - re-implement by perform classification and sampling using the lexicon model
+
+Neural Network Alignment model
+- re-implement by summation and Viterbi approximation

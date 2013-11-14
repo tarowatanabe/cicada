@@ -376,15 +376,16 @@ struct Model
   template <typename Gen>
   struct randomize
   {
-    randomize(Gen& gen) : gen_(gen) {}
+    randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
     
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return boost::random::uniform_real_distribution<Tp>(-0.01, 0.01)(const_cast<Gen&>(gen_));
+      return boost::random::uniform_real_distribution<Tp>(-range_, range_)(const_cast<Gen&>(gen_));
     }
     
     Gen& gen_;
+    double range_;
   };
   
   template <typename Gen>
@@ -407,20 +408,27 @@ struct Model
     clear();
     
     const size_type vocabulary_size = word_type::allocated();
-    
-    source_ = tensor_type::Zero(embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
-    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
-    
-    Wt_ = tensor_type::Zero(embedding_, hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen));
-    bt_ = tensor_type::Zero(embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
-    
-    Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen));
-    ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1).array().unaryExpr(randomize<Gen>(gen));
 
-    Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen));
-    bn_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen));
+    const double range_e = std::sqrt(6.0 / (embedding_ + 1));
+    const double range_t = std::sqrt(6.0 / (hidden_ + embedding_ + embedding_));
+    const double range_a = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
+    const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
+    const double range_i = std::sqrt(6.0 / (hidden_ + 1));
     
-    Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen));
+    source_ = tensor_type::Zero(embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
+    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
+    target_.row(embedding_).setZero();
+    
+    Wt_ = tensor_type::Zero(embedding_, hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen, range_t));
+    bt_ = tensor_type::Zero(embedding_, 1);
+    
+    Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen, range_a));
+    ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
+
+    Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen, range_n));
+    bn_ = tensor_type::Zero(hidden_, 1);
+    
+    Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
   }
 
   void finalize()
@@ -738,7 +746,11 @@ struct HMM
   double              log_samples_;
   
   tensor_type alpha_;
+  tensor_type beta_;
   tensor_type trans_;
+  
+  tensor_type forw_;
+  
   back_type   back_;
   tensor_type accu_;
   tensor_type score_;
@@ -790,26 +802,39 @@ struct HMM
     //std::cerr << "source size: " << source_size << " target size: " << target_size << std::endl;
     
     alpha_.resize((source_size + 2) * 2 * state_size, target_size + 2);
+    alpha_.setZero();
+    
+    beta_.resize((source_size + 2) * 2 * state_size, target_size + 2);
+    beta_.setZero();
+    
     trans_.resize((source_size + 2) * 2 * theta.embedding_, target_size + 2);
+    trans_.setZero();
+    
+    forw_.resize((source_size + 2) * 2 * state_size, target_size + 2);
     
     score_.resize((source_size + 2) * 2, target_size + 2);
     score_.setConstant(zero);
-
+    
     accu_.resize((source_size + 2) * 2, target_size + 2);
     accu_.setConstant(zero);
     
     back_.resize((source_size + 2) * 2, target_size + 2);
     back_.setConstant(- 1);
     
+    // initialize
     alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::BOS.id());
     alpha_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
+    
+    forw_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::BOS.id());
+    forw_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
+    
     accu_(0, 0) = 0.0;
-
+    
     if (! layer_alpha0_.cols())
       layer_alpha0_ = tensor_type(state_size, 1);
     if (! layer_alpha_.cols())
       layer_alpha_ = tensor_type(state_size, 1);
-
+    
     layer_alpha0_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
     
     for (size_type trg = 1; trg != target_size + 2; ++ trg) {
@@ -818,7 +843,7 @@ struct HMM
 				     : (trg == target_size + 1
 					? vocab_type::EOS
 					: target[trg - 1]));
-
+      
       // for EOS, we need to match with EOS, otherwise, do not match..
       const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
       const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
@@ -847,11 +872,11 @@ struct HMM
 				       : (next == source_size + 1
 					  ? vocab_type::EOS
 					  : source[next - 1]));
-
+	
 	//std::cerr << "source next: " << next << " word: " << source_next << std::endl;
 	
 	layer_alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
-
+	
 	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
 	  if (accu_(prev1, trg - 1) > zero) {
 	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
@@ -1221,7 +1246,7 @@ struct LearnAdaGrad
 	     siter->second,
 	     embedding.target_.col(siter->first.id()),
 	     false);
-    
+
     gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first,
