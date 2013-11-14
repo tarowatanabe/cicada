@@ -537,83 +537,177 @@ struct Model
   tensor_type Wi_;
 };
 
-struct Unigram
+struct Lexicon
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
   typedef Model    model_type;
   typedef Gradient gradient_type;
-
+  
   typedef uint64_t count_type;
-
+  
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
   typedef cicada::Bitext    bitext_type;
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
+  
+  typedef boost::filesystem::path path_type;
 
-  typedef std::vector<double, std::allocator<double> >         logprob_set_type;
-  typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
-  typedef std::vector<word_type, std::allocator<word_type> >   word_map_type;
-  
-  typedef boost::random::discrete_distribution<> distribution_type;
-  
-  template <typename Tp>
-  struct compare_pair
+  struct Dict
   {
-    bool operator()(const Tp& x, const Tp& y) const
+    typedef utils::compact_map<word_type, double,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, double> > > logprob_set_type;
+    
+    typedef std::vector<word_type, std::allocator<word_type> >   word_map_type;
+    typedef boost::random::discrete_distribution<>               distribution_type;
+    
+    Dict() {}
+
+    template <typename Tp>
+    struct compare_pair
     {
-      return (x.second > y.second
-	      || (x.second == y.second
-		  && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
-    }
-  };
-  
-  template <typename Iterator>
-  Unigram(Iterator first, Iterator last)
-  {
-    typedef std::pair<word_type, count_type> word_count_type;
-    typedef std::vector<word_count_type, std::allocator<word_count_type> > word_count_set_type;
+      bool operator()(const Tp& x, const Tp& y) const
+      {
+	return (x.second > y.second
+		|| (x.second == y.second
+		    && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
+      }
+    };
     
-    word_count_set_type word_counts(first, last);
-    std::sort(word_counts.begin(), word_counts.end(), compare_pair<word_count_type>());
+    template <typename Iterator>
+    void initialize(Iterator first, Iterator last)
+    {
+      typedef std::pair<word_type, double> word_prob_type;
+      typedef std::vector<word_prob_type, std::allocator<word_prob_type> > word_prob_set_type;
+      typedef std::vector<double, std::allocator<double> > prob_set_type;
+      
+      logprobs_.clear();
+      words_.clear();
+      
+      word_prob_set_type word_probs(first, last);
+      std::sort(word_probs.begin(), word_probs.end(), compare_pair<word_prob_type>());
 
-    words_.reserve(word_counts.size());
-    counts_.reserve(word_counts.size());
-    logprobs_.reserve(word_type::allocated());
-    
-    word_count_set_type::const_iterator witer_end = word_counts.end();
-    for (word_count_set_type::const_iterator witer = word_counts.begin(); witer != witer_end; ++ witer) {
-      words_.push_back(witer->first);
-      counts_.push_back(witer->second);
+      prob_set_type probs;
+      words_.reserve(word_probs.size());
+      probs.reserve(word_probs.size());
+      
+      word_prob_set_type::const_iterator witer_end = word_probs.end();
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
+	words_.push_back(witer->first);
+	probs.push_back(witer->second);
+	logprobs_[witer->first] = std::log(witer->second);
+      }
+      
+      // initialize distribution
+      distribution_ = distribution_type(probs.begin(), probs.end());
     }
     
-    // initialize logprobs and words
-    const double norm = 1.0 / std::accumulate(counts_.begin(), counts_.end(), double(0));
-    for (word_type::id_type id = 0; id != counts_.size(); ++ id)
-      logprobs_[words_[id].id()] = std::log(norm * counts_[id]);
+    double logprob(const word_type& word) const
+    {
+      logprob_set_type::const_iterator liter = logprobs_.find(word);
+      if (liter != logprobs_.end())
+	return liter->second;
+      else
+	return - std::numeric_limits<double>::infinity();
+    }
     
-    // initialize distribution
-    distribution_ = distribution_type(counts_.begin(), counts_.end());
+    template <typename Gen>
+    word_type draw(Gen& gen) const
+    {
+      return words_[distribution_(gen)];
+    }
+    
+    logprob_set_type  logprobs_;
+    word_map_type     words_;
+    distribution_type distribution_;
+  };
+
+  typedef Dict dict_type;
+  typedef utils::alloc_vector<dict_type, std::allocator<dict_type> > dict_set_type;
+  
+  Lexicon() {}
+  Lexicon(const path_type& path) { read(path); }
+  
+  void read(const path_type& path)
+  {
+    typedef dict_type::logprob_set_type prob_set_type;
+    typedef utils::alloc_vector<prob_set_type, std::allocator<prob_set_type > > prob_map_type;
+
+    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    dicts.clear();
+    
+    prob_map_type probs;
+    
+    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iterator_type iter(is);
+    iterator_type iter_end;
+    
+    lexicon_parsed_type lexicon_parsed;
+    
+    while (iter != iter_end) {
+      boost::fusion::get<0>(lexicon_parsed).clear();
+      boost::fusion::get<1>(lexicon_parsed).clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+	if (iter != iter_end)
+	  throw std::runtime_error("global lexicon parsing failed");
+      
+      const word_type target(boost::fusion::get<0>(lexicon_parsed));
+      const word_type source(boost::fusion::get<1>(lexicon_parsed));
+      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
+      
+      probs[source.id()][target] = prob;
+    }
+
+    // if no BOS/EOS, insert
+    if (! probs.exists(vocab_type::BOS.id()))
+      probs[vocab_type::BOS.id()][vocab_type::BOS] = 1.0;
+    if (! probs.exists(vocab_type::EOS.id()))
+      probs[vocab_type::EOS.id()][vocab_type::EOS] = 1.0;
+    
+    // initialize dicts...
+    for (size_type i = 0; i != probs.size(); ++ i)
+      if (probs.exists(i))
+	dicts[i].initialize(probs[i].begin(), probs[i].end());
   }
   
-  double logprob(const word_type& word) const
+  double logprob(const word_type& source, const word_type& target) const
   {
-    return logprobs_[word.id()];
+    if (dicts.exists(source.id()))
+      return dicts[source.id()].logprob(target);
+    else
+      return dicts[vocab_type::EPSILON.id()].logprob(target);
   }
   
   template <typename Gen>
-  word_type draw(Gen& gen) const
+  word_type draw(const word_type& source, Gen& gen) const
   {
-    return words_[distribution_(gen)];
+    if (dicts.exists(source.id()))
+      return dicts[source.id()].draw(gen);
+    else
+      return dicts[vocab_type::EPSILON.id()].draw(gen);
   }
-  
-  logprob_set_type  logprobs_;
-  count_set_type    counts_;
-  word_map_type     words_;
-  distribution_type distribution_;
+
+  dict_set_type dicts;
 };
+
 
 struct HMM
 {
@@ -622,7 +716,7 @@ struct HMM
   
   typedef Model    model_type;
   typedef Gradient gradient_type;
-  typedef Unigram  unigram_type;
+  typedef Lexicon lexicon_type;
 
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type    tensor_type;
@@ -635,13 +729,11 @@ struct HMM
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
   
-  HMM(const unigram_type& source,
-      const unigram_type& target,
+  HMM(const lexicon_type& lexicon,
       const size_type samples)
-    : source_(source), target_(target), samples_(samples), log_samples_(std::log(samples)) {}
+    : lexicon_(lexicon), samples_(samples), log_samples_(std::log(samples)) {}
   
-  const unigram_type& source_;
-  const unigram_type& target_;
+  const lexicon_type& lexicon_;
   size_type           samples_;
   double              log_samples_;
   
@@ -955,7 +1047,7 @@ struct HMM
     double log_likelihood = 0;
     
     const double score = score_(source_pos, target_pos);
-    const double score_noise = log_samples_ + target_.logprob(word_target);
+    const double score_noise = log_samples_ + lexicon_.logprob(word_source, word_target);
     const double z = utils::mathop::logsum(score, score_noise);
     const double logprob = score - z;
     const double logprob_noise = score_noise - z;
@@ -981,7 +1073,7 @@ struct HMM
 		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
     
     for (size_type k = 0; k != samples_; ++ k) {
-      const word_type word_target = target_.draw(gen);
+      const word_type word_target = lexicon_.draw(word_source, gen);
       
       const double score = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose()
 			    * trans_.block(theta.embedding_ * source_pos,
@@ -989,7 +1081,7 @@ struct HMM
 					   theta.embedding_,
 					   1)
 			    + theta.target_.col(word_target.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-      const double score_noise = log_samples_ + target_.logprob(word_target);
+      const double score_noise = log_samples_ + lexicon_.logprob(word_source, word_target);
       const double z = utils::mathop::logsum(score, score_noise);
       const double logprob = score - z;
       const double logprob_noise = score_noise - z;
@@ -1270,14 +1362,8 @@ typedef cicada::Sentence sentence_type;
 typedef cicada::Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
-typedef Model    model_type;
-typedef Unigram  unigram_type;
-
-typedef uint64_t count_type;
-typedef utils::unordered_map<unigram_type::word_type, count_type,
-			     boost::hash<unigram_type::word_type>, std::equal_to<unigram_type::word_type>,
-			     std::allocator<std::pair<const unigram_type::word_type, count_type> > >::type word_set_type;
-
+typedef Model   model_type;
+typedef Lexicon lexicon_type;
 
 static const size_t DEBUG_DOT  = 100000;
 static const size_t DEBUG_WRAP = 100;
@@ -1285,6 +1371,8 @@ static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type source_file;
 path_type target_file;
+path_type lexicon_source_target_file;
+path_type lexicon_target_source_file;
 path_type output_source_target_file;
 path_type output_target_source_file;
 path_type alignment_source_target_file;
@@ -1314,15 +1402,13 @@ int debug = 0;
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  const unigram_type& sources,
-		  const unigram_type& targets,
+		  const lexicon_type& lexicon_source_target,
+		  const lexicon_type& lexicon_target_source,
 		  model_type& theta_source_target,
 		  model_type& theta_target_source);
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
-	       bitext_set_type& bitexts,
-	       word_set_type& sources,
-	       word_set_type& targets);
+	       bitext_set_type& bitexts);
 
 void options(int argc, char** argv);
 
@@ -1369,19 +1455,31 @@ int main(int argc, char** argv)
     if (target_file != "-" && ! boost::filesystem::exists(target_file))
       throw std::runtime_error("no target file? " + target_file.string());
     
-    bitext_set_type bitexts;
-    word_set_type   sources;
-    word_set_type   targets;
-    
-    read_data(source_file, target_file, bitexts, sources, targets);
+    if (lexicon_source_target_file != "-" && ! boost::filesystem::exists(lexicon_source_target_file))
+      throw std::runtime_error("no lexiocn file for P(target | source)? " + lexicon_source_target_file.string());
+    if (lexicon_target_source_file != "-" && ! boost::filesystem::exists(lexicon_target_source_file))
+      throw std::runtime_error("no lexiocn file for P(target | source)? " + lexicon_target_source_file.string());
 
-    if (debug)
-      std::cerr << "# of sentences: " << bitexts.size() << std::endl
-		<< "source vocabulary: " << sources.size() << std::endl
-		<< "target vocabulary: " << targets.size() << std::endl;
+    bitext_set_type bitexts;
+        
+    lexicon_type lexicon_source_target;
+    lexicon_type lexicon_target_source;
     
-    unigram_type unigram_sources(sources.begin(), sources.end());
-    unigram_type unigram_targets(targets.begin(), targets.end());
+    boost::thread_group workers_read;
+
+    workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read,
+							  boost::ref(lexicon_source_target),
+							  boost::cref(lexicon_source_target_file))));
+    workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read,
+							  boost::ref(lexicon_target_source),
+							  boost::cref(lexicon_target_source_file))));
+    
+    read_data(source_file, target_file, bitexts);
+        
+    workers_read.join_all();
+    
+    if (debug)
+      std::cerr << "# of sentences: " << bitexts.size() << std::endl;
     
     model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, generator);
@@ -1389,8 +1487,8 @@ int main(int argc, char** argv)
     if (iteration > 0)
       learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
 		   bitexts,
-		   unigram_sources,
-		   unigram_targets,
+		   lexicon_source_target,
+		   lexicon_target_source,
 		   theta_source_target,
 		   theta_target_source);
     
@@ -1603,8 +1701,8 @@ struct TaskAccumulate
   typedef Counter counter_type;
 
   TaskAccumulate(const bitext_set_type& bitexts,
-		 const unigram_type& sources,
-		 const unigram_type& targets,
+		 const lexicon_type& lexicon_source_target,
+		 const lexicon_type& lexicon_target_source,
 		 const size_type& samples,
 		 const model_type& theta_source_target,
 		 const model_type& theta_target_source,
@@ -1619,8 +1717,8 @@ struct TaskAccumulate
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
       counter_(counter),
-      hmm_source_target_(sources, targets, samples),
-      hmm_target_source_(targets, sources, samples),
+      hmm_source_target_(lexicon_source_target, samples),
+      hmm_target_source_(lexicon_target_source, samples),
       gradient_source_target_(theta_source_target.embedding_,
 			      theta_source_target.hidden_,
 			      theta_source_target.alignment_),
@@ -1743,8 +1841,8 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  const unigram_type& sources,
-		  const unigram_type& targets,
+		  const lexicon_type& lexicon_source_target,
+		  const lexicon_type& lexicon_target_source,
 		  model_type& theta_source_target,
 		  model_type& theta_target_source)
 {
@@ -1771,8 +1869,8 @@ void learn_online(const Learner& learner,
   Embedding embedding_target_source(theta_target_source.embedding_);
   
   task_set_type tasks(threads, task_type(bitexts,
-					 sources,
-					 targets,
+					 lexicon_source_target,
+					 lexicon_target_source,
 					 samples,
 					 theta_source_target,
 					 theta_target_source,
@@ -1906,12 +2004,19 @@ void learn_online(const Learner& learner,
 
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
-	       bitext_set_type& bitexts,
-	       word_set_type& sources,
-	       word_set_type& targets)
+	       bitext_set_type& bitexts)
 {
-  typedef cicada::Vocab vocab_type;
+  typedef cicada::Symbol word_type;
+  typedef cicada::Vocab  vocab_type;
+  typedef uint64_t count_type;
+  
+  typedef utils::unordered_map<word_type, count_type,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, count_type> > >::type word_set_type;
 
+  word_set_type sources;
+  word_set_type targets;
+  
   bitexts.clear();
   sources.clear();
   targets.clear();
@@ -2003,6 +2108,8 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("source", po::value<path_type>(&source_file), "source file")
     ("target", po::value<path_type>(&target_file), "target file")
+    ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model parameter for P(target | source)")
+    ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model parameter for P(source | target)")
     
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output model parameter for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output model parameter for P(source | target)")

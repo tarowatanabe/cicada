@@ -299,15 +299,16 @@ struct Model
   template <typename Gen>
   struct randomize
   {
-    randomize(Gen& gen) : gen_(gen) {}
+    randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
     
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return boost::random::uniform_real_distribution<Tp>(-0.01, 0.01)(const_cast<Gen&>(gen_));
+      return boost::random::uniform_real_distribution<Tp>(-range_, range_)(const_cast<Gen&>(gen_));
     }
     
     Gen& gen_;
+    double range_;
   };
   
   template <typename Unigram, typename Gen>
@@ -332,9 +333,12 @@ struct Model
     clear();
     
     const size_type vocabulary_size = word_type::allocated();
+
+    const double range_e = std::sqrt(6.0 / (dimension_embedding_ + 1));
     
-    embedding_input_  = tensor_type::Zero(dimension_embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
-    embedding_output_ = tensor_type::Zero(dimension_embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen));
+    embedding_input_  = tensor_type::Zero(dimension_embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
+    embedding_output_ = tensor_type::Zero(dimension_embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
+    embedding_output_.row(dimension_embedding_).setZero();
     
     uniques_ = unique_set_type(vocabulary_size, false);
     
@@ -359,12 +363,15 @@ struct Model
     
     uniques_[vocab_type::BOS.id()] = false;
     uniques_[vocab_type::EOS.id()] = false;
+
+    const double range_c = std::sqrt(6.0 / (dimension_hidden_ + dimension_embedding_ * (order - 1)));
+    const double range_h = std::sqrt(6.0 / (dimension_embedding_ + dimension_hidden_));
     
-    Wc_ = tensor_type::Zero(dimension_hidden_, dimension_embedding_ * (order - 1)).array().unaryExpr(randomize<Gen>(gen));
-    bc_ = tensor_type::Zero(dimension_hidden_, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wc_ = tensor_type::Zero(dimension_hidden_, dimension_embedding_ * (order - 1)).array().unaryExpr(randomize<Gen>(gen, range_c));
+    bc_ = tensor_type::Zero(dimension_hidden_, 1);
     
-    Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_).array().unaryExpr(randomize<Gen>(gen));
-    bh_ = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_).array().unaryExpr(randomize<Gen>(gen, range_h));
+    bh_ = tensor_type::Zero(dimension_embedding_, 1);
   }
 
   void finalize()
