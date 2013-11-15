@@ -412,13 +412,13 @@ struct Model
     clear();
     
     const size_type vocabulary_size = word_type::allocated();
-
+    
     const double range_e = std::sqrt(6.0 / (embedding_ + 1));
     const double range_t = std::sqrt(6.0 / (hidden_ + embedding_ + embedding_));
     const double range_a = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
     const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
     const double range_i = std::sqrt(6.0 / (hidden_ + 1));
-    
+ 
     source_ = tensor_type::Zero(embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
     target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
     target_.row(embedding_).setZero();
@@ -680,6 +680,23 @@ struct HMM
   tensor_type delta_alpha_;
   tensor_type delta_trans_;
 
+  struct tanh
+  {
+    double operator()(const double& x) const
+    {
+      return std::tanh(x);
+    }
+  };
+  
+  struct dtanh
+  {
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return Tp(1) - x * x;
+    }
+  };
+
   struct htanh
   {
     template <typename Tp>
@@ -821,7 +838,7 @@ struct HMM
 
 	// activation
 	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
-	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(htanh());
+	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(hinge());
       }
       
       // alingment into none..
@@ -853,7 +870,7 @@ struct HMM
 	
 	// activation
 	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
-	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(htanh());
+	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(hinge());
       }
     }
   }
@@ -974,7 +991,7 @@ struct HMM
 				   : target[target_pos - 1]));
     
     layer_trans_ = (theta.Wt_ * alpha_.block(state_size * source_pos, target_pos, state_size, 1)
-		    + theta.bt_).array().unaryExpr(htanh());
+		    + theta.bt_).array().unaryExpr(hinge());
     
     double log_likelihood = 0;
     
@@ -994,7 +1011,7 @@ struct HMM
     dembedding.block(0, 0, theta.embedding_, 1).array() += loss * layer_trans_.array();
     dembedding.block(theta.embedding_, 0, 1, 1).array() += loss;
     
-    delta_trans_ = (layer_trans_.array().unaryExpr(dhtanh())
+    delta_trans_ = (layer_trans_.array().unaryExpr(dhinge())
 		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
     
     for (size_type k = 0; k != samples_; ++ k) {
@@ -1015,7 +1032,7 @@ struct HMM
       dembedding.block(0, 0, theta.embedding_, 1).array() += loss * layer_trans_.array();
       dembedding.block(theta.embedding_, 0, 1, 1).array() += loss;
       
-      delta_trans_.array() += (layer_trans_.array().unaryExpr(dhtanh())
+      delta_trans_.array() += (layer_trans_.array().unaryExpr(dhinge())
 			       * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
     }
     
@@ -1023,7 +1040,7 @@ struct HMM
     gradient.bt_ += delta_trans_;
     
     delta_beta_ = beta_.block(state_size * source_pos, target_pos, state_size, 1) + theta.Wt_.transpose() * delta_trans_;
-    delta_alpha_ = (alpha_.block(state_size * source_pos + theta.embedding_, target_pos, theta.hidden_, 1).array().unaryExpr(dhtanh())
+    delta_alpha_ = (alpha_.block(state_size * source_pos + theta.embedding_, target_pos, theta.hidden_, 1).array().unaryExpr(dhinge())
 		    * delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1).array());
     
     // word embedding...
@@ -1163,14 +1180,14 @@ struct HMM
 	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
 	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 		 * forw_.block(state_size * prev1, trg - 1, state_size, 1)
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	    
-	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	    
-	    if (score + score_(prev1, trg - 1) >= score_(next, trg)) {
+	    if (score + score_(prev1, trg - 1) > score_(next, trg)) {
 	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	      score_(next, trg) = score + score_(prev1, trg - 1);
 	      back_(next, trg) = prev1;
@@ -1188,14 +1205,14 @@ struct HMM
 	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
 	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 		 * forw_.block(state_size * prev2, trg - 1, state_size, 1)
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	    
-	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	    
-	    if (score + score_(prev2, trg - 1) >= score_(next, trg)) {
+	    if (score + score_(prev2, trg - 1) > score_(next, trg)) {
 	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	      score_(next, trg) = score + score_(prev2, trg - 1);
 	      back_(next, trg) = prev2;
@@ -1215,14 +1232,14 @@ struct HMM
 	
 	if (visited_(prev1, trg - 1)) {
 	  layer_alpha0_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * forw_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	    = (theta.Wn_ * forw_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(hinge());
 	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev1, trg - 1) >= score_(next, trg)) {
+	  if (score + score_(prev1, trg - 1) > score_(next, trg)) {
 	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	    score_(next, trg) = score + score_(prev1, trg - 1);
 	    back_(next, trg) = prev1;
@@ -1231,14 +1248,14 @@ struct HMM
 
 	if (visited_(prev2, trg - 1)) {
 	  layer_alpha0_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * forw_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	    = (theta.Wn_ * forw_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(hinge());
 	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev2, trg - 1) >= score_(next, trg)) {
+	  if (score + score_(prev2, trg - 1) > score_(next, trg)) {
 	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	    score_(next, trg) = score + score_(prev2, trg - 1);
 	    back_(next, trg) = prev2;
@@ -1249,7 +1266,10 @@ struct HMM
 
     // traverse back...
     int src = back_(source_size + 1, target_size + 1);
+    
     for (int trg = target_size; trg >= 1; -- trg) {
+      if (src < 0) break;
+      
       if (src < static_cast<int>(source_size + 2))
 	alignment.push_back(std::make_pair(src - 1, trg - 1));
       
