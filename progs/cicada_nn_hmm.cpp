@@ -1375,7 +1375,7 @@ struct LearnAdaGrad
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
 
-      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      theta_(i, j) = std::max(std::min(utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_), 1e+7), -1e+7);
     }
     
     Eigen::MatrixBase<Theta>&      theta_;
@@ -1411,7 +1411,7 @@ struct LearnAdaGrad
       theta.visit(visitor);
     } else {
       G.array() += g.array().square();
-      theta.array() -= g.array() * G.array().unaryExpr(learning_rate(eta0_));
+      theta = (theta.array() - g.array() * G.array().unaryExpr(learning_rate(eta0_))).min(1e+7).max(-1e+7);
     }
   }
 
@@ -1430,7 +1430,7 @@ struct LearnAdaGrad
 	const double rate = eta0_ / std::sqrt(G(row, word.id()));
 	const double f = theta(row, word.id()) - rate * g(row, 0);
 	
-	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	theta(row, word.id()) = std::max(std::min(utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_), 1e+7), -1e+7);
       }
     
     if (bias_last) {
@@ -1438,7 +1438,7 @@ struct LearnAdaGrad
       
       if (g(row, 0) != 0) {
 	G(row, word.id()) += g(row, 0) * g(row, 0);
-	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+	theta(row, word.id()) = std::max(std::min(theta(row, word.id()) - eta0_ * g(row, 0) / std::sqrt(G(row, word.id())), 1e+7), -1e+7);
       }
     }
   }
