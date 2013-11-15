@@ -563,8 +563,6 @@ struct Lexicon
   typedef cicada::Bitext    bitext_type;
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
-  
-  typedef boost::filesystem::path path_type;
 
   struct Dict
   {
@@ -641,70 +639,13 @@ struct Lexicon
   typedef utils::alloc_vector<dict_type, std::allocator<dict_type> > dict_set_type;
   
   Lexicon() {}
-  Lexicon(const path_type& path) { read(path); }
-  
-  void read(const path_type& path)
-  {
-    typedef dict_type::logprob_set_type prob_set_type;
-    typedef utils::alloc_vector<prob_set_type, std::allocator<prob_set_type > > prob_map_type;
-
-    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
-    typedef boost::spirit::istream_iterator iterator_type;
-    
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
-    dicts.clear();
-    
-    prob_map_type probs;
-    
-    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
-    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
-    
-    word   %= qi::lexeme[+(standard::char_ - standard::space)];
-    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
-    
-    utils::compress_istream is(path, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
-    
-    iterator_type iter(is);
-    iterator_type iter_end;
-    
-    lexicon_parsed_type lexicon_parsed;
-    
-    while (iter != iter_end) {
-      boost::fusion::get<0>(lexicon_parsed).clear();
-      boost::fusion::get<1>(lexicon_parsed).clear();
-      
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
-	if (iter != iter_end)
-	  throw std::runtime_error("global lexicon parsing failed");
-      
-      const word_type target(boost::fusion::get<0>(lexicon_parsed));
-      const word_type source(boost::fusion::get<1>(lexicon_parsed));
-      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
-      
-      probs[source.id()][target] = prob;
-    }
-
-    // if no BOS/EOS, insert
-    if (! probs.exists(vocab_type::BOS.id()))
-      probs[vocab_type::BOS.id()][vocab_type::BOS] = 1.0;
-    if (! probs.exists(vocab_type::EOS.id()))
-      probs[vocab_type::EOS.id()][vocab_type::EOS] = 1.0;
-    
-    // initialize dicts...
-    for (size_type i = 0; i != probs.size(); ++ i)
-      if (probs.exists(i))
-	dicts[i].initialize(probs[i].begin(), probs[i].end());
-  }
   
   double logprob(const word_type& source, const word_type& target) const
   {
     if (dicts.exists(source.id()))
       return dicts[source.id()].logprob(target);
     else
-      return dicts[vocab_type::EPSILON.id()].logprob(target);
+      return dicts[vocab_type::UNK.id()].logprob(target);
   }
   
   template <typename Gen>
@@ -713,7 +654,7 @@ struct Lexicon
     if (dicts.exists(source.id()))
       return dicts[source.id()].draw(gen);
     else
-      return dicts[vocab_type::EPSILON.id()].draw(gen);
+      return dicts[vocab_type::UNK.id()].draw(gen);
   }
 
   dict_set_type dicts;
@@ -1696,7 +1637,7 @@ path_type output_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 
-int dimension_embedding = 16;
+int dimension_embedding = 64;
 int dimension_hidden = 128;
 int alignment = 8;
 
@@ -1705,7 +1646,7 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 128;
-int samples = 8;
+int samples = 4;
 int cutoff = 3;
 double lambda = 1e-5;
 double lambda2 = 0.0;
@@ -2548,6 +2489,9 @@ void viterbi(const bitext_set_type& bitexts,
 							   ? alignment_target_source_file
 							   : path_type(),
 							   queue_target_source));
+
+  if (debug)
+    std::cerr << "Viterbi alignment" << std::endl;
 
   utils::resource start;
   
