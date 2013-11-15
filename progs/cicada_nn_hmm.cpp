@@ -1170,7 +1170,7 @@ struct HMM
 	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	    
-	    if (score + score_(prev1, trg - 1) > score_(next, trg)) {
+	    if (score + score_(prev1, trg - 1) >= score_(next, trg)) {
 	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	      score_(next, trg) = score + score_(prev1, trg - 1);
 	      back_(next, trg) = prev1;
@@ -1195,7 +1195,7 @@ struct HMM
 	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	    
-	    if (score + score_(prev2, trg - 1) > score_(next, trg)) {
+	    if (score + score_(prev2, trg - 1) >= score_(next, trg)) {
 	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	      score_(next, trg) = score + score_(prev2, trg - 1);
 	      back_(next, trg) = prev2;
@@ -1222,7 +1222,7 @@ struct HMM
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev1, trg - 1) > score_(next, trg)) {
+	  if (score + score_(prev1, trg - 1) >= score_(next, trg)) {
 	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	    score_(next, trg) = score + score_(prev1, trg - 1);
 	    back_(next, trg) = prev1;
@@ -1238,7 +1238,7 @@ struct HMM
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev2, trg - 1) > score_(next, trg)) {
+	  if (score + score_(prev2, trg - 1) >= score_(next, trg)) {
 	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
 	    score_(next, trg) = score + score_(prev2, trg - 1);
 	    back_(next, trg) = prev2;
@@ -1375,7 +1375,7 @@ struct LearnAdaGrad
       const double rate = eta0_ / std::sqrt(G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
 
-      theta_(i, j) = std::max(std::min(utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_), 1e+7), -1e+7);
+      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
     
     Eigen::MatrixBase<Theta>&      theta_;
@@ -1411,7 +1411,7 @@ struct LearnAdaGrad
       theta.visit(visitor);
     } else {
       G.array() += g.array().square();
-      theta = (theta.array() - g.array() * G.array().unaryExpr(learning_rate(eta0_))).min(1e+7).max(-1e+7);
+      theta.array() -= g.array() * G.array().unaryExpr(learning_rate(eta0_));
     }
   }
 
@@ -1430,7 +1430,7 @@ struct LearnAdaGrad
 	const double rate = eta0_ / std::sqrt(G(row, word.id()));
 	const double f = theta(row, word.id()) - rate * g(row, 0);
 	
-	theta(row, word.id()) = std::max(std::min(utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_), 1e+7), -1e+7);
+	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
       }
     
     if (bias_last) {
@@ -1438,7 +1438,7 @@ struct LearnAdaGrad
       
       if (g(row, 0) != 0) {
 	G(row, word.id()) += g(row, 0) * g(row, 0);
-	theta(row, word.id()) = std::max(std::min(theta(row, word.id()) - eta0_ * g(row, 0) / std::sqrt(G(row, word.id())), 1e+7), -1e+7);
+	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
       }
     }
   }
