@@ -765,14 +765,11 @@ struct HMM
   typedef cicada::Vocab     vocab_type;
   
   HMM(const unigram_type& unigram_source,
-      const unigram_type& unigram_target,
-      const size_type samples)
-    : unigram_source_(unigram_source), unigram_target_(unigram_target),samples_(samples), log_samples_(std::log(samples)) {}
+      const unigram_type& unigram_target)
+    : unigram_source_(unigram_source), unigram_target_(unigram_target) {}
   
   const unigram_type& unigram_source_;
   const unigram_type& unigram_target_;
-  size_type           samples_;
-  double              log_samples_;
   
   tensor_type alpha_;
   tensor_type beta_;
@@ -1006,7 +1003,7 @@ struct HMM
     beta_.resize((source_size + 2) * 2 * state_size, target_size + 2);
     beta_.setZero();
     
-    double log_likelihood = 0.0;
+    double loss = 0.0;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
       // for EOS, we need to match with EOS, otherwise, do not match..
@@ -1028,7 +1025,7 @@ struct HMM
       
       for (size_type next = next_first; next != next_last; ++ next) {
 
-	log_likelihood += backward(source, target, theta, gradient, gen, trg, next);
+	loss += backward(source, target, theta, gradient, gen, trg, next);
 
 	const double norm = 1.0 / visited_.col(trg - 1).sum();
 	
@@ -1050,7 +1047,7 @@ struct HMM
 	const int visited1 = visited_(prev1, trg - 1);
 	const int visited2 = visited_(prev2, trg - 1);
 	
-	log_likelihood += backward(source, target, theta, gradient, gen, trg, next);
+	loss += backward(source, target, theta, gradient, gen, trg, next);
 	
 	const double norm = 1.0 / (visited1 + visited2);
 
@@ -1068,7 +1065,7 @@ struct HMM
     gradient.source(vocab_type::BOS) += beta_.block(0, 0, theta.embedding_, 1);
     gradient.Wi_ += beta_.block(theta.embedding_, 0, theta.hidden_, 1);
     
-    return log_likelihood;
+    return loss;
   }
 
   template <typename Gen>
@@ -1100,52 +1097,33 @@ struct HMM
 				: (target_pos == target_size + 1
 				   ? vocab_type::EOS
 				   : target[target_pos - 1]));
+
+    const word_type word_sampled = unigram_target_.draw(gen);    
     
     layer_trans_ = (theta.Wt_ * alpha_.block(state_size * source_pos, target_pos, state_size, 1)
 		    + theta.bt_).array().unaryExpr(htanh());
     
-    double log_likelihood = 0;
+    const double score_c = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+			    + theta.target_.col(word_target.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+    const double score_m = (theta.target_.col(word_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+			    + theta.target_.col(word_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
     
-    const double score = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-			  + theta.target_.col(word_target.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-    const double score_noise = log_samples_ + unigram_target_.logprob(word_target);
-    const double z = utils::mathop::logsum(score, score_noise);
-    const double logprob = score - z;
-    const double logprob_noise = score_noise - z;
+    const double loss = std::max(1.0 - (score_c - score_m), 0.0);
     
-    // we suffer loss...
-    const double loss = - 1.0 + std::exp(logprob);
-    log_likelihood += logprob;
+    const double delta_c = - (loss > 0.0);
+    const double delta_m =   (loss > 0.0);
     
-    tensor_type& dembedding = gradient.target(word_target);
+    tensor_type& dembedding_c = gradient.target(word_target);
+    tensor_type& dembedding_m = gradient.target(word_sampled);
     
-    dembedding.block(0, 0, theta.embedding_, 1).array() += loss * layer_trans_.array();
-    dembedding.block(theta.embedding_, 0, 1, 1).array() += loss;
+    dembedding_c.block(0, 0, theta.embedding_, 1).array() += delta_c * layer_trans_.array();
+    dembedding_c.block(theta.embedding_, 0, 1, 1).array() += delta_c;
+    dembedding_m.block(0, 0, theta.embedding_, 1).array() += delta_m * layer_trans_.array();
+    dembedding_m.block(theta.embedding_, 0, 1, 1).array() += delta_m;
     
     delta_trans_ = (layer_trans_.array().unaryExpr(dhtanh())
-		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
-    
-    for (size_type k = 0; k != samples_; ++ k) {
-      const word_type word_target = unigram_target_.draw(gen);
-      
-      const double score = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-			    + theta.target_.col(word_target.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-      const double score_noise = log_samples_ + unigram_target_.logprob(word_target);
-      const double z = utils::mathop::logsum(score, score_noise);
-      const double logprob = score - z;
-      const double logprob_noise = score_noise - z;
-      
-      const double loss = std::exp(logprob);
-      log_likelihood += logprob_noise;
-      
-      tensor_type& dembedding = gradient.target(word_target);
-      
-      dembedding.block(0, 0, theta.embedding_, 1).array() += loss * layer_trans_.array();
-      dembedding.block(theta.embedding_, 0, 1, 1).array() += loss;
-      
-      delta_trans_.array() += (layer_trans_.array().unaryExpr(dhtanh())
-			       * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * loss).array());
-    }
+		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * delta_c
+		       + theta.target_.col(word_sampled.id()).block(0, 0, theta.embedding_, 1) * delta_m).array());
     
     gradient.Wt_ += delta_trans_ * alpha_.block(state_size * source_pos, target_pos, state_size, 1).transpose();
     gradient.bt_ += delta_trans_;
@@ -1157,7 +1135,7 @@ struct HMM
     // word embedding...
     gradient.source(word_source) += delta_beta_.block(0, 0, theta.embedding_, 1);
     
-    return log_likelihood;
+    return loss;
   }
 
   void backward(const sentence_type& source,
@@ -1646,7 +1624,6 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 128;
-int samples = 4;
 int cutoff = 3;
 double lambda = 1e-5;
 double lambda2 = 0.0;
@@ -1693,8 +1670,6 @@ int main(int argc, char** argv)
     if (alignment <= 1)
       throw std::runtime_error("order size should be positive");
 
-    if (samples <= 0)
-      throw std::runtime_error("invalid sample size");
     if (batch_size <= 0)
       throw std::runtime_error("invalid batch size");
 
@@ -2048,7 +2023,6 @@ struct TaskAccumulate
   TaskAccumulate(const bitext_set_type& bitexts,
 		 const unigram_type& unigram_source,
 		 const unigram_type& unigram_target,
-		 const size_type& samples,
 		 const model_type& theta_source_target,
 		 const model_type& theta_target_source,
 		 queue_type& queue,
@@ -2062,16 +2036,16 @@ struct TaskAccumulate
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
       counter_(counter),
-      hmm_source_target_(unigram_source, unigram_target, samples),
-      hmm_target_source_(unigram_target, unigram_source, samples),
+      hmm_source_target_(unigram_source, unigram_target),
+      hmm_target_source_(unigram_target, unigram_source),
       gradient_source_target_(theta_source_target.embedding_,
 			      theta_source_target.hidden_,
 			      theta_source_target.alignment_),
       gradient_target_source_(theta_target_source.embedding_,
 			      theta_target_source.hidden_,
 			      theta_target_source.alignment_),
-      log_likelihood_source_target_(0),
-      log_likelihood_target_source_(0) {}
+      loss_source_target_(0),
+      loss_target_source_(0) {}
 
   void operator()()
   {
@@ -2105,14 +2079,14 @@ struct TaskAccumulate
 	hmm_source_target_.forward(bitext.source_, bitext.target_, theta_source_target_);
 	hmm_target_source_.forward(bitext.target_, bitext.source_, theta_target_source_);
 	
-	log_likelihood_source_target_
+	loss_source_target_
 	  += hmm_source_target_.backward(bitext.source_,
 					 bitext.target_,
 					 theta_source_target_,
 					 gradient_source_target_,
 					 generator);
 	
-	log_likelihood_target_source_
+	loss_target_source_
 	  += hmm_target_source_.backward(bitext.target_,
 					 bitext.source_,
 					 theta_target_source_,
@@ -2138,8 +2112,8 @@ struct TaskAccumulate
   {
     gradient_source_target_.clear();
     gradient_target_source_.clear();
-    log_likelihood_source_target_ = 0;
-    log_likelihood_target_source_ = 0;
+    loss_source_target_ = 0;
+    loss_target_source_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -2156,8 +2130,8 @@ struct TaskAccumulate
   
   gradient_type gradient_source_target_;
   gradient_type gradient_target_source_;
-  double        log_likelihood_source_target_;
-  double        log_likelihood_target_source_;
+  double        loss_source_target_;
+  double        loss_target_source_;
 };
 
 inline
@@ -2219,7 +2193,6 @@ void learn_online(const Learner& learner,
   task_set_type tasks(threads, task_type(bitexts,
 					 unigram_source,
 					 unigram_target,
-					 samples,
 					 theta_source_target,
 					 theta_target_source,
 					 mapper,
@@ -2253,8 +2226,8 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    double log_likelihood_source_target = 0.0;
-    double log_likelihood_target_source = 0.0;
+    double loss_source_target = 0.0;
+    double loss_target_source = 0.0;
     size_type samples = 0;
     size_type words_source = 0;
     size_type words_target = 0;
@@ -2295,14 +2268,14 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      log_likelihood_source_target += tasks.front().log_likelihood_source_target_;
-      log_likelihood_target_source += tasks.front().log_likelihood_target_source_;
+      loss_source_target += tasks.front().loss_source_target_;
+      loss_target_source += tasks.front().loss_target_source_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_source_target_ += tasks[i].gradient_source_target_;
 	tasks.front().gradient_target_source_ += tasks[i].gradient_target_source_;
 	
-	log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
-	log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
+	loss_source_target += tasks[i].loss_source_target_;
+	loss_target_source += tasks[i].loss_target_source_;
       }
 
       embedding_source_target.assign(tasks.front().gradient_source_target_);
@@ -2322,10 +2295,10 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
     
     if (debug)
-      std::cerr << "log_likelihood P(target | source) (per sentence): " << (log_likelihood_source_target / samples) << std::endl
-		<< "log_likelihood P(target | source) (per word): "     << (log_likelihood_source_target / words_target) << std::endl
-		<< "log_likelihood P(source | target) (per sentence): " << (log_likelihood_target_source / samples) << std::endl
-		<< "log_likelihood P(source | target) (per word): "     << (log_likelihood_target_source / words_source) << std::endl;
+      std::cerr << "loss P(target | source) (per sentence): " << (loss_source_target / samples) << std::endl
+		<< "loss P(target | source) (per word): "     << (loss_source_target / words_target) << std::endl
+		<< "loss P(source | target) (per sentence): " << (loss_target_source / samples) << std::endl
+		<< "loss P(source | target) (per word): "     << (loss_target_source / words_source) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
@@ -2372,7 +2345,6 @@ struct TaskViterbi
   TaskViterbi(const bitext_set_type& bitexts,
 	      const unigram_type& unigram_source,
 	      const unigram_type& unigram_target,
-	      const size_type& samples,
 	      const model_type& theta_source_target,
 	      const model_type& theta_target_source,
 	      queue_type& queue,
@@ -2384,10 +2356,10 @@ struct TaskViterbi
       queue_(queue),
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
-      hmm_source_target_(unigram_source, unigram_target, samples),
-      hmm_target_source_(unigram_target, unigram_source, samples),
-      log_likelihood_source_target_(0),
-      log_likelihood_target_source_(0) {}
+      hmm_source_target_(unigram_source, unigram_target),
+      hmm_target_source_(unigram_target, unigram_source),
+      loss_source_target_(0),
+      loss_target_source_(0) {}
 
   void operator()()
   {
@@ -2413,9 +2385,9 @@ struct TaskViterbi
       bitext_target_source.alignment_.clear();
 
       if (! bitext.source_.empty() && ! bitext.target_.empty()) {
-	log_likelihood_source_target_
+	loss_source_target_
 	  += hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
-	log_likelihood_target_source_
+	loss_target_source_
 	  += hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
       }
       
@@ -2427,8 +2399,8 @@ struct TaskViterbi
 
   void clear()
   {
-    log_likelihood_source_target_ = 0;
-    log_likelihood_target_source_ = 0;
+    loss_source_target_ = 0;
+    loss_target_source_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -2442,8 +2414,8 @@ struct TaskViterbi
   hmm_type hmm_source_target_;
   hmm_type hmm_target_source_;
   
-  double        log_likelihood_source_target_;
-  double        log_likelihood_target_source_;
+  double        loss_source_target_;
+  double        loss_target_source_;
 
 };
 
@@ -2469,7 +2441,6 @@ void viterbi(const bitext_set_type& bitexts,
   task_set_type tasks(threads, task_type(bitexts,
 					 unigram_source,
 					 unigram_target,
-					 samples,
 					 theta_source_target,
 					 theta_target_source,
 					 mapper,
@@ -2661,7 +2632,6 @@ void options(int argc, char** argv)
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
-    ("samples",           po::value<int>(&samples)->default_value(samples),       "# of NCE samples")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
