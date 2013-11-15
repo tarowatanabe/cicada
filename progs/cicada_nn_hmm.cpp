@@ -2233,29 +2233,29 @@ void read_data(const path_type& source_file,
   if (cutoff > 1) {
     word_set_type sources_new;
     word_set_type targets_new;
-    count_type source_unk = 0;
-    count_type target_unk = 0;
+    count_type source_oov = 0;
+    count_type target_oov = 0;
 
     word_set_type::const_iterator siter_end = sources.end();
     for (word_set_type::const_iterator siter = sources.begin(); siter != siter_end; ++ siter)
       if (siter->second >= cutoff)
 	sources_new.insert(*siter);
       else
-	source_unk += siter->second;
+	source_oov += siter->second;
 
     word_set_type::const_iterator titer_end = targets.end();
     for (word_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
       if (titer->second >= cutoff)
 	targets_new.insert(*titer);
       else
-	target_unk += titer->second;
+	target_oov += titer->second;
 
     if (debug)
-      std::cerr << "unk for source: " << source_unk << std::endl
-		<< "unk for target: " << target_unk << std::endl;
+      std::cerr << "oov for source: " << source_oov << std::endl
+		<< "oov for target: " << target_oov << std::endl;
     
-    sources_new[vocab_type::UNK] = source_unk;
-    targets_new[vocab_type::UNK] = target_unk;
+    sources_new[vocab_type::UNK] = source_oov;
+    targets_new[vocab_type::UNK] = target_oov;
     
     sources_new.swap(sources);
     targets_new.swap(targets);
