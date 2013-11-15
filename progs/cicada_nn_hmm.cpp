@@ -331,9 +331,9 @@ struct Model
   // we use float for the future compatibility with GPU :)
   typedef float parameter_type;
   typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
-
+  
   typedef Gradient gradient_type;
-
+  
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
   typedef cicada::Bitext    bitext_type;
@@ -341,7 +341,6 @@ struct Model
   typedef cicada::Vocab     vocab_type;
   
   typedef boost::filesystem::path path_type;
-
   
   Model() : embedding_(0), hidden_(0), alignment_(0) {}  
   template <typename Unigram, typename Gen>
@@ -547,6 +546,177 @@ struct Model
   tensor_type bn_;
 
   tensor_type Wi_;
+};
+
+struct Lexicon
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model    model_type;
+  typedef Gradient gradient_type;
+  
+  typedef uint64_t count_type;
+  
+  typedef cicada::Sentence  sentence_type;
+  typedef cicada::Alignment alignment_type;
+  typedef cicada::Bitext    bitext_type;
+  typedef cicada::Symbol    word_type;
+  typedef cicada::Vocab     vocab_type;
+  
+  typedef boost::filesystem::path path_type;
+
+  struct Dict
+  {
+    typedef utils::compact_map<word_type, double,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, double> > > logprob_set_type;
+    
+    typedef std::vector<word_type, std::allocator<word_type> >   word_map_type;
+    typedef boost::random::discrete_distribution<>               distribution_type;
+    
+    Dict() {}
+
+    template <typename Tp>
+    struct compare_pair
+    {
+      bool operator()(const Tp& x, const Tp& y) const
+      {
+	return (x.second > y.second
+		|| (x.second == y.second
+		    && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
+      }
+    };
+    
+    template <typename Iterator>
+    void initialize(Iterator first, Iterator last)
+    {
+      typedef std::pair<word_type, double> word_prob_type;
+      typedef std::vector<word_prob_type, std::allocator<word_prob_type> > word_prob_set_type;
+      typedef std::vector<double, std::allocator<double> > prob_set_type;
+      
+      logprobs_.clear();
+      words_.clear();
+      
+      word_prob_set_type word_probs(first, last);
+      std::sort(word_probs.begin(), word_probs.end(), compare_pair<word_prob_type>());
+
+      prob_set_type probs;
+      words_.reserve(word_probs.size());
+      probs.reserve(word_probs.size());
+      
+      word_prob_set_type::const_iterator witer_end = word_probs.end();
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
+	words_.push_back(witer->first);
+	probs.push_back(witer->second);
+	logprobs_[witer->first] = std::log(witer->second);
+      }
+      
+      // initialize distribution
+      distribution_ = distribution_type(probs.begin(), probs.end());
+    }
+    
+    double logprob(const word_type& word) const
+    {
+      logprob_set_type::const_iterator liter = logprobs_.find(word);
+      if (liter != logprobs_.end())
+	return liter->second;
+      else
+	return - std::numeric_limits<double>::infinity();
+    }
+    
+    template <typename Gen>
+    word_type draw(Gen& gen) const
+    {
+      return words_[distribution_(gen)];
+    }
+    
+    logprob_set_type  logprobs_;
+    word_map_type     words_;
+    distribution_type distribution_;
+  };
+
+  typedef Dict dict_type;
+  typedef utils::alloc_vector<dict_type, std::allocator<dict_type> > dict_set_type;
+  
+  Lexicon() {}
+  Lexicon(const path_type& path) { read(path); }
+  
+  void read(const path_type& path)
+  {
+    typedef dict_type::logprob_set_type prob_set_type;
+    typedef utils::alloc_vector<prob_set_type, std::allocator<prob_set_type > > prob_map_type;
+
+    typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    dicts.clear();
+    
+    prob_map_type probs;
+    
+    qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+    qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iterator_type iter(is);
+    iterator_type iter_end;
+    
+    lexicon_parsed_type lexicon_parsed;
+    
+    while (iter != iter_end) {
+      boost::fusion::get<0>(lexicon_parsed).clear();
+      boost::fusion::get<1>(lexicon_parsed).clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+	if (iter != iter_end)
+	  throw std::runtime_error("global lexicon parsing failed");
+      
+      const word_type target(boost::fusion::get<0>(lexicon_parsed));
+      const word_type source(boost::fusion::get<1>(lexicon_parsed));
+      const double&   prob(boost::fusion::get<2>(lexicon_parsed));
+      
+      probs[source.id()][target] = prob;
+    }
+
+    // if no BOS/EOS, insert
+    if (! probs.exists(vocab_type::BOS.id()))
+      probs[vocab_type::BOS.id()][vocab_type::BOS] = 1.0;
+    if (! probs.exists(vocab_type::EOS.id()))
+      probs[vocab_type::EOS.id()][vocab_type::EOS] = 1.0;
+    
+    // initialize dicts...
+    for (size_type i = 0; i != probs.size(); ++ i)
+      if (probs.exists(i))
+	dicts[i].initialize(probs[i].begin(), probs[i].end());
+  }
+  
+  double logprob(const word_type& source, const word_type& target) const
+  {
+    if (dicts.exists(source.id()))
+      return dicts[source.id()].logprob(target);
+    else
+      return dicts[vocab_type::EPSILON.id()].logprob(target);
+  }
+  
+  template <typename Gen>
+  word_type draw(const word_type& source, Gen& gen) const
+  {
+    if (dicts.exists(source.id()))
+      return dicts[source.id()].draw(gen);
+    else
+      return dicts[vocab_type::EPSILON.id()].draw(gen);
+  }
+
+  dict_set_type dicts;
 };
 
 struct Unigram
@@ -866,7 +1036,7 @@ struct HMM
 	// prev2
 	if (visited2)
 	  alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	    += (theta.Wn_ * alpha_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array() * norm;
+	    += (theta.Wn_ * alpha_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array() * norm;
 	
 	// activation
 	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
@@ -1293,6 +1463,7 @@ struct LearnAdaGrad
   typedef Embedding embedding_type;
 
   typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
   
   typedef model_type::tensor_type tensor_type;
   
@@ -1334,6 +1505,7 @@ struct LearnAdaGrad
     
     Wi_ = tensor_type::Zero(hidden_, 1);
   }
+
   
   void operator()(model_type& theta,
 		  const gradient_type& gradient,
@@ -1349,7 +1521,7 @@ struct LearnAdaGrad
 	     siter->second,
 	     embedding.target_.col(siter->first.id()),
 	     false);
-
+    
     gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first,
@@ -1392,7 +1564,7 @@ struct LearnAdaGrad
       
       G_(i, j) += g_(i, j) * g_(i, j);
       
-      const double rate = eta0_ / std::sqrt(G_(i, j));
+      const double rate = eta0_ / std::sqrt(double(G_(i, j)));
       const double f = theta_(i, j) - rate * g_(i, j);
 
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
@@ -1413,7 +1585,7 @@ struct LearnAdaGrad
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return (x == 0.0 ? 0.0 : eta0_ / std::sqrt(x));
+      return (x == 0.0 ? 0.0 : eta0_ / std::sqrt(double(x)));
     }
 
     const double& eta0_;
@@ -1443,22 +1615,38 @@ struct LearnAdaGrad
 	      const Eigen::MatrixBase<GradCross>& c,
 	      const bool bias_last=false) const
   {
-    for (int row = 0; row != g.rows() - bias_last; ++ row) 
-      if (g(row, 0) != 0) {
-	G(row, word.id()) +=  g(row, 0) * g(row, 0);
-	
-	const double rate = eta0_ / std::sqrt(G(row, word.id()));
-	const double f = theta(row, word.id()) - rate * g(row, 0);
-	
-	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
-      }
+    if (word != vocab_type::NONE && word != vocab_type::BOS && lambda2_ > 0.0) {
+      for (int row = 0; row != g.rows() - bias_last; ++ row) 
+	if (g(row, 0) != 0) {
+	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
+	  
+	  const double rate = eta0_ / std::sqrt(double(G(row, word.id())));
+	  const double f = theta(row, word.id()) - rate * g(row, 0);
+	  const double value = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	  
+	  const double shared = c(row, 0);
+	  const double diff = value - shared;
+	  
+	  theta(row, word.id()) = utils::mathop::sgn(diff) * std::max(0.0, std::fabs(diff) - rate * lambda2_) + shared;
+	}
+    } else {
+      for (int row = 0; row != g.rows() - bias_last; ++ row) 
+	if (g(row, 0) != 0) {
+	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
+	  
+	  const double rate = eta0_ / std::sqrt(double(G(row, word.id())));
+	  const double f = theta(row, word.id()) - rate * g(row, 0);
+	  
+	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	}
+    }
     
     if (bias_last) {
       const int row = g.rows() - 1;
       
       if (g(row, 0) != 0) {
 	G(row, word.id()) += g(row, 0) * g(row, 0);
-	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(double(G(row, word.id())));
       }
     }
   }
@@ -1510,17 +1698,17 @@ path_type alignment_target_source_file;
 
 int dimension_embedding = 16;
 int dimension_hidden = 128;
-int alignment = 5;
+int alignment = 8;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 128;
-int samples = 100;
+int samples = 8;
 int cutoff = 3;
 double lambda = 1e-5;
-double lambda2 = 1e-2;
+double lambda2 = 0.0;
 double eta0 = 1;
 
 bool moses_mode = false;
@@ -1536,7 +1724,7 @@ template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
 		  const unigram_type& unigram_source,
-		  const unigram_type& uingram_target,
+		  const unigram_type& unigram_target,
 		  model_type& theta_source_target,
 		  model_type& theta_target_source);
 void read_data(const path_type& source_file,
@@ -1544,6 +1732,11 @@ void read_data(const path_type& source_file,
 	       bitext_set_type& bitexts,
 	       unigram_type& unigram_source,
 	       unigram_type& unigram_target);
+void viterbi(const bitext_set_type& bitexts,
+	     const unigram_type& unigram_source,
+	     const unigram_type& unigram_target,
+	     const model_type& theta_source_target,
+	     const model_type& theta_target_source);
 
 void options(int argc, char** argv);
 
@@ -1604,6 +1797,22 @@ int main(int argc, char** argv)
     
     read_data(source_file, target_file, bitexts, unigram_source, unigram_target);
     
+#if 0
+    lexicon_type lexicon_source_target;
+    lexicon_type lexicon_target_source;
+    
+    boost::thread_group workers_read;
+
+    workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read,
+							  boost::ref(lexicon_source_target),
+							  boost::cref(lexicon_source_target_file))));
+    workers_read.add_thread(new boost::thread(boost::bind(&lexicon_type::read,
+							  boost::ref(lexicon_target_source),
+							  boost::cref(lexicon_target_source_file))));
+        
+    workers_read.join_all();
+#endif
+
     if (debug)
       std::cerr << "# of sentences: " << bitexts.size() << std::endl;
     
@@ -1617,6 +1826,13 @@ int main(int argc, char** argv)
 		   unigram_target,
 		   theta_source_target,
 		   theta_target_source);
+
+    if (! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
+      viterbi(bitexts,
+	      unigram_source,
+	      unigram_target,
+	      theta_source_target,
+	      theta_target_source);
     
     if (! output_source_target_file.empty())
       theta_source_target.write(output_source_target_file);
@@ -1834,7 +2050,6 @@ struct OutputAlignment : OutputMapReduce
   path_type   path_;
   queue_type& queue_;
 };
-
 
 struct TaskAccumulate
 {
@@ -2193,6 +2408,183 @@ void learn_online(const Learner& learner,
   theta_target_source.finalize();
 }
 
+struct TaskViterbi
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model    model_type;
+
+  typedef HMM hmm_type;
+  
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+
+  typedef OutputMapReduce output_map_reduce_type;
+  
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
+
+  typedef output_map_reduce_type::queue_type queue_alignment_type;
+  typedef output_map_reduce_type::value_type bitext_alignment_type;
+
+  TaskViterbi(const bitext_set_type& bitexts,
+	      const unigram_type& unigram_source,
+	      const unigram_type& unigram_target,
+	      const size_type& samples,
+	      const model_type& theta_source_target,
+	      const model_type& theta_target_source,
+	      queue_type& queue,
+	      queue_alignment_type& queue_source_target,
+	      queue_alignment_type& queue_target_source)
+    : bitexts_(bitexts),
+      theta_source_target_(theta_source_target),
+      theta_target_source_(theta_target_source),
+      queue_(queue),
+      queue_source_target_(queue_source_target),
+      queue_target_source_(queue_target_source),
+      hmm_source_target_(unigram_source, unigram_target, samples),
+      hmm_target_source_(unigram_target, unigram_source, samples),
+      log_likelihood_source_target_(0),
+      log_likelihood_target_source_(0) {}
+
+  void operator()()
+  {
+    bitext_alignment_type bitext_source_target;
+    bitext_alignment_type bitext_target_source;
+    
+    size_type sentence_id;
+    for (;;) {
+      queue_.pop(sentence_id);
+      
+      if (sentence_id == size_type(-1)) break;
+      
+      const bitext_type& bitext = bitexts_[sentence_id];
+      
+      bitext_source_target.id_ = sentence_id;
+      bitext_source_target.bitext_.source_ = bitext.source_;
+      bitext_source_target.bitext_.target_ = bitext.target_;
+      bitext_source_target.alignment_.clear();
+      
+      bitext_target_source.id_ = sentence_id;
+      bitext_target_source.bitext_.source_ = bitext.target_;
+      bitext_target_source.bitext_.target_ = bitext.source_;
+      bitext_target_source.alignment_.clear();
+
+      if (! bitext.source_.empty() && ! bitext.target_.empty()) {
+	log_likelihood_source_target_
+	  += hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
+	log_likelihood_target_source_
+	  += hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
+      }
+      
+      // reduce alignment
+      queue_source_target_.push_swap(bitext_source_target);
+      queue_target_source_.push_swap(bitext_target_source);
+    }
+  }
+
+  void clear()
+  {
+    log_likelihood_source_target_ = 0;
+    log_likelihood_target_source_ = 0;
+  }
+
+  const bitext_set_type& bitexts_;
+  const model_type& theta_source_target_;
+  const model_type& theta_target_source_;
+  
+  queue_type&           queue_;
+  queue_alignment_type& queue_source_target_;
+  queue_alignment_type& queue_target_source_;
+  
+  hmm_type hmm_source_target_;
+  hmm_type hmm_target_source_;
+  
+  double        log_likelihood_source_target_;
+  double        log_likelihood_target_source_;
+
+};
+
+void viterbi(const bitext_set_type& bitexts,
+	     const unigram_type& unigram_source,
+	     const unigram_type& unigram_target,
+	     const model_type& theta_source_target,
+	     const model_type& theta_target_source)
+{
+  typedef TaskViterbi task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+  typedef task_type::size_type size_type;
+
+  typedef OutputMapReduce  output_map_reduce_type;
+  typedef OutputAlignment  output_alignment_type;
+
+  task_type::queue_type   mapper(256 * threads);
+  
+  output_map_reduce_type::queue_type queue_source_target;
+  output_map_reduce_type::queue_type queue_target_source;
+  
+  task_set_type tasks(threads, task_type(bitexts,
+					 unigram_source,
+					 unigram_target,
+					 samples,
+					 theta_source_target,
+					 theta_target_source,
+					 mapper,
+					 queue_source_target,
+					 queue_target_source));
+
+  boost::thread_group workers;
+  for (size_type i = 0; i != tasks.size(); ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
+  
+  boost::thread output_source_target(output_alignment_type(! alignment_source_target_file.empty()
+							   ? alignment_source_target_file
+							   : path_type(),
+							   queue_source_target));
+  boost::thread output_target_source(output_alignment_type(! alignment_target_source_file.empty()
+							   ? alignment_target_source_file
+							   : path_type(),
+							   queue_target_source));
+
+  utils::resource start;
+  
+  // actually run...
+  size_type num_text = 0;
+  for (size_type id = 0; id != bitexts.size(); ++ id) {
+    mapper.push(id);
+    
+    ++ num_text;
+    if (debug) {
+      if (num_text % DEBUG_DOT == 0)
+	std::cerr << '.';
+      if (num_text % DEBUG_LINE == 0)
+	std::cerr << '\n';
+    }
+  }
+  
+  if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
+    std::cerr << std::endl;
+  
+  // termination
+  for (size_type i = 0; i != tasks.size(); ++ i)
+    mapper.push(size_type(-1));
+  workers.join_all();
+  
+  utils::resource end;
+
+  if (debug)
+    std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
+	      << "user time:   " << end.user_time() - start.user_time() << std::endl;
+  
+  queue_source_target.push(output_map_reduce_type::value_type());
+  queue_target_source.push(output_map_reduce_type::value_type());
+
+  output_source_target.join();
+  output_target_source.join();
+}
 
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
@@ -2331,9 +2723,9 @@ void options(int argc, char** argv)
     ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
-    ("moses", po::bool_switch(&moses_mode), "dump alignment in Moses format")
-    ("giza",  po::bool_switch(&giza_mode),  "dump alignment in Giza format")
-    ("dump",  po::bool_switch(&dump_mode),  "dump intermediate alignments")
+    ("moses",      po::bool_switch(&moses_mode),       "dump alignment in Moses format")
+    ("giza",       po::bool_switch(&giza_mode),        "dump alignment in Giza format")
+    ("dump",       po::bool_switch(&dump_mode),        "dump intermediate alignments")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
