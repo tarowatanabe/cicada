@@ -23,6 +23,8 @@
 
 #include <boost/algorithm/string/trim.hpp>
 
+#include <boost/functional/hash/hash.hpp>
+
 #include <Eigen/Core>
 
 #include "cicada/symbol.hpp"
@@ -49,6 +51,7 @@
 #include "utils/vector2.hpp"
 #include "utils/sampler.hpp"
 #include "utils/resource.hpp"
+#include "utils/simple_vector.hpp"
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
@@ -434,6 +437,19 @@ struct Model
     Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
   }
 
+  size_type shift(const difference_type source_size,
+		  const difference_type target_size,
+		  const difference_type prev,
+		  const difference_type next) const
+  {
+    const difference_type prev_adjusted = utils::bithack::branch(prev >= source_size + 2, prev - source_size - 2, prev);
+    const difference_type next_adjusted = utils::bithack::branch(next >= source_size + 2, next - source_size - 2, next);
+    
+    return utils::bithack::min(utils::bithack::max(next_adjusted - prev_adjusted + difference_type(alignment_),
+						   difference_type(0)),
+			       difference_type(alignment_ * 2));
+  }
+
   void finalize()
   {
     
@@ -547,6 +563,240 @@ struct Model
 
   tensor_type Wi_;
 };
+
+class State
+{
+public:
+  typedef char*  pointer;
+  typedef int    index_type;
+  typedef float  parameter_type;
+  typedef State  state_type;
+  
+  typedef size_t     size_type;
+  typedef ptrdiff_t  difference_type;
+  
+public:
+  State(pointer __base) : base_(__base) {}
+  State() : base_(0) {}
+  
+public:
+  static inline
+  size_type size(const size_type state_size)
+  {
+    return sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type) + sizeof(parameter_type) * state_size;
+  }
+  
+  bool empty() const { return ! base_; }
+
+  state_type& prev()
+  {
+    return *reinterpret_cast<state_type*>(base_);
+  }
+  
+  const state_type& prev() const
+  {
+    return *reinterpret_cast<const state_type*>(base_);
+  }
+  
+  index_type& index()
+  {
+    return *reinterpret_cast<index_type*>(base_ + sizeof(state_type));
+  }
+  const index_type& index() const
+  {
+    return *reinterpret_cast<const index_type*>(base_ + sizeof(state_type));
+  }
+
+  parameter_type& score()
+  {
+    return *reinterpret_cast<parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type));
+  }
+  const parameter_type& score() const
+  {
+    return *reinterpret_cast<const parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type));
+  }
+  
+  parameter_type* matrix()
+  {
+    return reinterpret_cast<parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type));
+  }
+  
+  parameter_type* matrix() const
+  {
+    return reinterpret_cast<parameter_type*>(const_cast<char*>(base_) + sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type));
+  }
+
+public:
+  friend
+  size_t hash_value(State const& x)
+  {
+    return boost::hash<pointer>()(x.base_);
+  }
+
+  friend
+  bool operator==(const State& x, const State& y)
+  {
+    return x.base_ == y.base_;
+  }
+
+  friend
+  bool operator!=(const State& x, const State& y)
+  {
+    return x.base_ != y.base_;
+  }
+  
+  
+  
+public:
+  pointer base_;
+};
+
+class StateAllocator : public std::allocator<char>
+{
+public:
+  typedef State      state_type;
+  typedef char*      pointer;
+  typedef size_t     size_type;
+  typedef ptrdiff_t  difference_type;
+  
+  typedef std::allocator<char> allocator_type;
+  typedef utils::simple_vector<pointer, std::allocator<pointer> > state_set_type;
+  
+public:
+  static const size_type chunk_size  = 1024 * 4;
+  static const size_type chunk_mask  = chunk_size - 1;
+  
+public:
+
+  StateAllocator()
+    : states(), state_iterator(0),
+      cache(0),
+      state_size(0),
+      state_alloc_size(0),
+      state_chunk_size(0) {}
+  
+  StateAllocator(size_type __state_size)
+    : states(), state_iterator(0),
+      cache(0),
+      state_size(__state_size),
+      state_alloc_size(0),
+      state_chunk_size(0)
+  {
+    if (state_size != 0) {
+      // sizeof(char*) aligned size..
+      const size_type pointer_size = sizeof(pointer);
+      const size_type pointer_mask = ~(pointer_size - 1);
+      
+      state_alloc_size = (state_size + pointer_size - 1) & pointer_mask;
+      state_chunk_size = state_alloc_size * chunk_size;
+    }
+  }
+  
+  StateAllocator(const StateAllocator& x) 
+    : allocator_type(static_cast<const allocator_type&>(x)),
+      states(), state_iterator(0),
+      cache(0),
+      state_size(x.state_size),
+      state_alloc_size(x.state_alloc_size),
+      state_chunk_size(x.state_chunk_size) {}
+  
+  StateAllocator& operator=(const StateAllocator& x)
+  { 
+    clear();
+      
+    static_cast<allocator_type&>(*this) = static_cast<const allocator_type&>(x);
+      
+    state_size = x.state_size;
+    state_alloc_size = x.state_alloc_size;
+    state_chunk_size = x.state_chunk_size;
+
+    return *this;
+  }
+  
+  ~StateAllocator() { clear(); }
+  
+public:  
+  state_type allocate()
+  {
+    if (state_size == 0) return 0;
+    
+    if (cache) {
+      pointer state = cache;
+      cache = *reinterpret_cast<pointer*>(state);
+      
+      // clear buffer...
+      std::fill(state, state + state_alloc_size, 0);
+      
+      return state_type(state);
+    }
+    
+    const size_type chunk_pos = state_iterator & chunk_mask;
+    
+    if (chunk_pos == 0) {
+      states.push_back(allocator_type::allocate(state_chunk_size));
+      std::uninitialized_fill(states.back(), states.back() + state_chunk_size, 0);
+      
+      //std::cerr << "allocated: " << ((void*) states.back()) << " size: " << states.size() << std::endl;
+    }
+    
+    ++ state_iterator;
+    
+    return state_type(states.back() + chunk_pos * state_alloc_size);
+  }
+  
+  void deallocate(const state_type& state)
+  {
+    if (state.empty() || state_size == 0 || states.empty()) return;
+    
+    *reinterpret_cast<pointer*>(const_cast<state_type&>(state).base_) = cache;
+    cache = state.base_;
+  }
+  
+  state_type clone(const state_type& state)
+  {
+    if (state_size == 0)
+      return state_type();
+      
+    state_type state_new = allocate();
+      
+    std::copy(state.base_, state.base_ + state_alloc_size, state_new.base_);
+      
+    return state_new;
+  }
+
+  void assign(size_type __state_size)
+  {
+    if (state_size != __state_size)
+      *this = StateAllocator(__state_size);
+    else
+      clear();
+  }
+  
+  void clear()
+  {
+    //std::cerr << "allocated states size: " << states.size() << std::endl;
+
+    state_set_type::iterator siter_end = states.end();
+    for (state_set_type::iterator siter = states.begin(); siter != siter_end; ++ siter) {
+      //std::cerr << "de-allocated: " << ((void*) *siter) << std::endl;
+      allocator_type::deallocate(*siter, state_chunk_size);
+    }
+    
+    states.clear();
+    state_iterator = 0;
+    cache = 0;
+  }
+  
+private:  
+  state_set_type states;
+  size_type state_iterator;
+  pointer   cache;
+
+  size_type state_size;
+  size_type state_alloc_size;
+  size_type state_chunk_size;
+};
+
 
 struct Lexicon
 {
@@ -763,13 +1013,35 @@ struct HMM
   typedef cicada::Bitext    bitext_type;
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
+
+  typedef State          state_type;
+  typedef StateAllocator state_allocator_type;
+
+  typedef std::vector<state_type, std::allocator<state_type> > heap_type;
+  typedef std::vector<heap_type, std::allocator<heap_type> > heap_set_type;
+  
+  typedef utils::unordered_map<state_type, state_type, boost::hash<state_type>, std::equal_to<state_type>,
+			       std::allocator<std::pair<const state_type, state_type> > >::type state_set_type;
+  typedef std::vector<state_set_type, std::allocator<state_set_type> > state_map_type;
+
+  struct heap_compare
+  {
+    // comparison by less, so that we can pop in greater order
+    bool operator()(const state_type& x, const state_type& y) const
+    {
+      return x.score() < y.score();
+    }
+  };
   
   HMM(const unigram_type& unigram_source,
-      const unigram_type& unigram_target)
-    : unigram_source_(unigram_source), unigram_target_(unigram_target) {}
+      const unigram_type& unigram_target,
+      const size_type& beam)
+    : unigram_source_(unigram_source), unigram_target_(unigram_target), beam_(beam) {}
   
   const unigram_type& unigram_source_;
   const unigram_type& unigram_target_;
+
+  size_type beam_;
   
   tensor_type alpha_;
   tensor_type beta_;
@@ -783,10 +1055,14 @@ struct HMM
   tensor_type layer_alpha_;
   tensor_type layer_alpha0_;
   tensor_type layer_trans_;
-
+  
   tensor_type delta_beta_;
   tensor_type delta_alpha_;
   tensor_type delta_trans_;
+  
+  state_allocator_type state_allocator_;
+  heap_set_type  heaps_;
+  state_map_type states_;
 
   struct tanh
   {
@@ -844,6 +1120,346 @@ struct HMM
     }
   };
 
+  void forward(const sentence_type& source,
+	       const sentence_type& target,
+	       const model_type& theta,
+	       alignment_type& alignment)
+  {
+    typedef Eigen::Map<tensor_type> matrix_type;
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    state_allocator_.assign(state_type::size(theta.hidden_ + theta.embedding_));
+    
+    alignment.clear();
+    
+    heaps_.clear();
+    heaps_.resize(target_size + 2);
+    
+    state_type state_bos = state_allocator_.allocate();
+    
+    state_bos.prev() = state_type();
+    state_bos.index() = 0;
+    state_bos.score() = 0.0;
+    
+    matrix_type(state_bos.matrix(), theta.hidden_, 1) = theta.Wi_;
+    
+    heaps_[0].push_back(state_bos);
+    
+    for (size_type trg = 1; trg != target_size + 2; ++ trg) {
+      const word_type target_next = (trg == 0
+				     ? vocab_type::BOS
+				     : (trg == target_size + 1
+					? vocab_type::EOS
+					: target[trg - 1]));
+      
+      heap_type& heap      = heaps_[trg - 1];
+      heap_type& heap_next = heaps_[trg];
+      
+      const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
+      const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
+      
+      // perform pruning
+      heap_type::iterator hiter_begin = heap.begin();
+      heap_type::iterator hiter       = heap.end();
+      heap_type::iterator hiter_end   = heap.end();
+      
+      if (heap.size() > beam_) {
+	for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_; -- hiter)
+	  std::pop_heap(hiter_begin, hiter, heap_compare());
+	
+	// deallocate unused states
+	for (/**/; hiter_begin != hiter; ++ hiter_begin)
+	  state_allocator_.deallocate(*hiter_begin);
+	
+      } else
+	hiter = hiter_begin;
+      
+      for (/**/; hiter != hiter_end; ++ hiter) {
+	const state_type& state = *hiter;
+	
+	const size_type prev = state.index();
+	const word_type source_prev = (prev >= source_size + 2
+				       ? vocab_type::EPSILON
+				       : (prev == 0
+					  ? vocab_type::BOS
+					  : (prev == source_size + 1
+					     ? vocab_type::EOS
+					     : source[prev - 1])));
+
+	// alignment into aligned...
+	for (size_type next = next_first; next != next_last; ++ next) {
+	  const word_type source_next = (next == 0
+					 ? vocab_type::BOS
+					 : (next == source_size + 1
+					    ? vocab_type::EOS
+					    : source[next - 1]));
+	  
+	  const size_type shift = theta.shift(source_size, target_size, prev, next);
+
+	  state_type state_next = state_allocator_.allocate();
+	  state_next.prev() = state;
+	  state_next.index() = next;
+	  
+	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
+	  matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	  
+	  layer_alpha
+	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
+		* theta.source_.col(source_prev.id()))
+	       
+	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
+		  * matrix_type(state.matrix(), theta.hidden_, 1))
+	       
+	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+
+	  layer_trans = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+			  * theta.source_.col(source_next.id()))
+			 
+			 + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			    * layer_alpha)
+			 
+			 + theta.bt_).array().unaryExpr(htanh());
+	  
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	  
+	  state_next.score() = score + state.score();
+
+	  heap_next.push_back(state_next);
+	  std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
+	}
+	
+	// none...
+	if (trg != target_size + 1) {
+	  const size_type next = utils::bithack::branch(prev >= source_size + 2, prev, prev + source_size + 2);
+	  
+	  state_type state_next = state_allocator_.allocate();
+	  state_next.prev() = state;
+	  state_next.index() = next;
+	  
+	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
+	  matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	  
+	  layer_alpha
+	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
+		* theta.source_.col(source_prev.id()))
+	       
+	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
+		  * matrix_type(state.matrix(), theta.hidden_, 1))
+	       
+	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	  
+	  layer_trans = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+			  * theta.source_.col(vocab_type::EPSILON.id()))
+			 
+			 + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			    * layer_alpha)
+			 
+			 + theta.bt_).array().unaryExpr(htanh());
+	  
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	  
+	  state_next.score() = score + state.score();
+	  
+	  heap_next.push_back(state_next);
+	  std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
+	}
+      }
+    }
+    
+    heap_type& heap = heaps_[target_size + 1];
+    
+    // perform pruning!
+    {
+      heap_type::iterator hiter_begin = heap.begin();
+      heap_type::iterator hiter       = heap.end();
+      heap_type::iterator hiter_end   = heap.end();
+      
+      for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_; -- hiter)
+	std::pop_heap(hiter_begin, hiter, heap_compare());
+      
+      // deallocate unused states
+      for (/**/; hiter_begin != hiter; ++ hiter_begin)
+	state_allocator_.deallocate(*hiter_begin);
+    }
+    
+    state_type state = heap.back();
+    
+    for (size_type trg = target_size + 1; trg >= 1; -- trg) {
+      const size_type src = state.index();
+      
+      if (trg < target_size + 1 && src < source_size + 1)
+	alignment.push_back(std::make_pair(src - 1, trg - 1));
+      
+      state = state.prev();
+    }
+  }
+  
+  template <typename Gen>
+  double backward(const sentence_type& source,
+		  const sentence_type& target,
+		  const model_type& theta,
+		  gradient_type& gradient,
+		  Gen& gen)
+  {
+    typedef Eigen::Map<tensor_type> matrix_type;
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    states_.clear();
+    states_.resize(target_size + 2);
+
+    {
+      state_set_type& states = states_[target_size + 1];
+      const heap_type& heap = heaps_[target_size + 1];
+      
+      heap_type::const_iterator hiter_end = heap.end();
+      for (heap_type::const_iterator hiter = std::max(heap.begin(), hiter_end - beam_); hiter != hiter_end; ++ hiter) {
+	state_type buffer = state_allocator_.allocate();
+	
+	matrix_type(buffer.matrix(), theta.embedding_ + theta.hidden_, 1).setZero();
+	
+	states[*hiter] = buffer;
+      }
+    }
+
+    double loss = 0.0;
+    
+    for (size_type trg = target_size + 1; trg > 0; -- trg) {
+      const state_set_type& states_next = states_[trg];
+      state_set_type& states_prev = states_[trg - 1];
+
+      const word_type target_next(trg == 0
+				  ? vocab_type::BOS
+				  : (trg == target_size + 1
+				     ? vocab_type::EOS
+				     : target[trg - 1]));
+      
+      state_set_type::const_iterator siter_end = states_next.end();
+      for (state_set_type::const_iterator siter = states_next.begin(); siter != siter_end; ++ siter) {
+	const state_type state_next(siter->first);
+	const state_type state_prev(state_next.prev());
+	
+	const matrix_type beta_next(siter->second.matrix(), theta.embedding_ + theta.hidden_, 1);
+	
+	state_set_type::iterator piter = states_prev.find(state_prev);
+	if (piter == states_prev.end()) {
+	  state_type buffer = state_allocator_.allocate();
+	  
+	  matrix_type(buffer.matrix(), theta.embedding_ + theta.hidden_, 1).setZero();
+	  
+	  piter = states_prev.insert(std::make_pair(state_prev, buffer)).first;
+	}
+	
+	matrix_type beta_prev(piter->second.matrix(), theta.embedding_ + theta.hidden_, 1);
+	
+	const size_type next = state_next.index();
+	const size_type prev = state_prev.index();
+	
+	const word_type source_next(next >= source_size + 2
+				    ? vocab_type::EPSILON
+				    : (next == 0
+				       ? vocab_type::BOS
+				       : (next == source_size + 1
+					  ? vocab_type::EOS
+					  : source[next - 1])));
+	const word_type source_prev(prev >= source_size + 2
+				    ? vocab_type::EPSILON
+				    : (prev == 0
+				       ? vocab_type::BOS
+				       : (prev == source_size + 1
+					  ? vocab_type::EOS
+					  : source[prev - 1])));
+	
+	const matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
+	const matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	
+	const word_type target_sampled = unigram_target_.draw(gen);    
+	
+	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+				+ theta.target_.col(target_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+	
+	const double error = std::max(1.0 - (score_c - score_m), 0.0);
+	
+	loss += error;
+	
+	const double delta_c = - (error > 0.0);
+	const double delta_m =   (error > 0.0);
+	
+	tensor_type& dembedding_c = gradient.target(target_next);
+	tensor_type& dembedding_m = gradient.target(target_sampled);
+	
+	dembedding_c.block(0, 0, theta.embedding_, 1).array() += delta_c * layer_trans.array();
+	dembedding_c.block(theta.embedding_, 0, 1, 1).array() += delta_c;
+	dembedding_m.block(0, 0, theta.embedding_, 1).array() += delta_m * layer_trans.array();
+	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += delta_m;
+	
+	delta_trans_ = (layer_trans.array().unaryExpr(dhtanh())
+			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * delta_c
+			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * delta_m).array());
+	
+	gradient.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+	  += delta_trans_ * theta.source_.col(source_next.id()).transpose();
+	gradient.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+	  += delta_trans_ * layer_alpha.transpose();
+	gradient.bt_ += delta_trans_;
+	
+	delta_beta_ = beta_next + theta.Wt_.transpose() * delta_trans_;
+	
+	gradient.source(source_next) += delta_beta_.block(0, 0, theta.embedding_, 1);
+	
+	delta_alpha_ = layer_alpha.array().unaryExpr(dtanh()) * delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1).array();
+
+	if (next >= source_size + 2) {
+	  gradient.Wn_.block(0, 0, theta.hidden_, theta.embedding_).array()
+	    += (delta_alpha_ * theta.source_.col(source_prev.id()).transpose()).array();
+	  
+	  gradient.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_).array()
+	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
+	  
+	  gradient.bn_.array()
+	    += delta_alpha_.array();
+	  
+	  beta_prev.array() += (theta.Wn_.transpose() * delta_alpha_).array();
+	} else {
+	  const size_type shift = theta.shift(source_size, target_size, prev, next);
+	  
+	  gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_).array()
+	    += (delta_alpha_ * theta.source_.col(source_prev.id()).transpose()).array();
+	  
+	  gradient.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_).array()
+	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
+	  
+	  gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1).array()
+	    += delta_alpha_.array();
+	  
+	  beta_prev.array() += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_ + theta.hidden_).transpose()
+				* delta_alpha_).array();
+	}
+      }
+    }
+    
+    // final propagation...
+    if (states_[0].empty())
+      throw std::runtime_error("no initial state?");
+    if (states_[0].size() != 1)
+      throw std::runtime_error("multiple initial states?");
+
+    const matrix_type beta(states_[0].begin()->second.matrix(), theta.embedding_ + theta.hidden_, 1);
+    
+    gradient.source(vocab_type::BOS) += beta.block(0, 0, theta.embedding_, 1);
+    gradient.Wi_ += beta.block(theta.embedding_, 0, theta.hidden_, 1);
+    
+    return loss;
+  }
+
+#if 0
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta)
@@ -914,8 +1530,6 @@ struct HMM
 	
 	alpha_.block(state_size * next, trg, theta.embedding_, 1) = theta.source_.col(source_next.id());
 	
-	const double norm = 1.0 / visited_.col(trg - 1).sum();
-	
 	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
 	  if (visited_(prev1, trg - 1)) {
 	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
@@ -927,7 +1541,7 @@ struct HMM
 	    alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
 	      += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 		  * alpha_.block(state_size * prev1, trg - 1, state_size, 1)
-		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array() * norm;
+		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array();
 	  }
 	
 	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2)
@@ -941,7 +1555,7 @@ struct HMM
 	    alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
 	      += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 		  * alpha_.block(state_size * prev2, trg - 1, state_size, 1)
-		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array() * norm;
+		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array();
 	  }
 
 	// activation
@@ -964,17 +1578,15 @@ struct HMM
 
 	alpha_.block(state_size * next, trg, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
 	
-	const double norm = 1.0 / (visited1 + visited2);
-	
 	// prev1
 	if (visited1)
 	  alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	    += (theta.Wn_ * alpha_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array() * norm;
+	    += (theta.Wn_ * alpha_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array();
 	
 	// prev2
 	if (visited2)
 	  alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	    += (theta.Wn_ * alpha_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array() * norm;
+	    += (theta.Wn_ * alpha_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array();
 	
 	// activation
 	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
@@ -982,7 +1594,7 @@ struct HMM
       }
     }
   }
-
+  
   template <typename Gen>
   double backward(const sentence_type& source,
 		  const sentence_type& target,
@@ -1027,15 +1639,13 @@ struct HMM
 
 	loss += backward(source, target, theta, gradient, gen, trg, next);
 
-	const double norm = 1.0 / visited_.col(trg - 1).sum();
-	
 	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
 	  if (visited_(prev1, trg - 1))
-	    backward(source, target, theta, gradient, trg, next, prev1, norm);
+	    backward(source, target, theta, gradient, trg, next, prev1);
 	
 	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2)
 	  if (visited_(prev2, trg - 1))
-	    backward(source, target, theta, gradient, trg, next, prev2, norm);
+	    backward(source, target, theta, gradient, trg, next, prev2);
       }
       
       // alingment into none..
@@ -1049,15 +1659,13 @@ struct HMM
 	
 	loss += backward(source, target, theta, gradient, gen, trg, next);
 	
-	const double norm = 1.0 / (visited1 + visited2);
-
 	// prev1
 	if (visited1)
-	  backward(source, target, theta, gradient, trg, next, prev1, norm);
+	  backward(source, target, theta, gradient, trg, next, prev1);
 	  
 	// prev2
 	if (visited2)
-	  backward(source, target, theta, gradient, trg, next, prev2, norm);
+	  backward(source, target, theta, gradient, trg, next, prev2);
       }
     }
     
@@ -1144,8 +1752,7 @@ struct HMM
 		gradient_type& gradient,
 		const size_type target_pos,
 		const size_type source_pos,
-		const size_type source_prev,
-		const double norm)
+		const size_type source_prev)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -1156,12 +1763,12 @@ struct HMM
     
     if (is_none) {
       gradient.Wn_.array()
-	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array() * norm;
+	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array();
       gradient.bn_.array()
-	+= delta_alpha_.array() * norm;
+	+= delta_alpha_.array();
       
       beta_.block(state_size * source_prev, target_pos - 1, state_size, 1).array()
-	+= (theta.Wn_.transpose() * delta_alpha_).array() * norm;
+	+= (theta.Wn_.transpose() * delta_alpha_).array();
     } else {
       const size_type shift = utils::bithack::min(utils::bithack::max(difference_type(source_pos)
 								      - difference_type(source_prev
@@ -1173,51 +1780,42 @@ struct HMM
 						  difference_type(theta.alignment_ * 2));
       
       gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).array()
-	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array() * norm;
+	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array();
       gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1).array()
-	+= delta_alpha_.array() * norm;
+	+= delta_alpha_.array();
       
       beta_.block(state_size * source_prev, target_pos - 1, state_size, 1).array()
-	+=  (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose() * delta_alpha_).array() * norm;
+	+=  (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose() * delta_alpha_).array();
     }
   }
-  
+#endif
+    
   double viterbi(const sentence_type& source,
 		 const sentence_type& target,
 		 const model_type& theta,
 		 alignment_type& alignment)
   {
+    typedef Eigen::Map<tensor_type> matrix_type;
+    
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
-    const size_type state_size = theta.embedding_ + theta.hidden_;
-
-    const parameter_type zero = - std::numeric_limits<parameter_type>::infinity();
-
+    state_allocator_.assign(state_type::size(theta.hidden_));
+    
     alignment.clear();
     
-    forw_.resize((source_size + 2) * 2 * state_size, target_size + 2);
-    forw_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::BOS.id());
-    forw_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
+    heaps_.clear();
+    heaps_.resize(target_size + 2);
     
-    visited_.resize((source_size + 2) * 2, target_size + 2);
-    visited_.setZero();
-    visited_(0, 0) = true;
+    state_type state_bos = state_allocator_.allocate();
     
-    score_.resize((source_size + 2) * 2, target_size + 2);
-    score_.setConstant(zero);
-    score_(0, 0) = 0.0;
+    state_bos.prev() = state_type();
+    state_bos.index() = 0;
+    state_bos.score() = 0.0;
     
-    back_.resize((source_size + 2) * 2, target_size + 2);
-    back_.setConstant(-1);
-
-    if (! layer_alpha0_.cols())
-      layer_alpha0_.resize(state_size, 1);
-    if (! layer_alpha_.cols())
-      layer_alpha_.resize(state_size, 1);
-
-    layer_alpha0_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
+    matrix_type(state_bos.matrix(), theta.hidden_, 1) = theta.Wi_;
     
+    heaps_[0].push_back(state_bos);
     
     for (size_type trg = 1; trg != target_size + 2; ++ trg) {
       const word_type target_next = (trg == 0
@@ -1226,149 +1824,143 @@ struct HMM
 					? vocab_type::EOS
 					: target[trg - 1]));
       
-      // for EOS, we need to match with EOS, otherwise, do not match..
+      heap_type& heap      = heaps_[trg - 1];
+      heap_type& heap_next = heaps_[trg];
+      
       const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
       const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
       
-      const size_type prev1_first = utils::bithack::branch(trg == 1, 0, 1);
-      const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
+      // perform pruning
+      heap_type::iterator hiter_begin = heap.begin();
+      heap_type::iterator hiter       = heap.end();
+      heap_type::iterator hiter_end   = heap.end();
       
-      const size_type prev2_first = source_size + 2 + (source_size + 1) * (trg == 1);
-      const size_type prev2_last  = source_size + 2 + source_size + 1;
-      
-      const size_type none_first = utils::bithack::branch(trg == 1,
-							  size_type(0),
-							  utils::bithack::branch(trg == target_size + 1,
-										 source_size + 1,
-										 size_type(0)));
-      const size_type none_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
-      
-      
-      // alignment into aligned...
-      for (size_type next = next_first; next != next_last; ++ next) {
-	//std::cerr << "source next: " << next << std::endl;
-
-	const word_type source_next = (next == 0
-				       ? vocab_type::BOS
-				       : (next == source_size + 1
-					  ? vocab_type::EOS
-					  : source[next - 1]));
-
-	visited_(next, trg) = true;
-
-	layer_alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
+      if (heap.size() > beam_) {
+	for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_; -- hiter)
+	  std::pop_heap(hiter_begin, hiter, heap_compare());
 	
-	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
-	  if (visited_(prev1, trg - 1)) {
-	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
-									     - difference_type(prev1))
-									    + theta.alignment_,
-									    difference_type(0)),
-							difference_type(theta.alignment_ * 2));
-	    
-	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
-	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-		 * forw_.block(state_size * prev1, trg - 1, state_size, 1)
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
-	    
-	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
-	    
-	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	    
-	    if (score + score_(prev1, trg - 1) > score_(next, trg)) {
-	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	      score_(next, trg) = score + score_(prev1, trg - 1);
-	      back_(next, trg) = prev1;
-	    }
-	  }
-
-	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2)
-	  if (visited_(prev2, trg - 1)) {
-	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next + source_size + 2)
-									     - difference_type(prev2))
-									    + theta.alignment_,
-									    difference_type(0)),
-							difference_type(theta.alignment_ * 2));
-	    
-	    layer_alpha_.block(theta.embedding_, 0, theta.hidden_, 1)
-	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-		 * forw_.block(state_size * prev2, trg - 1, state_size, 1)
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
-	    
-	    layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
-	    
-	    const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-				  + theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	    
-	    if (score + score_(prev2, trg - 1) > score_(next, trg)) {
-	      forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	      score_(next, trg) = score + score_(prev2, trg - 1);
-	      back_(next, trg) = prev2;
-	    }
-	  }
-      }
+	// deallocate unused states
+	for (/**/; hiter_begin != hiter; ++ hiter_begin)
+	  state_allocator_.deallocate(*hiter_begin);
+	
+      } else
+	hiter = hiter_begin;
       
-      // alingment into none..
-      for (size_type none = none_first; none != none_last; ++ none) {
-	//std::cerr << "source none: " << none << std::endl;
+      for (/**/; hiter != hiter_end; ++ hiter) {
+	const state_type& state = *hiter;
 	
-	const size_type next  = none + source_size + 2;
-	const size_type prev1 = none;
-	const size_type prev2 = none + source_size + 2;
-	
-	visited_(next, trg) = true;
-	
-	if (visited_(prev1, trg - 1)) {
-	  layer_alpha0_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * forw_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	const size_type prev = state.index();
+	const word_type source_prev = (prev >= source_size + 2
+				       ? vocab_type::EPSILON
+				       : (prev == 0
+					  ? vocab_type::BOS
+					  : (prev == source_size + 1
+					     ? vocab_type::EOS
+					     : source[prev - 1])));
+
+	// alignment into aligned...
+	for (size_type next = next_first; next != next_last; ++ next) {
+	  const word_type source_next = (next == 0
+					 ? vocab_type::BOS
+					 : (next == source_size + 1
+					    ? vocab_type::EOS
+					    : source[next - 1]));
 	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	  const size_type shift = theta.shift(source_size, target_size, prev, next);
+
+	  state_type state_next = state_allocator_.allocate();
+	  state_next.prev() = state;
+	  state_next.index() = next;
+	  
+	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
+	  
+	  layer_alpha
+	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
+		* theta.source_.col(source_prev.id()))
+	       
+	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
+		  * matrix_type(state.matrix(), theta.hidden_, 1))
+	       
+	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+
+	  layer_trans_ = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+			   * theta.source_.col(source_next.id()))
+			  
+			  + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			     * layer_alpha)
+			  
+			  + theta.bt_).array().unaryExpr(htanh());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev1, trg - 1) > score_(next, trg)) {
-	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	    score_(next, trg) = score + score_(prev1, trg - 1);
-	    back_(next, trg) = prev1;
-	  }
+	  state_next.score() = score + state.score();
+
+	  heap_next.push_back(state_next);
+	  std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
 	}
-
-	if (visited_(prev2, trg - 1)) {
-	  layer_alpha0_.block(theta.embedding_, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * forw_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	
+	// none...
+	if (trg != target_size + 1) {
+	  const size_type next = utils::bithack::branch(prev >= source_size + 2, prev, prev + source_size + 2);
 	  
-	  layer_trans_ = (theta.Wt_ * layer_alpha_ + theta.bt_).array().unaryExpr(htanh());
+	  state_type state_next = state_allocator_.allocate();
+	  state_next.prev() = state;
+	  state_next.index() = next;
+	  
+	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
+	  
+	  layer_alpha
+	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
+		* theta.source_.col(source_prev.id()))
+	       
+	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
+		  * matrix_type(state.matrix(), theta.hidden_, 1))
+	       
+	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	  
+	  layer_trans_ = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+			   * theta.source_.col(vocab_type::EPSILON.id()))
+			  
+			  + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			     * layer_alpha)
+			  
+			  + theta.bt_).array().unaryExpr(htanh());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
-	  if (score + score_(prev2, trg - 1) > score_(next, trg)) {
-	    forw_.block(state_size * next, trg, state_size, 1) = layer_alpha_;
-	    score_(next, trg) = score + score_(prev2, trg - 1);
-	    back_(next, trg) = prev2;
-	  }	  
-	}	
+	  state_next.score() = score + state.score();
+	  
+	  heap_next.push_back(state_next);
+	  std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
+	}
       }
     }
-
-    // traverse back...
-    int src = back_(source_size + 1, target_size + 1);
     
-    for (int trg = target_size; trg >= 1; -- trg) {
-      if (src < 0) break;
-      
-      if (src < static_cast<int>(source_size + 2))
+#if 0
+    std::cerr << "source: " << source << std::endl
+	      << "target: " << target << std::endl;
+#endif
+
+    heap_type& heap = heaps_[target_size + 1];
+    
+    std::pop_heap(heap.begin(), heap.end(), heap_compare());
+    
+    state_type state = heap.back();
+    const double score = state.score();
+    
+    for (size_type trg = target_size + 1; trg >= 1; -- trg) {
+      const size_type src = state.index();
+
+      if (trg < target_size + 1 && src < source_size + 1)
 	alignment.push_back(std::make_pair(src - 1, trg - 1));
       
-      src = back_(src, trg);
+      state = state.prev();
     }
-    
-    // score at EOS
-    return score_(source_size + 1, target_size + 1);
-  }
 
+    return score;
+  }
 };
 
 
@@ -1615,7 +2207,7 @@ path_type output_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 
-int dimension_embedding = 64;
+int dimension_embedding = 32;
 int dimension_hidden = 128;
 int alignment = 8;
 
@@ -1624,6 +2216,7 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 128;
+int beam_size = 10;
 int cutoff = 3;
 double lambda = 1e-5;
 double lambda2 = 0.0;
@@ -2036,8 +2629,8 @@ struct TaskAccumulate
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
       counter_(counter),
-      hmm_source_target_(unigram_source, unigram_target),
-      hmm_target_source_(unigram_target, unigram_source),
+      hmm_source_target_(unigram_source, unigram_target, beam_size),
+      hmm_target_source_(unigram_target, unigram_source, beam_size),
       gradient_source_target_(theta_source_target.embedding_,
 			      theta_source_target.hidden_,
 			      theta_source_target.alignment_),
@@ -2076,6 +2669,24 @@ struct TaskAccumulate
       bitext_target_source.alignment_.clear();
 
       if (! bitext.source_.empty() && ! bitext.target_.empty()) {
+	hmm_source_target_.forward(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
+	hmm_target_source_.forward(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
+	
+	loss_source_target_
+	  += hmm_source_target_.backward(bitext.source_,
+					 bitext.target_,
+					 theta_source_target_,
+					 gradient_source_target_,
+					 generator);
+	
+	loss_target_source_
+	  += hmm_target_source_.backward(bitext.target_,
+					 bitext.source_,
+					 theta_target_source_,
+					 gradient_target_source_,
+					 generator);
+	
+#if 0
 	hmm_source_target_.forward(bitext.source_, bitext.target_, theta_source_target_);
 	hmm_target_source_.forward(bitext.target_, bitext.source_, theta_target_source_);
 	
@@ -2097,6 +2708,7 @@ struct TaskAccumulate
 	  hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
 	  hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
 	}
+#endif
       }
       
       // reduce alignment
@@ -2356,8 +2968,8 @@ struct TaskViterbi
       queue_(queue),
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
-      hmm_source_target_(unigram_source, unigram_target),
-      hmm_target_source_(unigram_target, unigram_source),
+      hmm_source_target_(unigram_source, unigram_target, beam_size),
+      hmm_target_source_(unigram_target, unigram_source, beam_size),
       loss_source_target_(0),
       loss_target_source_(0) {}
 
@@ -2632,6 +3244,7 @@ void options(int argc, char** argv)
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
+    ("beam",              po::value<int>(&beam_size)->default_value(beam_size),   "histogram beam size")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
