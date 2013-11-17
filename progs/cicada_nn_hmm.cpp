@@ -574,6 +574,11 @@ public:
   
   typedef size_t     size_type;
   typedef ptrdiff_t  difference_type;
+
+  static const size_type offset_prev   = 0;
+  static const size_type offset_index  = offset_prev  + sizeof(pointer);
+  static const size_type offset_score  = offset_index + sizeof(index_type);
+  static const size_type offset_matrix = (offset_score + sizeof(parameter_type) + 15) & (~15);
   
 public:
   State(pointer __base) : base_(__base) {}
@@ -581,50 +586,21 @@ public:
   
 public:
   static inline
-  size_type size(const size_type state_size)
-  {
-    return sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type) + sizeof(parameter_type) * state_size;
-  }
+  size_type size(const size_type state_size) { return offset_matrix + sizeof(parameter_type) * state_size; }
   
   bool empty() const { return ! base_; }
 
-  state_type& prev()
-  {
-    return *reinterpret_cast<state_type*>(base_);
-  }
+  inline       state_type& prev()       { return *reinterpret_cast<state_type*>(base_ + offset_prev); }
+  inline const state_type& prev() const { return *reinterpret_cast<const state_type*>(base_ + offset_prev); }
   
-  const state_type& prev() const
-  {
-    return *reinterpret_cast<const state_type*>(base_);
-  }
-  
-  index_type& index()
-  {
-    return *reinterpret_cast<index_type*>(base_ + sizeof(state_type));
-  }
-  const index_type& index() const
-  {
-    return *reinterpret_cast<const index_type*>(base_ + sizeof(state_type));
-  }
+  inline       index_type& index()       { return *reinterpret_cast<index_type*>(base_ + offset_index); }
+  inline const index_type& index() const { return *reinterpret_cast<const index_type*>(base_ + offset_index); }
 
-  parameter_type& score()
-  {
-    return *reinterpret_cast<parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type));
-  }
-  const parameter_type& score() const
-  {
-    return *reinterpret_cast<const parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type));
-  }
+  inline       parameter_type& score()       { return *reinterpret_cast<parameter_type*>(base_ + offset_score); }
+  inline const parameter_type& score() const { return *reinterpret_cast<const parameter_type*>(base_ + offset_score); }
   
-  parameter_type* matrix()
-  {
-    return reinterpret_cast<parameter_type*>(base_ + sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type));
-  }
-  
-  parameter_type* matrix() const
-  {
-    return reinterpret_cast<parameter_type*>(const_cast<char*>(base_) + sizeof(state_type) + sizeof(index_type) + sizeof(parameter_type));
-  }
+  inline parameter_type* matrix()       { return reinterpret_cast<parameter_type*>(base_ + offset_matrix); }
+  inline parameter_type* matrix() const { return reinterpret_cast<parameter_type*>(const_cast<char*>(base_) + offset_matrix); }
 
 public:
   friend
@@ -644,8 +620,6 @@ public:
   {
     return x.base_ != y.base_;
   }
-  
-  
   
 public:
   pointer base_;
@@ -1052,8 +1026,6 @@ struct HMM
   back_type   back_;
   tensor_type score_;
 
-  tensor_type layer_alpha_;
-  tensor_type layer_alpha0_;
   tensor_type layer_trans_;
   
   tensor_type delta_beta_;
@@ -1129,6 +1101,9 @@ struct HMM
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    const size_type offset_word   = 0;
+    const size_type offset_matrix = theta.embedding_;
     
     state_allocator_.assign(state_type::size(theta.hidden_ + theta.embedding_));
     
@@ -1217,18 +1192,18 @@ struct HMM
 	  matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
 	  
 	  layer_alpha
-	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
+	    = ((theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
 		* theta.source_.col(source_aligned_prev.id()))
 	       
-	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
+	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
 
-	  layer_trans = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+	  layer_trans = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			  * theta.source_.col(source_next.id()))
 			 
-			 + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			 + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			    * layer_alpha)
 			 
 			 + theta.bt_).array().unaryExpr(htanh());
@@ -1320,6 +1295,9 @@ struct HMM
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    const size_type offset_word   = 0;
+    const size_type offset_matrix = theta.embedding_;
     
     states_.clear();
     states_.resize(target_size + 2);
@@ -1332,7 +1310,7 @@ struct HMM
       for (heap_type::const_iterator hiter = std::max(heap.begin(), hiter_end - beam_); hiter != hiter_end; ++ hiter) {
 	state_type buffer = state_allocator_.allocate();
 	
-	matrix_type(buffer.matrix(), theta.embedding_ + theta.hidden_, 1).setZero();
+	matrix_type(buffer.matrix(), theta.hidden_, 1).setZero();
 	
 	states[*hiter] = buffer;
       }
@@ -1355,18 +1333,18 @@ struct HMM
 	const state_type state_next(siter->first);
 	const state_type state_prev(state_next.prev());
 	
-	const matrix_type beta_next(siter->second.matrix(), theta.embedding_ + theta.hidden_, 1);
+	const matrix_type beta_next(siter->second.matrix(), theta.hidden_, 1);
 	
 	state_set_type::iterator piter = states_prev.find(state_prev);
 	if (piter == states_prev.end()) {
 	  state_type buffer = state_allocator_.allocate();
 	  
-	  matrix_type(buffer.matrix(), theta.embedding_ + theta.hidden_, 1).setZero();
+	  matrix_type(buffer.matrix(), theta.hidden_, 1).setZero();
 	  
 	  piter = states_prev.insert(std::make_pair(state_prev, buffer)).first;
 	}
 	
-	matrix_type beta_prev(piter->second.matrix(), theta.embedding_ + theta.hidden_, 1);
+	matrix_type beta_prev(piter->second.matrix(), theta.hidden_, 1);
 	
 	const size_type next = state_next.index();
 	const size_type prev = state_prev.index();
@@ -1426,43 +1404,49 @@ struct HMM
 			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * delta_c
 			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * delta_m).array());
 	
-	gradient.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+	gradient.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 	  += delta_trans_ * theta.source_.col(source_next.id()).transpose();
-	gradient.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+	gradient.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 	  += delta_trans_ * layer_alpha.transpose();
 	gradient.bt_ += delta_trans_;
 	
-	delta_beta_ = beta_next + theta.Wt_.transpose() * delta_trans_;
+	delta_beta_ = theta.Wt_.transpose() * delta_trans_;
 	
 	gradient.source(source_next) += delta_beta_.block(0, 0, theta.embedding_, 1);
 	
-	delta_alpha_ = layer_alpha.array().unaryExpr(dtanh()) * delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1).array();
-
+	delta_alpha_ = (layer_alpha.array().unaryExpr(dtanh())
+			* (delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1) + beta_next).array());
+	
 	if (next >= source_size + 2) {
-	  gradient.Wn_.block(0, 0, theta.hidden_, theta.embedding_).array()
-	    += (delta_alpha_ * theta.source_.col(source_none_prev.id()).transpose()).array();
+	  gradient.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
+	    += (delta_alpha_ * theta.source_.col(source_none_prev.id()).transpose());
 	  
-	  gradient.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_).array()
-	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
+	  gradient.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose());
 	  
-	  gradient.bn_.array()
-	    += delta_alpha_.array();
+	  gradient.bn_ += delta_alpha_;
+
+	  gradient.source(source_none_prev) += (theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_).transpose()
+						* delta_alpha_);
 	  
-	  beta_prev.array() += (theta.Wn_.transpose() * delta_alpha_).array();
+	  beta_prev += (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_).transpose() * delta_alpha_);
 	} else {
 	  const size_type shift = theta.shift(source_size, target_size, prev, next);
 	  
-	  gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_).array()
-	    += (delta_alpha_ * theta.source_.col(source_aligned_prev.id()).transpose()).array();
+	  gradient.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
+	    += (delta_alpha_ * theta.source_.col(source_aligned_prev.id()).transpose());
 	  
-	  gradient.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_).array()
-	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
+	  gradient.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose());
 	  
-	  gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1).array()
-	    += delta_alpha_.array();
+	  gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
+	    += delta_alpha_;
 	  
-	  beta_prev.array() += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_ + theta.hidden_).transpose()
-				* delta_alpha_).array();
+	  gradient.source(source_aligned_prev) += (theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_).transpose()
+						   * delta_alpha_);
+	  
+	  beta_prev += (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_).transpose()
+			* delta_alpha_);
 	}
       }
     }
@@ -1490,6 +1474,9 @@ struct HMM
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+    
+    const size_type offset_word   = 0;
+    const size_type offset_matrix = theta.embedding_;
     
     state_allocator_.assign(state_type::size(theta.hidden_));
     
@@ -1577,18 +1564,18 @@ struct HMM
 	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
 	  
 	  layer_alpha
-	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
+	    = ((theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
 		* theta.source_.col(source_aligned_prev.id()))
 	       
-	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
+	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
 
-	  layer_trans_ = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			   * theta.source_.col(source_next.id()))
 			  
-			  + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
 			  + theta.bt_).array().unaryExpr(htanh());
@@ -1613,18 +1600,18 @@ struct HMM
 	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
 	  
 	  layer_alpha
-	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
+	    = ((theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
 		* theta.source_.col(source_none_prev.id()))
 	       
-	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
+	       + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
 	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
 	  
-	  layer_trans_ = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
+	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			   * theta.source_.col(vocab_type::EPSILON.id()))
 			  
-			  + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
+			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
 			  + theta.bt_).array().unaryExpr(htanh());
