@@ -1180,13 +1180,24 @@ struct HMM
 	const state_type& state = *hiter;
 	
 	const size_type prev = state.index();
-	const word_type source_prev = (prev >= source_size + 2
-				       ? vocab_type::EPSILON
-				       : (prev == 0
-					  ? vocab_type::BOS
-					  : (prev == source_size + 1
-					     ? vocab_type::EOS
-					     : source[prev - 1])));
+	const word_type source_aligned_prev = (prev >= source_size + 2
+					       ? (prev - source_size - 2 == 0
+						  ? vocab_type::BOS
+						  : (prev - source_size - 2 == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - source_size - 2 - 1]))
+					       : (prev == 0
+						  ? vocab_type::BOS
+						  : (prev == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - 1])));
+	const word_type source_none_prev = (prev >= source_size + 2
+					    ? vocab_type::EPSILON
+					    : (prev == 0
+					       ? vocab_type::BOS
+					       : (prev == source_size + 1
+						  ? vocab_type::EOS
+						  : source[prev - 1])));
 
 	// alignment into aligned...
 	for (size_type next = next_first; next != next_last; ++ next) {
@@ -1207,7 +1218,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_aligned_prev.id()))
 	       
 	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
@@ -1244,7 +1255,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_none_prev.id()))
 	       
 	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
@@ -1367,13 +1378,24 @@ struct HMM
 				       : (next == source_size + 1
 					  ? vocab_type::EOS
 					  : source[next - 1])));
-	const word_type source_prev(prev >= source_size + 2
-				    ? vocab_type::EPSILON
-				    : (prev == 0
-				       ? vocab_type::BOS
-				       : (prev == source_size + 1
-					  ? vocab_type::EOS
-					  : source[prev - 1])));
+	const word_type source_aligned_prev = (prev >= source_size + 2
+					       ? (prev - source_size - 2 == 0
+						  ? vocab_type::BOS
+						  : (prev - source_size - 2 == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - source_size - 2 - 1]))
+					       : (prev == 0
+						  ? vocab_type::BOS
+						  : (prev == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - 1])));
+	const word_type source_none_prev = (prev >= source_size + 2
+					    ? vocab_type::EPSILON
+					    : (prev == 0
+					       ? vocab_type::BOS
+					       : (prev == source_size + 1
+						  ? vocab_type::EOS
+						  : source[prev - 1])));
 	
 	const matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
 	const matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
@@ -1418,7 +1440,7 @@ struct HMM
 
 	if (next >= source_size + 2) {
 	  gradient.Wn_.block(0, 0, theta.hidden_, theta.embedding_).array()
-	    += (delta_alpha_ * theta.source_.col(source_prev.id()).transpose()).array();
+	    += (delta_alpha_ * theta.source_.col(source_none_prev.id()).transpose()).array();
 	  
 	  gradient.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_).array()
 	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
@@ -1431,7 +1453,7 @@ struct HMM
 	  const size_type shift = theta.shift(source_size, target_size, prev, next);
 	  
 	  gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_).array()
-	    += (delta_alpha_ * theta.source_.col(source_prev.id()).transpose()).array();
+	    += (delta_alpha_ * theta.source_.col(source_aligned_prev.id()).transpose()).array();
 	  
 	  gradient.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_).array()
 	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose()).array();
@@ -1458,337 +1480,6 @@ struct HMM
     
     return loss;
   }
-
-#if 0
-  void forward(const sentence_type& source,
-	       const sentence_type& target,
-	       const model_type& theta)
-  {
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-
-    const size_type state_size = theta.embedding_ + theta.hidden_;
-    
-#if 0
-    std::cerr << "forward source: " << source << std::endl
-	      << "forward taregt: " << target << std::endl;
-#endif
-    
-    alpha_.resize((source_size + 2) * 2 * state_size, target_size + 2);
-    alpha_.setZero();
-    
-    alpha_.block(0, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::BOS.id());
-    alpha_.block(theta.embedding_, 0, theta.hidden_, 1) = theta.Wi_;
-
-    visited_.resize((source_size + 2) * 2, target_size + 2);
-    visited_.setZero();
-    visited_(0, 0) = true;
-
-    for (size_type trg = 1; trg != target_size + 2; ++ trg) {
-      const word_type target_next = (trg == 0
-				     ? vocab_type::BOS
-				     : (trg == target_size + 1
-					? vocab_type::EOS
-					: target[trg - 1]));
-      
-      // for EOS, we need to match with EOS, otherwise, do not match..
-      const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
-      const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
-      
-      const size_type prev1_first = utils::bithack::branch(trg == 1, 0, 1);
-      const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
-      
-      const size_type prev2_first = source_size + 2 + (source_size + 1) * (trg == 1);
-      const size_type prev2_last  = source_size + 2 + source_size + 1;
-      
-      const size_type none_first = utils::bithack::branch(trg == 1,
-							  size_type(0),
-							  utils::bithack::branch(trg == target_size + 1,
-										 source_size + 1,
-										 size_type(0)));
-      const size_type none_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
-            
-#if 0
-      std::cerr << "target pos: " << trg << " word: " << target_next 
-		<< " next: [" << next_first << ", " << next_last << ")"
-		<< " prev1: [" << prev1_first << ", " << prev1_last << ")"
-		<< " prev2: [" << prev2_first << ", " << prev2_last << ")"
-		<< " none: [" << none_first << ", " << none_last << ")" << std::endl;
-#endif
-
-      // alignment into aligned...
-      for (size_type next = next_first; next != next_last; ++ next) {
-	//std::cerr << "source next: " << next << std::endl;
-
-	const word_type source_next = (next == 0
-				       ? vocab_type::BOS
-				       : (next == source_size + 1
-					  ? vocab_type::EOS
-					  : source[next - 1]));
-	
-	visited_(next, trg) = true;
-	
-	alpha_.block(state_size * next, trg, theta.embedding_, 1) = theta.source_.col(source_next.id());
-	
-	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
-	  if (visited_(prev1, trg - 1)) {
-	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next)
-									     - difference_type(prev1))
-									    + theta.alignment_,
-									    difference_type(0)),
-							difference_type(theta.alignment_ * 2));
-	    
-	    alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	      += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-		  * alpha_.block(state_size * prev1, trg - 1, state_size, 1)
-		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array();
-	  }
-	
-	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2)
-	  if (visited_(prev2, trg - 1)) {
-	    const size_type shift = utils::bithack::min(utils::bithack::max((difference_type(next + source_size + 2)
-									     - difference_type(prev2))
-									    + difference_type(theta.alignment_),
-									    difference_type(0)),
-							difference_type(theta.alignment_ * 2));
-	    
-	    alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	      += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-		  * alpha_.block(state_size * prev2, trg - 1, state_size, 1)
-		  + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array();
-	  }
-
-	// activation
-	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
-	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(htanh());
-      }
-      
-      // alingment into none..
-      for (size_type none = none_first; none != none_last; ++ none) {
-	//std::cerr << "source none: " << none << std::endl;
-	
-	const size_type next  = none + source_size + 2;
-	const size_type prev1 = none;
-	const size_type prev2 = none + source_size + 2;
-	
-	const int visited1 = visited_(prev1, trg - 1);
-	const int visited2 = visited_(prev2, trg - 1);
-
-	visited_(next, trg) = true;
-
-	alpha_.block(state_size * next, trg, theta.embedding_, 1) = theta.source_.col(vocab_type::NONE.id());
-	
-	// prev1
-	if (visited1)
-	  alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	    += (theta.Wn_ * alpha_.block(state_size * prev1, trg - 1, state_size, 1) + theta.bn_).array();
-	
-	// prev2
-	if (visited2)
-	  alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array()
-	    += (theta.Wn_ * alpha_.block(state_size * prev2, trg - 1, state_size, 1) + theta.bn_).array();
-	
-	// activation
-	alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1)
-	  = alpha_.block(state_size * next + theta.embedding_, trg, theta.hidden_, 1).array().unaryExpr(htanh());
-      }
-    }
-  }
-  
-  template <typename Gen>
-  double backward(const sentence_type& source,
-		  const sentence_type& target,
-		  const model_type& theta,
-		  gradient_type& gradient,
-		  Gen& gen)
-  {
-#if 0
-    std::cerr << "backward source: " << source << std::endl
-	      << "backward taregt: " << target << std::endl;
-#endif
-
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-
-    const size_type state_size = theta.embedding_ + theta.hidden_;
-
-    beta_.resize((source_size + 2) * 2 * state_size, target_size + 2);
-    beta_.setZero();
-    
-    double loss = 0.0;
-    
-    for (size_type trg = target_size + 1; trg > 0; -- trg) {
-      // for EOS, we need to match with EOS, otherwise, do not match..
-      const size_type next_first = utils::bithack::branch(trg == target_size + 1, source_size + 1, size_type(1));
-      const size_type next_last  = utils::bithack::branch(trg == target_size + 1, source_size + 2, source_size + 1);
-      
-      const size_type prev1_first = utils::bithack::branch(trg == 1, 0, 1);
-      const size_type prev1_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);
-      
-      const size_type prev2_first = source_size + 2 + (source_size + 1) * (trg == 1);
-      const size_type prev2_last  = source_size + 2 + source_size + 1;
-      
-      const size_type none_first = utils::bithack::branch(trg == 1,
-							  size_type(0),
-							  utils::bithack::branch(trg == target_size + 1,
-										 source_size + 1,
-										 size_type(0)));
-      const size_type none_last  = utils::bithack::branch(trg == 1, size_type(1), source_size + 1);  
-      
-      for (size_type next = next_first; next != next_last; ++ next) {
-
-	loss += backward(source, target, theta, gradient, gen, trg, next);
-
-	for (size_type prev1 = prev1_first; prev1 != prev1_last; ++ prev1) 
-	  if (visited_(prev1, trg - 1))
-	    backward(source, target, theta, gradient, trg, next, prev1);
-	
-	for (size_type prev2 = prev2_first; prev2 != prev2_last; ++ prev2)
-	  if (visited_(prev2, trg - 1))
-	    backward(source, target, theta, gradient, trg, next, prev2);
-      }
-      
-      // alingment into none..
-      for (size_type none = none_first; none != none_last; ++ none) {
-	const size_type next  = none + source_size + 2;
-	const size_type prev1 = none;
-	const size_type prev2 = none + source_size + 2;
-	
-	const int visited1 = visited_(prev1, trg - 1);
-	const int visited2 = visited_(prev2, trg - 1);
-	
-	loss += backward(source, target, theta, gradient, gen, trg, next);
-	
-	// prev1
-	if (visited1)
-	  backward(source, target, theta, gradient, trg, next, prev1);
-	  
-	// prev2
-	if (visited2)
-	  backward(source, target, theta, gradient, trg, next, prev2);
-      }
-    }
-    
-    // final...
-    gradient.source(vocab_type::BOS) += beta_.block(0, 0, theta.embedding_, 1);
-    gradient.Wi_ += beta_.block(theta.embedding_, 0, theta.hidden_, 1);
-    
-    return loss;
-  }
-
-  template <typename Gen>
-  double backward(const sentence_type& source,
-		  const sentence_type& target,
-		  const model_type& theta,
-		  gradient_type& gradient,
-		  Gen& gen,
-		  const size_type target_pos,
-		  const size_type source_pos)
-  {
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-    
-    const size_type state_size = theta.embedding_ + theta.hidden_;
-    
-    const bool is_none = (source_pos >= source_size + 2);
-
-    // compute the error at the EOS...
-    const word_type word_source(is_none
-				? vocab_type::EPSILON
-				: (source_pos == 0
-				   ? vocab_type::BOS
-				   : (source_pos == source_size + 1
-				      ? vocab_type::EOS
-				      : source[source_pos - 1])));
-    const word_type word_target(target_pos == 0
-				? vocab_type::BOS
-				: (target_pos == target_size + 1
-				   ? vocab_type::EOS
-				   : target[target_pos - 1]));
-
-    const word_type word_sampled = unigram_target_.draw(gen);    
-    
-    layer_trans_ = (theta.Wt_ * alpha_.block(state_size * source_pos, target_pos, state_size, 1)
-		    + theta.bt_).array().unaryExpr(htanh());
-    
-    const double score_c = (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-			    + theta.target_.col(word_target.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-    const double score_m = (theta.target_.col(word_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
-			    + theta.target_.col(word_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-    
-    const double loss = std::max(1.0 - (score_c - score_m), 0.0);
-    
-    const double delta_c = - (loss > 0.0);
-    const double delta_m =   (loss > 0.0);
-    
-    tensor_type& dembedding_c = gradient.target(word_target);
-    tensor_type& dembedding_m = gradient.target(word_sampled);
-    
-    dembedding_c.block(0, 0, theta.embedding_, 1).array() += delta_c * layer_trans_.array();
-    dembedding_c.block(theta.embedding_, 0, 1, 1).array() += delta_c;
-    dembedding_m.block(0, 0, theta.embedding_, 1).array() += delta_m * layer_trans_.array();
-    dembedding_m.block(theta.embedding_, 0, 1, 1).array() += delta_m;
-    
-    delta_trans_ = (layer_trans_.array().unaryExpr(dhtanh())
-		    * (theta.target_.col(word_target.id()).block(0, 0, theta.embedding_, 1) * delta_c
-		       + theta.target_.col(word_sampled.id()).block(0, 0, theta.embedding_, 1) * delta_m).array());
-    
-    gradient.Wt_ += delta_trans_ * alpha_.block(state_size * source_pos, target_pos, state_size, 1).transpose();
-    gradient.bt_ += delta_trans_;
-    
-    delta_beta_ = beta_.block(state_size * source_pos, target_pos, state_size, 1) + theta.Wt_.transpose() * delta_trans_;
-    delta_alpha_ = (alpha_.block(state_size * source_pos + theta.embedding_, target_pos, theta.hidden_, 1).array().unaryExpr(dhtanh())
-		    * delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1).array());
-    
-    // word embedding...
-    gradient.source(word_source) += delta_beta_.block(0, 0, theta.embedding_, 1);
-    
-    return loss;
-  }
-
-  void backward(const sentence_type& source,
-		const sentence_type& target,
-		const model_type& theta,
-		gradient_type& gradient,
-		const size_type target_pos,
-		const size_type source_pos,
-		const size_type source_prev)
-  {
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-    
-    const size_type state_size = theta.embedding_ + theta.hidden_;
-    
-    const bool is_none = (source_pos >= source_size + 2);
-    
-    if (is_none) {
-      gradient.Wn_.array()
-	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array();
-      gradient.bn_.array()
-	+= delta_alpha_.array();
-      
-      beta_.block(state_size * source_prev, target_pos - 1, state_size, 1).array()
-	+= (theta.Wn_.transpose() * delta_alpha_).array();
-    } else {
-      const size_type shift = utils::bithack::min(utils::bithack::max(difference_type(source_pos)
-								      - difference_type(source_prev
-											- utils::bithack::branch(source_prev >= source_size + 2,
-														 source_size + 2,
-														 size_type(0)))
-								      + difference_type(theta.alignment_),
-								      difference_type(0)),
-						  difference_type(theta.alignment_ * 2));
-      
-      gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).array()
-	+= (delta_alpha_ * alpha_.block(state_size * source_prev, target_pos - 1, state_size, 1).transpose()).array();
-      gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1).array()
-	+= delta_alpha_.array();
-      
-      beta_.block(state_size * source_prev, target_pos - 1, state_size, 1).array()
-	+=  (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose() * delta_alpha_).array();
-    }
-  }
-#endif
     
   double viterbi(const sentence_type& source,
 		 const sentence_type& target,
@@ -1850,13 +1541,24 @@ struct HMM
 	const state_type& state = *hiter;
 	
 	const size_type prev = state.index();
-	const word_type source_prev = (prev >= source_size + 2
-				       ? vocab_type::EPSILON
-				       : (prev == 0
-					  ? vocab_type::BOS
-					  : (prev == source_size + 1
-					     ? vocab_type::EOS
-					     : source[prev - 1])));
+	const word_type source_aligned_prev = (prev >= source_size + 2
+					       ? (prev - source_size - 2 == 0
+						  ? vocab_type::BOS
+						  : (prev - source_size - 2 == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - source_size - 2 - 1]))
+					       : (prev == 0
+						  ? vocab_type::BOS
+						  : (prev == source_size + 1
+						     ? vocab_type::EOS
+						     : source[prev - 1])));
+	const word_type source_none_prev = (prev >= source_size + 2
+					    ? vocab_type::EPSILON
+					    : (prev == 0
+					       ? vocab_type::BOS
+					       : (prev == source_size + 1
+						  ? vocab_type::EOS
+						  : source[prev - 1])));
 
 	// alignment into aligned...
 	for (size_type next = next_first; next != next_last; ++ next) {
@@ -1876,7 +1578,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_aligned_prev.id()))
 	       
 	       + (theta.Wa_.block(theta.hidden_ * shift, theta.embedding_, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
@@ -1912,7 +1614,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_none_prev.id()))
 	       
 	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
