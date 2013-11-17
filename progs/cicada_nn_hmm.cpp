@@ -1815,7 +1815,7 @@ struct LearnAdaGrad
 	      const Eigen::MatrixBase<GradCross>& c,
 	      const bool bias_last=false) const
   {
-    if (word != vocab_type::NONE && word != vocab_type::BOS && lambda2_ > 0.0) {
+    if (word != vocab_type::EPSILON && word != vocab_type::BOS && lambda2_ > 0.0) {
       for (int row = 0; row != g.rows() - bias_last; ++ row) 
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
@@ -2016,6 +2016,16 @@ int main(int argc, char** argv)
     
     model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, unigram_source, unigram_target, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, unigram_target, unigram_source, generator);
+    
+    const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
+								theta_source_target.target_.cols()),
+					    utils::bithack::min(theta_target_source.source_.cols(),
+								theta_target_source.target_.cols()));
+    
+    theta_source_target.source_.block(0, 0, dimension_embedding, cols)
+      = theta_target_source.target_.block(0, 0, dimension_embedding, cols);
+    theta_source_target.target_.block(0, 0, dimension_embedding, cols)
+      = theta_target_source.source_.block(0, 0, dimension_embedding, cols);
     
     if (iteration > 0)
       learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
@@ -2374,30 +2384,6 @@ struct TaskAccumulate
 					 theta_target_source_,
 					 gradient_target_source_,
 					 generator);
-	
-#if 0
-	hmm_source_target_.forward(bitext.source_, bitext.target_, theta_source_target_);
-	hmm_target_source_.forward(bitext.target_, bitext.source_, theta_target_source_);
-	
-	loss_source_target_
-	  += hmm_source_target_.backward(bitext.source_,
-					 bitext.target_,
-					 theta_source_target_,
-					 gradient_source_target_,
-					 generator);
-	
-	loss_target_source_
-	  += hmm_target_source_.backward(bitext.target_,
-					 bitext.source_,
-					 theta_target_source_,
-					 gradient_target_source_,
-					 generator);
-
-	if (dump_mode) {
-	  hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
-	  hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
-	}
-#endif
       }
       
       // reduce alignment
