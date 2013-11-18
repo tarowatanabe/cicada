@@ -425,11 +425,11 @@ namespace utils
     block_type __bitblock[__bitblock_size];
   };
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  std::ostream& operator<<(std::ostream& os, const bit_vector<_N>& x)
+  std::ostream& operator<<(std::ostream& os, const bit_vector<N>& x)
   {
-    typedef typename bit_vector<_N>::size_type size_type;
+    typedef typename bit_vector<N>::size_type size_type;
     
     for (size_type i = 0; i < x.size(); ++ i) {
       const char mask = (x.test(i) - 1);
@@ -439,52 +439,52 @@ namespace utils
     return os;
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  size_t hash_value(bit_vector<_N> const& x)
+  size_t hash_value(bit_vector<N> const& x)
   {
     return utils::hashmurmur3<size_t>()(x.begin(), x.end(), 0);
   }
 
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator==(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator==(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return std::equal(x.begin(), x.end(), y.begin());
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator!=(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator!=(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return ! (x == y);
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator<(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator<(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator>(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator>(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return y < x;
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator<=(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator<=(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return ! (y < x);
   }
   
-  template <size_t _N>
+  template <size_t N>
   inline
-  bool operator>=(const bit_vector<_N>& x, const bit_vector<_N>& y)
+  bool operator>=(const bit_vector<N>& x, const bit_vector<N>& y)
   {
     return ! (x < y);
   }
