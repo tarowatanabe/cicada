@@ -92,8 +92,10 @@ namespace utils
     inline
     Tp log1p(Tp x)
     {
-#if defined(HAVE_CMATH) && defined(HAVE_STD_LOG1P)
+#if defined(HAVE_STD_LOG1P)
       return std::log1p(x);
+#elif defined(HAVE_LOG1P)
+      return ::log1p(x);
 #elif defined(HAVE_TR1_CMATH)
       return std::tr1::log1p(x);
 #else
@@ -142,8 +144,10 @@ namespace utils
     inline
     Tp lgamma(Tp x)
     {
-#if defined(HAVE_CMATH) && defined(HAVE_STD_LGAMMA)
+#if defined(HAVE_STD_LGAMMA)
       return std::lgamma(x);
+#elif defined(HAVE_LGAMMA)
+      return ::lgamma(x);
 #elif defined(HAVE_TR1_CMATH)
       return std::tr1::lgamma(x);
 #else

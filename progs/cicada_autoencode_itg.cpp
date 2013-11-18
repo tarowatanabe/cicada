@@ -1674,16 +1674,16 @@ struct ITGTree
 	    
 	    node.output_sampled_norm_ = leaf.output_sampled_norm_;
 	    
-	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
-	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double y_p = (theta.Wc_ * node.output_norm_ + theta.bc_)(0,0);
+	    const double y_m = (theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0);
 	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
 	    
 	    leaf.error_classification_ = error;
 	    node.error_classification_ = error;
 	    node.total_classification_ = error;
 	    
-	    leaf.delta_classification_p_ = - deriv(y_p) * (error > 0.0) * theta.beta_;
-	    leaf.delta_classification_m_ =   deriv(y_m) * (error > 0.0) * theta.beta_;
+	    leaf.delta_classification_p_ = - (error > 0.0) * theta.beta_;
+	    leaf.delta_classification_m_ =   (error > 0.0) * theta.beta_;
 	  } else {
 	    const bool straight = edge.straight();
 	    
@@ -1701,15 +1701,15 @@ struct ITGTree
 	    node.output_sampled_      = (W1 * c + b1).array().unaryExpr(func);
 	    node.output_sampled_norm_ = node.output_sampled_.normalized();
 	    
-	    const double y_p = func((theta.Wc_ * node.output_norm_ + theta.bc_)(0,0));
-	    const double y_m = func((theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0));
+	    const double y_p = (theta.Wc_ * node.output_norm_ + theta.bc_)(0,0);
+	    const double y_m = (theta.Wc_ * node.output_sampled_norm_ + theta.bc_)(0,0);
 	    const double error = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
 	    
 	    node.error_classification_ = error;
 	    node.total_classification_ = error + node1.total_classification_ + node2.total_classification_;
 	    
-	    node.delta_classification_p_ = - deriv(y_p) * (error > 0.0) * theta.beta_;
-	    node.delta_classification_m_ =   deriv(y_m) * (error > 0.0) * theta.beta_;
+	    node.delta_classification_p_ = - (error > 0.0) * theta.beta_;
+	    node.delta_classification_m_ =   (error > 0.0) * theta.beta_;
 	  }
 	}
       }

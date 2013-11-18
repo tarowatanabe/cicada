@@ -660,6 +660,49 @@ if test "x$ac_cv_header_cmath" = "xyes"; then
       AC_DEFINE([HAVE_STD_LGAMMA], 1, [Define to 1 if you have the std::lgamma.])],
      [AC_MSG_RESULT([no])])
 
+  AC_MSG_CHECKING([for ::log1p])
+  AC_TRY_COMPILE([#include <cmath>],
+     [ ::log1p(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_LOG1P], 1, [Define to 1 if you have the ::log1p.])],
+     [AC_MSG_RESULT([no])])
+
+  AC_MSG_CHECKING([for ::lgamma])
+  AC_TRY_COMPILE([#include <cmath>],
+     [ ::lgamma(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_LGAMMA], 1, [Define to 1 if you have the ::lgamma.])],
+     [AC_MSG_RESULT([no])])
+fi
+
+if test "x$ac_cv_header_tr1_cmath" = "xyes"; then
+  AC_MSG_CHECKING([for std::log1p])
+  AC_TRY_COMPILE([#include <tr1/cmath>],
+     [ std::log1p(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_STD_LOG1P], 1, [Define to 1 if you have the std::log1p.])],
+     [AC_MSG_RESULT([no])])
+
+  AC_MSG_CHECKING([for std::lgamma])
+  AC_TRY_COMPILE([#include <tr1/cmath>],
+     [ std::lgamma(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_STD_LGAMMA], 1, [Define to 1 if you have the std::lgamma.])],
+     [AC_MSG_RESULT([no])])
+
+  AC_MSG_CHECKING([for ::log1p])
+  AC_TRY_COMPILE([#include <tr1/cmath>],
+     [ ::log1p(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_LOG1P], 1, [Define to 1 if you have the ::log1p.])],
+     [AC_MSG_RESULT([no])])
+
+  AC_MSG_CHECKING([for ::lgamma])
+  AC_TRY_COMPILE([#include <tr1/cmath>],
+     [ ::lgamma(1.0); ],
+     [AC_MSG_RESULT([yes])
+      AC_DEFINE([HAVE_LGAMMA], 1, [Define to 1 if you have the ::lgamma.])],
+     [AC_MSG_RESULT([no])])
 fi
 
 ## SSE related...

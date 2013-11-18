@@ -462,6 +462,88 @@ struct Model
       return 10;
     }
   };
+
+  void read_embedding(const path_type& source_file, const path_type& target_file)
+  {
+    // we will overwrite embedding... thus we will not clear embedding_
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
+    typedef boost::fusion::tuple<std::string, parameter_set_type > embedding_parsed_type;
+    typedef boost::spirit::istream_iterator iterator_type;
+    
+    qi::rule<iterator_type, std::string(), standard::blank_type>           word;
+    qi::rule<iterator_type, embedding_parsed_type(), standard::blank_type> parser; 
+    
+    word   %= qi::lexeme[+(standard::char_ - standard::space)];
+    parser %= word >> *qi::double_ >> (qi::eol | qi::eoi);
+
+    if (! source_file.empty()) {
+      
+      if (source_file != "-" && ! boost::filesystem::exists(source_file))
+	throw std::runtime_error("no embedding: " + source_file.string());
+      
+      utils::compress_istream is(source_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+    
+      iterator_type iter(is);
+      iterator_type iter_end;
+      
+      embedding_parsed_type parsed;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<0>(parsed).clear();
+	boost::fusion::get<1>(parsed).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, parsed))
+	  if (iter != iter_end)
+	    throw std::runtime_error("embedding parsing failed");
+	
+	if (boost::fusion::get<1>(parsed).size() != embedding_)
+	  throw std::runtime_error("invalid embedding size");
+
+	const word_type word = boost::fusion::get<0>(parsed);
+	
+	if (word.id() < source_.cols())
+	  source_.col(word.id()).block(0, 0, embedding_, 1)
+	    = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+      }
+    }
+
+    if (! target_file.empty()) {
+      
+      if (target_file != "-" && ! boost::filesystem::exists(target_file))
+	throw std::runtime_error("no embedding: " + target_file.string());
+      
+      utils::compress_istream is(target_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+    
+      iterator_type iter(is);
+      iterator_type iter_end;
+      
+      embedding_parsed_type parsed;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<0>(parsed).clear();
+	boost::fusion::get<1>(parsed).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, parsed))
+	  if (iter != iter_end)
+	    throw std::runtime_error("embedding parsing failed");
+	
+	if (boost::fusion::get<1>(parsed).size() != embedding_)
+	  throw std::runtime_error("invalid embedding size");
+	
+	const word_type word = boost::fusion::get<0>(parsed);
+
+	if (word.id() < target_.cols())
+	  target_.col(word.id()).block(0, 0, embedding_, 1)
+	    = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+      }
+    }
+  }
   
   boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
   
@@ -1815,7 +1897,7 @@ struct LearnAdaGrad
 	      const Eigen::MatrixBase<GradCross>& c,
 	      const bool bias_last=false) const
   {
-    if (word != vocab_type::EPSILON && word != vocab_type::BOS && lambda2_ > 0.0) {
+    if (lambda2_ > 0.0) {
       for (int row = 0; row != g.rows() - bias_last; ++ row) 
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
@@ -1891,6 +1973,10 @@ static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type source_file;
 path_type target_file;
+
+path_type embedding_source_file;
+path_type embedding_target_file;
+
 path_type output_source_target_file;
 path_type output_target_source_file;
 path_type alignment_source_target_file;
@@ -2016,6 +2102,16 @@ int main(int argc, char** argv)
     
     model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, unigram_source, unigram_target, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, unigram_target, unigram_source, generator);
+
+    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
+      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
+	throw std::runtime_error("no embedding: " + embedding_source_file.string());
+      
+      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
+	throw std::runtime_error("no embedding: " + embedding_target_file.string());
+      
+      theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
+    }
     
     const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
 								theta_source_target.target_.cols()),
@@ -2903,6 +2999,9 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("source", po::value<path_type>(&source_file), "source file")
     ("target", po::value<path_type>(&target_file), "target file")
+    
+    ("embedding-source", po::value<path_type>(&embedding_source_file), "initial source embedding")
+    ("embedding-target", po::value<path_type>(&embedding_target_file), "initial target embedding")
     
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output model parameter for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output model parameter for P(source | target)")

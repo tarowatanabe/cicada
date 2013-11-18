@@ -166,15 +166,16 @@ struct Model
   template <typename Gen>
   struct randomize
   {
-    randomize(Gen& gen) : gen_(gen) {}
-
+    randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
+    
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return boost::random::uniform_real_distribution<Tp>(-0.1, 0.1)(const_cast<Gen&>(gen_));
+      return boost::random::uniform_real_distribution<Tp>(-range_, range_)(const_cast<Gen&>(gen_));
     }
-
+    
     Gen& gen_;
+    double range_;
   };
   
   template <typename Gen>
@@ -198,18 +199,20 @@ struct Model
     embedding_.clear();
     
     // intialize randomly...
+    const double range_l = std::sqrt(6.0 / (dimension_hidden_ + dimension_embedding * order));
+    const double range_c = std::sqrt(6.0 / (dimension_hidden_ + 1));
 
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order).array().unaryExpr(randomize<Gen>(gen));
-    bl1_ = tensor_type::Zero(dimension_hidden, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bl1_ = tensor_type::Zero(dimension_hidden, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Zero(dimension_embedding * order, dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
-    bl2_ = tensor_type::Zero(dimension_embedding * order, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wl2_ = tensor_type::Zero(dimension_embedding * order, dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bl2_ = tensor_type::Zero(dimension_embedding * order, 1);
     
     // classification
-    Wc_ = tensor_type::Zero(1, dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
-    bc_ = tensor_type::Zero(1, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wc_ = tensor_type::Zero(1, dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_c));
+    bc_ = tensor_type::Ones(1, 1);
   }
   
   void initialize(const size_type dimension_embedding,
@@ -246,19 +249,21 @@ struct Model
   template <typename Iterator, typename Gen>
   void embedding(Iterator first, Iterator last, Gen& gen)
   {
+    const double range_e = std::sqrt(6.0 / (dimension_embedding_ + 1));
+
     tensor_type& bos     = embedding_[vocab_type::BOS];
     tensor_type& eos     = embedding_[vocab_type::EOS];
     
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+      bos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+      eos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding_[*first];
 
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     }
   }
   
@@ -400,6 +405,87 @@ struct Model
   tensor_type bc_;
 };
 
+struct Unigram
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model    model_type;
+
+  typedef uint64_t count_type;
+
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+
+  typedef std::vector<double, std::allocator<double> >         logprob_set_type;
+  typedef std::vector<count_type, std::allocator<count_type> > count_set_type;
+  typedef std::vector<word_type, std::allocator<word_type> >   word_map_type;
+  
+  typedef boost::random::discrete_distribution<> distribution_type;
+  
+  template <typename Tp>
+  struct compare_pair
+  {
+    bool operator()(const Tp& x, const Tp& y) const
+    {
+      return (x.second > y.second
+	      || (x.second == y.second
+		  && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
+    }
+  };
+  
+  
+  Unigram() {}
+  
+  template <typename Iterator>
+  void insert(Iterator first, Iterator last)
+  {
+    typedef std::pair<word_type, count_type> word_count_type;
+    typedef std::vector<word_count_type, std::allocator<word_count_type> > word_count_set_type;
+    
+    word_count_set_type word_counts(first, last);
+    std::sort(word_counts.begin(), word_counts.end(), compare_pair<word_count_type>());
+
+    logprobs_.clear();
+    counts_.clear();
+    words_.clear();
+    
+    words_.reserve(word_counts.size());
+    counts_.reserve(word_counts.size());
+    logprobs_.reserve(word_type::allocated());
+    
+    word_count_set_type::const_iterator witer_end = word_counts.end();
+    for (word_count_set_type::const_iterator witer = word_counts.begin(); witer != witer_end; ++ witer) {
+      words_.push_back(witer->first);
+      counts_.push_back(witer->second);
+    }
+    
+    // initialize logprobs and words
+    const double norm = 1.0 / std::accumulate(counts_.begin(), counts_.end(), double(0));
+    for (word_type::id_type id = 0; id != counts_.size(); ++ id)
+      logprobs_[words_[id].id()] = std::log(norm * counts_[id]);
+    
+    // initialize distribution
+    distribution_ = distribution_type(counts_.begin(), counts_.end());
+  }
+  
+  double logprob(const word_type& word) const
+  {
+    return logprobs_[word.id()];
+  }
+  
+  template <typename Gen>
+  word_type draw(Gen& gen) const
+  {
+    return words_[distribution_(gen)];
+  }
+  
+  logprob_set_type  logprobs_;
+  count_set_type    counts_;
+  word_map_type     words_;
+  distribution_type distribution_;
+};
 
 struct NGram
 {
@@ -409,18 +495,19 @@ struct NGram
   typedef Model model_type;
   typedef Model gradient_type;
 
+  typedef Unigram unigram_type;
+
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
   
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
-
-  typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
+  
+  NGram(const unigram_type& unigram) : unigram_(unigram) {}
   
   template <typename Function, typename Derivative, typename Gen>
   std::pair<double, double> operator()(const sentence_type& sentence,
-				       const word_set_type& words,
 				       const model_type& theta,
 				       gradient_type& gradient,
 				       Function   func,
@@ -459,10 +546,7 @@ struct NGram
       input_sampled = input;
       
       const word_type& word = (pos == sentence_size ? vocab_type::EOS : sentence[pos]);
-      
-      const size_type pos_sampled = boost::random::uniform_int_distribution<size_t>(0, words.size() - 1)(gen);
-      
-      const word_type& word_sampled = words[pos_sampled];
+      const word_type word_sampled = unigram_.draw(gen);
       
       embedding_type::const_iterator piter = theta.embedding_.find(word);
       if (piter == theta.embedding_.end())
@@ -499,13 +583,13 @@ struct NGram
       const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
       const tensor_type delta_reconstruction = y.array().unaryExpr(deriv) * reconstruction.array();
       
-      const double y_p = func((theta.Wc_ * p_norm + theta.bc_)(0,0));
-      const double y_m = func((theta.Wc_ * p_sampled_norm + theta.bc_)(0,0));
+      const double y_p = (theta.Wc_ * p_norm + theta.bc_)(0,0);
+      const double y_m = (theta.Wc_ * p_sampled_norm + theta.bc_)(0,0);
       
       const double e_classification = std::max(1.0 - (y_p - y_m), 0.0) * theta.beta_;
       
-      const double delta_classification_p = - deriv(y_p) * (e_classification > 0.0) * theta.beta_;
-      const double delta_classification_m =   deriv(y_m) * (e_classification > 0.0) * theta.beta_;
+      const double delta_classification_p = - (e_classification > 0.0) * theta.beta_;
+      const double delta_classification_m =   (e_classification > 0.0) * theta.beta_;
       
       // update error...
       error                += e;
@@ -572,6 +656,8 @@ struct NGram
     
     return std::make_pair(error, error_classification);
   }
+
+  const unigram_type& unigram_;
 };
 
 struct LearnAdaGrad
@@ -599,6 +685,9 @@ struct LearnAdaGrad
     
     if (eta0_ <= 0.0)
       throw std::runtime_error("invalid learning rate");
+
+    const size_type vocabulary_size = word_type::allocated();
+    embedding_ = tensor_type::Zero(dimension_embedding, vocabulary_size);
     
     // initialize...
     Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * order);
@@ -622,16 +711,6 @@ struct LearnAdaGrad
       if (eiter == theta.embedding_.end()) {
 	std::cerr << "WARNING: this should not happen: embedding: " << siter->first << std::endl;
 	eiter = theta.embedding_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
-      }
-      
-      if (siter->first.id() >= embedding_.cols()) {
-	const size_type pos_first = embedding_.cols();
-	const size_type pos_last  = siter->first.id() + 1;
-
-	tensor_type& matrix = const_cast<tensor_type&>(embedding_);
-	
-	matrix.conservativeResize(dimension_embedding_, pos_last);
-	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
       }
       
       update(siter->first, eiter->second, const_cast<tensor_type&>(embedding_), siter->second, lambda_ != 0.0);
@@ -758,9 +837,9 @@ typedef boost::filesystem::path path_type;
 
 typedef cicada::Sentence sentence_type;
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
-typedef NGram::word_set_type word_set_type;
 
 typedef Model model_type;
+typedef Unigram unigram_type;
 
 static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
@@ -783,6 +862,7 @@ int iteration = 10;
 int batch_size = 1024;
 double lambda = 1e-5;
 double eta0 = 1;
+int cutoff = 3;
 
 int threads = 2;
 
@@ -791,12 +871,12 @@ int debug = 0;
 template <typename Learner, typename Gen>
 void learn_online(const Learner& learner,
 		  const sentence_set_type& sentences,
-		  const word_set_type& words,
+		  const unigram_type& unigram,
 		  model_type& theta,
 		  Gen& gen);
 void read_data(const path_type& input_file,
 	       sentence_set_type& sentences,
-	       word_set_type& words);
+	       unigram_type& unigram);
 
 void options(int argc, char** argv);
 
@@ -838,9 +918,9 @@ int main(int argc, char** argv)
       throw std::runtime_error("no data?");
     
     sentence_set_type sentences;
-    word_set_type words;
+    unigram_type unigram;
     
-    read_data(input_file, sentences, words);
+    read_data(input_file, sentences, unigram);
     
     model_type theta(dimension_embedding, dimension_hidden, order, alpha, beta, generator);
 
@@ -851,10 +931,10 @@ int main(int argc, char** argv)
       theta.read_embedding(embedding_file);
     }
     
-    theta.embedding(words.begin(), words.end(), generator);
+    theta.embedding(unigram.words_.begin(), unigram.words_.end(), generator);
     
     if (iteration > 0)
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, words, theta, generator);
+      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta, generator);
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -936,15 +1016,15 @@ struct TaskAccumulate
   typedef Counter counter_type;
 
   TaskAccumulate(const sentence_set_type& sentences,
-		 const word_set_type& words,
+		 const unigram_type& unigram,
 		 const model_type& theta,
 		 queue_type& queue,
 		 counter_type& counter)
     : sentences_(sentences),
-      words_(words),
       theta_(theta),
       queue_(queue),
       counter_(counter),
+      ngram_(unigram),
       gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.order_),
       error_(0),
       classification_(0),
@@ -1043,7 +1123,7 @@ struct TaskAccumulate
       const sentence_type& sentence = sentences_[sentence_id];
       
       if (! sentence.empty()) {
-	std::pair<double, double> errors = ngram_(sentence, words_, theta_, gradient_, htanh(), dhtanh(), generator);
+	std::pair<double, double> errors = ngram_(sentence, theta_, gradient_, htanh(), dhtanh(), generator);
 	  
 	error_          += errors.first;
 	classification_ += errors.second;
@@ -1063,7 +1143,6 @@ struct TaskAccumulate
   }
 
   const sentence_set_type& sentences_;
-  const word_set_type& words_;
   const model_type& theta_;
   
   queue_type&            queue_;
@@ -1106,7 +1185,7 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 template <typename Learner, typename Gen>
 void learn_online(const Learner& learner,
 		  const sentence_set_type& sentences,
-		  const word_set_type& words,
+		  const unigram_type& unigram,
 		  model_type& theta,
 		  Gen& gen)
 {
@@ -1123,7 +1202,7 @@ void learn_online(const Learner& learner,
   task_type::counter_type reducer;
   
   task_set_type tasks(threads, task_type(sentences,
-					 words,
+					 unigram,
 					 theta,
 					 mapper,
 					 reducer));
@@ -1219,30 +1298,63 @@ void learn_online(const Learner& learner,
 
 void read_data(const path_type& input_file,
 	       sentence_set_type& sentences,
-	       word_set_type& words)
+	       unigram_type& unigram)
 {
-  typedef utils::compact_set<sentence_type::word_type,
+  typedef cicada::Vocab vocab_type;
+  typedef uint64_t count_type;
+  typedef utils::compact_map<sentence_type::word_type, count_type,
 			     utils::unassigned<sentence_type::word_type>, utils::unassigned<sentence_type::word_type>,
 			     boost::hash<sentence_type::word_type>, std::equal_to<sentence_type::word_type>,
-			     std::allocator<sentence_type::word_type> > unique_set_type;
+			     std::allocator<std::pair<const sentence_type::word_type, count_type> > > word_set_type;
   
   sentences.clear();
 
-  unique_set_type uniques;
+  word_set_type words;
   
   utils::compress_istream is(input_file, 1024 * 1024);
   
   sentence_type sentence;
+  count_type count_eos = 0;
   
   while (is >> sentence) {
+    if (sentence.empty()) continue;
+    
     sentences.push_back(sentence);
     
-    uniques.insert(sentence.begin(), sentence.end());
+    sentence_type::const_iterator siter_end = sentence.end();
+    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+      ++ words[*siter];
+
+    ++ count_eos;
   }
   
-  words.clear();
-  words.reserve(uniques.size());
-  words.insert(words.end(), uniques.begin(), uniques.end());
+  words[vocab_type::EOS] = count_eos;
+  
+  if (cutoff > 1) {
+    word_set_type words_new;
+    count_type count_unk = 0;
+    
+    word_set_type::const_iterator witer_end = words.end();
+    for (word_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer)
+      if (witer->second >= cutoff)
+	words_new.insert(*witer);
+      else
+	count_unk += witer->second;
+    
+    words_new[vocab_type::UNK] = count_unk;
+    words_new.swap(words);
+    words_new.clear();
+    
+    sentence_set_type::iterator siter_end = sentences.end();
+    for (sentence_set_type::iterator siter = sentences.begin(); siter != siter_end; ++ siter) {
+      sentence_type::iterator iter_end = siter->end();
+      for (sentence_type::iterator iter = siter->begin(); iter != iter_end; ++ iter)
+	if (words.find(*iter) == words.end())
+	  *iter = vocab_type::UNK;
+    }
+  }
+  
+  unigram.insert(words.begin(), words.end());
 }
 
 void options(int argc, char** argv)
@@ -1269,8 +1381,10 @@ void options(int argc, char** argv)
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
+    
 
     ("threads", po::value<int>(&threads), "# of threads")
     

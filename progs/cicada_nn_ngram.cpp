@@ -989,7 +989,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 int samples = 100;
-int cutoff = 1;
+int cutoff = 3;
 double lambda = 1e-5;
 double eta0 = 1;
 
