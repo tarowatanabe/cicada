@@ -222,11 +222,10 @@ namespace cicada
       return categories;
     }
 
-    category_set_type assign_category(const char* (&nt)[0])
+    category_set_type assign_category(const char* [0])
     {
       return category_set_type();
-    }
-    
+    }    
     
   public:
     static HeadFinder& create(const utils::piece& parameter);
