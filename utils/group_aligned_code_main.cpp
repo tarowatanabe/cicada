@@ -5,6 +5,8 @@
 #include <iostream>
 
 #include <climits>
+#include <cstdlib>
+
 #include <vector>
 
 #include "group_aligned_code.hpp"

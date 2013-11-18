@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include <climits>
+#include <cstdlib>
 
 #include "byte_aligned_code.hpp"
 
