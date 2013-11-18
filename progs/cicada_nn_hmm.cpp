@@ -2905,9 +2905,9 @@ void read_data(const path_type& source_file,
 	word_set_type::const_iterator titer_end = dict_source_target[i].counts_.end();
 	for (word_set_type::const_iterator titer = dict_source_target[i].counts_.begin(); titer != titer_end; ++ titer)
 	  if (words_target.find(titer->first) == words_target.end())
-	    dict[vocab_type::UNK] = titer->second;
+	    dict[vocab_type::UNK] += titer->second;
 	  else
-	    dict[titer->first] = titer->second;
+	    dict[titer->first] += titer->second;
       }
     
     for (word_type::id_type i = 0; i != dict_target_source.dicts_.size(); ++ i)
@@ -2922,9 +2922,9 @@ void read_data(const path_type& source_file,
 	word_set_type::const_iterator siter_end = dict_target_source[i].counts_.end();
 	for (word_set_type::const_iterator siter = dict_target_source[i].counts_.begin(); siter != siter_end; ++ siter)
 	  if (words_source.find(siter->first) == words_source.end())
-	    dict[vocab_type::UNK] = siter->second;
+	    dict[vocab_type::UNK] += siter->second;
 	  else
-	    dict[siter->first] = siter->second;
+	    dict[siter->first] += siter->second;
       }
 
     dict_source_target.swap(dict_source_target_new);
