@@ -672,7 +672,7 @@ struct NGram
 	
 	gradient_embedding_[i] = &gradient_embedding_eps;
       }
-    
+
     layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id());
     gradient_embedding_[order - 2] = &gradient_embedding_bos;
     
@@ -682,10 +682,20 @@ struct NGram
     for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
       log_likelihood += learn(*siter, theta, gradient, gen);
       
+      // shift layer_input...
+      if (order > 2)
+	for (size_type i = 0; i < order - 2; ++ i)
+	  layer_input_.block(dimension * i, 0, dimension, 1) = layer_input_.block(dimension * (i + 1), 0, dimension, 1);
+      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id());
+      
+      // shift context
+      std::copy(gradient_embedding_.begin() + 1, gradient_embedding_.end(), gradient_embedding_.begin());
+      gradient_embedding_.back() = &gradient.embedding_input(*siter);
+      
+#if 0
       layer_input_back_        = layer_input_;
       gradient_embedding_back_ = gradient_embedding_;
       
-#if 0
       // compute lower-order ngram language model
       for (size_type i = eps_size; i != order - 1; ++ i) {
 	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
@@ -693,7 +703,6 @@ struct NGram
 	
 	learn(*siter, theta, gradient, gen);
       }
-#endif
       
       // shift layer_input...
       layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_back_.block(dimension, 0, dimension * (order - 2), 1);
@@ -701,7 +710,9 @@ struct NGram
       
       // shift context
       std::copy(gradient_embedding_back_.begin() + 1, gradient_embedding_back_.end(), gradient_embedding_.begin());
-      gradient_embedding_.back() = &gradient.embedding_input(*siter);
+      gradient_embedding_.back() = &gradient.embedding_input(*siter);      
+#endif
+      
       
       eps_size -= (eps_size > 0);
     }
