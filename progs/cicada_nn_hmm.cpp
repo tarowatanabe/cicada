@@ -1901,7 +1901,7 @@ typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 typedef Model      model_type;
 typedef Dictionary dictionary_type;
 
-static const size_t DEBUG_DOT  = 100000;
+static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
