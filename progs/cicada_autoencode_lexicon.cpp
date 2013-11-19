@@ -730,7 +730,7 @@ struct Lexicon
 	    
 	    embedding_type::const_iterator siter = theta.source_.find(embedding_source);
 	    if (siter == theta.source_.end())
-	      throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	      throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(embedding_source));
 	    
 	    if (siter->second.rows() != dimension_embedding)
 	      throw std::runtime_error("dimensin does not for the source side");
@@ -765,7 +765,7 @@ struct Lexicon
 	    
 	    embedding_type::const_iterator titer = theta.target_.find(embedding_target);
 	    if (titer == theta.target_.end())
-	      throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	      throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(embedding_target));
 	    
 	    if (titer->second.rows() != dimension_embedding)
 	      throw std::runtime_error("dimensin does not for the target side");
@@ -786,7 +786,7 @@ struct Lexicon
 	  
 	  embedding_type::const_iterator siter = theta.source_.find(source_sampled);
 	  if (siter == theta.source_.end())
-	    throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	    throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(source_sampled));
 	  
 	  if (siter->second.rows() != dimension_embedding)
 	    throw std::runtime_error("dimensin does not for the source side");
@@ -799,7 +799,7 @@ struct Lexicon
 	  
 	  embedding_type::const_iterator titer = theta.target_.find(target_sampled);
 	  if (titer == theta.target_.end())
-	    throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+	    throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(target_sampled));
 	  
 	  if (titer->second.rows() != dimension_embedding)
 	    throw std::runtime_error("dimensin does not for the target side");
@@ -1776,6 +1776,21 @@ void read_bitext(const path_type& source_file,
 
     dict_source_target.swap(dict_source_target_new);
     dict_target_source.swap(dict_target_source_new);
+    
+    bitext_set_type::iterator biter_end = bitexts.end();
+    for (bitext_set_type::iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
+
+      sentence_type::iterator siter_end = biter->source_.end();
+      for (sentence_type::iterator siter = biter->source_.begin(); siter != siter_end; ++ siter)
+	if (words_source.find(*siter) == words_source.end())
+	  *siter = vocab_type::UNK;
+
+      sentence_type::iterator titer_end = biter->target_.end();
+      for (sentence_type::iterator titer = biter->target_.begin(); titer != titer_end; ++ titer)
+	if (words_target.find(*titer) == words_target.end())
+	  *titer = vocab_type::UNK;	
+    }
+    
   }
 
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
