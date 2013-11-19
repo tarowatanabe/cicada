@@ -344,6 +344,8 @@ struct Model
   typedef cicada::Vocab     vocab_type;
   
   typedef boost::filesystem::path path_type;
+
+  typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
   Model() : embedding_(0), hidden_(0), alignment_(0) {}  
   template <typename Words, typename Gen>
@@ -420,6 +422,23 @@ struct Model
     const double range_a = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
     const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
     const double range_i = std::sqrt(6.0 / (hidden_ + 1));
+
+    words_source_.clear();
+    words_target_.clear();
+    words_source_.resize(vocabulary_size, false);
+    words_target_.resize(vocabulary_size, false);
+
+    words_source_[vocab_type::EPSILON.id()] = true;
+    words_target_[vocab_type::EPSILON.id()] = true;
+    words_source_[vocab_type::BOS.id()] = true;
+    words_target_[vocab_type::BOS.id()] = true;
+    words_source_[vocab_type::EOS.id()] = true;
+    words_target_[vocab_type::EOS.id()] = true;
+
+    for (typename Words::const_iterator siter = words_source.begin(); siter != words_source.end(); ++ siter)
+      words_source_[siter->id()] = true;
+    for (typename Words::const_iterator titer = words_target.begin(); titer != words_target.end(); ++ titer)
+      words_target_[titer->id()] = true;
  
     source_ = tensor_type::Zero(embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
     target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
@@ -561,8 +580,8 @@ struct Model
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);    
     rep["alignment"] = utils::lexical_cast<std::string>(alignment_);    
     
-    write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_);
-    write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_);
+    write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_, words_source_);
+    write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_, words_target_);
     
     write(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
     write(rep.path("bt.txt.gz"), rep.path("bt.bin"), bt_);
@@ -574,37 +593,49 @@ struct Model
     write(rep.path("bn.txt.gz"), rep.path("bn.bin"), bn_);
     
     write(rep.path("Wi.txt.gz"), rep.path("Wi.bin"), Wi_);
-    
+
     // vocabulary...
-    word_type::write(rep.path("vocab"));
+    vocab_type vocab;
+
+    const word_type::id_type vocabulary_size = utils::bithack::min(words_source_.size(), words_target_.size());
+    
+    vocab.open(rep.path("vocab"), vocabulary_size >> 1);
+    
+    for (word_type::id_type id = 0; id != vocabulary_size; ++ id)
+      if (words_source_[id] || words_target_[id]) {
+	const word_type word(id);
+	
+	vocab.insert(word);
+      }
+    
+    vocab.close();
   }
   
-  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
+  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix, const word_unique_type& words) const
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
     const word_type::id_type rows = matrix.rows();
-    const word_type::id_type cols = matrix.cols();
+    const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());
     
     utils::compress_ostream os_txt(path_text, 1024 * 1024);
     utils::compress_ostream os_bin(path_binary, 1024 * 1024);
     std::ostream_iterator<char> iter(os_txt);
     
-    for (word_type::id_type id = 0; id != cols; ++ id)  {
-      const word_type word(id);
-      
-      if (word != word_type()) {
+    for (word_type::id_type id = 0; id != cols; ++ id)  
+      if (words[id]) {
+	const word_type word(id);
+	
 	karma::generate(iter, standard::string, word);
 	
 	for (difference_type j = 0; j != rows; ++ j)
 	  karma::generate(iter, karma::lit(' ') << float10, matrix(j, id));
 	
 	karma::generate(iter, karma::lit('\n'));
+	
+	os_bin.write((char*) matrix.col(id).data(), sizeof(tensor_type::Scalar) * rows);
       }
-    }
-    
-    os_bin.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * cols * rows);
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const
@@ -629,6 +660,9 @@ struct Model
   size_type embedding_;
   size_type hidden_;
   int       alignment_;
+
+  word_unique_type words_source_;
+  word_unique_type words_target_;
   
   // embedding
   tensor_type source_;
@@ -1332,7 +1366,7 @@ struct HMM
       }
     }
 
-    double loss = 0.0;
+    double log_likelihood = 0.0;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
       const state_set_type& states_next = states_[trg];
@@ -1400,25 +1434,35 @@ struct HMM
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
 				+ theta.target_.col(target_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
+
+	const double score_noise_c = 0.0 + dict_.logprob(source_none_prev, target_next);
+	const double score_noise_m = 0.0 + dict_.logprob(source_none_prev, target_sampled);
 	
-	const double error = std::max(1.0 - (score_c - score_m), 0.0);
+	const double z_c = utils::mathop::logsum(score_c, score_noise_c);
+	const double z_m = utils::mathop::logsum(score_m, score_noise_m);
 	
-	loss += error;
+	const double logprob_c = score_c - z_c;
+	const double logprob_m = score_m - z_m;
 	
-	const double delta_c = - (error > 0.0);
-	const double delta_m =   (error > 0.0);
+	const double logprob_noise_c = score_noise_c - z_c;
+	const double logprob_noise_m = score_noise_m - z_m;
+	
+	log_likelihood += logprob_c + logprob_noise_m;
+	
+	const double loss_c = - 1.0 + std::exp(logprob_c);
+	const double loss_m =         std::exp(logprob_m);
 	
 	tensor_type& dembedding_c = gradient.target(target_next);
 	tensor_type& dembedding_m = gradient.target(target_sampled);
 	
-	dembedding_c.block(0, 0, theta.embedding_, 1).array() += delta_c * layer_trans.array();
-	dembedding_c.block(theta.embedding_, 0, 1, 1).array() += delta_c;
-	dembedding_m.block(0, 0, theta.embedding_, 1).array() += delta_m * layer_trans.array();
-	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += delta_m;
+	dembedding_c.block(0, 0, theta.embedding_, 1).array() += loss_c * layer_trans.array();
+	dembedding_c.block(theta.embedding_, 0, 1, 1).array() += loss_c;
+	dembedding_m.block(0, 0, theta.embedding_, 1).array() += loss_m * layer_trans.array();
+	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += loss_m;
 	
 	delta_trans_ = (layer_trans.array().unaryExpr(dhtanh())
-			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * delta_c
-			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * delta_m).array());
+			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * loss_c
+			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * loss_m).array());
 	
 	gradient.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 	  += delta_trans_ * theta.source_.col(source_next.id()).transpose();
@@ -1478,7 +1522,7 @@ struct HMM
     gradient.source(vocab_type::BOS) += beta.block(0, 0, theta.embedding_, 1);
     gradient.Wi_ += beta.block(theta.embedding_, 0, theta.hidden_, 1);
     
-    return loss;
+    return log_likelihood;
   }
     
   double viterbi(const sentence_type& source,
@@ -1928,7 +1972,7 @@ int batch_size = 128;
 int beam_size = 10;
 int cutoff = 3;
 double lambda = 1e-5;
-double lambda2 = 0.0;
+double lambda2 = 0.01;
 double eta0 = 1;
 
 bool moses_mode = false;
@@ -2353,8 +2397,8 @@ struct TaskAccumulate
       gradient_target_source_(theta_target_source.embedding_,
 			      theta_target_source.hidden_,
 			      theta_target_source.alignment_),
-      loss_source_target_(0),
-      loss_target_source_(0) {}
+      log_likelihood_source_target_(0),
+      log_likelihood_target_source_(0) {}
 
   void operator()()
   {
@@ -2388,14 +2432,14 @@ struct TaskAccumulate
 	hmm_source_target_.forward(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
 	hmm_target_source_.forward(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
 	
-	loss_source_target_
+	log_likelihood_source_target_
 	  += hmm_source_target_.backward(bitext.source_,
 					 bitext.target_,
 					 theta_source_target_,
 					 gradient_source_target_,
 					 generator);
 	
-	loss_target_source_
+	log_likelihood_target_source_
 	  += hmm_target_source_.backward(bitext.target_,
 					 bitext.source_,
 					 theta_target_source_,
@@ -2416,8 +2460,8 @@ struct TaskAccumulate
   {
     gradient_source_target_.clear();
     gradient_target_source_.clear();
-    loss_source_target_ = 0;
-    loss_target_source_ = 0;
+    log_likelihood_source_target_ = 0;
+    log_likelihood_target_source_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -2434,8 +2478,8 @@ struct TaskAccumulate
   
   gradient_type gradient_source_target_;
   gradient_type gradient_target_source_;
-  double        loss_source_target_;
-  double        loss_target_source_;
+  double        log_likelihood_source_target_;
+  double        log_likelihood_target_source_;
 };
 
 inline
@@ -2530,8 +2574,8 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    double loss_source_target = 0.0;
-    double loss_target_source = 0.0;
+    double log_likelihood_source_target = 0.0;
+    double log_likelihood_target_source = 0.0;
     size_type samples = 0;
     size_type words_source = 0;
     size_type words_target = 0;
@@ -2572,14 +2616,14 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      loss_source_target += tasks.front().loss_source_target_;
-      loss_target_source += tasks.front().loss_target_source_;
+      log_likelihood_source_target += tasks.front().log_likelihood_source_target_;
+      log_likelihood_target_source += tasks.front().log_likelihood_target_source_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_source_target_ += tasks[i].gradient_source_target_;
 	tasks.front().gradient_target_source_ += tasks[i].gradient_target_source_;
 	
-	loss_source_target += tasks[i].loss_source_target_;
-	loss_target_source += tasks[i].loss_target_source_;
+	log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
+	log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
       }
 
       embedding_source_target.assign(tasks.front().gradient_source_target_);
@@ -2599,10 +2643,10 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
     
     if (debug)
-      std::cerr << "loss P(target | source) (per sentence): " << (loss_source_target / samples) << std::endl
-		<< "loss P(target | source) (per word): "     << (loss_source_target / words_target) << std::endl
-		<< "loss P(source | target) (per sentence): " << (loss_target_source / samples) << std::endl
-		<< "loss P(source | target) (per word): "     << (loss_target_source / words_source) << std::endl;
+      std::cerr << "log-likelihood P(target | source) (per sentence): " << (log_likelihood_source_target / samples) << std::endl
+		<< "log-likelihood P(target | source) (per word): "     << (log_likelihood_source_target / words_target) << std::endl
+		<< "log-likelihood P(source | target) (per sentence): " << (log_likelihood_target_source / samples) << std::endl
+		<< "log-likelihood P(source | target) (per word): "     << (log_likelihood_target_source / words_source) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
@@ -2662,8 +2706,8 @@ struct TaskViterbi
       queue_target_source_(queue_target_source),
       hmm_source_target_(dict_source_target, beam_size),
       hmm_target_source_(dict_target_source, beam_size),
-      loss_source_target_(0),
-      loss_target_source_(0) {}
+      log_likelihood_source_target_(0),
+      log_likelihood_target_source_(0) {}
 
   void operator()()
   {
@@ -2689,9 +2733,9 @@ struct TaskViterbi
       bitext_target_source.alignment_.clear();
 
       if (! bitext.source_.empty() && ! bitext.target_.empty()) {
-	loss_source_target_
+	log_likelihood_source_target_
 	  += hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
-	loss_target_source_
+	log_likelihood_target_source_
 	  += hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
       }
       
@@ -2703,8 +2747,8 @@ struct TaskViterbi
 
   void clear()
   {
-    loss_source_target_ = 0;
-    loss_target_source_ = 0;
+    log_likelihood_source_target_ = 0;
+    log_likelihood_target_source_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -2718,8 +2762,8 @@ struct TaskViterbi
   hmm_type hmm_source_target_;
   hmm_type hmm_target_source_;
   
-  double        loss_source_target_;
-  double        loss_target_source_;
+  double        log_likelihood_source_target_;
+  double        log_likelihood_target_source_;
 
 };
 

@@ -376,38 +376,29 @@ struct Model
 
   void finalize()
   {
-    // clear general embedding
-    embedding_input_.col(vocab_type::EPSILON.id())  = tensor_type::Zero(dimension_embedding_, 1);
-    embedding_output_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
-    
     // clear unused entries
     embedding_input_.col(vocab_type::EOS.id())  = tensor_type::Zero(dimension_embedding_, 1);
     embedding_output_.col(vocab_type::BOS.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
+    embedding_output_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_embedding_ + 1, 1);
     
     const double factor = 1.0 / std::accumulate(uniques_.begin(), uniques_.end(), size_type(0));
     
-    tensor_type epsilon_input  = tensor_type::Zero(dimension_embedding_, 1);
-    tensor_type epsilon_output = tensor_type::Zero(dimension_embedding_ + 1, 1);
+    tensor_type average_input  = tensor_type::Zero(dimension_embedding_, 1);
+    tensor_type average_output = tensor_type::Zero(dimension_embedding_ + 1, 1);
     
     bool has_unk = false;
     
     for (size_type pos = 0; pos != uniques_.size(); ++ pos) 
       if (uniques_[pos]) {
-	epsilon_input  += embedding_input_.col(pos) * factor;
-	epsilon_output += embedding_output_.col(pos) * factor;
+	average_input  += embedding_input_.col(pos) * factor;
+	average_output += embedding_output_.col(pos) * factor;
 	
 	has_unk |= (word_type(pos) == vocab_type::UNK);
       }
     
-    embedding_input_.col(vocab_type::EPSILON.id())  = epsilon_input;
-    embedding_output_.col(vocab_type::EPSILON.id()) = epsilon_output;
-    
-    embedding_input_.col(vocab_type::EOS.id())  = epsilon_input;
-    embedding_output_.col(vocab_type::BOS.id()) = epsilon_output;
-    
     if (! has_unk) {
-      embedding_input_.col(vocab_type::UNK.id())  = epsilon_input;
-      embedding_output_.col(vocab_type::UNK.id()) = epsilon_output;
+      embedding_input_.col(vocab_type::UNK.id())  = average_input;
+      embedding_output_.col(vocab_type::UNK.id()) = average_output;
     }
   }
   
@@ -617,13 +608,14 @@ struct NGram
 
   NGram(const unigram_type& unigram,
 	const size_type samples)
-    : unigram_(unigram), samples_(samples), log_samples_(std::log(samples)) {}
+    : unigram_(unigram), samples_(samples), log_samples_(std::log(double(samples))) {}
 
   const unigram_type& unigram_;
   size_type           samples_;
   double              log_samples_;
   
   tensor_type layer_input_;
+  tensor_type layer_input_back_;
   tensor_type layer_context_;
   tensor_type layer_hidden_;
 
@@ -632,6 +624,7 @@ struct NGram
   tensor_type delta_hidden_;
 
   gradient_embedding_type gradient_embedding_;
+  gradient_embedding_type gradient_embedding_back_;
   
   struct hinge
   {
@@ -669,29 +662,58 @@ struct NGram
       layer_input_ = tensor_type::Zero(dimension * (order - 1), 1);
     
     tensor_type& gradient_embedding_bos = gradient.embedding_input(vocab_type::BOS);
+    tensor_type& gradient_embedding_eps = gradient.embedding_input(vocab_type::EPSILON);
+
+    size_type eps_size = (order > 2 ? order - 2 : size_type(0));
     
-    for (size_type i = 0; i < order - 1; ++ i) {
-      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id());
-      
-      gradient_embedding_[i] = &gradient_embedding_bos;
-    }
+    if (order > 2)
+      for (size_type i = 0; i < order - 2; ++ i) {
+	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+	
+	gradient_embedding_[i] = &gradient_embedding_eps;
+      }
+    
+    layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id());
+    gradient_embedding_[order - 2] = &gradient_embedding_bos;
     
     double log_likelihood = 0.0;
-    sentence_type::const_iterator siter_end = sentence.end();
-    for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+    sentence_type::const_iterator siter_begin = sentence.begin();
+    sentence_type::const_iterator siter_end   = sentence.end();
+    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
       log_likelihood += learn(*siter, theta, gradient, gen);
       
+      layer_input_back_        = layer_input_;
+      gradient_embedding_back_ = gradient_embedding_;
+      
+      // compute lower-order ngram language model
+      for (size_type i = eps_size; i != order - 1; ++ i) {
+	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+	gradient_embedding_[i] = &gradient_embedding_eps;
+	
+	learn(*siter, theta, gradient, gen);
+      }
+      
       // shift layer_input...
-      layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_.block(dimension, 0, dimension * (order - 2), 1).eval();
+      layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_back_.block(dimension, 0, dimension * (order - 2), 1);
       layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id());
       
       // shift context
-      std::copy(gradient_embedding_.begin() + 1, gradient_embedding_.end(), gradient_embedding_.begin());
+      std::copy(gradient_embedding_back_.begin() + 1, gradient_embedding_back_.end(), gradient_embedding_.begin());
       gradient_embedding_.back() = &gradient.embedding_input(*siter);
+      
+      eps_size -= (eps_size > 0);
     }
     
     // correct scoring
     log_likelihood += learn(vocab_type::EOS, theta, gradient, gen);
+    
+    // compute lower-order ngram language model
+    for (size_type i = eps_size; i != order - 1; ++ i) {
+      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+      gradient_embedding_[i] = &gradient_embedding_eps;
+      
+      learn(vocab_type::EOS, theta, gradient, gen);
+    }
     
     return log_likelihood;
   }
@@ -979,8 +1001,8 @@ path_type list_file;
 path_type embedding_file;
 path_type output_model_file;
 
-int dimension_embedding = 16;
-int dimension_hidden = 128;
+int dimension_embedding = 32;
+int dimension_hidden = 256;
 int order = 5;
 
 bool optimize_sgd = false;

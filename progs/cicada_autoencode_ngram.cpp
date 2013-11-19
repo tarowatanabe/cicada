@@ -851,7 +851,7 @@ path_type output_model_file;
 
 double alpha = 0.99;
 double beta = 0.01;
-int dimension_embedding = 16;
+int dimension_embedding = 32;
 int dimension_hidden = 128;
 int order = 3;
 

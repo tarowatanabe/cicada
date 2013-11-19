@@ -239,11 +239,9 @@ namespace cicada
       matrix_type input(reinterpret_cast<parameter_type*>(buffer), dimension_embedding_ * (order_ - 1), 1);
       
       if (last - first < order_) {
-	const id_type id_fill = (last - first == 1 || *first != id_bos_ ? id_eps_ : id_bos_);
-	
 	size_type i = 0;
 	for (/**/; i < order_ - (last - first); ++ i)
-	  input.block(dimension_embedding_ * i, 0, dimension_embedding_, 1) = embedding_input_().col(id_fill);
+	  input.block(dimension_embedding_ * i, 0, dimension_embedding_, 1) = embedding_input_().col(id_eps_);
 	
 	for (/**/; first != last - 1; ++ first, ++ i)
 	  input.block(dimension_embedding_ * i, 0, dimension_embedding_, 1) = embedding_input_().col(*first);
