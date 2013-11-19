@@ -1519,7 +1519,7 @@ struct HMM
 
     const matrix_type beta(states_[0].begin()->second.matrix(), theta.embedding_ + theta.hidden_, 1);
     
-    gradient.source(vocab_type::BOS) += beta.block(0, 0, theta.embedding_, 1);
+    // this is not necessary...
     gradient.Wi_ += beta.block(theta.embedding_, 0, theta.hidden_, 1);
     
     return log_likelihood;
@@ -2281,7 +2281,7 @@ struct OutputAlignment : OutputMapReduce
        << " alignment score : " << 0 << '\n';
     os << bitext.bitext_.target_ << '\n';
     
-    if (bitext.alignment_.empty() || bitext.bitext_.source_.empty() || bitext.bitext_.target_.empty()) {
+    if (bitext.bitext_.source_.empty() || bitext.bitext_.target_.empty()) {
       os << "NULL ({ })";
       sentence_type::const_iterator siter_end = bitext.bitext_.source_.end();
       for (sentence_type::const_iterator siter = bitext.bitext_.source_.begin(); siter != siter_end; ++ siter)
