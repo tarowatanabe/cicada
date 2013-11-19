@@ -111,6 +111,12 @@ In order to train a model, see `doc/training.rst` and
 {tree,string}-to-{tree,string} models, tune parameters, and run
 decoder.
 
+Systems
+-------
+
+It has been successfully compiled on x86\_64 on Linux, OS X and
+Cygwin, and regularly tested on Linux and OS X.
+
 Descriptions
 ------------
 
