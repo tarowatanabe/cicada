@@ -685,6 +685,7 @@ struct NGram
       layer_input_back_        = layer_input_;
       gradient_embedding_back_ = gradient_embedding_;
       
+#if 0
       // compute lower-order ngram language model
       for (size_type i = eps_size; i != order - 1; ++ i) {
 	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
@@ -692,6 +693,7 @@ struct NGram
 	
 	learn(*siter, theta, gradient, gen);
       }
+#endif
       
       // shift layer_input...
       layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_back_.block(dimension, 0, dimension * (order - 2), 1);
@@ -707,6 +709,7 @@ struct NGram
     // correct scoring
     log_likelihood += learn(vocab_type::EOS, theta, gradient, gen);
     
+#if 0
     // compute lower-order ngram language model
     for (size_type i = eps_size; i != order - 1; ++ i) {
       layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
@@ -714,6 +717,7 @@ struct NGram
       
       learn(vocab_type::EOS, theta, gradient, gen);
     }
+#endif
     
     return log_likelihood;
   }
