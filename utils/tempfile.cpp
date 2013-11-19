@@ -222,7 +222,6 @@ namespace utils
       
       const std::string tmpdir_spec_short = boost::algorithm::replace_all_copy(tmpdir_spec, "%host", get_hostname_short());
       const std::string tmpdir_spec_long = boost::algorithm::replace_all_copy(tmpdir_spec, "%host", get_hostname());
-
       
       if (boost::filesystem::exists(tmpdir_spec_short) && boost::filesystem::is_directory(tmpdir_spec_short))
 	return tmpdir_spec_short;
@@ -231,20 +230,20 @@ namespace utils
 	return tmpdir_spec_long;
     }
     
-    // wired to /tmp... is this safe?
-    std::string tmpdir("/tmp");
-    
     const char* tmpdir_env = getenv("TMPDIR");
-    if (! tmpdir_env)
-      return path_type(tmpdir);
-      
-    const path_type tmpdir_env_path(tmpdir_env);
-    if (boost::filesystem::exists(tmpdir_env_path) && boost::filesystem::is_directory(tmpdir_env_path))
-      return tmpdir_env_path;
-    else
-      return path_type(tmpdir);
+    if (tmpdir_env) {
+      const path_type tmpdir_env_path(tmpdir_env);
+      if (boost::filesystem::exists(tmpdir_env_path) && boost::filesystem::is_directory(tmpdir_env_path))
+	return tmpdir_env_path;
+    }
+
+    // wired to /tmp...
+    const path_type tmpdir("/tmp");
+    if (boost::filesystem::exists(tmpdir) && boost::filesystem::is_directory(tmpdir))
+      return tmpdir;
     
-    
+    // return  current dir
+    return ".";
   }
   
 };
