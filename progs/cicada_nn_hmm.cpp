@@ -112,15 +112,15 @@ struct Gradient
       Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
     if (! bt_.rows())
       bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
-
+    
     if (! Wa_.rows())
       Wa_ = tensor_type::Zero(x.Wa_.rows(), x.Wa_.cols());
     if (! ba_.rows())
       ba_ = tensor_type::Zero(x.ba_.rows(), x.ba_.cols());
-
+    
     if (! Wn_.rows())
       Wn_ = tensor_type::Zero(x.Wn_.rows(), x.Wn_.cols());
-    if (! ba_.rows())
+    if (! bn_.rows())
       bn_ = tensor_type::Zero(x.bn_.rows(), x.bn_.cols());
 
     if (! Wi_.rows())
@@ -176,7 +176,7 @@ struct Gradient
       Wn_ = tensor_type::Zero(x.Wn_.rows(), x.Wn_.cols());
     if (! bn_.rows())
       bn_ = tensor_type::Zero(x.bn_.rows(), x.bn_.cols()); 
-   
+
     if (! Wi_.rows())
       Wi_ = tensor_type::Zero(x.Wi_.rows(), x.Wi_.cols());
 
@@ -188,7 +188,7 @@ struct Gradient
 
     Wn_ += x.Wn_;
     bn_ += x.bn_;
-    
+
     Wi_ += x.Wi_;
 
     return *this;
@@ -253,7 +253,7 @@ struct Gradient
     
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), hidden_ + embedding_);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
-
+    
     Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     bn_ = tensor_type::Zero(hidden_, 1);
     
@@ -452,7 +452,7 @@ struct Model
 
     Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_).array().unaryExpr(randomize<Gen>(gen, range_n));
     bn_ = tensor_type::Zero(hidden_, 1);
-    
+
     Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
   }
 
@@ -1064,13 +1064,11 @@ struct HMM
 
   size_type beam_;
   
-  
   tensor_type layer_trans_;
   
   tensor_type delta_beta_;
   tensor_type delta_alpha_;
   tensor_type delta_trans_;
-  tensor_type delta_reconstruction_;
   
   state_allocator_type state_allocator_;
   heap_set_type  heaps_;
@@ -1464,12 +1462,9 @@ struct HMM
 	
 	gradient.source(source_next) += delta_beta_.block(0, 0, theta.embedding_, 1);
 	
-	// compute reconstruction error...
-	
-	
-	
 	delta_alpha_ = (layer_alpha.array().unaryExpr(dtanh())
-			* (delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1) + beta_next).array());
+			* (delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1)
+			   + beta_next).array());
 	
 	if (next >= source_size + 2) {
 	  gradient.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
@@ -1477,7 +1472,7 @@ struct HMM
 	  
 	  gradient.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
 	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose());
-	  
+	  	  
 	  gradient.bn_ += delta_alpha_;
 
 	  gradient.source(source_none_prev) += (theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_).transpose()
@@ -1753,7 +1748,7 @@ struct LearnAdaGrad
     
     Wn_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     bn_ = tensor_type::Zero(hidden_, 1);
-    
+
     Wi_ = tensor_type::Zero(hidden_, 1);
   }
 

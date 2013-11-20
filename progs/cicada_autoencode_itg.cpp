@@ -365,15 +365,16 @@ struct Model
   template <typename Gen>
   struct randomize
   {
-    randomize(Gen& gen) : gen_(gen) {}
-
+    randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
+    
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return boost::random::uniform_real_distribution<Tp>(-0.1, 0.1)(const_cast<Gen&>(gen_));
+      return boost::random::uniform_real_distribution<Tp>(-range_, range_)(const_cast<Gen&>(gen_));
     }
-
+    
     Gen& gen_;
+    double range_;
   };
 
   template <typename Gen>
@@ -398,34 +399,39 @@ struct Model
     // embedding
     source_.clear();
     target_.clear();
+
+    const double range_i = std::sqrt(6.0 / (dimension_itg * 3));
+    const double range_p = std::sqrt(6.0 / (dimension_itg + dimension_hidden));
+    const double range_l = std::sqrt(6.0 / (dimension_hidden + dimension_embedding * 2 * (window * 2 + 1)));
+    const double range_c = std::sqrt(6.0 / (dimension_itg + 1));
     
     // score
-    Ws1_ = tensor_type::Zero(dimension_itg, dimension_itg * 2).array().unaryExpr(randomize<Gen>(gen));
-    bs1_ = tensor_type::Zero(dimension_itg, 1).array().unaryExpr(randomize<Gen>(gen));
-    Wi1_ = tensor_type::Zero(dimension_itg, dimension_itg * 2).array().unaryExpr(randomize<Gen>(gen));
-    bi1_ = tensor_type::Zero(dimension_itg, 1).array().unaryExpr(randomize<Gen>(gen));
+    Ws1_ = tensor_type::Zero(dimension_itg, dimension_itg * 2).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bs1_ = tensor_type::Zero(dimension_itg, 1);
+    Wi1_ = tensor_type::Zero(dimension_itg, dimension_itg * 2).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi1_ = tensor_type::Zero(dimension_itg, 1);
     
     // reconstruction
-    Ws2_ = tensor_type::Zero(dimension_itg * 2, dimension_itg).array().unaryExpr(randomize<Gen>(gen));
-    bs2_ = tensor_type::Zero(dimension_itg * 2, 1).array().unaryExpr(randomize<Gen>(gen));
-    Wi2_ = tensor_type::Zero(dimension_itg * 2, dimension_itg).array().unaryExpr(randomize<Gen>(gen));
-    bi2_ = tensor_type::Zero(dimension_itg * 2, 1).array().unaryExpr(randomize<Gen>(gen));
+    Ws2_ = tensor_type::Zero(dimension_itg * 2, dimension_itg).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bs2_ = tensor_type::Zero(dimension_itg * 2, 1);
+    Wi2_ = tensor_type::Zero(dimension_itg * 2, dimension_itg).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi2_ = tensor_type::Zero(dimension_itg * 2, 1);
     
     // phrases
-    Wp1_ = tensor_type::Zero(dimension_itg, dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
-    bp1_ = tensor_type::Zero(dimension_itg, 1).array().unaryExpr(randomize<Gen>(gen));
-    Wp2_ = tensor_type::Zero(dimension_hidden, dimension_itg).array().unaryExpr(randomize<Gen>(gen));
-    bp2_ = tensor_type::Zero(dimension_hidden, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wp1_ = tensor_type::Zero(dimension_itg, dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_p));
+    bp1_ = tensor_type::Zero(dimension_itg, 1);
+    Wp2_ = tensor_type::Zero(dimension_hidden, dimension_itg).array().unaryExpr(randomize<Gen>(gen, range_p));
+    bp2_ = tensor_type::Zero(dimension_hidden, 1);
     
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1)).array().unaryExpr(randomize<Gen>(gen));
-    bl1_ = tensor_type::Zero(dimension_hidden, 1).array().unaryExpr(randomize<Gen>(gen));
-    Wl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden).array().unaryExpr(randomize<Gen>(gen));
-    bl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1).array().unaryExpr(randomize<Gen>(gen));
+    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1)).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bl1_ = tensor_type::Zero(dimension_hidden, 1);
+    Wl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);
     
     // classification
-    Wc_ = tensor_type::Zero(1, dimension_itg).array().unaryExpr(randomize<Gen>(gen));
-    bc_ = tensor_type::Zero(1, 1).array().unaryExpr(randomize<Gen>(gen));
+    Wc_ = tensor_type::Zero(1, dimension_itg).array().unaryExpr(randomize<Gen>(gen, range_c));
+    bc_ = tensor_type::Ones(1, 1);
   }
 
   void initialize(const size_type dimension_embedding,
@@ -493,19 +499,21 @@ struct Model
     tensor_type& eps = embedding[vocab_type::EPSILON];
     tensor_type& bos = embedding[vocab_type::BOS];
     tensor_type& eos = embedding[vocab_type::EOS];
+
+    const double range_e = std::sqrt(6.0 / (dimension_embedding_ + 1));
     
     if (! eps.rows() || ! eps.cols())
-      eps = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+      eps = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     if (! bos.rows() || ! bos.cols())
-      bos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+      bos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     if (! eos.rows() || ! eos.cols())
-      eos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+      eos = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     
     for (/**/; first != last; ++ first) {
       tensor_type& we = embedding[*first];
       
       if (! we.rows() || ! we.cols())
-	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen));
+	we = tensor_type::Zero(dimension_embedding_, 1).array().unaryExpr(randomize<Gen>(gen, range_e));
     }
   }
   
@@ -787,6 +795,137 @@ struct Model
   tensor_type bc_;
 };
 
+struct Dictionary
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model    model_type;
+  
+  typedef uint64_t count_type;
+  
+  typedef cicada::Sentence  sentence_type;
+  typedef cicada::Alignment alignment_type;
+  typedef cicada::Symbol    word_type;
+  typedef cicada::Vocab     vocab_type;
+  
+  struct Dict
+  {
+    typedef utils::compact_map<word_type, double,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, double> > > logprob_set_type;
+    typedef utils::compact_map<word_type, count_type,
+			       utils::unassigned<word_type>, utils::unassigned<word_type>,
+			       boost::hash<word_type>, std::equal_to<word_type>,
+			       std::allocator<std::pair<const word_type, count_type> > > count_set_type;
+    
+    typedef std::vector<word_type, std::allocator<word_type> >   word_set_type;
+    typedef boost::random::discrete_distribution<>               distribution_type;
+    
+    Dict() {}
+
+    template <typename Tp>
+    struct compare_pair
+    {
+      bool operator()(const Tp& x, const Tp& y) const
+      {
+	return (x.second > y.second
+		|| (x.second == y.second
+		    && static_cast<const std::string&>(x.first) < static_cast<const std::string&>(y.first)));
+      }
+    };
+    
+    void initialize()
+    {
+      typedef std::pair<word_type, double> word_prob_type;
+      typedef std::vector<word_prob_type, std::allocator<word_prob_type> > word_prob_set_type;
+      typedef std::vector<double, std::allocator<double> > prob_set_type;
+      
+      logprobs_.clear();
+      words_.clear();
+      
+      word_prob_set_type word_probs(counts_.begin(), counts_.end());
+      std::sort(word_probs.begin(), word_probs.end(), compare_pair<word_prob_type>());
+      
+      prob_set_type probs;
+      words_.reserve(word_probs.size());
+      probs.reserve(word_probs.size());
+      
+      word_prob_set_type::const_iterator witer_end = word_probs.end();
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
+	words_.push_back(witer->first);
+	probs.push_back(witer->second);
+	logprobs_[witer->first] = std::log(witer->second);
+      }
+      
+      // initialize distribution
+      distribution_ = distribution_type(probs.begin(), probs.end());
+    }
+    
+    double logprob(const word_type& word) const
+    {
+      logprob_set_type::const_iterator liter = logprobs_.find(word);
+      if (liter != logprobs_.end())
+	return liter->second;
+      else
+	return - std::numeric_limits<double>::infinity();
+    }
+    
+    template <typename Gen>
+    word_type draw(Gen& gen) const
+    {
+      return words_[distribution_(gen)];
+    }
+
+    count_type& operator[](const word_type& word) { return counts_[word]; }
+    
+    count_set_type    counts_;
+    logprob_set_type  logprobs_;
+    word_set_type     words_;
+    distribution_type distribution_;
+  };
+
+  typedef Dict dict_type;
+  typedef utils::alloc_vector<dict_type, std::allocator<dict_type> > dict_set_type;
+  
+  Dictionary() {}
+
+  dict_type& operator[](const word_type& word) { return dicts_[word.id()]; }
+
+  void swap(Dictionary& x) { dicts_.swap(x.dicts_); }
+
+  void initialize()
+  {
+    for (size_type i = 0; i != dicts_.size(); ++ i)
+      if (dicts_.exists(i))
+	dicts_[i].initialize();
+  }
+  
+  void clear()
+  {
+    dicts_.clear();
+  }
+  
+  double logprob(const word_type& source, const word_type& target) const
+  {
+    if (dicts_.exists(source.id()))
+      return dicts_[source.id()].logprob(target);
+    else
+      return dicts_[vocab_type::UNK.id()].logprob(target);
+  }
+  
+  template <typename Gen>
+  word_type draw(const word_type& source, Gen& gen) const
+  {
+    if (dicts_.exists(source.id()))
+      return dicts_[source.id()].draw(gen);
+    else
+      return dicts_[vocab_type::UNK.id()].draw(gen);
+  }
+
+  dict_set_type dicts_;
+};
 
 struct ITGTree
 {
@@ -796,6 +935,8 @@ struct ITGTree
   typedef Model model_type;
   typedef Model gradient_type;
 
+  typedef Dictionary dictionary_type;
+
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
   
@@ -804,8 +945,6 @@ struct ITGTree
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
   typedef bitext_type::vocab_type vocab_type;
-
-  typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
 
   struct Span
   {
@@ -1059,6 +1198,14 @@ struct ITGTree
 
   typedef Leaf leaf_type;
   typedef utils::vector2<leaf_type, std::allocator<leaf_type> > leaf_set_type;
+
+  ITGTree(const dictionary_type& dict_source_target,
+	  const dictionary_type& dict_target_source)
+    : dict_source_target_(dict_source_target),
+      dict_target_source_(dict_target_source) {}
+
+  const dictionary_type& dict_source_target_;
+  const dictionary_type& dict_target_source_;
   
   void clear()
   {
@@ -1568,8 +1715,6 @@ struct ITGTree
   template <typename Function, typename Derivative, typename Gen>
   void forward(const sentence_type& source,
 	       const sentence_type& target,
-	       const word_set_type& sources,
-	       const word_set_type& targets,
 	       const model_type& theta,
 	       Function   func,
 	       Derivative deriv,
@@ -1635,13 +1780,14 @@ struct ITGTree
 	    leaf.target_sampled_ = vocab_type::EPSILON;
 	    
 	    if (! edge.span_.source_.empty()) {
-	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, sources.size() - 1)(gen);
-
-	      leaf.source_sampled_ = sources[pos];
+	      leaf.source_sampled_ = dict_target_source_.draw(edge.span_.target_.empty()
+							     ? vocab_type::EPSILON
+							     : target[edge.span_.target_.first_],
+							     gen);
 	      
-	      embedding_type::const_iterator siter = theta.source_.find(sources[pos]);
+	      embedding_type::const_iterator siter = theta.source_.find(leaf.source_sampled_);
 	      if (siter == theta.source_.end())
-		throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+		throw std::runtime_error("no source embedding for " + static_cast<const std::string&>(leaf.source_sampled_));
 	      
 	      if (siter->second.rows() != dimension_embedding)
 		throw std::runtime_error("dimensin does not for the source side");
@@ -1650,13 +1796,14 @@ struct ITGTree
 	    }
 	    
 	    if (! edge.span_.target_.empty()) {
-	      const size_type pos = boost::random::uniform_int_distribution<size_t>(0, targets.size() - 1)(gen);
-
-	      leaf.target_sampled_ = targets[pos];
+	      leaf.target_sampled_ = dict_source_target_.draw(edge.span_.source_.empty()
+							     ? vocab_type::EPSILON
+							     : source[edge.span_.source_.first_],
+							     gen);
 	      
-	      embedding_type::const_iterator titer = theta.target_.find(targets[pos]);
+	      embedding_type::const_iterator titer = theta.target_.find(leaf.target_sampled_);
 	      if (titer == theta.target_.end())
-		throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(vocab_type::EPSILON));
+		throw std::runtime_error("no target embedding for " + static_cast<const std::string&>(leaf.target_sampled_));
 	      
 	      if (titer->second.rows() != dimension_embedding)
 		throw std::runtime_error("dimensin does not for the target side");
@@ -2332,9 +2479,9 @@ typedef boost::filesystem::path path_type;
 
 typedef Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
-typedef ITGTree::word_set_type word_set_type;
 
 typedef Model model_type;
+typedef Dictionary dictionary_type;
 
 static const size_t DEBUG_DOT  = 10000;
 static const size_t DEBUG_WRAP = 100;
@@ -2366,6 +2513,7 @@ int batch_size = 1024;
 double beam = 0.1;
 double lambda = 1e-5;
 double eta0 = 1;
+int cutoff = 3;
 
 bool dump_mode = false;
 
@@ -2376,16 +2524,18 @@ int debug = 0;
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  const word_set_type& sources,
-		  const word_set_type& targets,
+		  const dictionary_type& dict_source_target,
+		  const dictionary_type& dict_target_source,
 		  model_type& theta);
 void derivation(const bitext_set_type& bitexts,
+		const dictionary_type& dict_source_target,
+		const dictionary_type& dict_target_source,
 		const model_type& theta);
 void read_bitext(const path_type& source_file,
 		 const path_type& target_file,
 		 bitext_set_type& bitexts,
-		 word_set_type& sources,
-		 word_set_type& targets);
+		 dictionary_type& dict_source_target,
+		 dictionary_type& dict_target_source);
 
 void options(int argc, char** argv);
 
@@ -2407,6 +2557,9 @@ int main(int argc, char** argv)
       throw std::runtime_error("alpha should be >= 0.0");
     if (beta < 0.0)
       throw std::runtime_error("beta should be >= 0.0");
+
+    if (beam <= 0)
+      throw std::runtime_error("beam width should be positive");
     
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
@@ -2431,10 +2584,11 @@ int main(int argc, char** argv)
       throw std::runtime_error("no target data?");
     
     bitext_set_type bitexts;
-    word_set_type sources;
-    word_set_type targets;
-    
-    read_bitext(source_file, target_file, bitexts, sources, targets);
+
+    dictionary_type dict_source_target;
+    dictionary_type dict_target_source;
+
+    read_bitext(source_file, target_file, bitexts, dict_source_target, dict_target_source);
     
     model_type theta(dimension_embedding, dimension_hidden, dimension_itg, window, alpha, beta, generator);
     
@@ -2448,14 +2602,21 @@ int main(int argc, char** argv)
       theta.read_embedding(embedding_source_file, embedding_target_file);
     }
 
+    const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
+    const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
+    
     theta.embedding(sources.begin(), sources.end(), targets.begin(), targets.end(), generator);
     
     if (iteration > 0) {
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, dimension_itg, window, lambda, eta0), bitexts, sources, targets, theta);
+      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, dimension_itg, window, lambda, eta0),
+		   bitexts,
+		   dict_source_target,
+		   dict_target_source,
+		   theta);
     }
     
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
-      derivation(bitexts, theta);
+      derivation(bitexts, dict_source_target, dict_target_source, theta);
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -2805,8 +2966,8 @@ struct TaskAccumulate
   typedef Counter counter_type;
 
   TaskAccumulate(const bitext_set_type& bitexts,
-		 const word_set_type& sources,
-		 const word_set_type& targets,
+		 const dictionary_type& dict_source_target,
+		 const dictionary_type& dict_target_source,
 		 const model_type& theta,
 		 const double& beam,
 		 queue_type& queue,
@@ -2814,14 +2975,13 @@ struct TaskAccumulate
 		 queue_derivation_type& queue_derivation,
 		 queue_derivation_type& queue_alignment)
     : bitexts_(bitexts),
-      sources_(sources),
-      targets_(targets),
       theta_(theta),
       beam_(beam),
       queue_(queue),
       counter_(counter),
       queue_derivation_(queue_derivation),
       queue_alignment_(queue_alignment),
+      itg_tree_(dict_source_target, dict_target_source),
       gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.dimension_itg_, theta.window_),
       error_(0),
       classification_(0),
@@ -2864,7 +3024,7 @@ struct TaskAccumulate
 	const bool parsed = (root.error_ != std::numeric_limits<double>::infinity());
 	
 	if (parsed) {
-	  itg_tree_.forward(source, target, sources_, targets_, theta_, nn::htanh(), nn::dhtanh(), generator);
+	  itg_tree_.forward(source, target, theta_, nn::htanh(), nn::dhtanh(), generator);
 	  
 	  itg_tree_.backward(source, target, theta_, gradient_, nn::htanh(), nn::dhtanh());
 	  
@@ -2896,8 +3056,6 @@ struct TaskAccumulate
   }
 
   const bitext_set_type& bitexts_;
-  const word_set_type& sources_;
-  const word_set_type& targets_;
   const model_type& theta_;
   const double beam_;
   
@@ -2943,8 +3101,8 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
-		  const word_set_type& sources,
-		  const word_set_type& targets,
+		  const dictionary_type& dict_source_target,
+		  const dictionary_type& dict_target_source,
 		  model_type& theta)
 {
   typedef TaskAccumulate task_type;
@@ -2965,8 +3123,8 @@ void learn_online(const Learner& learner,
   output_map_reduce_type::queue_type queue_alignment;
   
   task_set_type tasks(threads, task_type(bitexts,
-					 sources,
-					 targets,
+					 dict_source_target,
+					 dict_target_source,
 					 theta,
 					 beam,
 					 mapper,
@@ -3101,6 +3259,8 @@ struct TaskDerivation
   typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
   
   TaskDerivation(const bitext_set_type& bitexts,
+		 const dictionary_type& dict_source_target,
+		 const dictionary_type& dict_target_source,
 		 const model_type& theta,
 		 const double& beam,
 		 queue_type& queue,
@@ -3111,7 +3271,8 @@ struct TaskDerivation
       beam_(beam),
       queue_(queue),
       queue_derivation_(queue_derivation),
-      queue_alignment_(queue_alignment) {}
+      queue_alignment_(queue_alignment),
+      itg_tree_(dict_source_target, dict_target_source) {}
 
   
   void operator()()
@@ -3169,6 +3330,8 @@ struct TaskDerivation
 };
 
 void derivation(const bitext_set_type& bitexts,
+		const dictionary_type& dict_source_target,
+		const dictionary_type& dict_target_source,
 		const model_type& theta)
 {
   typedef TaskDerivation task_type;
@@ -3185,6 +3348,8 @@ void derivation(const bitext_set_type& bitexts,
   output_map_reduce_type::queue_type queue_alignment;
   
   task_set_type tasks(threads, task_type(bitexts,
+					 dict_source_target,
+					 dict_target_source,
 					 theta,
 					 beam,
 					 mapper,
@@ -3226,24 +3391,22 @@ void derivation(const bitext_set_type& bitexts,
 void read_bitext(const path_type& source_file,
 		 const path_type& target_file,
 		 bitext_set_type& bitexts,
-		 word_set_type& sources,
-		 word_set_type& targets)
+		 dictionary_type& dict_source_target,
+		 dictionary_type& dict_target_source)
 {
-  typedef utils::compact_set<bitext_type::word_type,
-			     utils::unassigned<bitext_type::word_type>, utils::unassigned<bitext_type::word_type>,
-			     boost::hash<bitext_type::word_type>, std::equal_to<bitext_type::word_type>,
-			     std::allocator<bitext_type::word_type> > unique_set_type;
-  
-  bitexts.clear();
+  typedef cicada::Vocab vocab_type;
+  typedef cicada::Symbol word_type;
+  typedef bitext_type::sentence_type sentence_type;
 
-  unique_set_type uniques_source;
-  unique_set_type uniques_target;
-  
+  bitexts.clear();
+  dict_source_target.clear();
+  dict_target_source.clear();
+
   utils::compress_istream src(source_file, 1024 * 1024);
   utils::compress_istream trg(target_file, 1024 * 1024);
   
-  bitext_type::sentence_type source;
-  bitext_type::sentence_type target;
+  sentence_type source;
+  sentence_type target;
   
   while (src && trg) {
     src >> source;
@@ -3252,22 +3415,124 @@ void read_bitext(const path_type& source_file,
     if (! src || ! trg) break;
     
     bitexts.push_back(bitext_type(source, target));
+    
+    sentence_type::const_iterator siter_begin = source.begin();
+    sentence_type::const_iterator siter_end   = source.end();
+    sentence_type::const_iterator titer_begin = target.begin();
+    sentence_type::const_iterator titer_end   = target.end();
+    
+    {
+      dictionary_type::dict_type& dict = dict_source_target[vocab_type::EPSILON];
+      
+      for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	++ dict[*titer];
+      
+      for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	dictionary_type::dict_type& dict = dict_source_target[*siter];
+	
+	for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	  ++ dict[*titer];
+      }
+    }
 
-    uniques_source.insert(source.begin(), source.end());
-    uniques_target.insert(target.begin(), target.end());
+    {
+      dictionary_type::dict_type& dict = dict_target_source[vocab_type::EPSILON];
+      
+      for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	++ dict[*siter];
+      
+      for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	dictionary_type::dict_type& dict = dict_target_source[*titer];
+	
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  ++ dict[*siter];
+      }
+    }
   }
   
   if (src || trg)
     throw std::runtime_error("# of sentnces do not match");
 
-  sources.clear();
-  targets.clear();
+  if (cutoff > 1) {
+    typedef dictionary_type::dict_type::count_set_type word_set_type;
+    
+    word_set_type words_source;
+    word_set_type words_target;
+    
+    const word_set_type& counts_source = dict_target_source[vocab_type::EPSILON].counts_;
+    const word_set_type& counts_target = dict_source_target[vocab_type::EPSILON].counts_;
+    
+    word_set_type::const_iterator siter_end = counts_source.end();
+    for (word_set_type::const_iterator siter = counts_source.begin(); siter != siter_end; ++ siter)
+      if (siter->second >= cutoff)
+	words_source.insert(*siter);
+    
+    word_set_type::const_iterator titer_end = counts_target.end();
+    for (word_set_type::const_iterator titer = counts_target.begin(); titer != titer_end; ++ titer)
+      if (titer->second >= cutoff)
+	words_target.insert(*titer);
+    
+    dictionary_type dict_source_target_new;
+    dictionary_type dict_target_source_new;
+    
+    for (word_type::id_type i = 0; i != dict_source_target.dicts_.size(); ++ i)
+      if (dict_source_target.dicts_.exists(i)) {
+	word_type source(i);
+	
+	if (source != vocab_type::EPSILON && words_source.find(source) == words_source.end())
+	  source = vocab_type::UNK;
+	
+	dictionary_type::dict_type& dict = dict_source_target_new[source];
+	
+	word_set_type::const_iterator titer_end = dict_source_target[i].counts_.end();
+	for (word_set_type::const_iterator titer = dict_source_target[i].counts_.begin(); titer != titer_end; ++ titer)
+	  if (words_target.find(titer->first) == words_target.end())
+	    dict[vocab_type::UNK] += titer->second;
+	  else
+	    dict[titer->first] += titer->second;
+      }
+    
+    for (word_type::id_type i = 0; i != dict_target_source.dicts_.size(); ++ i)
+      if (dict_target_source.dicts_.exists(i)) {
+	word_type target(i);
+	
+	if (target != vocab_type::EPSILON && words_target.find(target) == words_target.end())
+	  target = vocab_type::UNK;
+	
+	dictionary_type::dict_type& dict = dict_target_source_new[target];
+	
+	word_set_type::const_iterator siter_end = dict_target_source[i].counts_.end();
+	for (word_set_type::const_iterator siter = dict_target_source[i].counts_.begin(); siter != siter_end; ++ siter)
+	  if (words_source.find(siter->first) == words_source.end())
+	    dict[vocab_type::UNK] += siter->second;
+	  else
+	    dict[siter->first] += siter->second;
+      }
+
+    dict_source_target.swap(dict_source_target_new);
+    dict_target_source.swap(dict_target_source_new);
+    
+    bitext_set_type::iterator biter_end = bitexts.end();
+    for (bitext_set_type::iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
+
+      sentence_type::iterator siter_end = biter->source_.end();
+      for (sentence_type::iterator siter = biter->source_.begin(); siter != siter_end; ++ siter)
+	if (words_source.find(*siter) == words_source.end())
+	  *siter = vocab_type::UNK;
+
+      sentence_type::iterator titer_end = biter->target_.end();
+      for (sentence_type::iterator titer = biter->target_.begin(); titer != titer_end; ++ titer)
+	if (words_target.find(*titer) == words_target.end())
+	  *titer = vocab_type::UNK;	
+    }
+    
+  }
+
+  dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
+  dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
   
-  sources.reserve(uniques_source.size());
-  targets.reserve(uniques_target.size());
-  
-  sources.insert(sources.end(), uniques_source.begin(), uniques_source.end());
-  targets.insert(targets.end(), uniques_target.begin(), uniques_target.end());
+  dict_source_target.initialize();
+  dict_target_source.initialize();
 }
 
 void options(int argc, char** argv)
@@ -3301,6 +3566,7 @@ void options(int argc, char** argv)
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
     ("beam",              po::value<double>(&beam)->default_value(beam),          "beam width for parsing")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")

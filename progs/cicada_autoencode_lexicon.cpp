@@ -832,7 +832,7 @@ struct Lexicon
 	//std::cerr << "error: " << e << std::endl;
 	
 	const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
-	const tensor_type delta_reconstruction = -y.array().unaryExpr(deriv) * reconstruction.array();
+	const tensor_type delta_reconstruction = y.array().unaryExpr(deriv) * reconstruction.array();
 	
 	const double y_p = (theta.Wc_ * p_norm + theta.bc_)(0,0);
 	const double y_m = (theta.Wc_ * p_sampled_norm + theta.bc_)(0,0);
