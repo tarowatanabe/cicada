@@ -67,6 +67,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/vector2.hpp"
 #include "utils/sampler.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
@@ -3165,6 +3166,8 @@ void learn_online(const Learner& learner,
     double classification = 0.0;
     size_type samples = 0;
     size_type num_bitext = 0;
+
+    utils::resource start;
     
     while (biter < biter_end) {
       // clear gradients...
@@ -3207,6 +3210,8 @@ void learn_online(const Learner& learner,
       learner(theta, tasks.front().gradient_);
     }
 
+    utils::resource end;
+
     queue_derivation.push(output_map_reduce_type::value_type());
     queue_alignment.push(output_map_reduce_type::value_type());
 
@@ -3220,6 +3225,10 @@ void learn_online(const Learner& learner,
 		<< "classification error: " << (classification / samples) << std::endl
 		<< "parsed: " << samples << std::endl;
     
+    if (debug)
+      std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
+		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
+
     // shuffle bitexts!
     std::random_shuffle(ids.begin(), ids.end());
     
@@ -3372,6 +3381,11 @@ void derivation(const bitext_set_type& bitexts,
 								  ? alignment_target_source_file
 								  : path_type(),
 								  queue_alignment)));
+
+  if (debug)
+    std::cerr << "max derivation" << std::endl;
+
+  utils::resource start;
   
   for (size_type i = 0; i != bitexts.size(); ++ i)
     mapper.push(i);
@@ -3381,6 +3395,12 @@ void derivation(const bitext_set_type& bitexts,
     mapper.push(size_type(-1));
   
   workers.join_all();
+
+  utils::resource end;
+
+  if (debug)
+    std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
+	      << "user time:   " << end.user_time() - start.user_time() << std::endl;
 
   queue_derivation.push(output_map_reduce_type::value_type());
   queue_alignment.push(output_map_reduce_type::value_type());

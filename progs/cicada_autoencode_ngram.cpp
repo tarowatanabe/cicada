@@ -52,8 +52,8 @@
 #include "utils/random_seed.hpp"
 #include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/vector2.hpp"
 #include "utils/sampler.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
@@ -1229,6 +1229,8 @@ void learn_online(const Learner& learner,
     size_type samples = 0;
     size_type num_bitext = 0;
     
+    utils::resource start;
+
     while (biter < biter_end) {
       // clear gradients...
       for (size_type i = 0; i != tasks.size(); ++ i)
@@ -1269,6 +1271,8 @@ void learn_online(const Learner& learner,
       // update model parameters
       learner(theta, tasks.front().gradient_);
     }
+
+    utils::resource end;
     
     if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
@@ -1277,9 +1281,12 @@ void learn_online(const Learner& learner,
 
     if (debug)
       std::cerr << "reconstruction error: " << (error / samples) << std::endl
-		<< "classification error: " << (classification / samples) << std::endl
-		<< "parsed: " << samples << std::endl;
+		<< "classification error: " << (classification / samples) << std::endl;
     
+    if (debug)
+      std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
+		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
+
     // shuffle bitexts!
     
     std::random_shuffle(ids.begin(), ids.end(), g);
