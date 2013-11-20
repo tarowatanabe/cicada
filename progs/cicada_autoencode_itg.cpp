@@ -2516,6 +2516,9 @@ double lambda = 1e-3;
 double eta0 = 1;
 int cutoff = 3;
 
+bool moses_mode = false;
+bool giza_mode = false;
+
 bool dump_mode = false;
 
 int threads = 2;
@@ -2562,6 +2565,12 @@ int main(int argc, char** argv)
     if (beam <= 0)
       throw std::runtime_error("beam width should be positive");
     
+    if (int(giza_mode) + moses_mode > 1)
+      throw std::runtime_error("either giza style output or moses style output");
+
+    if (int(giza_mode) + moses_mode == 0)
+      moses_mode = true;
+
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
@@ -2882,8 +2891,6 @@ struct OutputAlignment : OutputMapReduce
     }
   }
 
-
-  
   void write(std::ostream* os_source_target, std::ostream* os_target_source, const value_type& bitext)
   {
     alignment_.clear();
@@ -2895,14 +2902,77 @@ struct OutputAlignment : OutputMapReduce
     
     if (os_source_target) {
       std::sort(alignment_.begin(), alignment_.end());
-      *os_source_target << alignment_ << '\n';
+
+      if (moses_mode)
+	*os_source_target << alignment_ << '\n';
+      else
+	output(*os_source_target, bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, alignment_);
     }
     
     if (os_target_source) {
       alignment_.inverse();
       
       std::sort(alignment_.begin(), alignment_.end());
-      *os_target_source << alignment_ << '\n';
+
+      if (moses_mode)
+	*os_target_source << alignment_ << '\n';
+      else
+	output(*os_target_source, bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, alignment_);
+    }
+  }
+
+  typedef int index_type;
+  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
+  typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
+  typedef std::set<index_type, std::less<index_type>, std::allocator<index_type> > align_none_type;
+  
+  align_set_type  aligns_;
+  align_none_type aligns_none_;
+
+  void output(std::ostream& os,
+	      const size_type& id,
+	      const sentence_type& source,
+	      const sentence_type& target,
+	      const alignment_type& alignment)
+  {
+    os << "# Sentence pair (" << (id + 1) << ')'
+       << " source length " << source.size()
+       << " target length " << target.size()
+       << " alignment score : " << 0 << '\n';
+    os << target << '\n';
+    
+    if (source.empty() || target.empty()) {
+      os << "NULL ({ })";
+      sentence_type::const_iterator siter_end = source.end();
+      for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	os << ' ' << *siter << " ({ })";
+      os << '\n';
+    } else {
+      aligns_.clear();
+      aligns_.resize(source.size());
+      
+      aligns_none_.clear();
+      for (size_type trg = 0; trg != target.size(); ++ trg)
+	aligns_none_.insert(trg + 1);
+      
+      alignment_type::const_iterator aiter_end = alignment.end();
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	aligns_[aiter->source].push_back(aiter->target + 1);
+	aligns_none_.erase(aiter->target + 1);
+      }
+      
+      os << "NULL";
+      os << " ({ ";
+      std::copy(aligns_none_.begin(), aligns_none_.end(), std::ostream_iterator<index_type>(os, " "));
+      os << "})";
+      
+      for (size_type src = 0; src != source.size(); ++ src) {
+	os << ' ' << source[src];
+	os << " ({ ";
+	std::copy(aligns_[src].begin(), aligns_[src].end(), std::ostream_iterator<index_type>(os, " "));
+	os << "})";
+      }
+      os << '\n';
     }
   }
 
@@ -3591,7 +3661,9 @@ void options(int argc, char** argv)
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
-    ("dump", po::bool_switch(&dump_mode), "dump intermediate derivations and alignments")
+    ("moses", po::bool_switch(&moses_mode), "dump alignment in Moses format")
+    ("giza",  po::bool_switch(&giza_mode),  "dump alignment in Giza format")
+    ("dump",  po::bool_switch(&dump_mode),  "dump intermediate derivations and alignments")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
