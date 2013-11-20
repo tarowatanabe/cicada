@@ -1219,6 +1219,7 @@ struct TaskAccumulate
       
       if (! sentence.empty()) {
 	log_likelihood_ += ngram_.learn(sentence, theta_, gradient_, generator);
+	
 	++ samples_;
 	words_ += sentence.size() + 1;
       }
@@ -1315,7 +1316,7 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    double log_likelihood = 0.0;
+    std::vector<double, std::allocator<double> > log_likelihoods;
     size_type samples = 0;
     size_type words = 0;
     size_type num_text = 0;
@@ -1349,12 +1350,23 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      log_likelihood += tasks.front().log_likelihood_;
+      if (log_likelihoods.empty()
+	  || log_likelihoods.back() + tasks.front().log_likelihood_ > boost::numeric::bounds<float>::highest())
+	log_likelihoods.push_back(tasks.front().log_likelihood_);
+      else
+	log_likelihoods.back() += tasks.front().log_likelihood_;
+      
       samples        += tasks.front().samples_;
       words          += tasks.front().words_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_ += tasks[i].gradient_;
-	log_likelihood += tasks[i].log_likelihood_;
+
+	if (log_likelihoods.empty()
+	    || log_likelihoods.back() + tasks[i].log_likelihood_ > boost::numeric::bounds<float>::highest())
+	  log_likelihoods.push_back(tasks[i].log_likelihood_);
+	else
+	  log_likelihoods.back() += tasks[i].log_likelihood_;
+	
 	samples        += tasks[i].samples_;
 	words          += tasks[i].words_;
       }
@@ -1367,10 +1379,17 @@ void learn_online(const Learner& learner,
     
     if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
+
+    double ll_sentence = 0.0;
+    double ll_words = 0.0;
+    for (size_t i = 0; i != log_likelihoods.size(); ++ i) {
+      ll_sentence += log_likelihoods[i] / samples;
+      ll_words    += log_likelihoods[i] / words;
+    }
     
     if (debug)
-      std::cerr << "log_likelihood (per sentence): " << (log_likelihood / samples) << std::endl
-		<< "log_likelihood (per word): "     << (log_likelihood / words) << std::endl
+      std::cerr << "log_likelihood (per sentence): " << ll_sentence << std::endl
+		<< "log_likelihood (per word): "     << ll_words << std::endl
 		<< "# of sentences: " << samples << std::endl
 		<< "# of words: " << words << std::endl;
 
