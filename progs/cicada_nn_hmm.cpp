@@ -1957,7 +1957,7 @@ int iteration = 10;
 int batch_size = 128;
 int beam_size = 10;
 int cutoff = 3;
-double lambda = 1e-5;
+double lambda = 1e-3;
 double lambda2 = 0.01;
 double eta0 = 1;
 

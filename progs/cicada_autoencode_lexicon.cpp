@@ -1194,7 +1194,7 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 1024;
-double lambda = 1e-5;
+double lambda = 1e-3;
 double eta0 = 1;
 int cutoff = 3;
 
