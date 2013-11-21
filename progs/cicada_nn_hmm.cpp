@@ -1948,6 +1948,7 @@ path_type alignment_target_source_file;
 
 int dimension_embedding = 32;
 int dimension_hidden = 128;
+int window = 2;
 int alignment = 8;
 
 bool optimize_sgd = false;
@@ -3002,6 +3003,7 @@ void options(int argc, char** argv)
     
     ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
+    ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     ("alignment",           po::value<int>(&alignment)->default_value(alignment),                     "alignment model size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
