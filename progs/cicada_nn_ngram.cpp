@@ -1351,7 +1351,7 @@ void learn_online(const Learner& learner,
       
       // merge gradients
       if (log_likelihoods.empty()
-	  || log_likelihoods.back() + tasks.front().log_likelihood_ > boost::numeric::bounds<float>::highest())
+	  || log_likelihoods.back() + tasks.front().log_likelihood_ < boost::numeric::bounds<float>::lowest())
 	log_likelihoods.push_back(tasks.front().log_likelihood_);
       else
 	log_likelihoods.back() += tasks.front().log_likelihood_;
@@ -1362,7 +1362,7 @@ void learn_online(const Learner& learner,
 	tasks.front().gradient_ += tasks[i].gradient_;
 
 	if (log_likelihoods.empty()
-	    || log_likelihoods.back() + tasks[i].log_likelihood_ > boost::numeric::bounds<float>::highest())
+	    || log_likelihoods.back() + tasks[i].log_likelihood_ < boost::numeric::bounds<float>::lowest())
 	  log_likelihoods.push_back(tasks[i].log_likelihood_);
 	else
 	  log_likelihoods.back() += tasks[i].log_likelihood_;
