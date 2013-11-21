@@ -1137,13 +1137,20 @@ struct HMM
   {
     typedef Eigen::Map<tensor_type> matrix_type;
     
+#if 0
+    std::cerr << "forward source: " << source << std::endl
+	      << "forward target: " << target << std::endl;
+#endif
+
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+    
+    const size_type state_size = theta.embedding_ + theta.hidden_;
 
     const size_type offset_word   = 0;
     const size_type offset_matrix = theta.embedding_;
     
-    state_allocator_.assign(state_type::size(theta.hidden_ + theta.embedding_));
+    state_allocator_.assign(state_type::size(state_size + theta.embedding_));
     
     alignment.clear();
     
@@ -1193,24 +1200,13 @@ struct HMM
 	const state_type& state = *hiter;
 	
 	const size_type prev = state.index();
-	const word_type source_aligned_prev = (prev >= source_size + 2
-					       ? (prev - source_size - 2 == 0
-						  ? vocab_type::BOS
-						  : (prev - source_size - 2 == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - source_size - 2 - 1]))
-					       : (prev == 0
-						  ? vocab_type::BOS
-						  : (prev == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - 1])));
-	const word_type source_none_prev = (prev >= source_size + 2
-					    ? vocab_type::EPSILON
-					    : (prev == 0
-					       ? vocab_type::BOS
-					       : (prev == source_size + 1
-						  ? vocab_type::EOS
-						  : source[prev - 1])));
+	const word_type source_prev = (prev >= source_size + 2
+				       ? vocab_type::EPSILON
+				       : (prev == 0
+					  ? vocab_type::BOS
+					  : (prev == source_size + 1
+					     ? vocab_type::EOS
+					     : source[prev - 1])));
 
 	// alignment into aligned...
 	for (size_type next = next_first; next != next_last; ++ next) {
@@ -1226,29 +1222,21 @@ struct HMM
 	  state_next.prev() = state;
 	  state_next.index() = next;
 	  
-	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
-	  matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	  matrix_type layer_alpha(state_next.matrix(), state_size, 1);
+	  matrix_type layer_trans(state_next.matrix() + state_size, theta.embedding_, 1);
 	  
-	  layer_alpha
-	    = ((theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_aligned_prev.id()))
-	       
-	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
-		  * matrix_type(state.matrix(), theta.hidden_, 1))
-	       
+	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
+	  
+	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
+	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
+	       * matrix_type(state.matrix(), state_size, 1)
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
-
-	  layer_trans = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
-			  * theta.source_.col(source_next.id()))
-			 
-			 + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
-			    * layer_alpha)
-			 
-			 + theta.bt_).array().unaryExpr(htanh());
+	  
+	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	  
+
 	  state_next.score() = score + state.score();
 
 	  heap_next.push_back(state_next);
@@ -1263,25 +1251,15 @@ struct HMM
 	  state_next.prev() = state;
 	  state_next.index() = next;
 	  
-	  matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
-	  matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	  matrix_type layer_alpha(state_next.matrix(), state_size, 1);
+	  matrix_type layer_trans(state_next.matrix() + state_size, theta.embedding_, 1);
 	  
-	  layer_alpha
-	    = ((theta.Wn_.block(0, 0, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_none_prev.id()))
-	       
-	       + (theta.Wn_.block(0, theta.embedding_, theta.hidden_, theta.hidden_)
-		  * matrix_type(state.matrix(), theta.hidden_, 1))
-	       
-	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::EPSILON.id());
 	  
-	  layer_trans = ((theta.Wt_.block(0, 0, theta.embedding_, theta.embedding_)
-			  * theta.source_.col(vocab_type::EPSILON.id()))
-			 
-			 + (theta.Wt_.block(0, theta.embedding_, theta.embedding_, theta.hidden_)
-			    * layer_alpha)
-			 
-			 + theta.bt_).array().unaryExpr(htanh());
+	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
+	    = (theta.Wn_ * matrix_type(state.matrix(), state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	  
+	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
@@ -1331,8 +1309,15 @@ struct HMM
   {
     typedef Eigen::Map<tensor_type> matrix_type;
     
+#if 0
+    std::cerr << "backward source: " << source << std::endl
+	      << "backward target: " << target << std::endl;
+#endif
+
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    const size_type state_size = theta.embedding_ + theta.hidden_;
 
     const size_type offset_word   = 0;
     const size_type offset_matrix = theta.embedding_;
@@ -1348,7 +1333,7 @@ struct HMM
       for (heap_type::const_iterator hiter = std::max(heap.begin(), hiter_end - beam_); hiter != hiter_end; ++ hiter) {
 	state_type buffer = state_allocator_.allocate();
 	
-	matrix_type(buffer.matrix(), theta.hidden_, 1).setZero();
+	matrix_type(buffer.matrix(), state_size, 1).setZero();
 	
 	states[*hiter] = buffer;
       }
@@ -1371,18 +1356,17 @@ struct HMM
 	const state_type state_next(siter->first);
 	const state_type state_prev(state_next.prev());
 	
-	const matrix_type beta_next(siter->second.matrix(), theta.hidden_, 1);
-	
 	state_set_type::iterator piter = states_prev.find(state_prev);
 	if (piter == states_prev.end()) {
 	  state_type buffer = state_allocator_.allocate();
 	  
-	  matrix_type(buffer.matrix(), theta.hidden_, 1).setZero();
+	  matrix_type(buffer.matrix(), state_size, 1).setZero();
 	  
 	  piter = states_prev.insert(std::make_pair(state_prev, buffer)).first;
 	}
 	
-	matrix_type beta_prev(piter->second.matrix(), theta.hidden_, 1);
+	const matrix_type beta_next(siter->second.matrix(), state_size, 1);
+	/**/  matrix_type beta_prev(piter->second.matrix(), state_size, 1);
 	
 	const size_type next = state_next.index();
 	const size_type prev = state_prev.index();
@@ -1394,37 +1378,28 @@ struct HMM
 				       : (next == source_size + 1
 					  ? vocab_type::EOS
 					  : source[next - 1])));
-	const word_type source_aligned_prev = (prev >= source_size + 2
-					       ? (prev - source_size - 2 == 0
-						  ? vocab_type::BOS
-						  : (prev - source_size - 2 == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - source_size - 2 - 1]))
-					       : (prev == 0
-						  ? vocab_type::BOS
-						  : (prev == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - 1])));
-	const word_type source_none_prev = (prev >= source_size + 2
-					    ? vocab_type::EPSILON
-					    : (prev == 0
-					       ? vocab_type::BOS
-					       : (prev == source_size + 1
-						  ? vocab_type::EOS
-						  : source[prev - 1])));
+	const word_type source_prev = (prev >= source_size + 2
+				       ? vocab_type::EPSILON
+				       : (prev == 0
+					  ? vocab_type::BOS
+					  : (prev == source_size + 1
+					     ? vocab_type::EOS
+					     : source[prev - 1])));
 	
-	const matrix_type layer_alpha(state_next.matrix(), theta.hidden_, 1);
-	const matrix_type layer_trans(state_next.matrix() + theta.hidden_, theta.embedding_, 1);
+	const matrix_type alpha_next(state_next.matrix(), state_size, 1);
+	const matrix_type trans_next(state_next.matrix() + state_size, theta.embedding_, 1);
+	const matrix_type alpha_prev(state_prev.matrix(), state_size, 1);
+	const matrix_type trans_prev(state_prev.matrix() + state_size, theta.embedding_, 1);
 	
-	const word_type target_sampled = dict_.draw(source_none_prev, gen);
+	const word_type target_sampled = dict_.draw(source_prev, gen);
 	
-	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next
 				+ theta.target_.col(target_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 
-	const double score_noise_c = 0.0 + dict_.logprob(source_none_prev, target_next);
-	const double score_noise_m = 0.0 + dict_.logprob(source_none_prev, target_sampled);
+	const double score_noise_c = 0.0 + dict_.logprob(source_prev, target_next);
+	const double score_noise_m = 0.0 + dict_.logprob(source_prev, target_sampled);
 	
 	const double z_c = utils::mathop::logsum(score_c, score_noise_c);
 	const double z_m = utils::mathop::logsum(score_m, score_noise_m);
@@ -1443,59 +1418,51 @@ struct HMM
 	tensor_type& dembedding_c = gradient.target(target_next);
 	tensor_type& dembedding_m = gradient.target(target_sampled);
 	
-	dembedding_c.block(0, 0, theta.embedding_, 1).array() += loss_c * layer_trans.array();
+	dembedding_c.block(0, 0, theta.embedding_, 1).array() += loss_c * trans_next.array();
 	dembedding_c.block(theta.embedding_, 0, 1, 1).array() += loss_c;
-	dembedding_m.block(0, 0, theta.embedding_, 1).array() += loss_m * layer_trans.array();
+	dembedding_m.block(0, 0, theta.embedding_, 1).array() += loss_m * trans_next.array();
 	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += loss_m;
 	
-	delta_trans_ = (layer_trans.array().unaryExpr(dhtanh())
+	delta_trans_ = (trans_next.array().unaryExpr(dhtanh())
 			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * loss_c
 			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * loss_m).array());
 	
-	gradient.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
-	  += delta_trans_ * theta.source_.col(source_next.id()).transpose();
-	gradient.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
-	  += delta_trans_ * layer_alpha.transpose();
+	gradient.Wt_ += delta_trans_ * alpha_next.transpose();
 	gradient.bt_ += delta_trans_;
-	
-	delta_beta_ = theta.Wt_.transpose() * delta_trans_;
-	
-	gradient.source(source_next) += delta_beta_.block(0, 0, theta.embedding_, 1);
-	
-	delta_alpha_ = (layer_alpha.array().unaryExpr(dtanh())
-			* (delta_beta_.block(theta.embedding_, 0, theta.hidden_, 1)
-			   + beta_next).array());
-	
-	if (next >= source_size + 2) {
-	  gradient.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
-	    += (delta_alpha_ * theta.source_.col(source_none_prev.id()).transpose());
-	  
-	  gradient.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
-	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose());
-	  	  
-	  gradient.bn_ += delta_alpha_;
 
-	  gradient.source(source_none_prev) += (theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_).transpose()
-						* delta_alpha_);
+	delta_alpha_ = theta.Wt_.transpose() * delta_trans_;
+
+	if (! delta_beta_.rows())
+	  delta_beta_.resize(state_size, 1);
+	
+	delta_beta_.block(offset_word, 0, theta.embedding_, 1)
+	  = (delta_alpha_.block(offset_word, 0, theta.embedding_, 1)
+	     + beta_next.block(offset_word, 0, theta.embedding_, 1));
+	
+	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1).array()
+	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhtanh())
+	      * (delta_alpha_.block(offset_matrix, 0, theta.hidden_, 1)
+		 + beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
+
+	if (next >= source_size + 2) {
+	  gradient.source(vocab_type::EPSILON.id()) += delta_beta_.block(offset_word, 0, theta.embedding_, 1);
 	  
-	  beta_prev += (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_).transpose() * delta_alpha_);
+	  gradient.Wn_ += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1) * alpha_prev.transpose();
+	  gradient.bn_ += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1);
+	  
+	  beta_prev += theta.Wn_.transpose() * delta_beta_.block(offset_matrix, 0, theta.hidden_, 1);
 	} else {
 	  const size_type shift = theta.shift(source_size, target_size, prev, next);
 	  
-	  gradient.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
-	    += (delta_alpha_ * theta.source_.col(source_aligned_prev.id()).transpose());
+	  gradient.source(source_next.id()) += delta_beta_.block(offset_word, 0, theta.embedding_, 1);
 	  
-	  gradient.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
-	    += (delta_alpha_ * matrix_type(state_prev.matrix(), theta.hidden_, 1).transpose());
-	  
+	  gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
+	    += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1) * alpha_prev.transpose();
 	  gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
-	    += delta_alpha_;
+	    += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1);
 	  
-	  gradient.source(source_aligned_prev) += (theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_).transpose()
-						   * delta_alpha_);
-	  
-	  beta_prev += (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_).transpose()
-			* delta_alpha_);
+	  beta_prev += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose()
+			* delta_beta_.block(offset_matrix, 0, theta.hidden_, 1));
 	}
       }
     }
@@ -1505,8 +1472,11 @@ struct HMM
       throw std::runtime_error("no initial state?");
     if (states_[0].size() != 1)
       throw std::runtime_error("multiple initial states?");
-
-    gradient.Wi_ += matrix_type(states_[0].begin()->second.matrix(), theta.hidden_, 1);
+    
+    matrix_type beta_bos(states_[0].begin()->second.matrix(), state_size, 1);
+    
+    gradient.source(vocab_type::BOS.id()) += beta_bos.block(offset_word, 0, theta.embedding_, 1);
+    gradient.Wi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1);
     
     return log_likelihood;
   }
@@ -1574,24 +1544,13 @@ struct HMM
 	const state_type& state = *hiter;
 	
 	const size_type prev = state.index();
-	const word_type source_aligned_prev = (prev >= source_size + 2
-					       ? (prev - source_size - 2 == 0
-						  ? vocab_type::BOS
-						  : (prev - source_size - 2 == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - source_size - 2 - 1]))
-					       : (prev == 0
-						  ? vocab_type::BOS
-						  : (prev == source_size + 1
-						     ? vocab_type::EOS
-						     : source[prev - 1])));
-	const word_type source_none_prev = (prev >= source_size + 2
-					    ? vocab_type::EPSILON
-					    : (prev == 0
-					       ? vocab_type::BOS
-					       : (prev == source_size + 1
-						  ? vocab_type::EOS
-						  : source[prev - 1])));
+	const word_type source_prev = (prev >= source_size + 2
+				       ? vocab_type::EPSILON
+				       : (prev == 0
+					  ? vocab_type::BOS
+					  : (prev == source_size + 1
+					     ? vocab_type::EOS
+					     : source[prev - 1])));
 
 	// alignment into aligned...
 	for (size_type next = next_first; next != next_last; ++ next) {
@@ -1602,7 +1561,7 @@ struct HMM
 					    : source[next - 1]));
 	  
 	  const size_type shift = theta.shift(source_size, target_size, prev, next);
-
+	  
 	  state_type state_next = state_allocator_.allocate();
 	  state_next.prev() = state;
 	  state_next.index() = next;
@@ -1611,13 +1570,13 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_aligned_prev.id()))
+		* theta.source_.col(source_prev.id()))
 	       
 	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
-
+	  
 	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			   * theta.source_.col(source_next.id()))
 			  
@@ -1647,7 +1606,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_none_prev.id()))
+		* theta.source_.col(source_prev.id()))
 	       
 	       + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
