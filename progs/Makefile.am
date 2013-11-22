@@ -112,6 +112,7 @@ bin_PROGRAMS = \
 	cicada_mert_kbest \
 	cicada_mert_kbest_mpi \
 	cicada_nn_hmm \
+	cicada_nn_hmm_joint \
 	cicada_nn_ngram \
 	cicada_oracle \
 	cicada_oracle_mpi \
@@ -464,6 +465,9 @@ cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LD
 
 cicada_nn_hmm_SOURCES = cicada_nn_hmm.cpp
 cicada_nn_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_nn_hmm_joint_SOURCES = cicada_nn_hmm_joint.cpp
+cicada_nn_hmm_joint_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp
 cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
