@@ -60,6 +60,33 @@
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
 
+struct Average
+{
+  Average() : average_(0), count_(0) {}
+  
+  Average& operator+=(const double& x)
+  {
+    average_ += (x - average_) / (++ count_);
+    return *this;
+  }
+  
+  Average& operator+=(const Average& x)
+  {
+    const uint64_t total = count_ + x.count_;
+    
+    average_ = average_ * (double(count_) / total) + x.average_ * (double(x.count_) / total);
+    count_ = total;
+    
+    return *this;
+  }
+  
+  operator const double&() const { return average_; }
+  
+  double   average_;
+  uint64_t count_;
+};
+
+
 struct Gradient
 {
   typedef size_t    size_type;
@@ -597,6 +624,8 @@ struct NGram
   typedef Gradient gradient_type;
   typedef Unigram  unigram_type;
 
+  typedef Average log_likelihood_type;
+
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type    tensor_type;
   
@@ -648,10 +677,10 @@ struct NGram
   };
   
   template <typename Gen>
-  double learn(const sentence_type& sentence,
-	       const model_type& theta,
-	       gradient_type& gradient,
-	       Gen& gen)
+  log_likelihood_type learn(const sentence_type& sentence,
+			    const model_type& theta,
+			    gradient_type& gradient,
+			    Gen& gen)
   {
     const size_type dimension = theta.dimension_embedding_;
     const size_type order     = theta.order_;
@@ -676,7 +705,7 @@ struct NGram
     layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id());
     gradient_embedding_[order - 2] = &gradient_embedding_bos;
     
-    double log_likelihood = 0.0;
+    log_likelihood_type log_likelihood;
     sentence_type::const_iterator siter_begin = sentence.begin();
     sentence_type::const_iterator siter_end   = sentence.end();
     for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
@@ -900,7 +929,7 @@ struct LearnAdaGrad
       
       G_(i, j) += g_(i, j) * g_(i, j);
       
-      const double rate = eta0_ / std::sqrt(G_(i, j));
+      const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
 
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
@@ -919,7 +948,7 @@ struct LearnAdaGrad
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return (x == 0.0 ? 0.0 : 1.0 / std::sqrt(x));
+      return (x == 0.0 ? 0.0 : 1.0 / std::sqrt(double(1.0) + x));
     }
   };
   
@@ -952,7 +981,7 @@ struct LearnAdaGrad
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
 	  
-	  const double rate = eta0_ / std::sqrt(G(row, word.id()));
+	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
 	  const double f = theta(row, word.id()) - rate * g(row, 0);
 	  
 	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
@@ -963,7 +992,7 @@ struct LearnAdaGrad
 	
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) += g(row, 0) * g(row, 0);
-	  theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(G(row, word.id()));
+	  theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(double(1.0) + G(row, word.id()));
 	}
       }
     } else {
@@ -1147,6 +1176,8 @@ struct TaskAccumulate
   typedef Gradient gradient_type;
 
   typedef NGram ngram_type;
+
+  typedef ngram_type::log_likelihood_type log_likelihood_type;
   
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
@@ -1198,9 +1229,7 @@ struct TaskAccumulate
       counter_(counter),
       ngram_(unigram, samples),
       gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.order_),
-      log_likelihood_(0),
-      samples_(0),
-      words_(0) {}
+      log_likelihood_() {}
 
   void operator()()
   {
@@ -1217,12 +1246,8 @@ struct TaskAccumulate
       
       const sentence_type& sentence = sentences_[sentence_id];
       
-      if (! sentence.empty()) {
+      if (! sentence.empty())
 	log_likelihood_ += ngram_.learn(sentence, theta_, gradient_, generator);
-	
-	++ samples_;
-	words_ += sentence.size() + 1;
-      }
       
       counter_.increment();
     }
@@ -1231,9 +1256,7 @@ struct TaskAccumulate
   void clear()
   {
     gradient_.clear();
-    log_likelihood_ = 0;
-    samples_ = 0;
-    words_ = 0;
+    log_likelihood_ = log_likelihood_type();
   }
 
   const sentence_set_type& sentences_;
@@ -1244,10 +1267,8 @@ struct TaskAccumulate
   
   ngram_type ngram_;
 
-  gradient_type gradient_;
-  double        log_likelihood_;
-  size_type     samples_;
-  size_type     words_;
+  gradient_type       gradient_;
+  log_likelihood_type log_likelihood_;
 };
 
 inline
@@ -1316,9 +1337,7 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    std::vector<double, std::allocator<double> > log_likelihoods;
-    size_type samples = 0;
-    size_type words = 0;
+    task_type::log_likelihood_type log_likelihood;
     size_type num_text = 0;
 
     utils::resource start;
@@ -1350,25 +1369,10 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      if (log_likelihoods.empty()
-	  || log_likelihoods.back() + tasks.front().log_likelihood_ < boost::numeric::bounds<float>::lowest())
-	log_likelihoods.push_back(tasks.front().log_likelihood_);
-      else
-	log_likelihoods.back() += tasks.front().log_likelihood_;
-      
-      samples        += tasks.front().samples_;
-      words          += tasks.front().words_;
+      log_likelihood += tasks.front().log_likelihood_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_ += tasks[i].gradient_;
-
-	if (log_likelihoods.empty()
-	    || log_likelihoods.back() + tasks[i].log_likelihood_ < boost::numeric::bounds<float>::lowest())
-	  log_likelihoods.push_back(tasks[i].log_likelihood_);
-	else
-	  log_likelihoods.back() += tasks[i].log_likelihood_;
-	
-	samples        += tasks[i].samples_;
-	words          += tasks[i].words_;
+	log_likelihood += tasks[i].log_likelihood_;
       }
       
       // update model parameters
@@ -1380,18 +1384,8 @@ void learn_online(const Learner& learner,
     if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
       std::cerr << std::endl;
 
-    double ll_sentence = 0.0;
-    double ll_words = 0.0;
-    for (size_t i = 0; i != log_likelihoods.size(); ++ i) {
-      ll_sentence += log_likelihoods[i] / samples;
-      ll_words    += log_likelihoods[i] / words;
-    }
-    
     if (debug)
-      std::cerr << "log_likelihood (per sentence): " << ll_sentence << std::endl
-		<< "log_likelihood (per word): "     << ll_words << std::endl
-		<< "# of sentences: " << samples << std::endl
-		<< "# of words: " << words << std::endl;
+      std::cerr << "log_likelihood (per word): " << static_cast<double>(log_likelihood) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl

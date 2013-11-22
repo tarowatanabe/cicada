@@ -1769,7 +1769,7 @@ struct LearnAdaGrad
       
       G_(i, j) += g_(i, j) * g_(i, j);
       
-      const double rate = eta0_ / std::sqrt(double(G_(i, j)));
+      const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
       const double f = theta_(i, j) - rate * g_(i, j);
 
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
@@ -1790,7 +1790,7 @@ struct LearnAdaGrad
     template <typename Tp>
     Tp operator()(const Tp& x) const
     {
-      return (x == 0.0 ? 0.0 : eta0_ / std::sqrt(double(x)));
+      return (x == 0.0 ? 0.0 : eta0_ / std::sqrt(double(1.0) + x));
     }
 
     const double& eta0_;
@@ -1825,7 +1825,7 @@ struct LearnAdaGrad
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
 	  
-	  const double rate = eta0_ / std::sqrt(double(G(row, word.id())));
+	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
 	  const double f = theta(row, word.id()) - rate * g(row, 0);
 	  const double value = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
 	  
@@ -1839,7 +1839,7 @@ struct LearnAdaGrad
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
 	  
-	  const double rate = eta0_ / std::sqrt(double(G(row, word.id())));
+	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
 	  const double f = theta(row, word.id()) - rate * g(row, 0);
 	  
 	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
