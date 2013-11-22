@@ -1385,7 +1385,7 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
 
     if (debug)
-      std::cerr << "log_likelihood (per word): " << static_cast<double>(log_likelihood) << std::endl;
+      std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
