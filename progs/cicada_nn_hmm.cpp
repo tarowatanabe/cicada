@@ -1439,7 +1439,7 @@ struct HMM
 	  = (delta_alpha_.block(offset_word, 0, theta.embedding_, 1)
 	     + beta_next.block(offset_word, 0, theta.embedding_, 1));
 	
-	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1).array()
+	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1)
 	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhtanh())
 	      * (delta_alpha_.block(offset_matrix, 0, theta.hidden_, 1)
 		 + beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
