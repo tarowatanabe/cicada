@@ -711,6 +711,7 @@ struct NGram
     for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
       log_likelihood += learn(*siter, theta, gradient, gen);
       
+#if 0
       // shift layer_input...
       if (order > 2)
 	for (size_type i = 0; i < order - 2; ++ i)
@@ -720,8 +721,9 @@ struct NGram
       // shift context
       std::copy(gradient_embedding_.begin() + 1, gradient_embedding_.end(), gradient_embedding_.begin());
       gradient_embedding_.back() = &gradient.embedding_input(*siter);
+#endif
       
-#if 0
+#if 1
       layer_input_back_        = layer_input_;
       gradient_embedding_back_ = gradient_embedding_;
       
@@ -749,7 +751,7 @@ struct NGram
     // correct scoring
     log_likelihood += learn(vocab_type::EOS, theta, gradient, gen);
     
-#if 0
+#if 1
     // compute lower-order ngram language model
     for (size_type i = eps_size; i != order - 1; ++ i) {
       layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
