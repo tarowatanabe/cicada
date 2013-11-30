@@ -711,7 +711,7 @@ struct NGram
     for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
       log_likelihood += learn(*siter, theta, gradient, gen);
       
-#if 0
+#if 1
       // shift layer_input...
       if (order > 2)
 	for (size_type i = 0; i < order - 2; ++ i)
@@ -723,7 +723,7 @@ struct NGram
       gradient_embedding_.back() = &gradient.embedding_input(*siter);
 #endif
       
-#if 1
+#if 0
       layer_input_back_        = layer_input_;
       gradient_embedding_back_ = gradient_embedding_;
       
@@ -751,7 +751,7 @@ struct NGram
     // correct scoring
     log_likelihood += learn(vocab_type::EOS, theta, gradient, gen);
     
-#if 1
+#if 0
     // compute lower-order ngram language model
     for (size_type i = eps_size; i != order - 1; ++ i) {
       layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
@@ -821,15 +821,15 @@ struct NGram
 				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss).array());
     }
     
-    gradient.Wh_ += delta_hidden_ * layer_context_.transpose();
-    gradient.bh_ += delta_hidden_;
+    gradient.Wh_.noalias() += delta_hidden_ * layer_context_.transpose();
+    gradient.bh_.noalias() += delta_hidden_;
     
     delta_context_ = (layer_context_.array().unaryExpr(dhinge()) * (theta.Wh_.transpose() * delta_hidden_).array());
     
-    gradient.Wc_ += delta_context_ * layer_input_.transpose();
-    gradient.bc_ += delta_context_;
+    gradient.Wc_.noalias() += delta_context_ * layer_input_.transpose();
+    gradient.bc_.noalias() += delta_context_;
     
-    delta_input_ = theta.Wc_.transpose() * delta_context_;
+    delta_input_.noalias() = theta.Wc_.transpose() * delta_context_;
     
     // finally, input embedding...
     for (int i = 0; i != order - 1; ++ i)
