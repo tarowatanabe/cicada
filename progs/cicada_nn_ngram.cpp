@@ -304,7 +304,7 @@ struct Model
   typedef std::vector<bool, std::allocator<bool> > unique_set_type;
   typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
   
-  Model() : dimension_embedding_(0), dimension_hidden_(0), order_(0) {}  
+  Model() : dimension_embedding_(0), dimension_hidden_(0), order_(0), scale_(1) {}
   template <typename Unigram, typename Gen>
   Model(const size_type& dimension_embedding,
 	const size_type& dimension_hidden,
@@ -313,7 +313,8 @@ struct Model
 	Gen& gen) 
     : dimension_embedding_(dimension_embedding),
       dimension_hidden_(dimension_hidden),
-      order_(order)
+      order_(order),
+      scale_(1)
   { initialize(dimension_embedding, dimension_hidden, order, unigram, gen); }
   
   
@@ -330,6 +331,8 @@ struct Model
     // matrix for hidden layer
     Wh_.setZero();
     bh_.setZero();
+
+    scale_ = 1.0;
   }
   
   
@@ -409,6 +412,8 @@ struct Model
     
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_).array().unaryExpr(randomize<Gen>(gen, range_h));
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
+
+    scale_ = 1.0;
   }
 
   void finalize()
@@ -437,6 +442,13 @@ struct Model
       embedding_input_.col(vocab_type::UNK.id())  = average_input;
       embedding_output_.col(vocab_type::UNK.id()) = average_output;
     }
+    
+    if (scale_ != 1.0) {
+      embedding_input_.array() *= scale_;
+      embedding_output_.block(0, 0, dimension_embedding_, embedding_output_.cols()).array() *= scale_;
+      
+      scale_ = 1.0;
+    }
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -463,6 +475,7 @@ struct Model
     rep["hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);    
     rep["order"]     = utils::lexical_cast<std::string>(order_);
     rep["size"]      = utils::lexical_cast<std::string>(words_.size());
+    rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
     write_embedding(rep.path("input.gz"),  rep.path("input.bin"), embedding_input_);
     write_embedding(rep.path("output.gz"), rep.path("output.bin"), embedding_output_);
@@ -547,6 +560,9 @@ struct Model
   // Wh and bh for hidden layer
   tensor_type Wh_;
   tensor_type bh_;
+
+  // scale for embedding...
+  double scale_;
 };
 
 struct Unigram
@@ -707,12 +723,12 @@ struct NGram
     
     if (order > 2)
       for (size_type i = 0; i < order - 2; ++ i) {
-	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	
 	gradient_embedding_[i] = &gradient_embedding_eps;
       }
 
-    layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id());
+    layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id()) * theta.scale_;
     gradient_embedding_[order - 2] = &gradient_embedding_bos;
     
     log_likelihood_type log_likelihood;
@@ -726,7 +742,7 @@ struct NGram
       if (order > 2)
 	for (size_type i = 0; i < order - 2; ++ i)
 	  layer_input_.block(dimension * i, 0, dimension, 1) = layer_input_.block(dimension * (i + 1), 0, dimension, 1);
-      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id());
+      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id()) * theta.scale_;
       
       // shift context
       std::copy(gradient_embedding_.begin() + 1, gradient_embedding_.end(), gradient_embedding_.begin());
@@ -739,7 +755,7 @@ struct NGram
       
       // compute lower-order ngram language model
       for (size_type i = eps_size; i != order - 1; ++ i) {
-	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	gradient_embedding_[i] = &gradient_embedding_eps;
 	
 	learn(*siter, theta, gradient, gen);
@@ -747,7 +763,7 @@ struct NGram
       
       // shift layer_input...
       layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_back_.block(dimension, 0, dimension * (order - 2), 1);
-      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id());
+      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id()) * theta.scale_;
       
       // shift context
       std::copy(gradient_embedding_back_.begin() + 1, gradient_embedding_back_.end(), gradient_embedding_.begin());
@@ -764,7 +780,7 @@ struct NGram
 #if 0
     // compute lower-order ngram language model
     for (size_type i = eps_size; i != order - 1; ++ i) {
-      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id());
+      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
       gradient_embedding_[i] = &gradient_embedding_eps;
       
       learn(vocab_type::EOS, theta, gradient, gen);
@@ -786,7 +802,7 @@ struct NGram
     layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_).array().unaryExpr(hinge());
     layer_hidden_            = (theta.Wh_ * layer_context_ + theta.bh_).array().unaryExpr(hinge());
     
-    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
+    const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
 			  + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
     const double score_noise = log_samples_ + unigram_.logprob(word);
     const double z = utils::mathop::logsum(score, score_noise);
@@ -805,12 +821,12 @@ struct NGram
     
     // backward...
     delta_hidden_ = (layer_hidden_.array().unaryExpr(dhinge())
-		     * (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss).array());
+		     * (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
     
     for (size_type k = 0; k != samples_; ++ k) {
       const word_type word = unigram_.draw(gen);
 
-      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_
+      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
 			    + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
       const double score_noise = log_samples_ + unigram_.logprob(word);
       const double z = utils::mathop::logsum(score, score_noise);
@@ -828,7 +844,7 @@ struct NGram
       dembedding.block(dimension, 0, 1, 1).array() += loss;
       
       delta_hidden_.array() += (layer_hidden_.array().unaryExpr(dhinge())
-				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss).array());
+				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
     }
     
     gradient.Wh_.noalias() += delta_hidden_ * layer_context_.transpose();
@@ -1042,6 +1058,105 @@ struct LearnAdaGrad
   tensor_type bh_;  
 };
 
+struct LearnSGD
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model    model_type;
+  typedef Gradient gradient_type;
+
+  typedef cicada::Symbol   word_type;
+  
+  typedef model_type::tensor_type tensor_type;
+  
+  LearnSGD(const double& lambda,
+	   const double& eta0)
+    : lambda_(lambda),
+      eta0_(eta0),
+      epoch_(0)
+  {
+    if (lambda_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+    
+    if (eta0_ <= 0.0)
+      throw std::runtime_error("invalid learning rate");
+  }
+  
+  void operator()(model_type& theta, const gradient_type& gradient) const
+  {
+    typedef gradient_type::embedding_type embedding_type;
+
+    ++ const_cast<size_type&>(epoch_);
+    
+    const double eta = eta0_ / (epoch_ + 1);
+    
+    if (lambda_ != 0.0)
+      theta.scale_ *= 1.0 - eta * lambda_;
+    
+    embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
+    for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
+      update(iiter->first,
+	     theta.embedding_input_,
+	     iiter->second,
+	     1.0 / gradient.count_,
+	     theta.scale_,
+	     false);    
+    
+    embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
+    for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
+      update(oiter->first,
+	     theta.embedding_output_,
+	     oiter->second,
+	     1.0 / gradient.count_,
+	     theta.scale_,
+	     true);
+    
+    update(theta.Wc_, gradient.Wc_, 1.0 / gradient.count_, lambda_ != 0.0);
+    update(theta.bc_, gradient.bc_, 1.0 / gradient.count_, false);
+    
+    update(theta.Wh_, gradient.Wh_, 1.0 / gradient.count_, lambda_ != 0.0);
+    update(theta.bh_, gradient.bh_, 1.0 / gradient.count_, false);
+  }
+  
+  template <typename Theta, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize=true) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (regularize)
+      theta *= 1.0 - eta * lambda_;
+    
+    theta -= eta * scale * g;
+  }
+  
+  template <typename Theta, typename Grad>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const double theta_scale,
+	      const bool bias_last=false) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (bias_last) {
+      const size_type rows = g.rows();
+      
+      theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale /  theta_scale) * g.block(0, 0, rows - 1, 1);
+      theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
+    } else
+      theta.col(word.id()) -= (eta * scale /  theta_scale) * g;
+  }
+
+  double lambda_;
+  double eta0_;
+  
+  size_type epoch_;
+};
 
 typedef boost::filesystem::path path_type;
 
@@ -1154,8 +1269,12 @@ int main(int argc, char** argv)
     
     model_type theta(dimension_embedding, dimension_hidden, order, unigram, generator);
     
-    if (iteration > 0)
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta);
+    if (iteration > 0) {
+      if (optimize_adagrad)
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta);
+      else
+	learn_online(LearnSGD(lambda, eta0), sentences, unigram, theta);
+    }
     
     if (! output_model_file.empty())
       theta.write(output_model_file);
@@ -1406,7 +1525,8 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
 
     if (debug)
-      std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl;
+      std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl
+		<< "perplexity: " << std::exp(- static_cast<double>(log_likelihood)) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
