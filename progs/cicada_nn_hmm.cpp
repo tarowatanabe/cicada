@@ -77,13 +77,14 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), hidden_(0), alignment_(0) {}
+  Gradient() : embedding_(0), hidden_(0), alignment_(0), count_(0) {}
   Gradient(const size_type& embedding,
 	   const size_type& hidden,
 	   const int alignment) 
     : embedding_(embedding),
       hidden_(hidden),
-      alignment_(alignment)
+      alignment_(alignment),
+      count_(0)
   { initialize(embedding, hidden, alignment); }
   
   Gradient& operator-=(const Gradient& x)
@@ -136,6 +137,8 @@ struct Gradient
     bn_ -= x.bn_;
     
     Wi_ -= x.Wi_;
+
+    count_ -= x.count_;
 
     return *this;
   }
@@ -191,6 +194,8 @@ struct Gradient
 
     Wi_ += x.Wi_;
 
+    count_ += x.count_;
+
     return *this;
   }
   
@@ -210,6 +215,8 @@ struct Gradient
     bn_.setZero();
     
     Wi_.setZero();
+
+    count_ = 0;
   }
 
   
@@ -258,6 +265,8 @@ struct Gradient
     bn_ = tensor_type::Zero(hidden_, 1);
     
     Wi_ = tensor_type::Zero(hidden_, 1);
+
+    count_ = 0;
   }
   
   // dimension...
@@ -279,6 +288,8 @@ struct Gradient
   tensor_type bn_;
 
   tensor_type Wi_;
+  
+  size_type count_;
 };
 
 struct Embedding
@@ -1314,6 +1325,8 @@ struct HMM
 	      << "backward target: " << target << std::endl;
 #endif
 
+    ++ gradient.count_;
+
     const size_type source_size = source.size();
     const size_type target_size = target.size();
 
@@ -1717,6 +1730,8 @@ struct LearnAdaGrad
 		  const embedding_type& embedding) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+    
+    const double scale = 1.0 / gradient.count_;
 
     gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
     for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
@@ -1725,6 +1740,7 @@ struct LearnAdaGrad
 	     const_cast<tensor_type&>(source_),
 	     siter->second,
 	     embedding.target_.col(siter->first.id()),
+	     scale,
 	     false);
     
     gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
@@ -1734,18 +1750,19 @@ struct LearnAdaGrad
 	     const_cast<tensor_type&>(target_),
 	     titer->second,
 	     embedding.source_.col(titer->first.id()),
+	     scale,
 	     true);
     
-    update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, lambda_ != 0.0);
-    update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, false);
+    update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
+    update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
     
-    update(theta.Wa_, const_cast<tensor_type&>(Wa_), gradient.Wa_, lambda_ != 0.0);
-    update(theta.ba_, const_cast<tensor_type&>(ba_), gradient.ba_, false);
+    update(theta.Wa_, const_cast<tensor_type&>(Wa_), gradient.Wa_, scale, lambda_ != 0.0);
+    update(theta.ba_, const_cast<tensor_type&>(ba_), gradient.ba_, scale, false);
 
-    update(theta.Wn_, const_cast<tensor_type&>(Wn_), gradient.Wn_, lambda_ != 0.0);
-    update(theta.bn_, const_cast<tensor_type&>(bn_), gradient.bn_, false);
+    update(theta.Wn_, const_cast<tensor_type&>(Wn_), gradient.Wn_, scale, lambda_ != 0.0);
+    update(theta.bn_, const_cast<tensor_type&>(bn_), gradient.bn_, scale, false);
     
-    update(theta.Wi_, const_cast<tensor_type&>(Wi_), gradient.Wi_, lambda_ != 0.0);
+    update(theta.Wi_, const_cast<tensor_type&>(Wi_), gradient.Wi_, scale, lambda_ != 0.0);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -1754,9 +1771,10 @@ struct LearnAdaGrad
     update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
 			      Eigen::MatrixBase<GradVar>& G,
 			      const Eigen::MatrixBase<Grad>& g,
+			      const double& scale,
 			      const double& lambda,
 			      const double& eta0)
-      : theta_(theta), G_(G), g_(g), lambda_(lambda), eta0_(eta0) {}
+      : theta_(theta), G_(G), g_(g), scale_(scale), lambda_(lambda), eta0_(eta0) {}
     
     void init(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
     {
@@ -1767,10 +1785,10 @@ struct LearnAdaGrad
     {
       if (g_(i, j) == 0) return;
       
-      G_(i, j) += g_(i, j) * g_(i, j);
+      G_(i, j) += g_(i, j) * g_(i, j) * scale_ * scale_;
       
       const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
-      const double f = theta_(i, j) - rate * g_(i, j);
+      const double f = theta_(i, j) - rate * scale_ * g_(i, j);
 
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
@@ -1779,6 +1797,7 @@ struct LearnAdaGrad
     Eigen::MatrixBase<GradVar>&    G_;
     const Eigen::MatrixBase<Grad>& g_;
     
+    const double scale_;
     const double lambda_;
     const double eta0_;
   };
@@ -1800,15 +1819,16 @@ struct LearnAdaGrad
   void update(Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
 	      const bool regularize=true) const
   {
     if (regularize) {
-      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, lambda_, eta0_);
+      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, scale, lambda_, eta0_);
       
       theta.visit(visitor);
     } else {
-      G.array() += g.array().square();
-      theta.array() -= g.array() * G.array().unaryExpr(learning_rate(eta0_));
+      G.array() += g.array().square() * scale * scale;
+      theta.array() -= scale * g.array() * G.array().unaryExpr(learning_rate(eta0_));
     }
   }
 
@@ -1818,15 +1838,16 @@ struct LearnAdaGrad
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
 	      const Eigen::MatrixBase<GradCross>& c,
+	      const double scale,
 	      const bool bias_last=false) const
   {
     if (lambda2_ > 0.0) {
       for (int row = 0; row != g.rows() - bias_last; ++ row) 
 	if (g(row, 0) != 0) {
-	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
+	  G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
 	  
 	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
-	  const double f = theta(row, word.id()) - rate * g(row, 0);
+	  const double f = theta(row, word.id()) - rate * scale * g(row, 0);
 	  const double value = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
 	  
 	  const double shared = c(row, 0);
@@ -1837,10 +1858,10 @@ struct LearnAdaGrad
     } else {
       for (int row = 0; row != g.rows() - bias_last; ++ row) 
 	if (g(row, 0) != 0) {
-	  G(row, word.id()) +=  g(row, 0) * g(row, 0);
+	  G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
 	  
 	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
-	  const double f = theta(row, word.id()) - rate * g(row, 0);
+	  const double f = theta(row, word.id()) - rate * scale * g(row, 0);
 	  
 	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
 	}
@@ -1850,8 +1871,8 @@ struct LearnAdaGrad
       const int row = g.rows() - 1;
       
       if (g(row, 0) != 0) {
-	G(row, word.id()) += g(row, 0) * g(row, 0);
-	theta(row, word.id()) -= eta0_ * g(row, 0) / std::sqrt(double(G(row, word.id())));
+	G(row, word.id()) += g(row, 0) * g(row, 0) * scale * scale;
+	theta(row, word.id()) -= eta0_ * scale * g(row, 0) / std::sqrt(double(1.0) + G(row, word.id()));
       }
     }
   }

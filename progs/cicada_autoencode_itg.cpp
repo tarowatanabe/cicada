@@ -217,20 +217,20 @@ struct Model
   typedef boost::filesystem::path path_type;
   
   Model() : dimension_embedding_(0), dimension_hidden_(0), dimension_itg_(0),
-	    window_(0), alpha_(0), beta_(0) {}
+	    window_(0), alpha_(0), beta_(0), count_(0) {}
   Model(const size_type& dimension_embedding,
 	const size_type& dimension_hidden,
 	const size_type& dimension_itg,
 	const size_type& window) 
     : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden), dimension_itg_(dimension_itg),
-      window_(window), alpha_(0), beta_(0) { initialize(dimension_embedding, dimension_hidden, dimension_itg, window); }
+      window_(window), alpha_(0), beta_(0), count_(0) { initialize(dimension_embedding, dimension_hidden, dimension_itg, window); }
   template <typename Gen>
   Model(const size_type& dimension_embedding,
 	const size_type& dimension_hidden,
 	const size_type& dimension_itg,
 	const size_type& window, const double& alpha, const double& beta, Gen& gen) 
     : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden), dimension_itg_(dimension_itg),
-      window_(window), alpha_(alpha), beta_(beta) { initialize(dimension_embedding, dimension_hidden, dimension_itg, window, gen); }
+      window_(window), alpha_(alpha), beta_(beta), count_(0) { initialize(dimension_embedding, dimension_hidden, dimension_itg, window, gen); }
   
   Model& operator-=(const Model& x)
   {
@@ -276,6 +276,8 @@ struct Model
     
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
+
+    count_ -= x.count_;
     
     return *this;
   }
@@ -324,6 +326,8 @@ struct Model
     
     Wc_ += x.Wc_;
     bc_ += x.bc_;
+
+    count_ += x.count_;
     
     return *this;
   }
@@ -357,6 +361,8 @@ struct Model
     
     Wc_.setZero();
     bc_.setZero();
+
+    count_ = 0;
   }
 
   void finalize()
@@ -433,6 +439,8 @@ struct Model
     // classification
     Wc_ = tensor_type::Zero(1, dimension_itg).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Ones(1, 1);
+
+    count_ = 0;
   }
 
   void initialize(const size_type dimension_embedding,
@@ -483,6 +491,8 @@ struct Model
     // classification
     Wc_ = tensor_type::Zero(1, dimension_itg);
     bc_ = tensor_type::Zero(1, 1);
+
+    count_ = 0;
   }
   
   template <typename IteratorSource, typename IteratorTarget, typename Gen>
@@ -794,6 +804,8 @@ struct Model
   // Wc and bc for classification
   tensor_type Wc_;
   tensor_type bc_;
+  
+  size_type count_;
 };
 
 struct Dictionary
@@ -1872,6 +1884,8 @@ struct ITGTree
 		Function   func,
 		Derivative deriv)
   {
+    ++ gradient.count_;
+
     const size_type dimension_embedding = theta.dimension_embedding_;
     const size_type dimension_hidden    = theta.dimension_hidden_;
     const size_type dimension_itg       = theta.dimension_itg_;
@@ -2250,6 +2264,12 @@ struct LearnAdaGrad
     
     if (eta0_ <= 0.0)
       throw std::runtime_error("invalid learning rate");
+
+    
+    const size_type vocabulary_size = word_type::allocated();
+    
+    source_ = tensor_type::Zero(dimension_embedding, vocabulary_size);
+    target_ = tensor_type::Zero(dimension_embedding, vocabulary_size);
     
     // initialize...
     Ws1_ = tensor_type::Zero(dimension_itg, dimension_itg * 2);
@@ -2280,6 +2300,8 @@ struct LearnAdaGrad
   {
     typedef model_type::embedding_type embedding_type;
 
+    const double scale = 1.0 / gradient.count_;
+
     embedding_type::const_iterator siter_end = gradient.source_.end();
     for (embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter) {
       embedding_type::iterator eiter = theta.source_.find(siter->first);
@@ -2289,17 +2311,7 @@ struct LearnAdaGrad
 	eiter = theta.source_.insert(std::make_pair(siter->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
       }
       
-      if (siter->first.id() >= source_.cols()) {
-	const size_type pos_first = source_.cols();
-	const size_type pos_last  = siter->first.id() + 1;
-
-	tensor_type& matrix = const_cast<tensor_type&>(source_);
-	
-	matrix.conservativeResize(dimension_embedding_, pos_last);
-	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
-      }
-      
-      update(siter->first, eiter->second, const_cast<tensor_type&>(source_), siter->second, lambda_ != 0.0);
+      update(siter->first, eiter->second, const_cast<tensor_type&>(source_), siter->second, scale, lambda_ != 0.0);
     }
 
     embedding_type::const_iterator titer_end = gradient.target_.end();
@@ -2311,41 +2323,31 @@ struct LearnAdaGrad
 	eiter = theta.target_.insert(std::make_pair(titer->first, tensor_type::Zero(theta.dimension_embedding_, 1))).first;
       }
       
-      if (titer->first.id() >= target_.cols()) {
-	const size_type pos_first = target_.cols();
-	const size_type pos_last  = titer->first.id() + 1;
-
-	tensor_type& matrix = const_cast<tensor_type&>(target_);
-	
-	matrix.conservativeResize(dimension_embedding_, pos_last);
-	matrix.block(0, pos_first, dimension_embedding_, pos_last - pos_first).setZero();
-      }
-      
-      update(titer->first, eiter->second, const_cast<tensor_type&>(target_), titer->second, lambda_ != 0.0);
+      update(titer->first, eiter->second, const_cast<tensor_type&>(target_), titer->second, scale, lambda_ != 0.0);
     }
     
-    update(theta.Ws1_, const_cast<tensor_type&>(Ws1_), gradient.Ws1_, lambda_ != 0.0);
-    update(theta.bs1_, const_cast<tensor_type&>(bs1_), gradient.bs1_, false);
-    update(theta.Wi1_, const_cast<tensor_type&>(Wi1_), gradient.Wi1_, lambda_ != 0.0);
-    update(theta.bi1_, const_cast<tensor_type&>(bi1_), gradient.bi1_, false);
+    update(theta.Ws1_, const_cast<tensor_type&>(Ws1_), gradient.Ws1_, scale, lambda_ != 0.0);
+    update(theta.bs1_, const_cast<tensor_type&>(bs1_), gradient.bs1_, scale, false);
+    update(theta.Wi1_, const_cast<tensor_type&>(Wi1_), gradient.Wi1_, scale, lambda_ != 0.0);
+    update(theta.bi1_, const_cast<tensor_type&>(bi1_), gradient.bi1_, scale, false);
 
-    update(theta.Ws2_, const_cast<tensor_type&>(Ws2_), gradient.Ws2_, lambda_ != 0.0);
-    update(theta.bs2_, const_cast<tensor_type&>(bs2_), gradient.bs2_, false);
-    update(theta.Wi2_, const_cast<tensor_type&>(Wi2_), gradient.Wi2_, lambda_ != 0.0);
-    update(theta.bi2_, const_cast<tensor_type&>(bi2_), gradient.bi2_, false);
+    update(theta.Ws2_, const_cast<tensor_type&>(Ws2_), gradient.Ws2_, scale, lambda_ != 0.0);
+    update(theta.bs2_, const_cast<tensor_type&>(bs2_), gradient.bs2_, scale, false);
+    update(theta.Wi2_, const_cast<tensor_type&>(Wi2_), gradient.Wi2_, scale, lambda_ != 0.0);
+    update(theta.bi2_, const_cast<tensor_type&>(bi2_), gradient.bi2_, scale, false);
 
-    update(theta.Wp1_, const_cast<tensor_type&>(Wp1_), gradient.Wp1_, lambda_ != 0.0);
-    update(theta.bp1_, const_cast<tensor_type&>(bp1_), gradient.bp1_, false);
-    update(theta.Wp2_, const_cast<tensor_type&>(Wp2_), gradient.Wp2_, lambda_ != 0.0);
-    update(theta.bp2_, const_cast<tensor_type&>(bp2_), gradient.bp2_, false);
+    update(theta.Wp1_, const_cast<tensor_type&>(Wp1_), gradient.Wp1_, scale, lambda_ != 0.0);
+    update(theta.bp1_, const_cast<tensor_type&>(bp1_), gradient.bp1_, scale, false);
+    update(theta.Wp2_, const_cast<tensor_type&>(Wp2_), gradient.Wp2_, scale, lambda_ != 0.0);
+    update(theta.bp2_, const_cast<tensor_type&>(bp2_), gradient.bp2_, scale, false);
     
-    update(theta.Wl1_, const_cast<tensor_type&>(Wl1_), gradient.Wl1_, lambda_ != 0.0);
-    update(theta.bl1_, const_cast<tensor_type&>(bl1_), gradient.bl1_, false);
-    update(theta.Wl2_, const_cast<tensor_type&>(Wl2_), gradient.Wl2_, lambda_ != 0.0);
-    update(theta.bl2_, const_cast<tensor_type&>(bl2_), gradient.bl2_, false);
+    update(theta.Wl1_, const_cast<tensor_type&>(Wl1_), gradient.Wl1_, scale, lambda_ != 0.0);
+    update(theta.bl1_, const_cast<tensor_type&>(bl1_), gradient.bl1_, scale, false);
+    update(theta.Wl2_, const_cast<tensor_type&>(Wl2_), gradient.Wl2_, scale, lambda_ != 0.0);
+    update(theta.bl2_, const_cast<tensor_type&>(bl2_), gradient.bl2_, scale, false);
 
-    update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, lambda_ != 0.0);
-    update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, false);
+    update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -2354,9 +2356,10 @@ struct LearnAdaGrad
     update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
 			      Eigen::MatrixBase<GradVar>& G,
 			      const Eigen::MatrixBase<Grad>& g,
+			      const double& scale,
 			      const double& lambda,
 			      const double& eta0)
-      : theta_(theta), G_(G), g_(g), lambda_(lambda), eta0_(eta0) {}
+      : theta_(theta), G_(G), g_(g), scale_(scale), lambda_(lambda), eta0_(eta0) {}
     
     void init(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
     {
@@ -2367,10 +2370,10 @@ struct LearnAdaGrad
     {
       if (g_(i, j) == 0) return;
       
-      G_(i, j) += g_(i, j) * g_(i, j);
+      G_(i, j) += g_(i, j) * g_(i, j) * scale_ * scale_;
       
       const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
-      const double f = theta_(i, j) - rate * g_(i, j);
+      const double f = theta_(i, j) - rate * scale_ * g_(i, j);
       
       theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
     }
@@ -2379,6 +2382,7 @@ struct LearnAdaGrad
     Eigen::MatrixBase<GradVar>&    G_;
     const Eigen::MatrixBase<Grad>& g_;
     
+    const double scale_;
     const double lambda_;
     const double eta0_;
   };
@@ -2396,15 +2400,16 @@ struct LearnAdaGrad
   void update(Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
 	      const bool regularize=true) const
   {
     if (regularize) {
-      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, lambda_, eta0_);
+      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, scale, lambda_, eta0_);
       
       theta.visit(visitor);
     } else {
-      G.array() += g.array().square();
-      theta.array() -= eta0_ * g.array() * G.array().unaryExpr(learning_rate());
+      G.array() += g.array().square() * scale * scale;
+      theta.array() -= eta0_ * scale * g.array() * G.array().unaryExpr(learning_rate());
     }
   }
 
@@ -2413,21 +2418,22 @@ struct LearnAdaGrad
 	      Eigen::MatrixBase<Theta>& theta,
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
 	      const bool regularize=true) const
   {
     if (regularize) {
       for (int row = 0; row != g.rows(); ++ row)
 	if (g(row, 0) != 0) {
-	  G(row, word.id()) += g(row, 0) * g(row, 0);
+	  G(row, word.id()) += g(row, 0) * g(row, 0) * scale * scale;
 	  
 	  const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
-	  const double f = theta(row, 0) - rate * g(row, 0);
+	  const double f = theta(row, 0) - rate * scale * g(row, 0);
 	  
 	  theta(row, 0) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
 	}
     } else {
-      G.col(word.id()).array() += g.array().square();
-      theta.array() -= eta0_ * g.array() * G.col(word.id()).array().unaryExpr(learning_rate());
+      G.col(word.id()).array() += g.array().square() * scale * scale;
+      theta.array() -= eta0_ * scale * g.array() * G.col(word.id()).array().unaryExpr(learning_rate());
     }
   }
   
