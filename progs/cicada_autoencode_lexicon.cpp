@@ -1334,7 +1334,7 @@ double alpha = 0.99;
 double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
-int window = 2;
+int window = 0;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
@@ -1540,8 +1540,7 @@ struct TaskAccumulate
   {
     double operator()(const double& x) const
     {
-      const double expx = std::exp(- x);
-      return (expx == std::numeric_limits<double>::infinity() ? 0.0 : 1.0 / (expx + 1.0));
+      return 1.0 / (std::exp(- x) + 1.0);
     }
   };
 
@@ -1549,14 +1548,9 @@ struct TaskAccumulate
   {
     double operator()(const double& x) const
     {
-      const double expx = std::exp(- x);
-
-      if (expx == std::numeric_limits<double>::infinity())
-	return 0.0;
-      else {
-	const double m = 1.0 / (expx + 1.0);
-	return m * (1.0 - m);
-      }
+      const double m = 1.0 / (std::exp(- x) + 1.0);
+      
+      return m * (1.0 - m);
     }
   };
 

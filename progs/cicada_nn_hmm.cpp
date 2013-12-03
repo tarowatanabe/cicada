@@ -2060,7 +2060,7 @@ path_type alignment_target_source_file;
 
 int dimension_embedding = 32;
 int dimension_hidden = 128;
-int window = 2;
+int window = 0;
 int alignment = 8;
 
 bool optimize_sgd = false;
