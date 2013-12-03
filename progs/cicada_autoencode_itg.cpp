@@ -1405,7 +1405,7 @@ struct ITGTree
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const model_type& theta,
-	       const double beam,
+	       const int beam,
 	       Function   func,
 	       Derivative deriv)
   {
@@ -1475,7 +1475,7 @@ struct ITGTree
     // iterate!
     const double infty = std::numeric_limits<double>::infinity();
     const size_type length_max = source_size + target_size;
-    double beam_curr = beam;
+    int beam_curr = beam;
 
     for (int iter = 0; iter != 10; ++ iter) {
       
@@ -1502,11 +1502,16 @@ struct ITGTree
 	  heap_type::iterator hiter       = heap_.end();
 	  heap_type::iterator hiter_end   = heap_.end();
 
-	  if (length > 2) {
+	  if (length > 2 && std::distance(hiter_begin, hiter_end) > beam_curr) {
 	    // we will derive those with smaller reconstruction error...
+#if 0
 	    const double threshold = hiter_begin->first + beam_curr;
 	    for (/**/; hiter_begin != hiter && hiter_begin->first < threshold; -- hiter)
 	      std::pop_heap(hiter_begin, hiter, heap_compare());
+#endif
+	    for (/**/; hiter_begin != hiter && std::distance(hiter, hiter_end) != beam_curr; -- hiter)
+	      std::pop_heap(hiter_begin, hiter, heap_compare());
+	    
 	  } else
 	    hiter = hiter_begin;
 
@@ -1612,7 +1617,8 @@ struct ITGTree
 
       std::cerr << "parsing failed: " << beam_curr << std::endl;
       
-      beam_curr *= 10;
+      //beam_curr *= 10;
+      beam_curr <<= 1;
     }
   }
 
@@ -2695,7 +2701,8 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 1024;
-double beam = 0.1;
+//double beam = 0.1;
+int beam = 5;
 double lambda = 0;
 double eta0 = 0.1;
 int cutoff = 3;
@@ -3231,7 +3238,7 @@ struct TaskAccumulate
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
 		 const model_type& theta,
-		 const double& beam,
+		 const int& beam,
 		 queue_type& queue,
 		 counter_type& counter,
 		 queue_derivation_type& queue_derivation,
@@ -3319,7 +3326,7 @@ struct TaskAccumulate
 
   const bitext_set_type& bitexts_;
   const model_type& theta_;
-  const double beam_;
+  const int beam_;
   
   queue_type&            queue_;
   counter_type&          counter_;
@@ -3532,7 +3539,7 @@ struct TaskDerivation
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
 		 const model_type& theta,
-		 const double& beam,
+		 const int& beam,
 		 queue_type& queue,
 		 queue_derivation_type& queue_derivation,
 		 queue_derivation_type& queue_alignment)
@@ -3590,7 +3597,7 @@ struct TaskDerivation
 
   const bitext_set_type& bitexts_;
   const model_type& theta_;
-  const double beam_;
+  const int beam_;
   
   queue_type&            queue_;
   queue_derivation_type& queue_derivation_;
@@ -3848,7 +3855,7 @@ void options(int argc, char** argv)
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
-    ("beam",              po::value<double>(&beam)->default_value(beam),          "beam width for parsing")
+    ("beam",              po::value<int>(&beam)->default_value(beam),          "beam width for parsing")
     ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
