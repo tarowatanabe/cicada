@@ -3097,7 +3097,17 @@ void learn_online(const Learner& learner,
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
     // shuffle bitexts!
-    std::random_shuffle(ids.begin(), ids.end());
+    {
+      id_set_type::iterator biter     = ids.begin();
+      id_set_type::iterator biter_end = ids.end();
+      
+      while (biter < biter_end) {
+	id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	
+	std::random_shuffle(biter, iter_end);
+	biter = iter_end;
+      }
+    }
     
     output_source_target.join();
     output_target_source.join();

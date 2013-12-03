@@ -2694,7 +2694,7 @@ double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
 int dimension_itg = 64;
-int window = 2;
+int window = 0;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
@@ -2702,7 +2702,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 1024;
 //double beam = 0.1;
-int beam = 5;
+int beam = 10;
 double lambda = 0;
 double eta0 = 0.1;
 int cutoff = 3;
@@ -3498,7 +3498,17 @@ void learn_online(const Learner& learner,
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
 
     // shuffle bitexts!
-    std::random_shuffle(ids.begin(), ids.end());
+    {
+      id_set_type::iterator biter     = ids.begin();
+      id_set_type::iterator biter_end = ids.end();
+      
+      while (biter < biter_end) {
+	id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	
+	std::random_shuffle(biter, iter_end);
+	biter = iter_end;
+      }
+    }
     
     output_derivation.join();
     output_alignment.join();
