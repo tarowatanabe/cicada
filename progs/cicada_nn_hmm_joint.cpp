@@ -389,7 +389,7 @@ struct Model
 
   typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
-  Model() : embedding_(0), hidden_(0), window_(0), alignment_(0) {}  
+  Model() : embedding_(0), hidden_(0), window_(0), alignment_(0), scale_(1) {}  
   template <typename Words, typename Gen>
   Model(const size_type& embedding,
 	const size_type& hidden,
@@ -401,7 +401,8 @@ struct Model
     : embedding_(embedding),
       hidden_(hidden),
       window_(window),
-      alignment_(alignment)
+      alignment_(alignment),
+      scale_(1)
   { initialize(embedding, hidden, window, alignment, words_source, words_target, gen); }
   
   void clear()
@@ -423,6 +424,8 @@ struct Model
     bn_.setZero();
     
     Wi_.setZero();
+
+    scale_ = 1.0;
   }
   
   
@@ -508,6 +511,8 @@ struct Model
     bn_ = tensor_type::Zero(hidden_, 1);
 
     Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
+
+    scale_ = 1.0;
   }
 
   size_type shift(const difference_type source_size,
@@ -525,7 +530,12 @@ struct Model
 
   void finalize()
   {
+    if (scale_ == 1.0) return;
     
+    source_ *= scale_;
+    target_ *= scale_;
+
+    scale_ = 1.0;
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -634,6 +644,7 @@ struct Model
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["alignment"] = utils::lexical_cast<std::string>(alignment_);
+    rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
     write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_, words_source_);
     write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_, words_target_);
@@ -740,6 +751,8 @@ struct Model
   tensor_type bn_;
 
   tensor_type Wi_;
+
+  double scale_;
 };
 
 class State
@@ -1226,7 +1239,7 @@ struct HMM
     
     if (source_pos >= source_size + 2) {
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
-	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1) = theta.source_.col(vocab_type::EPSILON.id());
+	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1) = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
     } else {
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
 	const difference_type shift = i - window_size;
@@ -1236,7 +1249,7 @@ struct HMM
 				    ? vocab_type::EOS
 				    : source[source_pos + shift - 1]));
 	
-	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1) = theta.source_.col(word.id());
+	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1) = theta.source_.col(word.id()) * theta.scale_;
       }
     }
     
@@ -1249,7 +1262,7 @@ struct HMM
 				  ? vocab_type::EOS
 				  : target[target_pos + shift - 1]));
       
-      embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1) = theta.target_.col(word.id());
+      embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1) = theta.target_.col(word.id()) * theta.scale_;
     }    
   }
 
@@ -1397,7 +1410,7 @@ struct HMM
 	      alpha_sampled = alpha_next;
 	      
 	      alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
-		= theta.target_.col(target_sampled.id());
+		= theta.target_.col(target_sampled.id()) * theta.scale_;
 	      
 	      // compute trans-sampled
 	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(htanh());
@@ -1458,7 +1471,7 @@ struct HMM
 	      alpha_sampled = alpha_next;
 	      
 	      alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
-		= theta.target_.col(target_sampled.id());
+		= theta.target_.col(target_sampled.id()) * theta.scale_;
 	      
 	      // compute trans-sampled
 	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(htanh());
@@ -2225,6 +2238,122 @@ struct LearnAdaGrad
   tensor_type Wi_;
 };
 
+struct LearnSGD
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model     model_type;
+  typedef Gradient  gradient_type;
+  typedef Embedding embedding_type;
+
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+  
+  typedef model_type::tensor_type tensor_type;
+
+  LearnSGD(const double& lambda,
+	   const double& lambda2,
+	   const double& eta0)
+    : lambda_(lambda),
+      lambda2_(lambda2),
+      eta0_(eta0),
+      epoch_(0)
+  {
+    if (lambda_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+    
+    if (lambda2_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+    
+    if (eta0_ <= 0.0)
+      throw std::runtime_error("invalid learning rate");
+  }
+  
+  void operator()(model_type& theta,
+		  const gradient_type& gradient,
+		  const embedding_type& embedding) const
+  {
+    typedef gradient_type::embedding_type gradient_embedding_type;
+
+    const double scale = 1.0 / gradient.count_;
+    
+    if (lambda_ != 0.0) {
+      const double eta = eta0_ / (epoch_ + 1);
+      
+      theta.scale_ *= 1.0 - eta * lambda_;
+    }
+    
+    gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
+    for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
+      update(siter->first,
+	     theta.source_,
+	     siter->second,
+	     embedding.target_.col(siter->first.id()),
+	     scale,
+	     theta.scale_);
+    
+    gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
+    for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
+      update(titer->first,
+	     theta.target_,
+	     titer->second,
+	     embedding.source_.col(titer->first.id()),
+	     scale,
+	     theta.scale_);
+
+    update(theta.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, gradient.bc_, scale, false);
+    
+    update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
+    update(theta.bt_, gradient.bt_, scale, false);
+    
+    update(theta.Wa_, gradient.Wa_, scale, lambda_ != 0.0);
+    update(theta.ba_, gradient.ba_, scale, false);
+    
+    update(theta.Wn_, gradient.Wn_, scale, lambda_ != 0.0);
+    update(theta.bn_, gradient.bn_, scale, false);
+    
+    update(theta.Wi_, gradient.Wi_, scale, lambda_ != 0.0);
+  }
+
+  template <typename Theta, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize=true) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (regularize)
+      theta *= 1.0 - eta * lambda_;
+    
+    theta.noalias() -= (eta * scale) * g;
+  }
+
+  template <typename Theta, typename Grad, typename GradCross>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const Eigen::MatrixBase<GradCross>& c,
+	      const double scale,
+	      const double theta_scale) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+    
+    if (lambda2_ > 0.0)
+      theta.col(word.id()) -= (eta * scale * lambda2_) * (theta.col(word.id()) - c / theta_scale) + (eta * scale / theta_scale) * g;
+    else
+      theta.col(word.id()).noalias() -= (eta * scale / theta_scale) * g;
+  }
+  
+  double lambda_;
+  double lambda2_;
+  double eta0_;
+
+  size_type epoch_;
+};
+
 
 typedef boost::filesystem::path path_type;
 
@@ -2263,7 +2392,7 @@ int batch_size = 128;
 int sample_size = 1;
 int beam_size = 10;
 int cutoff = 3;
-double lambda = 1e-3;
+double lambda = 1e-5;
 double lambda2 = 0.01;
 double eta0 = 1;
 
@@ -2382,13 +2511,22 @@ int main(int argc, char** argv)
     theta_source_target.target_.block(0, 0, dimension_embedding, cols)
       = theta_target_source.source_.block(0, 0, dimension_embedding, cols);
     
-    if (iteration > 0)
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, alignment, lambda, lambda2, eta0),
-		   bitexts,
-		   dict_source_target,
-		   dict_target_source,
-		   theta_source_target,
-		   theta_target_source);
+    if (iteration > 0) {
+      if (optimize_adagrad)
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, alignment, lambda, lambda2, eta0),
+		     bitexts,
+		     dict_source_target,
+		     dict_target_source,
+		     theta_source_target,
+		     theta_target_source);
+      else
+	learn_online(LearnSGD(lambda, lambda2, eta0),
+		     bitexts,
+		     dict_source_target,
+		     dict_target_source,
+		     theta_source_target,
+		     theta_target_source);
+    }
 
     if (! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
       viterbi(bitexts,
