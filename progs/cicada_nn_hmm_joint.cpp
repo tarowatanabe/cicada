@@ -2276,6 +2276,8 @@ struct LearnSGD
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
 
+    //++ const_cast<size_type&>(epoch_);
+
     const double scale = 1.0 / gradient.count_;
     
     if (lambda_ != 0.0) {
@@ -2392,9 +2394,9 @@ int batch_size = 128;
 int sample_size = 1;
 int beam_size = 10;
 int cutoff = 3;
-double lambda = 1e-5;
-double lambda2 = 0.01;
-double eta0 = 1;
+double lambda = 0;
+double lambda2 = 0;
+double eta0 = 0.01;
 
 bool moses_mode = false;
 bool giza_mode = false;
@@ -2452,7 +2454,7 @@ int main(int argc, char** argv)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
-      optimize_adagrad = true;
+      optimize_sgd = true;
     
     threads = utils::bithack::max(threads, 1);
     

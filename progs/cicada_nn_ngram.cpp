@@ -1087,7 +1087,7 @@ struct LearnSGD
   {
     typedef gradient_type::embedding_type embedding_type;
 
-    ++ const_cast<size_type&>(epoch_);
+    //++ const_cast<size_type&>(epoch_);
     
     const double eta = eta0_ / (epoch_ + 1);
     
@@ -1192,8 +1192,8 @@ int iteration = 10;
 int batch_size = 1024;
 int samples = 100;
 int cutoff = 3;
-double lambda = 1e-5;
-double eta0 = 1;
+double lambda = 0;
+double eta0 = 0.01;
 
 int threads = 2;
 
@@ -1232,7 +1232,7 @@ int main(int argc, char** argv)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
-      optimize_adagrad = true;
+      optimize_sgd = true;
     
     threads = utils::bithack::max(threads, 1);
     
@@ -1780,7 +1780,7 @@ void options(int argc, char** argv)
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
     ("order",     po::value<int>(&order)->default_value(order),         "context order size")
     
-    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
+    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD fixed rate optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
