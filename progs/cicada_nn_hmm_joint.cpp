@@ -2396,7 +2396,7 @@ int beam_size = 10;
 int cutoff = 3;
 double lambda = 0;
 double lambda2 = 0;
-double eta0 = 0.01;
+double eta0 = 0.1;
 
 bool moses_mode = false;
 bool giza_mode = false;

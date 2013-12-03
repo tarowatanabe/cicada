@@ -358,7 +358,7 @@ struct Model
 
   typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
-  Model() : embedding_(0), hidden_(0), alignment_(0) {}  
+  Model() : embedding_(0), hidden_(0), alignment_(0), scale_(1) {}  
   template <typename Words, typename Gen>
   Model(const size_type& embedding,
 	const size_type& hidden,
@@ -368,7 +368,8 @@ struct Model
 	Gen& gen) 
     : embedding_(embedding),
       hidden_(hidden),
-      alignment_(alignment)
+      alignment_(alignment),
+      scale_(1)
   { initialize(embedding, hidden, alignment, words_source, words_target, gen); }
   
   void clear()
@@ -387,6 +388,8 @@ struct Model
     bn_.setZero();
     
     Wi_.setZero();
+    
+    scale_ = 1.0;
   }
   
   
@@ -465,6 +468,8 @@ struct Model
     bn_ = tensor_type::Zero(hidden_, 1);
 
     Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
+
+    scale_ = 1.0;
   }
 
   size_type shift(const difference_type source_size,
@@ -482,7 +487,12 @@ struct Model
 
   void finalize()
   {
+    if (scale_ == 1.0) return;
     
+    source_ *= scale_;
+    target_.block(0, 0, embedding_, target_.cols()) *= scale_;
+
+    scale_ = 1.0;    
   }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
@@ -689,6 +699,8 @@ struct Model
   tensor_type bn_;
 
   tensor_type Wi_;
+
+  double scale_;
 };
 
 class State
@@ -1236,7 +1248,7 @@ struct HMM
 	  matrix_type layer_alpha(state_next.matrix(), state_size, 1);
 	  matrix_type layer_trans(state_next.matrix() + state_size, theta.embedding_, 1);
 	  
-	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(source_next.id());
+	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(source_next.id()) * theta.scale_;
 	  
 	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
 	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
@@ -1245,7 +1257,7 @@ struct HMM
 	  
 	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
 	  
-	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 
 	  state_next.score() = score + state.score();
@@ -1265,14 +1277,14 @@ struct HMM
 	  matrix_type layer_alpha(state_next.matrix(), state_size, 1);
 	  matrix_type layer_trans(state_next.matrix() + state_size, theta.embedding_, 1);
 	  
-	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::EPSILON.id());
+	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	  
 	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
 	    = (theta.Wn_ * matrix_type(state.matrix(), state_size, 1) + theta.bn_).array().unaryExpr(htanh());
 	  
 	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
 	  
-	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
 	  state_next.score() = score + state.score();
@@ -1406,9 +1418,9 @@ struct HMM
 	
 	const word_type target_sampled = dict_.draw(source_prev, gen);
 	
-	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next
+	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
-	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next
+	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next * theta.scale_
 				+ theta.target_.col(target_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 
 	const double score_noise_c = 0.0 + dict_.logprob(source_prev, target_next);
@@ -1437,8 +1449,8 @@ struct HMM
 	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += loss_m;
 	
 	delta_trans_ = (trans_next.array().unaryExpr(dhtanh())
-			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * loss_c
-			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * loss_m).array());
+			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * loss_c * theta.scale_
+			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * loss_m * theta.scale_).array());
 	
 	gradient.Wt_ += delta_trans_ * alpha_next.transpose();
 	gradient.bt_ += delta_trans_;
@@ -1583,7 +1595,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wa_.block(theta.hidden_ * shift, offset_word, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_prev.id()) * theta.scale_)
 	       
 	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
@@ -1591,14 +1603,14 @@ struct HMM
 	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
 	  
 	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
-			   * theta.source_.col(source_next.id()))
+			   * theta.source_.col(source_next.id()) * theta.scale_)
 			  
 			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
 			  + theta.bt_).array().unaryExpr(htanh());
 	  
-	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_ * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
 	  state_next.score() = score + state.score();
@@ -1619,7 +1631,7 @@ struct HMM
 	  
 	  layer_alpha
 	    = ((theta.Wn_.block(0, offset_word, theta.hidden_, theta.embedding_)
-		* theta.source_.col(source_prev.id()))
+		* theta.source_.col(source_prev.id()) * theta.scale_)
 	       
 	       + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
@@ -1627,14 +1639,14 @@ struct HMM
 	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
 	  
 	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
-			   * theta.source_.col(vocab_type::EPSILON.id()))
+			   * theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_)
 			  
 			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
 			  + theta.bt_).array().unaryExpr(htanh());
 	  
-	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_
+	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_ * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	  
 	  state_next.score() = score + state.score();
@@ -1901,6 +1913,126 @@ struct LearnAdaGrad
   tensor_type Wi_;
 };
 
+struct LearnSGD
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model     model_type;
+  typedef Gradient  gradient_type;
+  typedef Embedding embedding_type;
+
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+  
+  typedef model_type::tensor_type tensor_type;
+
+  
+  LearnSGD(const double& lambda,
+	   const double& lambda2,
+	   const double& eta0)
+    : lambda_(lambda),
+      lambda2_(lambda2),
+      eta0_(eta0),
+      epoch_(0)
+  {
+    if (lambda_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+
+    if (lambda2_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+    
+    if (eta0_ <= 0.0)
+      throw std::runtime_error("invalid learning rate");
+  }
+
+  void operator()(model_type& theta,
+		  const gradient_type& gradient,
+		  const embedding_type& embedding) const
+  {
+    typedef gradient_type::embedding_type gradient_embedding_type;
+
+    //++ const_cast<size_type&>(epoch_);
+    
+    const double eta = eta0_ / (epoch_ + 1);
+    const double scale = 1.0 / gradient.count_;
+    
+    if (lambda_ != 0.0)
+      theta.scale_ *= 1.0 - eta * lambda_;
+    
+    gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
+    for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
+      update(siter->first,
+	     theta.source_,
+	     siter->second,
+	     embedding.target_.col(siter->first.id()),
+	     scale,
+	     theta.scale_,
+	     false);
+    
+    gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
+    for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
+      update(titer->first,
+	     theta.target_,
+	     titer->second,
+	     embedding.source_.col(titer->first.id()),
+	     scale,
+	     theta.scale_,
+	     true);
+    
+    update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
+    update(theta.bt_, gradient.bt_, scale, false);
+    
+    update(theta.Wa_, gradient.Wa_, scale, lambda_ != 0.0);
+    update(theta.ba_, gradient.ba_, scale, false);
+
+    update(theta.Wn_, gradient.Wn_, scale, lambda_ != 0.0);
+    update(theta.bn_, gradient.bn_, scale, false);
+    
+    update(theta.Wi_, gradient.Wi_, scale, lambda_ != 0.0);
+  }
+
+  template <typename Theta, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize=true) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (regularize)
+      theta *= 1.0 - eta * lambda_;
+    
+    theta.noalias() -= (eta * scale) * g;    
+  }
+  
+  template <typename Theta, typename Grad, typename GradCross>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const Eigen::MatrixBase<GradCross>& c,
+	      const double scale,
+	      const double theta_scale,
+	      const bool bias_last=false) const
+  {
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (bias_last) {
+      const size_type rows = g.rows();
+      
+      theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
+      theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
+    } else
+      theta.col(word.id()) -= (eta * scale / theta_scale) * g;
+  }
+
+  double lambda_;
+  double lambda2_;
+  double eta0_;
+  
+  size_type epoch_;
+};
+
 
 typedef boost::filesystem::path path_type;
 
@@ -1938,9 +2070,9 @@ int iteration = 10;
 int batch_size = 128;
 int beam_size = 10;
 int cutoff = 3;
-double lambda = 1e-3;
-double lambda2 = 0.01;
-double eta0 = 1;
+double lambda = 0;
+double lambda2 = 0;
+double eta0 = 0.1;
 
 bool moses_mode = false;
 bool giza_mode = false;
@@ -1996,7 +2128,7 @@ int main(int argc, char** argv)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
-      optimize_adagrad = true;
+      optimize_sgd = true;
     
     threads = utils::bithack::max(threads, 1);
     
@@ -2055,13 +2187,22 @@ int main(int argc, char** argv)
     theta_source_target.target_.block(0, 0, dimension_embedding, cols)
       = theta_target_source.source_.block(0, 0, dimension_embedding, cols);
     
-    if (iteration > 0)
-      learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
-		   bitexts,
-		   dict_source_target,
-		   dict_target_source,
-		   theta_source_target,
-		   theta_target_source);
+    if (iteration > 0) {
+      if (optimize_adagrad)
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
+		     bitexts,
+		     dict_source_target,
+		     dict_target_source,
+		     theta_source_target,
+		     theta_target_source);
+      else
+	learn_online(LearnSGD(lambda, lambda2, eta0),
+		     bitexts,
+		     dict_source_target,
+		     dict_target_source,
+		     theta_source_target,
+		     theta_target_source);
+    }
 
     if (! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
       viterbi(bitexts,

@@ -1193,7 +1193,7 @@ int batch_size = 1024;
 int samples = 100;
 int cutoff = 3;
 double lambda = 0;
-double eta0 = 0.01;
+double eta0 = 0.1;
 
 int threads = 2;
 
