@@ -1627,7 +1627,7 @@ void learn_online(const Learner& learner,
       id_set_type::iterator biter_end = ids.end();
       
       while (biter < biter_end) {
-	id_set_type::iterator iter_end = std::min(biter + (batch_size * 64), biter_end);
+	id_set_type::iterator iter_end = std::min(biter + (batch_size << 8), biter_end);
 	
 	std::random_shuffle(biter, iter_end);
 	biter = iter_end;
