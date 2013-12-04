@@ -762,9 +762,10 @@ struct NGram
 		     * (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
     
     for (size_type k = 0; k != samples_; ++ k) {
-      const word_type sampled = unigram_.draw(gen);
+      word_type sampled = unigram_.draw(gen);
       
-      //if (sampled == word) continue;
+      while (sampled == word)
+	sampled = unigram_.draw(gen);
       
       const double score = (theta.embedding_output_.col(sampled.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
 			    + theta.embedding_output_.col(sampled.id()).block(dimension, 0, 1, 1))(0, 0);
