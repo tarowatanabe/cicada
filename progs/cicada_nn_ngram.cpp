@@ -704,10 +704,10 @@ struct NGram
   };
 
   template <typename Iterator, typename Gen>
-  log_likelihood_type learn(Iterator first, Iterator last,
-			    const model_type& theta,
-			    gradient_type& gradient,
-			    Gen& gen)
+  double learn(Iterator first, Iterator last,
+	       const model_type& theta,
+	       gradient_type& gradient,
+	       Gen& gen)
   {
     const size_type dimension = theta.dimension_embedding_;
     const size_type order     = theta.order_;
@@ -1264,7 +1264,7 @@ typedef utils::unordered_map<unigram_type::word_type, count_type,
 			     std::allocator<std::pair<const unigram_type::word_type, count_type> > >::type word_set_type;
 
 
-static const size_t DEBUG_DOT  = 100000;
+static const size_t DEBUG_DOT  = 10000000;
 static const size_t DEBUG_WRAP = 100;
 static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
