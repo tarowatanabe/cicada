@@ -879,106 +879,10 @@ struct Learn
   typedef cicada::Symbol   word_type;
   
   typedef model_type::tensor_type tensor_type;
-  
-  typedef std::pair<model_type*, const gradient_type*> update_type;
-  
-  typedef utils::lockfree_list_queue<update_type, std::allocator<update_type> > queue_type;
-
-  struct Counter
-  {
-    Counter() : counter(0) {}
-  
-    void increment()
-    {
-      utils::atomicop::fetch_and_add(counter, size_type(1));
-    }
-  
-    void wait(size_type target)
-    {
-      for (;;) {
-	for (int i = 0; i < 64; ++ i) {
-	  if (counter == target)
-	    return;
-	  else
-	    boost::thread::yield();
-	}
-	
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-    }
-    
-    void clear() { counter = 0; }
-    
-    volatile size_type counter;
-  };
-  typedef Counter counter_type;
 };
 
 struct LearnAdaGrad : public Learn
 {
-  
-  struct Updator
-  {
-    Updator(LearnAdaGrad& learner,
-	    queue_type& queue,
-	    counter_type& counter,
-	    size_type shard,
-	    size_type size)
-      : learner_(learner), queue_(queue), counter_(counter), shard_(shard), size_(size) {}
-
-    void operator()()
-    {
-      update_type update;
-
-      for (;;) {
-	queue_.pop(update);
-	
-	if (! update.first) break;
-	
-	model_type& theta = *update.first;
-	const gradient_type& gradient = *update.second;
-	
-	typedef gradient_type::embedding_type embedding_type;
-
-	const double scale = 1.0 / gradient.count_;
-	
-	embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
-	for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
-	  if (iiter->first.id() % size_ == shard_)
-	    learner_.update(iiter->first,
-			    theta.embedding_input_,
-			    learner_.embedding_input_,
-			    iiter->second,
-			    scale,
-			    learner_.lambda_ != 0.0,
-			    false);
-	
-	embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
-	for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
-	  if (oiter->first.id() % size_ == shard_)
-	    learner_.update(oiter->first,
-			    theta.embedding_output_,
-			    learner_.embedding_output_,
-			    oiter->second,
-			    scale,
-			    learner_.lambda_ != 0.0,
-			    true);
-
-	counter_.increment();
-      }
-    }
-    
-    LearnAdaGrad& learner_;
-    queue_type&   queue_;
-    counter_type& counter_;
-
-    size_type shard_;
-    size_type size_;
-  };
-
   LearnAdaGrad(const size_type& dimension_embedding,
 	       const size_type& dimension_hidden,
 	       const int order,
@@ -1008,30 +912,12 @@ struct LearnAdaGrad : public Learn
     
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_);
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
-    
-    for (int i = 0; i != threads; ++ i)
-      workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, i, threads)));
-  }
-  
-  ~LearnAdaGrad()
-  {
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      queue_.push(update_type(0, 0));
-    
-    workers_.join_all();
   }
   
   void operator()(model_type& theta, const gradient_type& gradient) const
   {
     typedef gradient_type::embedding_type embedding_type;
 
-    // parallelize here...
-    const_cast<counter_type&>(counter_).clear();
-    
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      const_cast<queue_type&>(queue_).push(update_type(&theta, &gradient));
-    
-#if 0
     embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
     for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
       update(iiter->first,
@@ -1051,16 +937,12 @@ struct LearnAdaGrad : public Learn
 	     1.0 / gradient.count_,
 	     lambda_ != 0.0,
 	     true);
-#endif
     
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, 1.0 / gradient.count_, false);
 
     update(theta.Wh_, const_cast<tensor_type&>(Wh_), gradient.Wh_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bh_, const_cast<tensor_type&>(bh_), gradient.bh_, 1.0 / gradient.count_, false);
-
-    // wait...
-    const_cast<counter_type&>(counter_).wait(workers_.size());
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -1178,71 +1060,10 @@ struct LearnAdaGrad : public Learn
   // Wh and bh for hidden layer
   tensor_type Wh_;
   tensor_type bh_;  
-
-  queue_type   queue_;
-  counter_type counter_;
-  boost::thread_group workers_;
 };
 
 struct LearnSGD : public Learn
 {  
-
-  struct Updator
-  {
-    Updator(LearnSGD& learner,
-	    queue_type& queue,
-	    counter_type& counter,
-	    size_type shard,
-	    size_type size)
-      : learner_(learner), queue_(queue), counter_(counter), shard_(shard), size_(size) {}
-
-    void operator()()
-    {
-      update_type update;
-
-      for (;;) {
-	queue_.pop(update);
-	
-	if (! update.first) break;
-	
-	model_type& theta = *update.first;
-	const gradient_type& gradient = *update.second;
-	
-	typedef gradient_type::embedding_type embedding_type;
-	
-	const double scale = 1.0 / gradient.count_;
-	
-	embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
-	for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
-	  if (iiter->first.id() % size_ == shard_)
-	    learner_.update(iiter->first,
-			    theta.embedding_input_,
-			    iiter->second,
-			    scale,
-			    theta.scale_,
-			    false);
-	
-	embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
-	for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
-	  if (oiter->first.id() % size_ == shard_)
-	    learner_.update(oiter->first,
-			    theta.embedding_output_,
-			    oiter->second,
-			    scale,
-			    theta.scale_,
-			    true);
-
-	counter_.increment();
-      }
-    }
-    
-    LearnSGD&     learner_;
-    queue_type&   queue_;
-    counter_type& counter_;
-
-    size_type shard_;
-    size_type size_;
-  };
 
   LearnSGD(const double& lambda,
 	   const double& eta0,
@@ -1256,17 +1077,6 @@ struct LearnSGD : public Learn
     
     if (eta0_ <= 0.0)
       throw std::runtime_error("invalid learning rate");
-
-    for (int i = 0; i != threads; ++ i)
-      workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, i, threads)));
-  }
-  
-  ~LearnSGD()
-  {
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      queue_.push(update_type(0, 0));
-    
-    workers_.join_all();
   }
 
   void operator()(model_type& theta, const gradient_type& gradient) const
@@ -1280,13 +1090,6 @@ struct LearnSGD : public Learn
     if (lambda_ != 0.0)
       theta.scale_ *= 1.0 - eta * lambda_;
 
-    // parallelize here...
-    const_cast<counter_type&>(counter_).clear();
-    
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      const_cast<queue_type&>(queue_).push(update_type(&theta, &gradient));
-    
-#if 0
     embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
     for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
       update(iiter->first,
@@ -1304,16 +1107,12 @@ struct LearnSGD : public Learn
 	     1.0 / gradient.count_,
 	     theta.scale_,
 	     true);
-#endif
     
     update(theta.Wc_, gradient.Wc_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bc_, gradient.bc_, 1.0 / gradient.count_, false);
     
     update(theta.Wh_, gradient.Wh_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bh_, gradient.bh_, 1.0 / gradient.count_, false);
-
-    // wait...
-    const_cast<counter_type&>(counter_).wait(workers_.size());
   }
   
   template <typename Theta, typename Grad>
@@ -1353,10 +1152,6 @@ struct LearnSGD : public Learn
   double eta0_;
   
   size_type epoch_;
-
-  queue_type   queue_;
-  counter_type counter_;
-  boost::thread_group workers_;
 };
 
 typedef boost::filesystem::path path_type;
