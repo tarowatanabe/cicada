@@ -63,6 +63,7 @@
 struct Average
 {
   Average() : average_(0), count_(0) {}
+  Average(const double& x) : average_(x), count_(1) {}
   
   Average& operator+=(const double& x)
   {
@@ -701,6 +702,28 @@ struct NGram
       return Tp(0) < x && x < Tp(50);
     }
   };
+
+  template <typename Iterator, typename Gen>
+  log_likelihood_type learn(Iterator first, Iterator last,
+			    const model_type& theta,
+			    gradient_type& gradient,
+			    Gen& gen)
+  {
+    const size_type dimension = theta.dimension_embedding_;
+    const size_type order     = theta.order_;
+    
+    gradient_embedding_.resize(order - 1);
+    
+    if (! layer_input_.cols())
+      layer_input_ = tensor_type::Zero(dimension * (order - 1), 1);
+    
+    for (size_type i = 0; i != order - 1; ++ i, ++ first) {
+      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(first->id()) * theta.scale_;
+      gradient_embedding_[i] = &gradient.embedding_input(*first);
+    }
+    
+    return learn(*first, theta, gradient, gen);
+  }
   
   template <typename Gen>
   log_likelihood_type learn(const sentence_type& sentence,
@@ -824,11 +847,13 @@ struct NGram
 		     * (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
     
     for (size_type k = 0; k != samples_; ++ k) {
-      const word_type word = unigram_.draw(gen);
-
-      const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
-			    + theta.embedding_output_.col(word.id()).block(dimension, 0, 1, 1))(0, 0);
-      const double score_noise = log_samples_ + unigram_.logprob(word);
+      const word_type sampled = unigram_.draw(gen);
+      
+      if (sampled == word) continue;
+      
+      const double score = (theta.embedding_output_.col(sampled.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
+			    + theta.embedding_output_.col(sampled.id()).block(dimension, 0, 1, 1))(0, 0);
+      const double score_noise = log_samples_ + unigram_.logprob(sampled);
       const double z = utils::mathop::logsum(score, score_noise);
       const double logprob = score - z;
       const double logprob_noise = score_noise - z;
@@ -838,13 +863,13 @@ struct NGram
       // we suffer loss...
       const double loss = std::exp(logprob);
             
-      tensor_type& dembedding = gradient.embedding_output(word);
+      tensor_type& dembedding = gradient.embedding_output(sampled);
       
       dembedding.block(0, 0, dimension, 1).array() += loss * layer_hidden_.array();
       dembedding.block(dimension, 0, 1, 1).array() += loss;
       
       delta_hidden_.array() += (layer_hidden_.array().unaryExpr(dhinge())
-				* (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
+				* (theta.embedding_output_.col(sampled.id()).block(0, 0, dimension, 1) * loss * theta.scale_).array());
     }
     
     gradient.Wh_.noalias() += delta_hidden_ * layer_context_.transpose();
@@ -1151,10 +1176,82 @@ struct LearnSGD : public Learn
   size_type epoch_;
 };
 
+struct Data
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+
+  typedef std::vector<word_type, std::allocator<word_type> > data_type;
+  
+  typedef data_type::const_iterator const_iterator;
+  typedef data_type::iterator       iterator;
+
+  Data(const int order) : order_(order) {}
+  
+  Data& operator+=(const Data& x)
+  {
+    if (order_ != x.order_)
+      throw std::runtime_error("different order?");
+
+    data_.insert(data_.end(), x.data_.begin(), x.data_.end());
+    
+    return *this;
+  };
+
+  void insert(const sentence_type& sent)
+  {
+    buffer_.resize(order_);
+    std::fill(buffer_.begin(), buffer_.end() - 1, vocab_type::EPSILON);
+    buffer_.back() = vocab_type::BOS;
+    
+    sentence_type::const_iterator siter_end = sent.end();
+    for (sentence_type::const_iterator siter = sent.begin(); siter != siter_end; ++ siter) {
+      buffer_.push_back(*siter);
+      data_.insert(data_.end(), buffer_.end() - order_, buffer_.end());
+    }
+    
+    buffer_.push_back(vocab_type::EOS);
+    data_.insert(data_.end(), buffer_.end() - order_, buffer_.end());
+  }
+
+  void clear()
+  {
+    buffer_.clear();
+    data_.clear();
+  };
+
+  void swap(Data& x)
+  {
+    data_.swap(x.data_);
+    std::swap(order_, x.order_);
+  }
+
+  void shrink()
+  {
+    data_type(data_).swap(data_);
+  }
+  
+  size_type size() const { return data_.size() / order_; }
+  bool empty() const { return data_.empty(); }
+  
+  const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
+  const_iterator end(size_type pos) const { return data_.begin() + (pos + 1) * order_; }
+
+  iterator begin() { return data_.begin(); }
+  iterator end() { return data_.end(); }
+  
+  data_type buffer_;
+  data_type data_;
+  int       order_;
+};
+
 typedef boost::filesystem::path path_type;
 
-typedef cicada::Sentence sentence_type;
-typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
+typedef Data data_type;
 
 typedef Model    model_type;
 typedef Unigram  unigram_type;
@@ -1182,7 +1279,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
-int batch_size = 1024;
+int batch_size = 128;
 int samples = 100;
 int cutoff = 3;
 double lambda = 0;
@@ -1194,12 +1291,12 @@ int debug = 0;
 
 template <typename Learner>
 void learn_online(const Learner& learner,
-		  const sentence_set_type& sentences,
+		  const data_type& data,
 		  const unigram_type& unigram,
 		  model_type& theta);
 void read_data(const path_type& input_file,
 	       const path_type& list_file,
-	       sentence_set_type& sentences,
+	       data_type& data,
 	       word_set_type& words);
 
 void options(int argc, char** argv);
@@ -1249,13 +1346,13 @@ int main(int argc, char** argv)
       if (list_file != "-" && ! boost::filesystem::exists(list_file))
 	throw std::runtime_error("no list file? " + list_file.string());
     
-    sentence_set_type sentences;
-    word_set_type     words;
+    data_type     data(order);
+    word_set_type words;
     
-    read_data(input_file, list_file, sentences, words);
+    read_data(input_file, list_file, data, words);
 
     if (debug)
-      std::cerr << "# of sentences: " << sentences.size() << std::endl
+      std::cerr << "# of ngrams: " << data.size() << std::endl
 		<< "vocabulary: " << (words.size() - 1) << std::endl;
     
     unigram_type unigram(words.begin(), words.end());
@@ -1264,9 +1361,9 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta);
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), data, unigram, theta);
       else
-	learn_online(LearnSGD(lambda, eta0), sentences, unigram, theta);
+	learn_online(LearnSGD(lambda, eta0), data, unigram, theta);
     }
     
     if (! output_model_file.empty())
@@ -1350,13 +1447,13 @@ struct TaskAccumulate
   };
   typedef Counter counter_type;
 
-  TaskAccumulate(const sentence_set_type& sentences,
+  TaskAccumulate(const data_type& data,
 		 const unigram_type& unigram,
 		 const size_type& samples,
 		 const model_type& theta,
 		 queue_type& queue,
 		 counter_type& counter)
-    : sentences_(sentences),
+    : data_(data),
       theta_(theta),
       queue_(queue),
       counter_(counter),
@@ -1371,28 +1468,25 @@ struct TaskAccumulate
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
     
-    size_type sentence_id;
+    size_type id;
     for (;;) {
-      queue_.pop(sentence_id);
+      queue_.pop(id);
       
-      if (sentence_id == size_type(-1)) break;
+      if (id == size_type(-1)) break;
       
-      const sentence_type& sentence = sentences_[sentence_id];
-      
-      if (! sentence.empty())
-	log_likelihood_ += ngram_.learn(sentence, theta_, gradient_, generator);
+      log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, gradient_, generator);
       
       counter_.increment();
     }
   }
-
+  
   void clear()
   {
     gradient_.clear();
     log_likelihood_ = log_likelihood_type();
   }
 
-  const sentence_set_type& sentences_;
+  const data_type&  data_;
   const model_type& theta_;
   
   queue_type&            queue_;
@@ -1432,7 +1526,7 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 
 template <typename Learner>
 void learn_online(const Learner& learner,
-		  const sentence_set_type& sentences,
+		  const data_type& data,
 		  const unigram_type& unigram,
 		  model_type& theta)
 {
@@ -1446,14 +1540,14 @@ void learn_online(const Learner& learner,
   task_type::queue_type   mapper(batch_size * threads);
   task_type::counter_type reducer;
   
-  task_set_type tasks(threads, task_type(sentences,
+  task_set_type tasks(threads, task_type(data,
 					 unigram,
 					 samples,
 					 theta,
 					 mapper,
 					 reducer));
   
-  id_set_type ids(sentences.size());
+  id_set_type ids(data.size());
   for (size_type i = 0; i != ids.size(); ++ i)
     ids[i] = i;
   
@@ -1526,7 +1620,17 @@ void learn_online(const Learner& learner,
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
     // shuffle bitexts!
-    std::random_shuffle(ids.begin(), ids.end());
+    {
+      id_set_type::iterator biter     = ids.begin();
+      id_set_type::iterator biter_end = ids.end();
+      
+      while (biter < biter_end) {
+	id_set_type::iterator iter_end = std::min(biter + 1024, biter_end);
+	
+	std::random_shuffle(biter, iter_end);
+	biter = iter_end;
+      }
+    }
   }
 
   // termination
@@ -1541,13 +1645,17 @@ void learn_online(const Learner& learner,
 
 struct Reader
 {
+  typedef cicada::Sentence sentence_type;
+
+  Reader(const int order)  : data_(order) {}
+
   void operator()(const sentence_type& sentence)
   {
     typedef cicada::Vocab vocab_type;
     
     if (sentence.empty()) return;
     
-    sentences_.push_back(sentence);
+    data_.insert(sentence);
     
     sentence_type::const_iterator siter_end = sentence.end();
     for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
@@ -1556,15 +1664,15 @@ struct Reader
     ++ words_[vocab_type::EOS];
   }
   
-  sentence_set_type sentences_;
-  word_set_type     words_;
+  data_type     data_;
+  word_set_type words_;
 };
 
 struct ReaderFile : public Reader
 {
   typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
   
-  ReaderFile(queue_type& queue) : queue_(queue) {}
+  ReaderFile(queue_type& queue, const int order) : Reader(order), queue_(queue) {}
   
   void operator()()
   {
@@ -1591,7 +1699,7 @@ struct ReaderLines : public Reader
   typedef std::vector<std::string, std::allocator<std::string> > line_set_type;
   typedef utils::lockfree_list_queue<line_set_type, std::allocator<line_set_type> > queue_type;
   
-  ReaderLines(queue_type& queue) : queue_(queue) {}
+  ReaderLines(queue_type& queue, const int order) : Reader(order), queue_(queue) {}
   
   void operator()() 
   {
@@ -1618,12 +1726,12 @@ struct ReaderLines : public Reader
 
 void read_data(const path_type& input_file,
 	       const path_type& list_file,
-	       sentence_set_type& sentences,
+	       data_type& data,
 	       word_set_type& words)
 {
   typedef cicada::Vocab vocab_type;
 
-  sentences.clear();
+  data.clear();
   words.clear();
   
   if (! input_file.empty()) {
@@ -1632,7 +1740,7 @@ void read_data(const path_type& input_file,
 
     ReaderLines::queue_type queue;
 
-    std::vector<ReaderLines> tasks(threads, ReaderLines(queue));
+    std::vector<ReaderLines> tasks(threads, ReaderLines(queue, order));
     
     boost::thread_group workers;
     for (size_t i = 0; i != tasks.size(); ++ i)
@@ -1665,14 +1773,8 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
-    size_t data_size = sentences.size();
-    for (size_t i = 0; i != tasks.size(); ++ i)
-      data_size += tasks[i].sentences_.size();
-    
-    sentences.reserve(data_size);
-
     for (size_t i = 0; i != tasks.size(); ++ i) {
-      sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
+      data += tasks[i].data_;
       
       word_set_type::const_iterator witer_end = tasks[i].words_.end();
       for (word_set_type::const_iterator witer = tasks[i].words_.begin(); witer != witer_end; ++ witer)
@@ -1686,7 +1788,7 @@ void read_data(const path_type& input_file,
     
     ReaderFile::queue_type queue;
     
-    std::vector<ReaderFile> tasks(threads, ReaderFile(queue));
+    std::vector<ReaderFile> tasks(threads, ReaderFile(queue, order));
     
     boost::thread_group workers;
     for (size_t i = 0; i != tasks.size(); ++ i)
@@ -1716,20 +1818,16 @@ void read_data(const path_type& input_file,
     workers.join_all();
     
     // join data...
-    size_t data_size = sentences.size();
-    for (size_t i = 0; i != tasks.size(); ++ i)
-      data_size += tasks[i].sentences_.size();
-    
-    sentences.reserve(data_size);
-    
     for (size_t i = 0; i != tasks.size(); ++ i) {
-      sentences.insert(sentences.end(), tasks[i].sentences_.begin(), tasks[i].sentences_.end());
+      data += tasks[i].data_;
       
       word_set_type::const_iterator witer_end = tasks[i].words_.end();
       for (word_set_type::const_iterator witer = tasks[i].words_.begin(); witer != witer_end; ++ witer)
 	words[witer->first] += witer->second;
     }
   }
+
+  data.shrink();
   
   if (cutoff > 1) {
     word_set_type words_new;
@@ -1746,15 +1844,14 @@ void read_data(const path_type& input_file,
     words_new.swap(words);
     words_new.clear();
     
-    // enumerate sentences and replace by UNK
-    
-    sentence_set_type::iterator siter_end = sentences.end();
-    for (sentence_set_type::iterator siter = sentences.begin(); siter != siter_end; ++ siter) {
-      sentence_type::iterator iter_end = siter->end();
-      for (sentence_type::iterator iter = siter->begin(); iter != iter_end; ++ iter)
-	if (words.find(*iter) == words.end())
-	  *iter = vocab_type::UNK;
-    }
+    // enumerate data and replace by UNK
+    data_type::iterator diter_end = data.end();
+    for (data_type::iterator diter = data.begin(); diter != diter_end; ++ diter)
+      if (*diter != vocab_type::BOS
+	  && *diter != vocab_type::EOS
+	  && *diter != vocab_type::EPSILON
+	  && words.find(*diter) == words.end())
+	*diter = vocab_type::UNK;
   }
 }
 
