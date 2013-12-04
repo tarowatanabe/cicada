@@ -1007,14 +1007,14 @@ struct LearnAdaGrad : public Learn
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_);
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
     
-    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, true)));
-    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, false)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_output_, counter_, true)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_input_,  counter_, false)));
   }
   
   ~LearnAdaGrad()
   {
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      queue_.push(update_type(0, 0));
+    queue_input_.push(update_type(0, 0));
+    queue_output_.push(update_type(0, 0));
     
     workers_.join_all();
   }
@@ -1026,8 +1026,8 @@ struct LearnAdaGrad : public Learn
     // parallelize here...
     const_cast<counter_type&>(counter_).clear();
     
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      const_cast<queue_type&>(queue_).push(update_type(&theta, &gradient));
+    const_cast<queue_type&>(queue_input_).push(update_type(&theta, &gradient));
+    const_cast<queue_type&>(queue_output_).push(update_type(&theta, &gradient));
     
 #if 0
     embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
@@ -1177,7 +1177,8 @@ struct LearnAdaGrad : public Learn
   tensor_type Wh_;
   tensor_type bh_;  
 
-  queue_type   queue_;
+  queue_type   queue_input_;
+  queue_type   queue_output_;
   counter_type counter_;
   boost::thread_group workers_;
 };
@@ -1252,14 +1253,14 @@ struct LearnSGD : public Learn
     if (eta0_ <= 0.0)
       throw std::runtime_error("invalid learning rate");
 
-    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, true)));
-    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, false)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_output_, counter_, true)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_input_,  counter_, false)));
   }
   
   ~LearnSGD()
   {
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      queue_.push(update_type(0, 0));
+    queue_input_.push(update_type(0, 0));
+    queue_output_.push(update_type(0, 0));
     
     workers_.join_all();
   }
@@ -1278,8 +1279,8 @@ struct LearnSGD : public Learn
     // parallelize here...
     const_cast<counter_type&>(counter_).clear();
     
-    for (size_type i = 0; i != workers_.size(); ++ i)
-      const_cast<queue_type&>(queue_).push(update_type(&theta, &gradient));
+    const_cast<queue_type&>(queue_input_).push(update_type(&theta, &gradient));
+    const_cast<queue_type&>(queue_output_).push(update_type(&theta, &gradient));
     
 #if 0
     embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
@@ -1349,7 +1350,8 @@ struct LearnSGD : public Learn
   
   size_type epoch_;
 
-  queue_type   queue_;
+  queue_type   queue_input_;
+  queue_type   queue_output_;
   counter_type counter_;
   boost::thread_group workers_;
 };
@@ -1646,7 +1648,7 @@ void learn_online(const Learner& learner,
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
-  task_type::queue_type   mapper(256 * threads);
+  task_type::queue_type   mapper(batch_size * threads);
   task_type::counter_type reducer;
   
   task_set_type tasks(threads, task_type(sentences,
