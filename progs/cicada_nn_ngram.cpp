@@ -801,12 +801,15 @@ struct NGram
     //gradient.Wc_ += delta_context_ * layer_input_.transpose();
     gradient.bc_.noalias() += delta_context_;
     
-    delta_input_.noalias() = theta.Wc_.transpose() * delta_context_;
+    //delta_input_.noalias() = theta.Wc_.transpose() * delta_context_;
     
     // finally, input embedding...
     Iterator iter = first;
-    for (int i = 0; i != order - 1; ++ i, ++ iter)
-      gradient.embedding_input(*iter) += delta_input_.block(dimension * i, 0, dimension, 1);
+    for (int i = 0; i != order - 1; ++ i, ++ iter) {
+      gradient.embedding_input(*iter) += theta.Wc_.block(0, i * dimension, hidden, dimension).transpose() * delta_context_;
+	
+      //gradient.embedding_input(*iter) += delta_input_.block(dimension * i, 0, dimension, 1);
+    }
 
     // increment
     ++ gradient.count_;
