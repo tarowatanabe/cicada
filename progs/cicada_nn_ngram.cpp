@@ -660,8 +660,6 @@ struct NGram
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
   
-  typedef std::vector<tensor_type*, std::allocator<tensor_type*> > gradient_embedding_type;
-
   NGram(const unigram_type& unigram,
 	const size_type samples)
     : unigram_(unigram), samples_(samples), log_samples_(std::log(double(samples))) {}
@@ -671,7 +669,6 @@ struct NGram
   double              log_samples_;
   
   tensor_type layer_input_;
-  tensor_type layer_input_back_;
   tensor_type layer_context_;
   tensor_type layer_hidden_;
 
@@ -679,9 +676,6 @@ struct NGram
   tensor_type delta_context_;
   tensor_type delta_hidden_;
 
-  gradient_embedding_type gradient_embedding_;
-  gradient_embedding_type gradient_embedding_back_;
-  
   struct hinge
   {
     // 50 for numerical stability...
@@ -709,120 +703,41 @@ struct NGram
 	       gradient_type& gradient,
 	       Gen& gen)
   {
-    const size_type dimension = theta.dimension_embedding_;
-    const size_type order     = theta.order_;
+    //const size_type dimension = theta.dimension_embedding_;
+    //const size_type order     = theta.order_;
     
-    gradient_embedding_.resize(order - 1);
-    
+#if 0
     if (! layer_input_.cols())
       layer_input_ = tensor_type::Zero(dimension * (order - 1), 1);
     
-    for (size_type i = 0; i != order - 1; ++ i, ++ first) {
-      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(first->id()) * theta.scale_;
-      gradient_embedding_[i] = &gradient.embedding_input(*first);
-    }
+    Iterator iter = first;
+    for (size_type i = 0; i != order - 1; ++ i, ++ iter)
+      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(iter->id()) * theta.scale_;
+#endif
     
-    return learn(*first, theta, gradient, gen);
+    return learn(first, last - 1, *(last - 1), theta, gradient, gen);
   }
   
-  template <typename Gen>
-  log_likelihood_type learn(const sentence_type& sentence,
-			    const model_type& theta,
-			    gradient_type& gradient,
-			    Gen& gen)
-  {
-    const size_type dimension = theta.dimension_embedding_;
-    const size_type order     = theta.order_;
-    
-    gradient_embedding_.resize(order - 1);
-    
-    if (! layer_input_.cols())
-      layer_input_ = tensor_type::Zero(dimension * (order - 1), 1);
-    
-    tensor_type& gradient_embedding_bos = gradient.embedding_input(vocab_type::BOS);
-    tensor_type& gradient_embedding_eps = gradient.embedding_input(vocab_type::EPSILON);
-
-    size_type eps_size = (order > 2 ? order - 2 : size_type(0));
-    
-    if (order > 2)
-      for (size_type i = 0; i < order - 2; ++ i) {
-	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
-	
-	gradient_embedding_[i] = &gradient_embedding_eps;
-      }
-
-    layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(vocab_type::BOS.id()) * theta.scale_;
-    gradient_embedding_[order - 2] = &gradient_embedding_bos;
-    
-    log_likelihood_type log_likelihood;
-    sentence_type::const_iterator siter_begin = sentence.begin();
-    sentence_type::const_iterator siter_end   = sentence.end();
-    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
-      log_likelihood += learn(*siter, theta, gradient, gen);
-      
-#if 1
-      // shift layer_input...
-      if (order > 2)
-	for (size_type i = 0; i < order - 2; ++ i)
-	  layer_input_.block(dimension * i, 0, dimension, 1) = layer_input_.block(dimension * (i + 1), 0, dimension, 1);
-      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id()) * theta.scale_;
-      
-      // shift context
-      std::copy(gradient_embedding_.begin() + 1, gradient_embedding_.end(), gradient_embedding_.begin());
-      gradient_embedding_.back() = &gradient.embedding_input(*siter);
-#endif
-      
-#if 0
-      layer_input_back_        = layer_input_;
-      gradient_embedding_back_ = gradient_embedding_;
-      
-      // compute lower-order ngram language model
-      for (size_type i = eps_size; i != order - 1; ++ i) {
-	layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
-	gradient_embedding_[i] = &gradient_embedding_eps;
-	
-	learn(*siter, theta, gradient, gen);
-      }
-      
-      // shift layer_input...
-      layer_input_.block(0, 0, dimension * (order - 2), 1) = layer_input_back_.block(dimension, 0, dimension * (order - 2), 1);
-      layer_input_.block(dimension * (order - 2), 0, dimension, 1) = theta.embedding_input_.col(siter->id()) * theta.scale_;
-      
-      // shift context
-      std::copy(gradient_embedding_back_.begin() + 1, gradient_embedding_back_.end(), gradient_embedding_.begin());
-      gradient_embedding_.back() = &gradient.embedding_input(*siter);      
-#endif
-      
-      
-      eps_size -= (eps_size > 0);
-    }
-    
-    // correct scoring
-    log_likelihood += learn(vocab_type::EOS, theta, gradient, gen);
-    
-#if 0
-    // compute lower-order ngram language model
-    for (size_type i = eps_size; i != order - 1; ++ i) {
-      layer_input_.block(dimension * i, 0, dimension, 1) = theta.embedding_input_.col(vocab_type::EPSILON.id()) * theta.scale_;
-      gradient_embedding_[i] = &gradient_embedding_eps;
-      
-      learn(vocab_type::EOS, theta, gradient, gen);
-    }
-#endif
-    
-    return log_likelihood;
-  }
-  
-  template <typename Gen>
-  double learn(const word_type& word,
+  template <typename Iterator, typename Gen>
+  double learn(Iterator first, Iterator last,
+	       const word_type& word,
 	       const model_type& theta,
 	       gradient_type& gradient,
 	       Gen& gen)
   {
     const size_type dimension = theta.dimension_embedding_;
+    const size_type hidden    = theta.dimension_hidden_;
     const size_type order     = theta.order_;
     
-    layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_).array().unaryExpr(hinge());
+    layer_context_ = theta.bc_;
+    {
+      Iterator iter = first;
+      for (size_type i = 0; i != order - 1; ++ i, ++ iter)
+	layer_context_ += theta.Wc_.block(0, i * dimension, hidden, dimension) * theta.embedding_input_.col(iter->id()) * theta.scale_;
+    }
+    layer_context_ = layer_context_.unaryExpr(hinge());
+    
+    //layer_context_           = (theta.Wc_ * layer_input_  + theta.bc_).array().unaryExpr(hinge());
     layer_hidden_            = (theta.Wh_ * layer_context_ + theta.bh_).array().unaryExpr(hinge());
     
     const double score = (theta.embedding_output_.col(word.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
@@ -849,7 +764,7 @@ struct NGram
     for (size_type k = 0; k != samples_; ++ k) {
       const word_type sampled = unigram_.draw(gen);
       
-      if (sampled == word) continue;
+      //if (sampled == word) continue;
       
       const double score = (theta.embedding_output_.col(sampled.id()).block(0, 0, dimension, 1).transpose() * layer_hidden_ * theta.scale_
 			    + theta.embedding_output_.col(sampled.id()).block(dimension, 0, 1, 1))(0, 0);
@@ -876,15 +791,22 @@ struct NGram
     gradient.bh_.noalias() += delta_hidden_;
     
     delta_context_ = (layer_context_.array().unaryExpr(dhinge()) * (theta.Wh_.transpose() * delta_hidden_).array());
+
+    {
+      Iterator iter = first;
+      for (size_type i = 0; i != order - 1; ++ i, ++ iter)
+	gradient.Wc_.block(0, i * dimension, hidden, dimension).noalias() += delta_context_ * theta.embedding_input_.col(iter->id()).transpose() * theta.scale_;
+    }
     
-    gradient.Wc_.noalias() += delta_context_ * layer_input_.transpose();
+    //gradient.Wc_ += delta_context_ * layer_input_.transpose();
     gradient.bc_.noalias() += delta_context_;
     
     delta_input_.noalias() = theta.Wc_.transpose() * delta_context_;
     
     // finally, input embedding...
-    for (int i = 0; i != order - 1; ++ i)
-      *gradient_embedding_[i] += delta_input_.block(dimension * i, 0, dimension, 1);
+    Iterator iter = first;
+    for (int i = 0; i != order - 1; ++ i, ++ iter)
+      gradient.embedding_input(*iter) += delta_input_.block(dimension * i, 0, dimension, 1);
 
     // increment
     ++ gradient.count_;
