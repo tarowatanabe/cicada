@@ -925,9 +925,8 @@ struct LearnAdaGrad : public Learn
     Updator(LearnAdaGrad& learner,
 	    queue_type& queue,
 	    counter_type& counter,
-	    size_type shard,
-	    size_type size)
-      : learner_(learner), queue_(queue), counter_(counter), shard_(shard), size_(size) {}
+	    bool output)
+      : learner_(learner), queue_(queue), counter_(counter), output_(output) {}
 
     void operator()()
     {
@@ -945,9 +944,9 @@ struct LearnAdaGrad : public Learn
 
 	const double scale = 1.0 / gradient.count_;
 	
-	embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
-	for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
-	  if (iiter->first.id() % size_ == shard_)
+	if (! output_) {
+	  embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
+	  for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
 	    learner_.update(iiter->first,
 			    theta.embedding_input_,
 			    learner_.embedding_input_,
@@ -956,9 +955,9 @@ struct LearnAdaGrad : public Learn
 			    learner_.lambda_ != 0.0,
 			    false);
 	
-	embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
-	for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
-	  if (oiter->first.id() % size_ == shard_)
+	} else {
+	  embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
+	  for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
 	    learner_.update(oiter->first,
 			    theta.embedding_output_,
 			    learner_.embedding_output_,
@@ -966,7 +965,8 @@ struct LearnAdaGrad : public Learn
 			    scale,
 			    learner_.lambda_ != 0.0,
 			    true);
-
+	}
+	
 	counter_.increment();
       }
     }
@@ -975,16 +975,14 @@ struct LearnAdaGrad : public Learn
     queue_type&   queue_;
     counter_type& counter_;
 
-    size_type shard_;
-    size_type size_;
+    bool output_;
   };
 
   LearnAdaGrad(const size_type& dimension_embedding,
 	       const size_type& dimension_hidden,
 	       const int order,
 	       const double& lambda,
-	       const double& eta0,
-	       const int threads)
+	       const double& eta0)
     : dimension_embedding_(dimension_embedding),
       dimension_hidden_(dimension_hidden),
       order_(order),
@@ -1009,8 +1007,8 @@ struct LearnAdaGrad : public Learn
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_);
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
     
-    for (int i = 0; i != threads; ++ i)
-      workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, i, threads)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, true)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, false)));
   }
   
   ~LearnAdaGrad()
@@ -1192,9 +1190,8 @@ struct LearnSGD : public Learn
     Updator(LearnSGD& learner,
 	    queue_type& queue,
 	    counter_type& counter,
-	    size_type shard,
-	    size_type size)
-      : learner_(learner), queue_(queue), counter_(counter), shard_(shard), size_(size) {}
+	    bool output)
+      : learner_(learner), queue_(queue), counter_(counter), output_(output) {}
 
     void operator()()
     {
@@ -1211,27 +1208,27 @@ struct LearnSGD : public Learn
 	typedef gradient_type::embedding_type embedding_type;
 	
 	const double scale = 1.0 / gradient.count_;
-	
-	embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
-	for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
-	  if (iiter->first.id() % size_ == shard_)
+
+	if (! output_) {
+	  embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
+	  for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
 	    learner_.update(iiter->first,
 			    theta.embedding_input_,
 			    iiter->second,
 			    scale,
 			    theta.scale_,
 			    false);
-	
-	embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
-	for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
-	  if (oiter->first.id() % size_ == shard_)
+	} else {
+	  embedding_type::const_iterator oiter_end = gradient.embedding_output_.end();
+	  for (embedding_type::const_iterator oiter = gradient.embedding_output_.begin(); oiter != oiter_end; ++ oiter)
 	    learner_.update(oiter->first,
 			    theta.embedding_output_,
 			    oiter->second,
 			    scale,
 			    theta.scale_,
 			    true);
-
+	}
+	
 	counter_.increment();
       }
     }
@@ -1239,14 +1236,12 @@ struct LearnSGD : public Learn
     LearnSGD&     learner_;
     queue_type&   queue_;
     counter_type& counter_;
-
-    size_type shard_;
-    size_type size_;
+    
+    bool output_;
   };
 
   LearnSGD(const double& lambda,
-	   const double& eta0,
-	   const int threads)
+	   const double& eta0)
     : lambda_(lambda),
       eta0_(eta0),
       epoch_(0)
@@ -1257,8 +1252,8 @@ struct LearnSGD : public Learn
     if (eta0_ <= 0.0)
       throw std::runtime_error("invalid learning rate");
 
-    for (int i = 0; i != threads; ++ i)
-      workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, i, threads)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, true)));
+    workers_.add_thread(new boost::thread(Updator(*this, queue_, counter_, false)));
   }
   
   ~LearnSGD()
@@ -1471,12 +1466,10 @@ int main(int argc, char** argv)
     model_type theta(dimension_embedding, dimension_hidden, order, unigram, generator);
     
     if (iteration > 0) {
-      const int threads_learn = utils::bithack::max(threads >> 1, 1);
-
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0, threads_learn), sentences, unigram, theta);
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), sentences, unigram, theta);
       else
-	learn_online(LearnSGD(lambda, eta0, threads_learn), sentences, unigram, theta);
+	learn_online(LearnSGD(lambda, eta0), sentences, unigram, theta);
     }
     
     if (! output_model_file.empty())
