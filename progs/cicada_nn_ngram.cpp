@@ -1217,7 +1217,9 @@ struct Data
     buffer_.push_back(vocab_type::EOS);
     data_.insert(data_.end(), buffer_.end() - order_, buffer_.end());
   }
-
+  
+  void reserve(size_type x) { data_.reserve(x * order_); }
+  
   void clear()
   {
     buffer_.clear();
@@ -1537,7 +1539,7 @@ void learn_online(const Learner& learner,
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
-  task_type::queue_type   mapper(batch_size * threads);
+  task_type::queue_type   mapper;
   task_type::counter_type reducer;
   
   task_set_type tasks(threads, task_type(data,
@@ -1625,7 +1627,7 @@ void learn_online(const Learner& learner,
       id_set_type::iterator biter_end = ids.end();
       
       while (biter < biter_end) {
-	id_set_type::iterator iter_end = std::min(biter + 1024, biter_end);
+	id_set_type::iterator iter_end = std::min(biter + (batch_size * 64), biter_end);
 	
 	std::random_shuffle(biter, iter_end);
 	biter = iter_end;
@@ -1771,6 +1773,11 @@ void read_data(const path_type& input_file,
       queue.push(ReaderLines::line_set_type());
     
     workers.join_all();
+
+    size_t data_size = 0;
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      data_size += tasks[i].data_.size();
+    data.reserve(data_size);
     
     // join data...
     for (size_t i = 0; i != tasks.size(); ++ i) {
@@ -1816,6 +1823,11 @@ void read_data(const path_type& input_file,
       queue.push(path_type());
     
     workers.join_all();
+    
+    size_t data_size = 0;
+    for (size_t i = 0; i != tasks.size(); ++ i)
+      data_size += tasks[i].data_.size();
+    data.reserve(data_size);
     
     // join data...
     for (size_t i = 0; i != tasks.size(); ++ i) {
