@@ -1745,7 +1745,7 @@ void read_data(const path_type& input_file,
     
     workers.join_all();
 
-    size_t data_size = 0;
+    size_t data_size = data.size();
     for (size_t i = 0; i != tasks.size(); ++ i)
       data_size += tasks[i].data_.size();
     data.reserve(data_size);
@@ -1795,7 +1795,7 @@ void read_data(const path_type& input_file,
     
     workers.join_all();
     
-    size_t data_size = 0;
+    size_t data_size = data.size();
     for (size_t i = 0; i != tasks.size(); ++ i)
       data_size += tasks[i].data_.size();
     data.reserve(data_size);
@@ -1809,8 +1809,6 @@ void read_data(const path_type& input_file,
 	words[witer->first] += witer->second;
     }
   }
-
-  data.shrink();
   
   if (cutoff > 1) {
     word_set_type words_new;
