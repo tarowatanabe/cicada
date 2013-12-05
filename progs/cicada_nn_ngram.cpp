@@ -1385,14 +1385,14 @@ struct TaskAccumulate
       ngram_(unigram, samples),
       log_likelihood_(),
       shard_(0),
-      batch_size_(batch_size) {}
+      batch_size_(batch_size)
+  {
+    generator_.seed(utils::random_seed());
+  }
   
   void operator()()
   {
     clear();
-    
-    boost::mt19937 generator;
-    generator.seed(utils::random_seed());
     
     const size_type shard_size = queues_.size();
     const size_type mini_batches_size = (batches_.size() + shard_size - 1) / shard_size;
@@ -1451,7 +1451,7 @@ struct TaskAccumulate
 	const size_type last  = utils::bithack::min(first + batch_size, data_.size());
 	
 	for (size_type id = first; id != last; ++ id)
-	  log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator);
+	  log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator_);
 	
 	if (shard_ == 0 && debug)
 	  ++ (*progress);
@@ -1517,6 +1517,8 @@ struct TaskAccumulate
 
   int shard_;
   size_type batch_size_;
+
+  boost::mt19937 generator_;
 };
 
 inline
