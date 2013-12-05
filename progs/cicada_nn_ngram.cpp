@@ -22,6 +22,7 @@
 #define PHOENIX_THREADSAFE
 
 #include <set>
+#include <deque>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -105,13 +106,15 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : dimension_embedding_(0), dimension_hidden_(0), order_(0) {}
+  Gradient() : dimension_embedding_(0), dimension_hidden_(0), order_(0), count_(0), shared_(0) {}
   Gradient(const size_type& dimension_embedding,
 	   const size_type& dimension_hidden,
 	   const int order) 
     : dimension_embedding_(dimension_embedding),
       dimension_hidden_(dimension_hidden),
-      order_(order)
+      order_(order),
+      count_(0),
+      shared_(0)
   { initialize(dimension_embedding, dimension_hidden, order); }
   
   Gradient& operator-=(const Gradient& x)
@@ -213,10 +216,10 @@ struct Gradient
     // matrix for hidden layer
     Wh_.setZero();
     bh_.setZero();
-
-    count_ = 0;
+    
+    count_  = 0;
+    shared_ = 0;
   }
-
   
   tensor_type& embedding_input(const word_type& word)
   {
@@ -235,7 +238,6 @@ struct Gradient
     
     return embedding;
   }
-
   
   void initialize(const size_type dimension_embedding, const size_type dimension_hidden, const int order)
   {
@@ -260,7 +262,20 @@ struct Gradient
     Wh_ = tensor_type::Zero(dimension_embedding_, dimension_hidden_);
     bh_ = tensor_type::Zero(dimension_embedding_, 1);
 
-    count_ = 0;
+    count_  = 0;
+    shared_ = 0;
+  }
+
+  void increment()
+  {
+    utils::atomicop::add_and_fetch(shared_, size_type(1));
+  }
+
+  size_type shared() const
+  {
+    const size_type ret = shared_;
+    utils::atomicop::memory_barrier();
+    return ret;
   }
   
   // dimension...
@@ -279,8 +294,10 @@ struct Gradient
   // Wh and bh for hidden layer
   tensor_type Wh_;
   tensor_type bh_;
-
+  
+  // other variables
   size_type count_;
+  size_type shared_;
 };
 
 struct Model
@@ -460,7 +477,7 @@ struct Model
     }
   };
   
-  boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+  
   
   void write(const path_type& path) const
   {
@@ -506,6 +523,8 @@ struct Model
 
     const tensor_type::Index rows = matrix.rows();
     const tensor_type::Index cols = matrix.cols();
+
+    boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
     
     utils::compress_ostream os_txt(path_text, 1024 * 1024);
     utils::compress_ostream os_bin(path_binary, 1024 * 1024);
@@ -1324,7 +1343,7 @@ int main(int argc, char** argv)
 // Basically, we split data into mini batch, and compute gradient only over the minibatch
 //
 
-
+template <typename Learner>
 struct TaskAccumulate
 {
   typedef size_t    size_type;
@@ -1341,89 +1360,153 @@ struct TaskAccumulate
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
   
-  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
+  typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
   
-  struct Counter
-  {
-    Counter() : counter(0) {}
+  typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_type;
+  typedef std::vector<queue_type*, std::allocator<queue_type*> > queue_set_type;
   
-    void increment()
-    {
-      utils::atomicop::fetch_and_add(counter, size_type(1));
-    }
+  typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
   
-    void wait(size_type target)
-    {
-      for (;;) {
-	for (int i = 0; i < 64; ++ i) {
-	  if (counter == target)
-	    return;
-	  else
-	    boost::thread::yield();
-	}
-      
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-    }
-
-    void clear() { counter = 0; }
-  
-    volatile size_type counter;
-  };
-  typedef Counter counter_type;
-
-  TaskAccumulate(const data_type& data,
+  TaskAccumulate(const Learner& learner,
+		 const data_type& data,
+		 const batch_set_type& batches,
 		 const unigram_type& unigram,
 		 const size_type& samples,
 		 const model_type& theta,
-		 queue_type& queue,
-		 counter_type& counter)
-    : data_(data),
+		 queue_set_type& queues,
+		 size_type batch_size)
+    : learner_(learner),
+      data_(data),
+      batches_(batches),
       theta_(theta),
-      queue_(queue),
-      counter_(counter),
+      queues_(queues),
       ngram_(unigram, samples),
-      gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.order_),
-      log_likelihood_() {}
-
+      log_likelihood_(),
+      shard_(0),
+      batch_size_(batch_size) {}
+  
   void operator()()
   {
     clear();
-
+    
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
     
-    size_type id;
-    for (;;) {
-      queue_.pop(id);
-      
-      if (id == size_type(-1)) break;
-      
-      log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, gradient_, generator);
-      
-      counter_.increment();
+    const size_type shard_size = queues_.size();
+    size_type batch = shard_;
+    
+    gradient_type* grad = 0;
+    
+    size_type merge_finished = 0;
+    bool learn_finished = batch >= batches_.size();
+    
+    if (learn_finished) {
+      for (size_type i = 0; i != shard_size; ++ i)
+	queues_[i]->push(0);
     }
+
+    int non_found_iter = 0;
+    
+    while (merge_finished != shard_size || ! learn_finished) {
+      bool found = false;
+      
+      if (merge_finished != shard_size)
+	while (queues_[shard_]->pop(grad, true)) {
+	  if (! grad)
+	    ++ merge_finished;
+	  else {
+	    learner_(theta_, *grad);
+	    grad->increment();
+	  }
+	  
+	  found = true;
+	}
+      
+      if (! learn_finished) {
+	gradient_type* grad = 0;
+	
+	for (size_type j = 0; j != gradients_.size(); ++ j)
+	  if (gradients_[j].shared() == shard_size) {
+	    grad = &gradients_[j];
+	    break;
+	  }
+	
+	if (! grad) {
+	  gradients_.push_back(gradient_type(theta_.dimension_embedding_, theta_.dimension_hidden_, theta_.order_));
+	  grad = &gradients_.back();
+	}
+	
+	grad->clear();
+	
+	// use of batch from batches_[batch] * batch_size and (batches_[batch] + 1) * batch_size
+
+	const size_type first = batches_[batch] * batch_size;
+	const size_type last  = utils::bithack::min(first + batch_size, data_.size());
+	
+	for (size_type id = first; id != last; ++ id)
+	  log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator);
+
+	learner_(theta_, *grad);
+	grad->increment();
+	
+	for (size_type i = 0; i != shard_size; ++ i)
+	  if (i != shard_)
+	    queues_[i]->push(grad);
+	
+	batch += shard_size;
+	learn_finished = batch >= batches_.size();
+	found = true;
+	
+	// send termination flag!
+	if (learn_finished) {
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    queues_[i]->push(0);
+	}
+      }
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+  }
+
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+    
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+      
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
   
   void clear()
   {
-    gradient_.clear();
+    //gradients_.clear();
     log_likelihood_ = log_likelihood_type();
   }
-
-  const data_type&  data_;
-  const model_type& theta_;
   
-  queue_type&            queue_;
-  counter_type&          counter_;
+  Learner               learner_;
+  const data_type&      data_;
+  const batch_set_type& batches_;
+  model_type            theta_;
+  queue_set_type&       queues_;
   
   ngram_type ngram_;
-
-  gradient_type       gradient_;
+  
+  gradient_set_type   gradients_;
   log_likelihood_type log_likelihood_;
+
+  int shard_;
+  size_type batch_size_;
 };
 
 inline
@@ -1458,87 +1541,58 @@ void learn_online(const Learner& learner,
 		  const unigram_type& unigram,
 		  model_type& theta)
 {
-  typedef TaskAccumulate task_type;
+  typedef TaskAccumulate<Learner> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-
-  typedef task_type::size_type size_type;
-
-  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
-  task_type::queue_type   mapper;
-  task_type::counter_type reducer;
+  typedef typename task_type::size_type           size_type;
+  typedef typename task_type::batch_set_type      batch_set_type;
+  typedef typename task_type::log_likelihood_type log_likelihood_type;
+
+  typedef typename task_type::queue_type     queue_type;
+  typedef typename task_type::queue_set_type queue_set_type;
+
+  const size_type batches_size = (data.size() + batch_size - 1) / batch_size;
+
+  batch_set_type batches(batches_size);
+  for (size_type batch = 0; batch != batches_size; ++ batch)
+    batches[batch] = batch;
   
-  task_set_type tasks(threads, task_type(data,
+  queue_set_type queues(threads);
+  for (int i = 0; i != threads; ++ i)
+    queues[i] = new queue_type();
+  
+  task_set_type tasks(threads, task_type(learner,
+					 data,
+					 batches,
 					 unigram,
 					 samples,
 					 theta,
-					 mapper,
-					 reducer));
+					 queues,
+					 batch_size));
   
-  id_set_type ids(data.size());
-  for (size_type i = 0; i != ids.size(); ++ i)
-    ids[i] = i;
-  
-  boost::thread_group workers;
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  // assign shard id
+  for (size_type shard = 0; shard != tasks.size(); ++ shard)
+    tasks[shard].shard_ = shard;
   
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
-
-    const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
-
-    id_set_type::const_iterator biter     = ids.begin();
-    id_set_type::const_iterator biter_end = ids.end();
-
-    task_type::log_likelihood_type log_likelihood;
-    size_type num_text = 0;
-
+    
     utils::resource start;
     
-    while (biter < biter_end) {
-      // clear gradients...
-      for (size_type i = 0; i != tasks.size(); ++ i)
-	tasks[i].clear();
-      
-      // clear reducer
-      reducer.clear();
-      
-      // map bitexts
-      id_set_type::const_iterator iter_end = std::min(biter + batch_size, biter_end);
-      for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter) {
-	mapper.push(*iter);
-	
-	++ num_text;
-	if (debug) {
-	  if (num_text % DEBUG_DOT == 0)
-	    std::cerr << '.';
-	  if (num_text % DEBUG_LINE == 0)
-	    std::cerr << '\n';
-	}
-      }
-      
-      // wait...
-      reducer.wait(iter_end - biter);
-      biter = iter_end;
-      
-      // merge gradients
-      log_likelihood += tasks.front().log_likelihood_;
-      for (size_type i = 1; i != tasks.size(); ++ i) {
-	tasks.front().gradient_ += tasks[i].gradient_;
-	log_likelihood += tasks[i].log_likelihood_;
-      }
-      
-      // update model parameters
-      learner(theta, tasks.front().gradient_);
-    }
-
+    boost::thread_group workers;
+    
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    workers.join_all();
+    
     utils::resource end;
     
-    if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
-      std::cerr << std::endl;
-
+    log_likelihood_type log_likelihood;
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      log_likelihood += tasks[i].log_likelihood_;
+    
     if (debug)
       std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl
 		<< "perplexity: " << std::exp(- static_cast<double>(log_likelihood)) << std::endl;
@@ -1547,28 +1601,19 @@ void learn_online(const Learner& learner,
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
-    // shuffle bitexts!
-    {
-      id_set_type::iterator biter     = ids.begin();
-      id_set_type::iterator biter_end = ids.end();
-      
-      while (biter < biter_end) {
-	id_set_type::iterator iter_end = std::min(biter + (batch_size << 8), biter_end);
-	
-	std::random_shuffle(biter, iter_end);
-	biter = iter_end;
-      }
-    }
+    // shuffle ngrams!
+    std::random_shuffle(batches.begin(), batches.end());
   }
-
-  // termination
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    mapper.push(size_type(-1));
-
-  workers.join_all();
-
+  
+  // copy model!
+  theta = tasks.front().theta_;
+  
   // finalize model...
   theta.finalize();
+
+  // clear queues!
+  for (int i = 0; i != threads; ++ i)
+    delete queues[i];
 }
 
 struct Reader
