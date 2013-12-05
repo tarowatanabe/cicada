@@ -38,13 +38,8 @@
 #include "cicada/vocab.hpp"
 #include "cicada/alignment.hpp"
 
-#include "utils/alloc_vector.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/indexed_set.hpp"
-#include "utils/bichart.hpp"
 #include "utils/bithack.hpp"
-#include "utils/compact_map.hpp"
-#include "utils/compact_set.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/mathop.hpp"
 #include "utils/unordered_map.hpp"
@@ -53,16 +48,12 @@
 #include "utils/random_seed.hpp"
 #include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/vector2.hpp"
-#include "utils/sampler.hpp"
 #include "utils/resource.hpp"
 
 #include "codec/lz4.hpp"
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
-#include <boost/math/special_functions/expm1.hpp>
-#include <boost/math/special_functions/log1p.hpp>
 #include <boost/progress.hpp>
 
 struct Average
@@ -1533,7 +1524,7 @@ struct TaskAccumulate
   typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
   
   typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_type;
-  typedef std::vector<queue_type*, std::allocator<queue_type*> > queue_set_type;
+  typedef std::vector<queue_type, std::allocator<queue_type> > queue_set_type;
   
   typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
   
@@ -1573,7 +1564,7 @@ struct TaskAccumulate
     
     if (learn_finished) {
       for (size_type i = 0; i != shard_size; ++ i)
-	queues_[i]->push(0);
+	queues_[i].push(0);
     }
 
     std::auto_ptr<boost::progress_display> progress(shard_ == 0 && debug
@@ -1586,7 +1577,7 @@ struct TaskAccumulate
       bool found = false;
       
       if (merge_finished != shard_size)
-	while (queues_[shard_]->pop(grad, true)) {
+	while (queues_[shard_].pop(grad, true)) {
 	  if (! grad)
 	    ++ merge_finished;
 	  else {
@@ -1629,7 +1620,7 @@ struct TaskAccumulate
 	
 	for (size_type i = 0; i != shard_size; ++ i)
 	  if (i != shard_)
-	    queues_[i]->push(grad);
+	    queues_[i].push(grad);
 	
 	batch += shard_size;
 	learn_finished = batch >= batches_.size();
@@ -1638,7 +1629,7 @@ struct TaskAccumulate
 	// send termination flag!
 	if (learn_finished) {
 	  for (size_type i = 0; i != shard_size; ++ i)
-	    queues_[i]->push(0);
+	    queues_[i].push(0);
 	}
       }
       
@@ -1741,8 +1732,6 @@ void learn_online(const Learner& learner,
     batches[batch] = batch;
   
   queue_set_type queues(threads);
-  for (int i = 0; i != threads; ++ i)
-    queues[i] = new queue_type();
   
   task_set_type tasks(threads, task_type(learner,
 					 data,
@@ -1805,10 +1794,6 @@ void learn_online(const Learner& learner,
 
   // finalize model...
   theta.finalize();
-  
-  // clear queues!
-  for (int i = 0; i != threads; ++ i)
-    delete queues[i];
 }
 
 struct Reader
