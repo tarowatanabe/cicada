@@ -23,6 +23,7 @@
 
 #include <set>
 #include <deque>
+#include <memory>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -60,6 +61,7 @@
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
+#include <boost/progress.hpp>
 
 struct Average
 {
@@ -1405,6 +1407,10 @@ struct TaskAccumulate
 	queues_[i]->push(0);
     }
 
+    std::auto_ptr<boost::progress_display> progress(shard_ == 0 && debug
+						    ? new boost::progress_display((batches_.size() + shard_size - 1) / shard_size, std::cerr, "", "", "")
+						    : 0);
+    
     int non_found_iter = 0;
     
     while (merge_finished != shard_size || ! learn_finished) {
@@ -1445,6 +1451,9 @@ struct TaskAccumulate
 	
 	for (size_type id = first; id != last; ++ id)
 	  log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator);
+	
+	if (shard_ == 0 && debug)
+	  ++ (*progress);
 
 	learner_(theta_, *grad);
 	grad->increment();
