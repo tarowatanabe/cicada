@@ -1228,7 +1228,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
-int batch_size = 128;
+int batch_size = 64;
 int samples = 100;
 int cutoff = 3;
 double lambda = 0;
