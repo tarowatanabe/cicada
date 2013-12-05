@@ -57,6 +57,8 @@
 #include "utils/sampler.hpp"
 #include "utils/resource.hpp"
 
+#include "codec/lz4.hpp"
+
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
@@ -279,7 +281,126 @@ struct Gradient
     utils::atomicop::memory_barrier();
     return ret;
   }
+
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  buffer_type buffer_;
   
+  void encode(std::string& encoded) const
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    buffer.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(codec::lz4_compressor());
+    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+    
+    os.write((char*) &dimension_embedding_, sizeof(size_type));
+    os.write((char*) &dimension_hidden_, sizeof(size_type));
+    os.write((char*) &order_, sizeof(size_type));
+    os.write((char*) &count_, sizeof(size_type));
+    
+    write(os, Wc_);
+    write(os, bc_);
+    write(os, Wh_);
+    write(os, bh_);
+    
+    write(os, embedding_input_,  false);
+    write(os, embedding_output_, true);
+    
+    encoded = std::string(buffer.begin(), buffer.end());
+  }
+
+  void decode(const std::string& encoded) 
+  {
+    clear();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
+    
+    is.read((char*) &dimension_embedding_, sizeof(size_type));
+    is.read((char*) &dimension_hidden_, sizeof(size_type));
+    is.read((char*) &order_, sizeof(size_type));
+    is.read((char*) &count_, sizeof(size_type));
+    
+    read(is, Wc_);
+    read(is, bc_);
+    read(is, Wh_);
+    read(is, bh_);
+    
+    read(is, embedding_input_,  false);
+    read(is, embedding_output_, true);
+
+    // checking...
+  }
+  
+  void write(std::ostream& os, const embedding_type& embedding, const bool bias_last) const
+  {
+    const size_type size = embedding.size();
+    
+    os.write((char*) &size, sizeof(size_type));
+    
+    embedding_type::const_iterator eiter_end = embedding.end();
+    for (embedding_type::const_iterator eiter = embedding.begin(); eiter != eiter_end; ++ eiter) {
+      const size_type word_size = eiter->first.size();
+      
+      os.write((char*) &word_size, sizeof(size_type));
+      os.write((char*) &(*eiter->first.begin()), word_size);
+      os.write((char*) eiter->second.data(), sizeof(tensor_type::Scalar) * eiter->second.rows());
+    }
+  }
+
+  void read(std::istream& is, embedding_type& embedding, const bool bias_last)
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    
+    embedding.clear();
+    
+    size_type size = 0;
+    
+    is.read((char*) &size, sizeof(size_type));
+    
+    for (size_type i = 0; i != size; ++ i) {
+      size_type word_size = 0;
+      is.read((char*) &word_size, sizeof(size_type));
+      
+      buffer.resize(word_size);
+      is.read((char*) &(*buffer.begin()), word_size);
+      
+      tensor_type& matrix = embedding[word_type(buffer.begin(), buffer.end())];
+      
+      matrix.resize(dimension_embedding_ + bias_last, 1);
+      
+      is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows());
+    }
+  }
+
+  void write(std::ostream& os, const tensor_type& matrix) const
+  {
+    const tensor_type::Index rows = matrix.rows();
+    const tensor_type::Index cols = matrix.cols();
+
+    os.write((char*) &rows, sizeof(tensor_type::Index));
+    os.write((char*) &cols, sizeof(tensor_type::Index));
+    
+    os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+
+  void read(std::istream& is, tensor_type& matrix)
+  {
+    tensor_type::Index rows = 0;
+    tensor_type::Index cols = 0;
+    
+    is.read((char*) &rows, sizeof(tensor_type::Index));
+    is.read((char*) &cols, sizeof(tensor_type::Index));
+    
+    matrix.resize(rows, cols);
+    
+    is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+  
+
   // dimension...
   size_type dimension_embedding_;
   size_type dimension_hidden_;
@@ -470,6 +591,16 @@ struct Model
       scale_ = 1.0;
     }
   }
+
+  void rescale()
+  {
+    if (scale_ == 1.0) return;
+    
+    embedding_input_.array() *= scale_;
+    embedding_output_.block(0, 0, dimension_embedding_, embedding_output_.cols()).array() *= scale_;
+    
+    scale_ = 1.0;
+  }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
   {
@@ -561,6 +692,37 @@ struct Model
       
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
+  }
+
+  Model& operator+=(const Model& x)
+  {
+    if (scale_ != x.scale_)
+      throw std::runtime_error("different scaling");
+
+    embedding_input_  += x.embedding_input_;
+    embedding_output_ += x.embedding_output_;
+    
+    Wc_ += x.Wc_;
+    bc_ += x.bc_;
+    
+    Wh_ += x.Wh_;
+    bh_ += x.bh_;
+
+    return *this;
+  }
+
+  Model& operator*=(const double& x)
+  {
+    embedding_input_  *= x;
+    embedding_output_ *= x;
+    
+    Wc_ *= x;
+    bc_ *= x;
+    
+    Wh_ *= x;
+    bh_ *= x;
+    
+    return *this;
   }
   
   // dimension...
@@ -1227,6 +1389,9 @@ int order = 5;
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
+bool mix_simple = false;
+bool mix_average = false;
+
 int iteration = 10;
 int batch_size = 64;
 int samples = 100;
@@ -1272,6 +1437,9 @@ int main(int argc, char** argv)
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
+
+    if (int(mix_simple) + mix_average > 1)
+      throw std::runtime_error("either one of mix-{simple,average}");
     
     threads = utils::bithack::max(threads, 1);
     
@@ -1476,8 +1644,11 @@ struct TaskAccumulate
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-  }
 
+    // rescale current model
+    theta_.rescale();
+  }
+  
   inline
   int loop_sleep(bool found, int non_found_iter)
   {
@@ -1608,21 +1779,33 @@ void learn_online(const Learner& learner,
     if (debug)
       std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl
 		<< "perplexity: " << std::exp(- static_cast<double>(log_likelihood)) << std::endl;
-
+    
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
     // shuffle ngrams!
     std::random_shuffle(batches.begin(), batches.end());
+    
+    if (mix_average) {
+      for (size_type i = 1; i != tasks.size(); ++ i)
+	tasks.front().theta_ += tasks[i].theta_;
+      
+      tasks.front().theta_ *= (1.0 / tasks.size());
+      
+      for (size_type i = 1; i != tasks.size(); ++ i)
+	tasks[i].theta_ = tasks.front().theta_;
+    } else if (mix_simple)
+      for (size_type i = 1; i != tasks.size(); ++ i)
+	tasks[i].theta_ = tasks.front().theta_;
   }
   
   // copy model!
   theta = tasks.front().theta_;
-  
+
   // finalize model...
   theta.finalize();
-
+  
   // clear queues!
   for (int i = 0; i != threads; ++ i)
     delete queues[i];
@@ -1865,6 +2048,9 @@ void options(int argc, char** argv)
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD fixed rate optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
+
+    ("mix-simple",  po::bool_switch(&mix_simple),  "mixing by selection")
+    ("mix-average", po::bool_switch(&mix_average), "mixing by averaging")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")

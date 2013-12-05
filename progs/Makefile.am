@@ -470,7 +470,7 @@ cicada_nn_hmm_joint_SOURCES = cicada_nn_hmm_joint.cpp
 cicada_nn_hmm_joint_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp
-cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_pyp_itg_learn_SOURCES = cicada_pyp_itg_learn.cpp 
 cicada_pyp_itg_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
