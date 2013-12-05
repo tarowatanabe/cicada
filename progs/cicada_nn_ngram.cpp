@@ -1395,6 +1395,7 @@ struct TaskAccumulate
     generator.seed(utils::random_seed());
     
     const size_type shard_size = queues_.size();
+    const size_type mini_batches_size = (batches_.size() + shard_size - 1) / shard_size;
     size_type batch = shard_;
     
     gradient_type* grad = 0;
@@ -1408,7 +1409,7 @@ struct TaskAccumulate
     }
 
     std::auto_ptr<boost::progress_display> progress(shard_ == 0 && debug
-						    ? new boost::progress_display((batches_.size() + shard_size - 1) / shard_size, std::cerr, "", "", "")
+						    ? new boost::progress_display(mini_batches_size, std::cerr, "", "", "")
 						    : 0);
     
     int non_found_iter = 0;
