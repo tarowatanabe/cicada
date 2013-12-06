@@ -286,6 +286,38 @@ struct Gradient
     os.push(codec::lz4_compressor());
     os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
     
+    write(os);
+    
+    encoded = std::string(buffer.begin(), buffer.end());
+  }
+
+  void decode(const std::string& encoded) 
+  {
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
+    
+    read(is);
+  }
+  
+  friend
+  std::ostream& operator<<(std::ostream& os, const Gradient& x)
+  {
+    x.write(os);
+    return os;
+  }
+
+  friend
+  std::istream& operator>>(std::istream& is, Gradient& x)
+  {
+    x.read(is);
+    return is;
+  }
+
+  
+private:
+  void write(std::ostream& os) const
+  {
     os.write((char*) &dimension_embedding_, sizeof(size_type));
     os.write((char*) &dimension_hidden_, sizeof(size_type));
     os.write((char*) &order_, sizeof(size_type));
@@ -298,17 +330,11 @@ struct Gradient
     
     write(os, embedding_input_,  false);
     write(os, embedding_output_, true);
-    
-    encoded = std::string(buffer.begin(), buffer.end());
   }
 
-  void decode(const std::string& encoded) 
+  void read(std::istream& is)
   {
     clear();
-    
-    boost::iostreams::filtering_istream is;
-    is.push(codec::lz4_decompressor());
-    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
     
     is.read((char*) &dimension_embedding_, sizeof(size_type));
     is.read((char*) &dimension_hidden_, sizeof(size_type));
@@ -325,7 +351,7 @@ struct Gradient
 
     // checking...
   }
-  
+
   void write(std::ostream& os, const embedding_type& embedding, const bool bias_last) const
   {
     const size_type size = embedding.size();
@@ -390,7 +416,7 @@ struct Gradient
     
     is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
   }
-  
+public:
 
   // dimension...
   size_type dimension_embedding_;
