@@ -1521,26 +1521,25 @@ struct TaskAccumulate
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
   
-  typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
-  
-  typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_type;
-  typedef std::vector<queue_type, std::allocator<queue_type> > queue_set_type;
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_mapper_type;
+  typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_merger_type;
+  typedef std::vector<queue_merger_type, std::allocator<queue_merger_type> > queue_merger_set_type;
   
   typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
   
   TaskAccumulate(const Learner& learner,
 		 const data_type& data,
-		 const batch_set_type& batches,
 		 const unigram_type& unigram,
 		 const size_type& samples,
 		 const model_type& theta,
-		 queue_set_type& queues,
+		 queue_mapper_type& mapper,
+		 queue_merger_set_type& mergers,
 		 size_type batch_size)
     : learner_(learner),
       data_(data),
-      batches_(batches),
       theta_(theta),
-      queues_(queues),
+      mapper_(mapper),
+      mergers_(mergers),
       ngram_(unigram, samples),
       log_likelihood_(),
       shard_(0),
@@ -1553,23 +1552,13 @@ struct TaskAccumulate
   {
     clear();
     
-    const size_type shard_size = queues_.size();
-    const size_type mini_batches_size = (batches_.size() + shard_size - 1) / shard_size;
-    size_type batch = shard_;
+    const size_type shard_size = mergers_.size();
     
+    size_type batch = 0;
     gradient_type* grad = 0;
     
     size_type merge_finished = 0;
-    bool learn_finished = batch >= batches_.size();
-    
-    if (learn_finished) {
-      for (size_type i = 0; i != shard_size; ++ i)
-	queues_[i].push(0);
-    }
-
-    std::auto_ptr<boost::progress_display> progress(shard_ == 0 && debug
-						    ? new boost::progress_display(mini_batches_size, std::cerr, "", "", "")
-						    : 0);
+    bool learn_finished = false;
     
     int non_found_iter = 0;
     
@@ -1577,7 +1566,7 @@ struct TaskAccumulate
       bool found = false;
       
       if (merge_finished != shard_size)
-	while (queues_[shard_].pop(grad, true)) {
+	while (mergers_[shard_].pop(grad, true)) {
 	  if (! grad)
 	    ++ merge_finished;
 	  else {
@@ -1588,54 +1577,52 @@ struct TaskAccumulate
 	  found = true;
 	}
       
-      if (! learn_finished) {
-	gradient_type* grad = 0;
+      if (! learn_finished && mapper_.pop(batch, true)) {
 	
-	for (size_type j = 0; j != gradients_.size(); ++ j)
-	  if (gradients_[j].shared() == shard_size) {
-	    grad = &gradients_[j];
-	    break;
-	  }
-	
-	if (! grad) {
-	  gradients_.push_back(gradient_type(theta_.dimension_embedding_, theta_.dimension_hidden_, theta_.order_));
-	  grad = &gradients_.back();
-	}
-	
-	grad->clear();
-	
-	// use of batch from batches_[batch] * batch_size and (batches_[batch] + 1) * batch_size
-
-	const size_type first = batches_[batch] * batch_size;
-	const size_type last  = utils::bithack::min(first + batch_size, data_.size());
-	
-	for (size_type id = first; id != last; ++ id)
-	  log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator_);
-	
-	if (shard_ == 0 && debug)
-	  ++ (*progress);
-
-	learner_(theta_, *grad);
-	grad->increment();
-	
-	for (size_type i = 0; i != shard_size; ++ i)
-	  if (i != shard_)
-	    queues_[i].push(grad);
-	
-	batch += shard_size;
-	learn_finished = batch >= batches_.size();
 	found = true;
 	
-	// send termination flag!
-	if (learn_finished) {
+	if (batch == size_type(-1)) {
+	  // send termination!
 	  for (size_type i = 0; i != shard_size; ++ i)
-	    queues_[i].push(0);
+	    mergers_[i].push(0);
+	  
+	  learn_finished = true;
+	} else {
+	  gradient_type* grad = 0;
+	  
+	  for (size_type j = 0; j != gradients_.size(); ++ j)
+	    if (gradients_[j].shared() == shard_size) {
+	      grad = &gradients_[j];
+	      break;
+	    }
+	  
+	  if (! grad) {
+	    gradients_.push_back(gradient_type(theta_.dimension_embedding_, theta_.dimension_hidden_, theta_.order_));
+	    grad = &gradients_.back();
+	  }
+	  
+	  grad->clear();
+	  
+	  // use of batch from batch * batch_size and (batch + 1) * batch_size
+	  
+	  const size_type first = batch * batch_size_;
+	  const size_type last  = utils::bithack::min(first + batch_size_, data_.size());
+	  
+	  for (size_type id = first; id != last; ++ id)
+	    log_likelihood_ += ngram_.learn(data_.begin(id), data_.end(id), theta_, *grad, generator_);
+	  
+	  learner_(theta_, *grad);
+	  grad->increment();
+	  
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    if (i != shard_)
+	      mergers_[i].push(grad);
 	}
       }
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-
+    
     // rescale current model
     theta_.rescale();
   }
@@ -1666,11 +1653,11 @@ struct TaskAccumulate
     log_likelihood_ = log_likelihood_type();
   }
   
-  Learner               learner_;
-  const data_type&      data_;
-  const batch_set_type& batches_;
-  model_type            theta_;
-  queue_set_type&       queues_;
+  Learner                learner_;
+  const data_type&       data_;
+  model_type             theta_;
+  queue_mapper_type&     mapper_;
+  queue_merger_set_type& mergers_;
   
   ngram_type ngram_;
   
@@ -1717,29 +1704,31 @@ void learn_online(const Learner& learner,
 {
   typedef TaskAccumulate<Learner> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-  
+
   typedef typename task_type::size_type           size_type;
-  typedef typename task_type::batch_set_type      batch_set_type;
   typedef typename task_type::log_likelihood_type log_likelihood_type;
 
-  typedef typename task_type::queue_type     queue_type;
-  typedef typename task_type::queue_set_type queue_set_type;
-
+  typedef typename task_type::queue_mapper_type     queue_mapper_type;
+  typedef typename task_type::queue_merger_set_type queue_merger_set_type;
+  
+  typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
+  
   const size_type batches_size = (data.size() + batch_size - 1) / batch_size;
-
+  
   batch_set_type batches(batches_size);
   for (size_type batch = 0; batch != batches_size; ++ batch)
     batches[batch] = batch;
   
-  queue_set_type queues(threads);
+  queue_mapper_type     mapper(threads * 256);
+  queue_merger_set_type mergers(threads);
   
   task_set_type tasks(threads, task_type(learner,
 					 data,
-					 batches,
 					 unigram,
 					 samples,
 					 theta,
-					 queues,
+					 mapper,
+					 mergers,
 					 batch_size));
   
   // assign shard id
@@ -1750,12 +1739,28 @@ void learn_online(const Learner& learner,
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
     
+    std::auto_ptr<boost::progress_display> progress(debug
+						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
+						    : 0);
+    
     utils::resource start;
     
     boost::thread_group workers;
     
     for (size_type i = 0; i != tasks.size(); ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+
+    typename batch_set_type::const_iterator biter_end = batches.end();
+    for (typename batch_set_type::const_iterator biter = batches.begin(); biter != biter_end; ++ biter) {
+      mapper.push(*biter);
+      
+      if (debug)
+	++ (*progress);
+    }
+
+    // termination
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      mapper.push(size_type(-1));
     
     workers.join_all();
     
