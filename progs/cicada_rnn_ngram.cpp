@@ -680,7 +680,6 @@ void read_data(const path_type& input_file,
     for (data_type::iterator diter = data.begin(); diter != diter_end; ++ diter)
       if (*diter != vocab_type::BOS
 	  && *diter != vocab_type::EOS
-	  && *diter != vocab_type::EPSILON
 	  && words.find(*diter) == words.end())
 	*diter = vocab_type::UNK;
   }

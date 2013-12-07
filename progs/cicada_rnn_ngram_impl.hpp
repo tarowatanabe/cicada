@@ -485,7 +485,6 @@ struct Model
     words_.clear();
     words_.push_back(vocab_type::BOS);
     words_.push_back(vocab_type::EOS);
-    words_.push_back(vocab_type::EPSILON);
     words_.push_back(vocab_type::UNK);
     
     for (size_type pos = 0; pos != unigram.words_.size(); ++ pos)
@@ -493,7 +492,6 @@ struct Model
 	uniques_[unigram.words_[pos].id()] = true;
 
 	if (unigram.words_[pos] != vocab_type::BOS
-	    && unigram.words_[pos] != vocab_type::EPSILON
 	    && unigram.words_[pos] != vocab_type::UNK)
 	  words_.push_back(unigram.words_[pos]);
       }
@@ -511,7 +509,6 @@ struct Model
     // clear unused entries
     embedding_input_.col(vocab_type::EOS.id())      = tensor_type::Zero(dimension_, 1);
     embedding_output_.col(vocab_type::BOS.id())     = tensor_type::Zero(dimension_ + 1, 1);
-    embedding_output_.col(vocab_type::EPSILON.id()) = tensor_type::Zero(dimension_ + 1, 1);
     
     const double factor = 1.0 / std::accumulate(uniques_.begin(), uniques_.end(), size_type(0));
     
