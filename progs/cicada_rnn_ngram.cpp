@@ -62,7 +62,7 @@ bool mix_simple = false;
 bool mix_average = false;
 
 int iteration = 10;
-int batch_size = 16;
+int batch_size = 8;
 int samples = 100;
 int cutoff = 3;
 double lambda = 0;
@@ -393,7 +393,7 @@ void learn_online(const Learner& learner,
   for (size_type batch = 0; batch != batches_size; ++ batch)
     batches[batch] = batch;
   
-  queue_mapper_type     mapper(threads * 256);
+  queue_mapper_type     mapper(threads);
   queue_merger_set_type mergers(threads);
   
   task_set_type tasks(threads, task_type(learner,

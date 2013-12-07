@@ -110,13 +110,13 @@ struct Gradient
     if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    if (! Wi_.rows())
-      Wi_ = tensor_type::Zero(x.Wi_.rows(), x.Wi_.cols());
+    if (! bi_.rows())
+      bi_ = tensor_type::Zero(x.bi_.rows(), x.bi_.cols());
         
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
 
-    Wi_ -= x.Wi_;
+    bi_ -= x.bi_;
 
     count_ -= x.count_;
     
@@ -150,14 +150,13 @@ struct Gradient
     if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    if (! Wi_.rows())
-      Wi_ = tensor_type::Zero(x.Wi_.rows(), x.Wi_.cols());
-    
+    if (! bi_.rows())
+      bi_ = tensor_type::Zero(x.bi_.rows(), x.bi_.cols());
 
     Wc_ += x.Wc_;
     bc_ += x.bc_;
 
-    Wi_ += x.Wi_;
+    bi_ += x.bi_;
 
     count_ += x.count_;
 
@@ -174,7 +173,7 @@ struct Gradient
     Wc_.setZero();
     bc_.setZero();
 
-    Wi_.setZero();
+    bi_.setZero();
     
     count_  = 0;
     shared_ = 0;
@@ -211,7 +210,7 @@ struct Gradient
     Wc_ = tensor_type::Zero(dimension_, dimension_ + dimension_);
     bc_ = tensor_type::Zero(dimension_, 1);
     
-    Wi_ = tensor_type::Zero(dimension_, 1);
+    bi_ = tensor_type::Zero(dimension_, 1);
     
     count_  = 0;
     shared_ = 0;
@@ -280,7 +279,7 @@ private:
     write(os, Wc_);
     write(os, bc_);
 
-    write(os, Wi_);
+    write(os, bi_);
     
     write(os, embedding_input_,  false);
     write(os, embedding_output_, true);
@@ -296,7 +295,7 @@ private:
     read(is, Wc_);
     read(is, bc_);
     
-    read(is, Wi_);
+    read(is, bi_);
 
     read(is, embedding_input_,  false);
     read(is, embedding_output_, true);
@@ -382,8 +381,8 @@ public:
   tensor_type Wc_;
   tensor_type bc_;
 
-  // Wi for initial context
-  tensor_type Wi_;
+  // bi for initial context
+  tensor_type bi_;
     
   // other variables
   size_type count_;
@@ -432,7 +431,7 @@ struct Model
     Wc_.setZero();
     bc_.setZero();
 
-    Wi_.setZero();
+    bi_.setZero();
     
     scale_ = 1.0;
   }
@@ -478,7 +477,7 @@ struct Model
     Wc_ = tensor_type::Zero(dimension_, dimension_ + dimension_).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Zero(dimension_, 1);
     
-    Wi_ = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi_ = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
     
     uniques_ = unique_set_type(vocabulary_size, false);
     
@@ -582,7 +581,7 @@ struct Model
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
 
-    write(rep.path("Wi.txt.gz"), rep.path("Wi.bin"), Wi_);
+    write(rep.path("bi.txt.gz"), rep.path("bi.bin"), bi_);
     
     // vocabulary...
     vocab_type vocab;
@@ -652,7 +651,7 @@ struct Model
     Wc_ += x.Wc_;
     bc_ += x.bc_;
 
-    Wi_ += x.Wi_;
+    bi_ += x.bi_;
     
     return *this;
   }
@@ -665,7 +664,7 @@ struct Model
     Wc_ *= x;
     bc_ *= x;
     
-    Wi_ *= x;
+    bi_ *= x;
     
     return *this;
   }
@@ -720,7 +719,7 @@ private:
     write(os, Wc_);
     write(os, bc_);
 
-    write(os, Wi_);
+    write(os, bi_);
     
     write(os, embedding_input_,  false);
     write(os, embedding_output_, true);
@@ -736,7 +735,7 @@ private:
     read(is, Wc_);
     read(is, bc_);
 
-    read(is, Wi_);
+    read(is, bi_);
     
     read(is, embedding_input_,  false);
     read(is, embedding_output_, true);
@@ -827,8 +826,8 @@ public:
   tensor_type Wc_;
   tensor_type bc_;
 
-  // Wi for initial context
-  tensor_type Wi_;
+  // bi for initial context
+  tensor_type bi_;
   
   // scale for embedding...
   double scale_;
@@ -982,12 +981,14 @@ struct NGram
     
     lattice_.resize(dimension, sentence_size + 1);
     
-    lattice_.col(0) = theta.Wi_.array().unaryExpr(hinge());
+    lattice_.col(0) = theta.bi_.array().unaryExpr(hinge());
 						  
     // iterator from first to last - 1
     word_type prev = vocab_type::BOS;
-    for (size_type i = 1; i != sentence_size; ++ i, ++ first) {
-      lattice_.col(i) = (theta.Wc_.block(0, 0, dimension, dimension) * theta.embedding_input_.col(prev.id())
+    for (size_type i = 1; i <= sentence_size; ++ i, ++ first) {
+      //std::cerr << "forward i: " << i << " prev: " << prev << " curr: " << *first << std::endl;
+
+      lattice_.col(i) = (theta.Wc_.block(0, 0, dimension, dimension) * theta.embedding_input_.col(prev.id()) * theta.scale_
 			 + theta.Wc_.block(0, dimension, dimension, dimension) * lattice_.col(i - 1)
 			 + theta.bc_).array().unaryExpr(hinge());
       
@@ -1011,6 +1012,8 @@ struct NGram
     for (size_type i = sentence_size; i != 0; -- i, -- last) {
       const word_type word(*(last - 1));
       const word_type prev(i == 1 ? vocab_type::BOS : *(last - 2));
+
+      //std::cerr << "backward i: " << i << " prev: " << prev << " curr: " << word << std::endl;
       
       // context-layer for classification is located at i
       
@@ -1024,6 +1027,8 @@ struct NGram
       const double logprob_noise = score_noise - z;
       
       const double loss = - 1.0 + std::exp(logprob);
+
+      //std::cerr << "word: " << word << " logprob: " << logprob << " loss: " << loss << std::endl;
       
       double log_likelihood_word = logprob;
       
@@ -1050,6 +1055,8 @@ struct NGram
 	const double z = utils::mathop::logsum(score, score_noise);
 	const double logprob = score - z;
 	const double logprob_noise = score_noise - z;
+
+	//std::cerr << "sampled: " << sampled << " logprob: " << logprob << " loss: " << loss << std::endl;
 	
 	log_likelihood_word += logprob_noise;
 	
@@ -1067,7 +1074,7 @@ struct NGram
       
       log_likelihood += log_likelihood_word;
       
-      gradient.Wc_.block(0, 0, dimension, dimension)         += delta_ * theta.embedding_input_.col(prev.id()).transpose();
+      gradient.Wc_.block(0, 0, dimension, dimension)         += delta_ * theta.embedding_input_.col(prev.id()).transpose() * theta.scale_;
       gradient.Wc_.block(0, dimension, dimension, dimension) += delta_ * lattice_.col(i - 1).transpose();
       gradient.bc_ += delta_;
       
@@ -1076,9 +1083,11 @@ struct NGram
       // propagate this...
       delta_ = (lattice_.col(i - 1).array().unaryExpr(dhinge())
 		* (theta.Wc_.block(0, dimension, dimension, dimension).transpose() * delta_).array()).eval();
+
+      ++ gradient.count_;
     }
 
-    gradient.Wi_ += delta_;
+    gradient.bi_ += delta_;
     
     return log_likelihood;
   }
@@ -1121,7 +1130,7 @@ struct LearnAdaGrad : public Learn
     Wc_ = tensor_type::Zero(dimension_, dimension_ + dimension_);
     bc_ = tensor_type::Zero(dimension_, 1);
     
-    Wi_ = tensor_type::Zero(dimension_, 1);
+    bi_ = tensor_type::Zero(dimension_, 1);
   }
   
   void operator()(model_type& theta, const gradient_type& gradient) const
@@ -1151,7 +1160,7 @@ struct LearnAdaGrad : public Learn
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, 1.0 / gradient.count_, false);
 
-    update(theta.Wi_, const_cast<tensor_type&>(Wi_), gradient.Wi_, 1.0 / gradient.count_, lambda_ != 0.0);
+    update(theta.bi_, const_cast<tensor_type&>(bi_), gradient.bi_, 1.0 / gradient.count_, lambda_ != 0.0);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -1264,8 +1273,8 @@ struct LearnAdaGrad : public Learn
   tensor_type Wc_;
   tensor_type bc_;
 
-// Wi for initial context
-  tensor_type Wi_;  
+// bi for initial context
+  tensor_type bi_;  
 };
 
 struct LearnSGD : public Learn
@@ -1315,7 +1324,7 @@ struct LearnSGD : public Learn
     update(theta.Wc_, gradient.Wc_, 1.0 / gradient.count_, lambda_ != 0.0);
     update(theta.bc_, gradient.bc_, 1.0 / gradient.count_, false);
     
-    update(theta.Wi_, gradient.Wi_, 1.0 / gradient.count_, lambda_ != 0.0);
+    update(theta.bi_, gradient.bi_, 1.0 / gradient.count_, lambda_ != 0.0);
   }
   
   template <typename Theta, typename Grad>
@@ -1376,7 +1385,7 @@ struct Data
   {
     data_.insert(data_.end(), x.data_.begin(), x.data_.end());
     
-    size_type pos = index_.back();
+    size_type pos = (index_.empty() ? size_type(0) : index_.back());
     index_type::const_iterator iiter_end = x.index_.end();
     for (index_type::const_iterator iiter = x.index_.begin(); iiter != iiter_end; ++ iiter)
       index_.push_back(pos + *iiter);
