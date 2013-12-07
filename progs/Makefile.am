@@ -118,6 +118,7 @@ bin_PROGRAMS = \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
+	cicada_rnn_ngram \
 	cicada_pyp_itg_learn \
 	cicada_pyp_ngram_learn \
 	cicada_pyp_ngram_learn \
@@ -471,6 +472,9 @@ cicada_nn_hmm_joint_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp cicada_nn_ngram_impl.hpp
 cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_rnn_ngram_SOURCES = cicada_rnn_ngram.cpp cicada_rnn_ngram_impl.hpp
+cicada_rnn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_pyp_itg_learn_SOURCES = cicada_pyp_itg_learn.cpp 
 cicada_pyp_itg_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
