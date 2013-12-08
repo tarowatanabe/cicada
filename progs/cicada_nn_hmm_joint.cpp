@@ -131,8 +131,8 @@ struct Gradient
     if (! bn_.rows())
       bn_ = tensor_type::Zero(x.bn_.rows(), x.bn_.cols());
 
-    if (! Wi_.rows())
-      Wi_ = tensor_type::Zero(x.Wi_.rows(), x.Wi_.cols());
+    if (! bi_.rows())
+      bi_ = tensor_type::Zero(x.bi_.rows(), x.bi_.cols());
 
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
@@ -146,7 +146,7 @@ struct Gradient
     Wn_ -= x.Wn_;
     bn_ -= x.bn_;
     
-    Wi_ -= x.Wi_;
+    bi_ -= x.bi_;
 
     count_ -= x.count_;
 
@@ -195,8 +195,8 @@ struct Gradient
     if (! bn_.rows())
       bn_ = tensor_type::Zero(x.bn_.rows(), x.bn_.cols()); 
 
-    if (! Wi_.rows())
-      Wi_ = tensor_type::Zero(x.Wi_.rows(), x.Wi_.cols());
+    if (! bi_.rows())
+      bi_ = tensor_type::Zero(x.bi_.rows(), x.bi_.cols());
 
     Wc_ += x.Wc_;
     bc_ += x.bc_;
@@ -210,7 +210,7 @@ struct Gradient
     Wn_ += x.Wn_;
     bn_ += x.bn_;
 
-    Wi_ += x.Wi_;
+    bi_ += x.bi_;
 
     count_ += x.count_;
     
@@ -235,7 +235,7 @@ struct Gradient
     Wn_.setZero();
     bn_.setZero();
     
-    Wi_.setZero();
+    bi_.setZero();
 
     count_ = 0;
   }
@@ -291,7 +291,7 @@ struct Gradient
     Wn_ = tensor_type::Zero(hidden_, state_size);
     bn_ = tensor_type::Zero(hidden_, 1);
     
-    Wi_ = tensor_type::Zero(hidden_, 1);
+    bi_ = tensor_type::Zero(hidden_, 1);
 
     count_ = 0;
   }
@@ -318,7 +318,7 @@ struct Gradient
   tensor_type Wn_;
   tensor_type bn_;
 
-  tensor_type Wi_;
+  tensor_type bi_;
 
   size_type count_;
 };
@@ -423,7 +423,7 @@ struct Model
     Wn_.setZero();
     bn_.setZero();
     
-    Wi_.setZero();
+    bi_.setZero();
 
     scale_ = 1.0;
   }
@@ -510,7 +510,7 @@ struct Model
     Wn_ = tensor_type::Zero(hidden_, state_size).array().unaryExpr(randomize<Gen>(gen, range_n));
     bn_ = tensor_type::Zero(hidden_, 1);
 
-    Wi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi_ = tensor_type::Zero(hidden_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
 
     scale_ = 1.0;
   }
@@ -661,7 +661,7 @@ struct Model
     write(rep.path("Wn.txt.gz"), rep.path("Wn.bin"), Wn_);
     write(rep.path("bn.txt.gz"), rep.path("bn.bin"), bn_);
     
-    write(rep.path("Wi.txt.gz"), rep.path("Wi.bin"), Wi_);
+    write(rep.path("bi.txt.gz"), rep.path("bi.bin"), bi_);
 
     // vocabulary...
     vocab_type vocab;
@@ -750,7 +750,7 @@ struct Model
   tensor_type Wn_;
   tensor_type bn_;
 
-  tensor_type Wi_;
+  tensor_type bi_;
 
   double scale_;
 };
@@ -1315,7 +1315,7 @@ struct HMM
     
     copy_embedding(source, target, theta, 0, 0, alpha_bos);
     
-    alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) =  theta.Wi_;
+    alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) = theta.bi_;
     
     heaps_[0].push_back(state_bos);
     heaps_viterbi_[0].push_back(state_bos);
@@ -1685,8 +1685,6 @@ struct HMM
 	      << "backward target: " << target << std::endl;
 #endif
 
-    ++ gradient.count_;
-
     const size_type source_size = source.size();
     const size_type target_size = target.size();
 
@@ -1700,6 +1698,8 @@ struct HMM
     double loss = 0.0;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
+      ++ gradient.count_;
+
       const state_set_type& states_next = states_[trg];
       state_set_type& states_prev = states_[trg - 1];
       
@@ -1848,7 +1848,7 @@ struct HMM
       gradient.target(word) += beta_bos.block(offset_target + theta.embedding_ * i, 0, theta.embedding_, 1);
     }
     
-    gradient.Wi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1);
+    gradient.bi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1) * (target_size + 1);
     
     return loss;
   }
@@ -1887,7 +1887,7 @@ struct HMM
 
     copy_embedding(source, target, theta, 0, 0, alpha_bos);
     
-    alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) =  theta.Wi_;
+    alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) = theta.bi_;
     
     heaps_[0].push_back(state_bos);
     
@@ -2063,7 +2063,7 @@ struct LearnAdaGrad
     Wn_ = tensor_type::Zero(hidden_, state_size);
     bn_ = tensor_type::Zero(hidden_, 1);
     
-    Wi_ = tensor_type::Zero(hidden_, 1);
+    bi_ = tensor_type::Zero(hidden_, 1);
   }
 
   
@@ -2105,7 +2105,7 @@ struct LearnAdaGrad
     update(theta.Wn_, const_cast<tensor_type&>(Wn_), gradient.Wn_, scale, lambda_ != 0.0);
     update(theta.bn_, const_cast<tensor_type&>(bn_), gradient.bn_, scale, false);
     
-    update(theta.Wi_, const_cast<tensor_type&>(Wi_), gradient.Wi_, scale, lambda_ != 0.0);
+    update(theta.bi_, const_cast<tensor_type&>(bi_), gradient.bi_, scale, lambda_ != 0.0);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -2235,7 +2235,7 @@ struct LearnAdaGrad
   tensor_type Wn_;
   tensor_type bn_;
 
-  tensor_type Wi_;
+  tensor_type bi_;
 };
 
 struct LearnSGD
@@ -2316,7 +2316,7 @@ struct LearnSGD
     update(theta.Wn_, gradient.Wn_, scale, lambda_ != 0.0);
     update(theta.bn_, gradient.bn_, scale, false);
     
-    update(theta.Wi_, gradient.Wi_, scale, lambda_ != 0.0);
+    update(theta.bi_, gradient.bi_, scale, lambda_ != 0.0);
   }
 
   template <typename Theta, typename Grad>
