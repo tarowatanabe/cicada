@@ -114,8 +114,10 @@ namespace cicada
     typedef utils::array_power2<cache_type, 16, std::allocator<cache_type> > cache_set_type;
     
   public:
-    NGramRNN() { clear(); }
-    NGramRNN(const path_type& path) { open(path); }
+    NGramRNN(const bool normalize=false)
+      : normalize_(normalize) { clear(); }
+    NGramRNN(const path_type& path, const bool normalize=false)
+      : normalize_(normalize) { open(path, normalize); }
     
   public:
    static NGramRNN& create(const path_type& path);
@@ -129,7 +131,7 @@ namespace cicada
     path_type path() const { return path_; }
     bool empty() const { return ! path_.empty(); }
     
-    void open(const path_type& path);
+    void open(const path_type& path, const bool normalize=false);
     void close() { clear(); }
 
     void populate()
@@ -253,9 +255,27 @@ namespace cicada
 	
 	curr = &context;
       }
-      
-      return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_, 1).transpose() * (*curr)
-	      + embedding_output_().col(*(last - 1)).block(dimension_, 0, 1, 1))(0, 0);
+
+      if (normalize_) {
+	double logsum = - std::numeric_limits<double>::infinity();
+	double logprob = 0.0;
+	
+	const word_type word = *(last - 1);
+	
+	for (id_type id = 0; id != embedding_size_; ++ id)
+	  if (id != id_bos_ && id != id_eps_) {
+	    const double lp = (embedding_output_().col(id).block(0, 0, dimension_, 1).transpose() * (*curr)
+			       + embedding_output_().col(id).block(dimension_, 0, 1, 1))(0, 0);
+	    
+	    logsum = utils::mathop::logsum(logsum, lp);
+	    if (id == word.id())
+	      logprob = lp;
+	  }
+	
+	return logprob - logsum;
+      } else
+	return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_, 1).transpose() * (*curr)
+		+ embedding_output_().col(*(last - 1)).block(dimension_, 0, 1, 1))(0, 0);
       
 #if 0
       const size_type offset_embedding = 0;
@@ -320,6 +340,8 @@ namespace cicada
     size_type embedding_size_;
     size_type dimension_;
     int       order_;
+
+    bool normalize_;
     
     // path to the directory...
     path_type path_;

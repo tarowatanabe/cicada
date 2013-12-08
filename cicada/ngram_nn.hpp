@@ -114,8 +114,10 @@ namespace cicada
     typedef utils::array_power2<cache_type, 16, std::allocator<cache_type> > cache_set_type;
     
   public:
-    NGramNN() { clear(); }
-    NGramNN(const path_type& path) { open(path); }
+    NGramNN(const bool normalize=false)
+      : normalize_(normalize) { clear(); }
+    NGramNN(const path_type& path, const bool normalize=false)
+      : normalize_(normalize) { open(path, normalize); }
     
   public:
    static NGramNN& create(const path_type& path);
@@ -130,7 +132,7 @@ namespace cicada
     path_type path() const { return path_; }
     bool empty() const { return ! path_.empty(); }
     
-    void open(const path_type& path);
+    void open(const path_type& path, const bool normalize=false);
     void close() { clear(); }
 
     void populate()
@@ -250,12 +252,36 @@ namespace cicada
 	for (/**/; first != last - 1; ++ first, ++ i)
 	  input.block(dimension_embedding_ * i, 0, dimension_embedding_, 1) = embedding_input_().col(*first);
       }
-      
-      return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_embedding_, 1).transpose()
-	      * (Wh_() * (Wc_() * input
-			  + bc_()).array().unaryExpr(hinge()).matrix()
-		 + bh_()).array().unaryExpr(hinge()).matrix()
-	      + embedding_output_().col(*(last - 1)).block(dimension_embedding_, 0, 1, 1))(0, 0);
+
+      if (normalize_) {
+	matrix_type hidden(reinterpret_cast<parameter_type*>(buffer) + dimension_embedding_ * (order_ - 1),
+			   dimension_embedding_,
+			   1);	
+	
+	hidden = (Wh_() * (Wc_() * input + bc_()).array().unaryExpr(hinge()).matrix() + bh_()).array().unaryExpr(hinge());
+
+	double logsum = - std::numeric_limits<double>::infinity();
+	double logprob = 0.0;
+	
+	const word_type word = *(last - 1);
+	
+	for (id_type id = 0; id != embedding_size_; ++ id)
+	  if (id != id_bos_ && id != id_eps_) {
+	    const double lp = (embedding_output_().col(id).block(0, 0, dimension_embedding_, 1).transpose() * hidden
+			       + embedding_output_().col(id).block(dimension_embedding_, 0, 1, 1))(0, 0);
+	    
+	    logsum = utils::mathop::logsum(logsum, lp);
+	    if (id == word.id())
+	      logprob = lp;
+	  }
+	
+	return logprob - logsum;
+      } else 
+	return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_embedding_, 1).transpose()
+		* (Wh_() * (Wc_() * input
+			    + bc_()).array().unaryExpr(hinge()).matrix()
+		   + bh_()).array().unaryExpr(hinge()).matrix()
+		+ embedding_output_().col(*(last - 1)).block(dimension_embedding_, 0, 1, 1))(0, 0);
     }
 
   private:
@@ -282,6 +308,8 @@ namespace cicada
     size_type dimension_embedding_;
     size_type dimension_hidden_;
     int       order_;
+
+    bool normalize_;
     
     // path to the directory...
     path_type path_;

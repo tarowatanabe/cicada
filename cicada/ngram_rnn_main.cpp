@@ -14,7 +14,7 @@ int main(int argc, char** argv)
     return 1;
   }
   
-  cicada::NGramRNN lm(argv[1]);
+  cicada::NGramRNN lm(argv[1], true);
   
   sentence_type sentence;
   sentence_type ngram(1, vocab_type::BOS);

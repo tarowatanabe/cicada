@@ -27,7 +27,7 @@ namespace cicada
     return boost::lexical_cast<Value>(iter->second);
   }
   
-  void NGramNN::open(const path_type& path)
+  void NGramNN::open(const path_type& path, const bool normalize)
   {
     typedef utils::repository repository_type;
 
@@ -41,6 +41,8 @@ namespace cicada
     dimension_embedding_ = repository_value<size_type>(rep, "embedding");
     dimension_hidden_    = repository_value<size_type>(rep, "hidden");
     order_               = repository_value<int>(rep, "order");
+
+    normalize_ = normalize;
     
     embedding_input_.open(rep.path("input.bin"), dimension_embedding_, embedding_size_);
     embedding_output_.open(rep.path("output.bin"), dimension_embedding_ + 1, embedding_size_);
@@ -58,7 +60,7 @@ namespace cicada
     id_eps_ = vocab_[vocab_type::EPSILON];
     id_unk_ = vocab_[vocab_type::UNK];
     
-    buffer_ = buffer_type(locks_.size(), dimension_embedding_ * (order_ - 1));
+    buffer_ = buffer_type(locks_.size(), dimension_embedding_ * (order_ - 1) + dimension_embedding_);
     
     for (size_type i = 0; i != cache_.size(); ++ i)
       cache_[i] = cache_type(order_);
