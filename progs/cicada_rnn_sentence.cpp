@@ -21,7 +21,7 @@
 #include <deque>
 #include <memory>
 
-#include "cicada_rnn_ngram_impl.hpp"
+#include "cicada_rnn_sentence_impl.hpp"
 
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
@@ -53,7 +53,7 @@ path_type list_file;
 path_type embedding_file;
 path_type output_model_file;
 
-int dimension = 256;
+int dimension = 64;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;

@@ -1,5 +1,5 @@
-#ifndef __CICADA_RNN_NGRAM_IMPL__HPP__
-#define __CICADA_RNN_NGRAM_IMPL__HPP__ 1
+#ifndef __CICADA_RNN_SENTENCE_IMPL__HPP__
+#define __CICADA_RNN_SENTENCE_IMPL__HPP__ 1
 
 #include <cstdlib>
 #include <cmath>
@@ -1079,12 +1079,13 @@ struct NGram
       
       // propagate this...
       delta_ = (lattice_.col(i - 1).array().unaryExpr(dhinge())
-		* (theta.Wc_.block(0, dimension, dimension, dimension).transpose() * delta_).array()).eval();
+		* (theta.Wc_.block(0, dimension, dimension, dimension).transpose() * delta_).array());
 
       ++ gradient.count_;
     }
 
-    gradient.bi_ += delta_;
+    // we will rescale this to avoid rescaling by # of words
+    gradient.bi_ += delta_ * sentence_size;
     
     return log_likelihood;
   }
