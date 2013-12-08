@@ -60,6 +60,27 @@ namespace cicada
     
     for (size_type i = 0; i != cache_.size(); ++ i)
       cache_[i] = cache_type(order_);
+
+    // initialize init_ buffers
+    
+    const size_type offset_embedding = 0;
+    const size_type offset_context   = dimension_;
+    
+    init_ = buffer_type(order_, dimension_);
+    
+    for (size_type n = 0; n != order_; ++ n) {
+      matrix_type context(&(*init_.begin(n)), dimension_, 1);
+      
+      context = bi_().array().unaryExpr(hinge());
+      
+      for (size_type i = 0; i != n; ++ i) {
+	const size_type shift = i * 2 * dimension_;
+	
+	context = (Wc_().block(0, shift + offset_embedding, dimension_, dimension_) * embedding_input_().col(id_eps_)
+		   + Wc_().block(0, shift + offset_context, dimension_, dimension_) * context
+		   + bc_().block(0, i, dimension_, 1)).array().unaryExpr(hinge());
+      }
+    }
   }
   
   typedef utils::unordered_map<std::string, NGramRNN, boost::hash<utils::piece>, std::equal_to<std::string>,

@@ -169,6 +169,7 @@ namespace cicada
       path_ = path_type();
 
       buffer_.clear();
+      init_.clear();
       cache_.clear();
     }
 
@@ -234,6 +235,31 @@ namespace cicada
     {
       const size_type offset_embedding = 0;
       const size_type offset_context   = dimension_;
+      
+      const size_type fill_size = order_ - std::distance(first, last);
+      
+      const matrix_type init(const_cast<parameter_type*>(&(*init_.begin(fill_size))), dimension_, 1);
+      matrix_type context(reinterpret_cast<parameter_type*>(buffer), dimension_, 1);
+      
+      const matrix_type* curr = &init;
+      
+      size_type i = fill_size;
+      for (/**/; first != last - 1; ++ first, ++ i) {
+	const size_type shift = i * 2 * dimension_;
+	
+	context = (Wc_().block(0, shift + offset_embedding, dimension_, dimension_) * embedding_input_().col(*first)
+		   + Wc_().block(0, shift + offset_context, dimension_, dimension_) * (*curr)
+		   + bc_().block(0, i, dimension_, 1)).array().unaryExpr(hinge());
+	
+	curr = &context;
+      }
+      
+      return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_, 1).transpose() * (*curr)
+	      + embedding_output_().col(*(last - 1)).block(dimension_, 0, 1, 1))(0, 0);
+      
+#if 0
+      const size_type offset_embedding = 0;
+      const size_type offset_context   = dimension_;
     
       matrix_type context(reinterpret_cast<parameter_type*>(buffer), dimension_, 1);
       
@@ -269,6 +295,7 @@ namespace cicada
       
       return (embedding_output_().col(*(last - 1)).block(0, 0, dimension_, 1).transpose() * context
 	      + embedding_output_().col(*(last - 1)).block(dimension_, 0, 1, 1))(0, 0);
+#endif
     }
 
   private:
@@ -298,6 +325,7 @@ namespace cicada
     path_type path_;
     
     buffer_type       buffer_;
+    buffer_type       init_;
     cache_set_type    cache_;
     spinlock_set_type locks_;
   };
