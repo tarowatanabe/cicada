@@ -38,7 +38,7 @@ int main(int argc, char** argv)
       const double prob = lm.prob(std::max(ngram.begin(), ngram.end() - lm.order()), ngram.end());
       const double lp = std::log(prob);
       
-      std::cerr << "word logprob:" << lp << " oov: " << is_oov << std::endl;
+      std::cerr << "word logprob: " << lp << " oov: " << is_oov << std::endl;
       
       if (! is_oov)
 	logprob_total += lp;

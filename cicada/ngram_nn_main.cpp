@@ -37,7 +37,7 @@ int main(int argc, char** argv)
       const bool is_oov = ! lm.vocab().exists(*siter);
       const double lp = lm(std::max(ngram.begin(), ngram.end() - lm.order()), ngram.end());
       
-      std::cerr << "word logprob:" << lp << " oov: " << is_oov << std::endl;
+      std::cerr << "word logprob: " << lp << " oov: " << is_oov << std::endl;
       
       if (! is_oov)
 	logprob_total += lp;
