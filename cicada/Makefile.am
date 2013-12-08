@@ -154,8 +154,9 @@ feature/lexicalized_reordering.hpp \
 feature/lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
-feature/ngram_pyp.hpp \
 feature/ngram_nn.hpp \
+feature/ngram_pyp.hpp \
+feature/ngram_rnn.hpp \
 feature/ngram_tree.hpp \
 feature/parent.hpp \
 feature/penalty.hpp \
@@ -192,8 +193,9 @@ feature/lexicalized_reordering.cpp \
 feature/lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
-feature/ngram_pyp.cpp \
 feature/ngram_nn.cpp \
+feature/ngram_pyp.cpp \
+feature/ngram_rnn.cpp \
 feature/ngram_tree.cpp \
 feature/parent.cpp \
 feature/penalty.cpp \
@@ -508,6 +510,7 @@ ngram_state_chart.hpp \
 ngram_count_set.hpp \
 ngram_nn.hpp \
 ngram_pyp.hpp \
+ngram_rnn.hpp \
 operation.hpp \
 operation_set.hpp \
 optimize.hpp \
@@ -611,6 +614,7 @@ ngram_count_set.cpp \
 ngram_index.cpp \
 ngram_nn.cpp \
 ngram_pyp.cpp \
+ngram_rnn.cpp \
 operation.cpp \
 operation_set.cpp \
 parameter.cpp \
@@ -678,6 +682,7 @@ matcher_main \
 ngram_count_set_main \
 ngram_nn_main \
 ngram_pyp_main \
+ngram_rnn_main \
 optimize_qp_main \
 parameter_main \
 rule_main \
@@ -757,6 +762,9 @@ ngram_nn_main_LDADD = libcicada.la
 
 ngram_pyp_main_SOURCES = ngram_pyp_main.cpp
 ngram_pyp_main_LDADD = libcicada.la
+
+ngram_rnn_main_SOURCES = ngram_rnn_main.cpp
+ngram_rnn_main_LDADD = libcicada.la
 
 optimize_qp_main_SOURCES = optimize_qp_main.cpp
 optimize_qp_main_LDADD = libcicada.la
