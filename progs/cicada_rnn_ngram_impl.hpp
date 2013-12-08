@@ -488,7 +488,7 @@ struct Model
     Wc_ = tensor_type::Zero(dimension_, dimension_ * 2 * (order - 1)).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Zero(dimension_, 2 * (order - 1));
     
-    bi_ = tensor_type::Zero(dimension_, 1);
+    bi_ = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
 
     uniques_ = unique_set_type(vocabulary_size, false);
     
