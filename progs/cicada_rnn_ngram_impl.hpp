@@ -212,7 +212,7 @@ struct Gradient
     
     // initialize...
     Wc_ = tensor_type::Zero(dimension_, dimension_ * 2 * (order - 1));
-    bc_ = tensor_type::Zero(dimension_, 2 * (order - 1)).array();
+    bc_ = tensor_type::Zero(dimension_, order - 1).array();
     
     bi_ = tensor_type::Zero(dimension_, 1);
 
@@ -486,7 +486,7 @@ struct Model
     embedding_output_.row(dimension_).setZero();
     
     Wc_ = tensor_type::Zero(dimension_, dimension_ * 2 * (order - 1)).array().unaryExpr(randomize<Gen>(gen, range_c));
-    bc_ = tensor_type::Zero(dimension_, 2 * (order - 1));
+    bc_ = tensor_type::Zero(dimension_, order - 1);
     
     bi_ = tensor_type::Zero(dimension_, 1).array().unaryExpr(randomize<Gen>(gen, range_i));
 
@@ -1008,7 +1008,7 @@ struct NGram
 			  * theta.scale_)
 			 + (theta.Wc_.block(0, shift + offset_context, dimension, dimension)
 			    * lattice_.col(i - 1))
-			 + theta.bc_.block(0, (i - 1) * 2, dimension, 1)).array().unaryExpr(hinge());
+			 + theta.bc_.block(0, i - 1, dimension, 1)).array().unaryExpr(hinge());
     }
   }
 
@@ -1084,7 +1084,7 @@ struct NGram
 	+= delta_ * theta.embedding_input_.col(prev.id()).transpose() * theta.scale_;
       gradient.Wc_.block(0, shift + offset_context, dimension, dimension)
 	+= delta_ * lattice_.col(i - 1).transpose();
-      gradient.bc_.block(0, (i - 1) * 2, dimension, 1)
+      gradient.bc_.block(0, i - 1, dimension, 1)
 	+= delta_;
       
       gradient.embedding_input(prev)
@@ -1140,7 +1140,7 @@ struct LearnAdaGrad : public Learn
     
     // initialize...
     Wc_ = tensor_type::Zero(dimension_, dimension_ * 2 * (order - 1));
-    bc_ = tensor_type::Zero(dimension_, 2 * (order - 1)).array();
+    bc_ = tensor_type::Zero(dimension_, order - 1).array();
     
     bi_ = tensor_type::Zero(dimension_, 1);
   }

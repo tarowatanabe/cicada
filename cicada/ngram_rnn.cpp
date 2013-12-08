@@ -45,7 +45,7 @@ namespace cicada
     embedding_output_.open(rep.path("output.bin"), dimension_ + 1, embedding_size_);
     
     Wc_.open(rep.path("Wc.bin"), dimension_, dimension_ * 2 * (order_ - 1));
-    bc_.open(rep.path("bc.bin"), dimension_, 2 * (order_ - 1));
+    bc_.open(rep.path("bc.bin"), dimension_, order_ - 1);
     
     bi_.open(rep.path("bi.bin"), dimension_, 1);
     

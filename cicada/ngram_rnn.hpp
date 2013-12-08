@@ -246,7 +246,7 @@ namespace cicada
 	  
 	  context = (Wc_().block(0, shift + offset_embedding, dimension_, dimension_) * embedding_input_().col(id_eps_)
 		     + Wc_().block(0, shift + offset_context, dimension_, dimension_) * context
-		     + bc_().block(0, i * 2, dimension_, 1)).array().unaryExpr(hinge());
+		     + bc_().block(0, i, dimension_, 1)).array().unaryExpr(hinge());
 	}
 	
 	for (/**/; first != last - 1; ++ first, ++ i) {
@@ -254,7 +254,7 @@ namespace cicada
 	  
 	  context = (Wc_().block(0, shift + offset_embedding, dimension_, dimension_) * embedding_input_().col(*first)
 		     + Wc_().block(0, shift + offset_context, dimension_, dimension_) * context
-		     + bc_().block(0, i * 2, dimension_, 1)).array().unaryExpr(hinge());
+		     + bc_().block(0, i, dimension_, 1)).array().unaryExpr(hinge());
 	}
       } else {
 	size_type i = 0;
@@ -263,7 +263,7 @@ namespace cicada
 	  
 	  context = (Wc_().block(0, shift + offset_embedding, dimension_, dimension_) * embedding_input_().col(*first)
 		     + Wc_().block(0, shift + offset_context, dimension_, dimension_) * context
-		     + bc_().block(0, i * 2, dimension_, 1)).array().unaryExpr(hinge());
+		     + bc_().block(0, i, dimension_, 1)).array().unaryExpr(hinge());
 	}
       }
       
