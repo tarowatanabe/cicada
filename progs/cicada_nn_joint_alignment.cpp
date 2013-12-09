@@ -1102,7 +1102,7 @@ struct Lexicon
 	
 	copy_embedding(source, target, src, trg, theta, embedding);
 	
-	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(htanh());
+	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
 	
 	const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
 	const double noise = log_samples_ + dict_.logprob(word_source, word_target);
@@ -1142,7 +1142,7 @@ struct Lexicon
 	gradient.Wc_.array() += (loss_partitioned * hidden.transpose()).array();
 	gradient.bc_.array() += loss_partitioned;
 	
-	delta = (hidden.array().unaryExpr(dhtanh()) * (theta.Wc_.transpose() * loss_partitioned).array());
+	delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_partitioned).array());
 	
 	gradient.Wt_ += delta * embedding.transpose();
 	gradient.bt_ += delta;
@@ -1174,7 +1174,7 @@ struct Lexicon
 	  embedding.block(offset_target + embedding_size * window_size, 0, embedding_size, 1)
 	    = theta.target_.col(sampled_target.id()) * theta.scale_;
 	  
-	  hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(htanh());
+	  hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
 	  const double noise = log_samples_ + dict_.logprob(word_source, sampled_target);
@@ -1206,7 +1206,7 @@ struct Lexicon
 	  gradient.Wc_.array() += (loss_partitioned * hidden.transpose()).array();
 	  gradient.bc_.array() += loss_partitioned;
 	  
-	  delta = (hidden.array().unaryExpr(dhtanh()) * (theta.Wc_.transpose() * loss_partitioned).array());
+	  delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_partitioned).array());
 	  
 	  gradient.Wt_ += delta * embedding.transpose();
 	  gradient.bt_ += delta;
@@ -1260,7 +1260,7 @@ struct Lexicon
 	
 	copy_embedding(source, target, src, trg, theta, embedding);
 	
-	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(htanh());
+	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
 	
 	const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
 	
@@ -1639,7 +1639,7 @@ path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 
 int dimension_embedding = 64;
-int dimension_hidden = 256;
+int dimension_hidden = 128;
 int window = 0;
 
 bool optimize_sgd = false;

@@ -919,7 +919,7 @@ struct Lexicon
       
       copy_embedding(source, src, theta, embedding);
       
-      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(htanh());
+      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
     }
     
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
@@ -984,7 +984,7 @@ struct Lexicon
 	dembedding.block(0, 0, embedding_size, 1).array() += loss_partitioned * hidden.array();
 	dembedding.block(embedding_size, 0, 1, 1).array() += loss_partitioned;
 	
-	delta = (hidden.array().unaryExpr(dhtanh())
+	delta = (hidden.array().unaryExpr(dhinge())
 		 * (theta.target_.col(word_target.id()).block(0, 0, embedding_size, 1)
 		    * loss_partitioned
 		    * theta.scale_).array());
@@ -1044,7 +1044,7 @@ struct Lexicon
 	  dembedding.block(0, 0, embedding_size, 1).array() += loss_partitioned * hidden.array();
 	  dembedding.block(embedding_size, 0, 1, 1).array() += loss_partitioned;
 	  
-	  delta.array() += (hidden.array().unaryExpr(dhtanh())
+	  delta.array() += (hidden.array().unaryExpr(dhinge())
 			    * (theta.target_.col(word_target.id()).block(0, 0, embedding_size, 1)
 			       * loss_partitioned
 			       * theta.scale_).array());
@@ -1100,7 +1100,7 @@ struct Lexicon
       
       copy_embedding(source, src, theta, embedding);
       
-      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(htanh());
+      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
     }
     
     // enumerate target side
