@@ -1848,7 +1848,7 @@ struct HMM
       gradient.target(word) += beta_bos.block(offset_target + theta.embedding_ * i, 0, theta.embedding_, 1);
     }
     
-    gradient.bi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1) * (target_size + 1);
+    gradient.bi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1);
     
     return loss;
   }

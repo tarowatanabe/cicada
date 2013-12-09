@@ -111,13 +111,14 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	cicada_mert_kbest \
 	cicada_mert_kbest_mpi \
-	cicada_nn_hmm \
-	cicada_nn_hmm_joint \
+	cicada_nn_alignment \
 	cicada_nn_ngram \
 	cicada_oracle \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
+	cicada_rnn_alignment \
+	cicada_rnn_joint_alignment \
 	cicada_rnn_ngram \
 	cicada_rnn_sentence \
 	cicada_pyp_itg_learn \
@@ -465,14 +466,17 @@ cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp cicada_maxlike_impl.hpp cic
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLBFGS) $(LIBCG_DESCENT)
 
-cicada_nn_hmm_SOURCES = cicada_nn_hmm.cpp
-cicada_nn_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_nn_hmm_joint_SOURCES = cicada_nn_hmm_joint.cpp
-cicada_nn_hmm_joint_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_nn_alignment_SOURCES = cicada_nn_alignment.cpp
+cicada_nn_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp cicada_nn_ngram_impl.hpp
 cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_rnn_alignment_SOURCES = cicada_rnn_alignment.cpp
+cicada_rnn_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_rnn_joint_alignment_SOURCES = cicada_rnn_joint_alignment.cpp
+cicada_rnn_joint_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_rnn_ngram_SOURCES = cicada_rnn_ngram.cpp cicada_rnn_ngram_impl.hpp
 cicada_rnn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
