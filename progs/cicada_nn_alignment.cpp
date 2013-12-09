@@ -514,7 +514,7 @@ struct Model
     repository_type rep(path, repository_type::write);
     
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
-    rep["window"]    = utils::lexical_cast<std::string>(window_);    
+    rep["window"]    = utils::lexical_cast<std::string>(window_);
     
     write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_, words_source_);
     write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_, words_target_);
@@ -1525,8 +1525,8 @@ int main(int argc, char** argv)
 
     if (dimension <= 0)
       throw std::runtime_error("dimension must be positive");
-    if (window <= 1)
-      throw std::runtime_error("order size should be positive");
+    if (window < 0)
+      throw std::runtime_error("window size should be positive");
 
     if (batch_size <= 0)
       throw std::runtime_error("invalid batch size");
