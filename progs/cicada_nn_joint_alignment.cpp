@@ -801,7 +801,7 @@ struct Lexicon
   typedef std::vector<parameter_type, std::allocator<parameter_type> > layer_type;
   typedef std::vector<double, std::allocator<double> > score_set_type;
 
-  typedef Average log_likelihood_type;
+  typedef Average loss_type;
   
   Lexicon(const dictionary_type& dict,
 	  const size_type samples)
@@ -815,9 +815,13 @@ struct Lexicon
   layer_type layer_input_;
   layer_type layer_hidden_;
   layer_type delta_hidden_;
-
+  
+  layer_type layer_input_sampled_;
+  layer_type layer_hidden_sampled_;
+  layer_type delta_hidden_sampled_;
+  
   score_set_type scores_;
-  score_set_type noises_;
+  score_set_type errors_;
   
   struct tanh
   {
@@ -1049,12 +1053,12 @@ struct Lexicon
   }
   
   template <typename Generator>
-  log_likelihood_type learn(const sentence_type& source,
-			    const sentence_type& target,
-			    const model_type& theta,
-			    gradient_type& gradient,
-			    alignment_type& alignment,
-			    Generator& gen)
+  loss_type learn(const sentence_type& source,
+		  const sentence_type& target,
+		  const model_type& theta,
+		  gradient_type& gradient,
+		  alignment_type& alignment,
+		  Generator& gen)
   {
     typedef Eigen::Map<tensor_type> matrix_type;
     
@@ -1070,7 +1074,7 @@ struct Lexicon
     const size_type offset_source = 0;
     const size_type offset_target = embedding_size * (window_size * 2 + 1);
 
-    log_likelihood_type log_likelihood;
+    loss_type loss;
     
     alignment.clear();
     
@@ -1078,6 +1082,10 @@ struct Lexicon
     layer_input_.resize((source_size + 1) * state_size);
     layer_hidden_.resize((source_size + 1) * hidden_size);
     delta_hidden_.resize((source_size + 1) * hidden_size);
+
+    layer_input_sampled_.resize((source_size + 1) * state_size);
+    layer_hidden_sampled_.resize((source_size + 1) * hidden_size);
+    delta_hidden_sampled_.resize((source_size + 1) * hidden_size);
     
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     
@@ -1088,15 +1096,14 @@ struct Lexicon
       size_type align_best = 0;
       double    score_best = - std::numeric_limits<double>::infinity();
       
-      double score_sum = - std::numeric_limits<double>::infinity();
-      double noise_sum = - std::numeric_limits<double>::infinity();
-
       scores_.clear();
-      noises_.clear();
+
+      errors_.clear();
+      errors_.resize(source_size + 1, 0.0);
       
       for (size_type src = 0; src <= source_size; ++ src) {
 	const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
-
+	
 	matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
 	matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
 	
@@ -1105,13 +1112,8 @@ struct Lexicon
 	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
 	
 	const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
-	const double noise = log_samples_ + dict_.logprob(word_source, word_target);
-	
-	score_sum = utils::mathop::logsum(score_sum, score);
-	noise_sum = utils::mathop::logsum(noise_sum, noise);
 	
 	scores_.push_back(score);
-	noises_.push_back(noise);
 	
 	if (score > score_best) {
 	  align_best = src;
@@ -1119,36 +1121,15 @@ struct Lexicon
 	}
       }
       
-      const double z = utils::mathop::logsum(score_sum, noise_sum);
-      const double loss = - 1.0 + std::exp(score_sum - z);
-      
-      double log_likelihood_target = score_sum - z;
-
       if (align_best)
 	alignment.push_back(std::make_pair(align_best - 1, trg - 1));
       
-      for (size_type src = 0; src <= source_size; ++ src) {
-	const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	
-	const matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-	const matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
-	/**/  matrix_type delta(&(*delta_hidden_.begin()) + hidden_size * src, hidden_size, 1);
-	
-	// propagate the loss for each alignment...
-	// we will partition by the relative log-likelihood
-	
-	const double loss_partitioned = loss * std::exp(scores_[src] - score_sum);
-	
-	gradient.Wc_.array() += (loss_partitioned * hidden.transpose()).array();
-	gradient.bc_.array() += loss_partitioned;
-	
-	delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_partitioned).array());
-	
-	gradient.Wt_ += delta * embedding.transpose();
-	gradient.bt_ += delta;
-	
-	propagate_embedding(source, target, src, trg, theta, gradient, delta);
-      }
+      const double loss_factor = 1.0 / ((source_size + 1) * samples_);
+      
+      double loss_target = 0.0;
+      
+      // copy input layer
+      layer_input_sampled_ = layer_input_;
       
       // perform sampling
       for (size_type k = 0; k != samples_; ++ k) {
@@ -1158,68 +1139,71 @@ struct Lexicon
 	word_type sampled_target = dict_.draw(source[uniform_source(gen)], gen);
 	while (sampled_target == word_target)
 	  sampled_target = dict_.draw(source[uniform_source(gen)], gen);
-
-	double score_sum = - std::numeric_limits<double>::infinity();
-	double noise_sum = - std::numeric_limits<double>::infinity();
 	
-	scores_.clear();
-	noises_.clear();
-	
-	for (size_type src = 0; src <= source_size; ++ src) {
-	  const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
-
-	  matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-	  matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
+	for (size_type src_sampled = 0; src_sampled <= source_size; ++ src_sampled) {
+	  const word_type sampled_source(src_sampled == 0 ? vocab_type::EPSILON : source[src_sampled - 1]);
 	  
-	  embedding.block(offset_target + embedding_size * window_size, 0, embedding_size, 1)
+	  matrix_type embedding_sampled(&(*layer_input_sampled_.begin()) + state_size * src_sampled, state_size, 1);
+	  matrix_type hidden_sampled(&(*layer_hidden_sampled_.begin()) + hidden_size * src_sampled, hidden_size, 1);
+	  matrix_type delta_sampled(&(*delta_hidden_sampled_.begin()) + hidden_size * src_sampled, hidden_size, 1);
+	  
+	  embedding_sampled.block(offset_target + embedding_size * window_size, 0, embedding_size, 1)
 	    = theta.target_.col(sampled_target.id()) * theta.scale_;
 	  
-	  hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
+	  hidden_sampled = (theta.Wt_ * embedding_sampled + theta.bt_).array().unaryExpr(hinge());
 	  
-	  const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
-	  const double noise = log_samples_ + dict_.logprob(word_source, sampled_target);
+	  const double score = (theta.Wc_ * hidden_sampled + theta.bc_)(0, 0);
 	  
-	  score_sum = utils::mathop::logsum(score_sum, score);
-	  noise_sum = utils::mathop::logsum(noise_sum, noise);
+	  double errors = 0.0;
 	  
-	  scores_.push_back(score);
-	  noises_.push_back(noise);
+	  for (size_type src = 0; src <= source_size; ++ src) {
+	    const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	    
+	    const double error = std::max(1.0 - (scores_[src] - score), 0.0) * loss_factor;
+	    
+	    if (error == 0.0) continue;
+	    
+	    errors       += error;
+	    errors_[src] -= error;
+	  }
+	  
+	  loss_target += errors;
+	    
+	  // we will propagate - error for correct instance, and error for sampled instance
+	  
+	  gradient.Wc_.array() += errors * hidden_sampled.transpose().array();
+	  gradient.bc_.array() += errors;
+	  
+	  delta_sampled = (hidden_sampled.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * errors).array());
+	  
+	  gradient.Wt_.noalias() += delta_sampled * embedding_sampled.transpose();
+	  gradient.bt_.noalias() += delta_sampled;
+	  
+	  propagate_embedding(source, target, src_sampled, trg, sampled_target, theta, gradient, delta_sampled);
 	}
-	
-	const double z = utils::mathop::logsum(score_sum, noise_sum);
-	const double loss = std::exp(score_sum - z);
-	
-	log_likelihood_target += noise_sum - z;
-	
-	for (size_type src = 0; src <= source_size; ++ src) {
-	  const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
+      }
 
-	  const matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-	  const matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
-	  /**/  matrix_type delta(&(*delta_hidden_.begin()) + hidden_size * src, hidden_size, 1);
-	  
-	  // propagate the loss for each alignment...
-	  // we will partition by the relative log-likelihood
-	  
-	  const double loss_partitioned = loss * std::exp(scores_[src] - score_sum);
-	  
-	  gradient.Wc_.array() += (loss_partitioned * hidden.transpose()).array();
-	  gradient.bc_.array() += loss_partitioned;
-	  
-	  delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_partitioned).array());
-	  
-	  gradient.Wt_ += delta * embedding.transpose();
-	  gradient.bt_ += delta;
-	  
-	  propagate_embedding(source, target, src, trg, sampled_target, theta, gradient, delta);
-	}
+      for (size_type src = 0; src <= source_size; ++ src) {
+	const matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
+	const matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
+	/**/  matrix_type delta(&(*delta_hidden_.begin()) + hidden_size * src, hidden_size, 1);
+	
+	gradient.Wc_.array() += errors_[src] * hidden.transpose().array();
+	gradient.bc_.array() += errors_[src];
+	
+	delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * errors_[src]).array());
+	
+	gradient.Wt_.noalias() += delta * embedding.transpose();
+	gradient.bt_.noalias() += delta;
+	
+	propagate_embedding(source, target, src, trg, theta, gradient, delta);
       }
       
       ++ gradient.count_;
-      log_likelihood += log_likelihood_target;
+      loss += loss_target;
     }
     
-    return log_likelihood;
+    return loss;
   }
   
     
@@ -2017,7 +2001,7 @@ struct TaskAccumulate
 
   typedef Lexicon lexicon_type;
   
-  typedef lexicon_type::log_likelihood_type log_likelihood_type;
+  typedef lexicon_type::loss_type loss_type;
   
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
@@ -2116,7 +2100,7 @@ struct TaskAccumulate
       bitext_target_source.alignment_.clear();
 
       if (! bitext.source_.empty() && ! bitext.target_.empty()) {
-	log_likelihood_source_target_
+	loss_source_target_
 	  += lexicon_source_target_.learn(bitext.source_,
 					  bitext.target_,
 					  theta_source_target_,
@@ -2124,7 +2108,7 @@ struct TaskAccumulate
 					  bitext_source_target.alignment_,
 					  generator);
 	
-	log_likelihood_target_source_
+	loss_target_source_
 	  += lexicon_target_source_.learn(bitext.target_,
 					  bitext.source_,
 					  theta_target_source_,
@@ -2146,8 +2130,8 @@ struct TaskAccumulate
   {
     gradient_source_target_.clear();
     gradient_target_source_.clear();
-    log_likelihood_source_target_ = log_likelihood_type();
-    log_likelihood_target_source_ = log_likelihood_type();
+    loss_source_target_ = loss_type();
+    loss_target_source_ = loss_type();
   }
 
   const bitext_set_type& bitexts_;
@@ -2164,8 +2148,8 @@ struct TaskAccumulate
   
   gradient_type gradient_source_target_;
   gradient_type gradient_target_source_;
-  log_likelihood_type log_likelihood_source_target_;
-  log_likelihood_type log_likelihood_target_source_;
+  loss_type loss_source_target_;
+  loss_type loss_target_source_;
 };
 
 inline
@@ -2210,7 +2194,7 @@ void learn_online(const Learner& learner,
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputAlignment  output_alignment_type;
 
-  typedef task_type::log_likelihood_type log_likelihood_type;
+  typedef task_type::loss_type loss_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
@@ -2262,8 +2246,8 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    log_likelihood_type log_likelihood_source_target;
-    log_likelihood_type log_likelihood_target_source;
+    loss_type loss_source_target;
+    loss_type loss_target_source;
     size_type samples = 0;
     size_type num_text = 0;
 
@@ -2297,14 +2281,14 @@ void learn_online(const Learner& learner,
       biter = iter_end;
       
       // merge gradients
-      log_likelihood_source_target += tasks.front().log_likelihood_source_target_;
-      log_likelihood_target_source += tasks.front().log_likelihood_target_source_;
+      loss_source_target += tasks.front().loss_source_target_;
+      loss_target_source += tasks.front().loss_target_source_;
       for (size_type i = 1; i != tasks.size(); ++ i) {
 	tasks.front().gradient_source_target_ += tasks[i].gradient_source_target_;
 	tasks.front().gradient_target_source_ += tasks[i].gradient_target_source_;
 	
-	log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
-	log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
+	loss_source_target += tasks[i].loss_source_target_;
+	loss_target_source += tasks[i].loss_target_source_;
       }
 
       embedding_source_target.assign(tasks.front().gradient_source_target_);
@@ -2324,10 +2308,8 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
     
     if (debug)
-      std::cerr << "log-likelihood P(target | source): " << static_cast<double>(log_likelihood_source_target) << std::endl
-		<< "perplexity     P(target | source): " << std::exp(- static_cast<double>(log_likelihood_source_target)) << std::endl
-		<< "log-likelihood P(source | target): " << static_cast<double>(log_likelihood_target_source) << std::endl
-		<< "perplexity     P(source | target): " << std::exp(- static_cast<double>(log_likelihood_target_source)) << std::endl;
+      std::cerr << "loss P(target | source): " << static_cast<double>(loss_source_target) << std::endl
+		<< "loss P(source | target): " << static_cast<double>(loss_target_source) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
