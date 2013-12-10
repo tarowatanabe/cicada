@@ -58,6 +58,33 @@
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
 
+struct Average
+{
+  Average() : average_(0), count_(0) {}
+  Average(const double& x) : average_(x), count_(1) {}
+  
+  Average& operator+=(const double& x)
+  {
+    average_ += (x - average_) / (++ count_);
+    return *this;
+  }
+  
+  Average& operator+=(const Average& x)
+  {
+    const uint64_t total = count_ + x.count_;
+    
+    average_ = average_ * (double(count_) / total) + x.average_ * (double(x.count_) / total);
+    count_ = total;
+    
+    return *this;
+  }
+  
+  operator const double&() const { return average_; }
+  
+  double   average_;
+  uint64_t count_;
+};
+
 struct Gradient
 {
   typedef size_t    size_type;
@@ -1039,6 +1066,11 @@ struct Dictionary
       return dicts_[vocab_type::UNK.id()].draw(gen);
   }
 
+  size_type size(const word_type& source) const
+  {
+    return (dicts_.exists(source.id()) ? dicts_[source.id()].words_.size() : size_type(0));
+  }
+
   dict_set_type dicts_;
 };
 
@@ -1059,6 +1091,8 @@ struct HMM
   typedef cicada::Bitext    bitext_type;
   typedef cicada::Symbol    word_type;
   typedef cicada::Vocab     vocab_type;
+
+  typedef Average log_likelihood_type;
 
   typedef State          state_type;
   typedef StateAllocator state_allocator_type;
@@ -1253,9 +1287,9 @@ struct HMM
 	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
 	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
 	       * matrix_type(state.matrix(), state_size, 1)
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	  
-	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
+	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
@@ -1280,9 +1314,9 @@ struct HMM
 	  layer_alpha.block(offset_word, 0, theta.embedding_, 1) = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	  
 	  layer_alpha.block(offset_matrix, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * matrix_type(state.matrix(), state_size, 1) + theta.bn_).array().unaryExpr(htanh());
+	    = (theta.Wn_ * matrix_type(state.matrix(), state_size, 1) + theta.bn_).array().unaryExpr(hinge());
 	  
-	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(htanh());
+	  layer_trans = (theta.Wt_ * layer_alpha + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
@@ -1312,7 +1346,7 @@ struct HMM
     }
     
     state_type state = heap.back();
-    
+
     for (size_type trg = target_size + 1; trg >= 1; -- trg) {
       const size_type src = state.index();
       
@@ -1324,11 +1358,11 @@ struct HMM
   }
   
   template <typename Gen>
-  double backward(const sentence_type& source,
-		  const sentence_type& target,
-		  const model_type& theta,
-		  gradient_type& gradient,
-		  Gen& gen)
+  log_likelihood_type backward(const sentence_type& source,
+			       const sentence_type& target,
+			       const model_type& theta,
+			       gradient_type& gradient,
+			       Gen& gen)
   {
     typedef Eigen::Map<tensor_type> matrix_type;
     
@@ -1362,7 +1396,9 @@ struct HMM
       }
     }
 
-    double log_likelihood = 0.0;
+    boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
+
+    log_likelihood_type log_likelihood;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
       ++ gradient.count_;
@@ -1415,16 +1451,30 @@ struct HMM
 	const matrix_type trans_next(state_next.matrix() + state_size, theta.embedding_, 1);
 	const matrix_type alpha_prev(state_prev.matrix(), state_size, 1);
 	const matrix_type trans_prev(state_prev.matrix() + state_size, theta.embedding_, 1);
+
+	word_type target_sampled = target_next;
 	
-	const word_type target_sampled = dict_.draw(source_prev, gen);
+	if (dict_.size(source_next) > 1) {
+	  if (source_next == vocab_type::EPSILON) {
+	    target_sampled = dict_.draw(source[uniform_source(gen)], gen);
+	    
+	    while (target_sampled == target_next)
+	      target_sampled = dict_.draw(source[uniform_source(gen)], gen);
+	  } else {
+	    target_sampled = dict_.draw(source_next, gen);
+	    
+	    while (target_sampled == target_next)
+	      target_sampled = dict_.draw(source_next, gen);
+	  } 
+	}
 	
 	const double score_c = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 	const double score_m = (theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1).transpose() * trans_next * theta.scale_
 				+ theta.target_.col(target_sampled.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
 
-	const double score_noise_c = 0.0 + dict_.logprob(source_prev, target_next);
-	const double score_noise_m = 0.0 + dict_.logprob(source_prev, target_sampled);
+	const double score_noise_c = 0.0 + dict_.logprob(source_next, target_next);
+	const double score_noise_m = 0.0 + dict_.logprob(source_next, target_sampled);
 	
 	const double z_c = utils::mathop::logsum(score_c, score_noise_c);
 	const double z_m = utils::mathop::logsum(score_m, score_noise_m);
@@ -1434,7 +1484,7 @@ struct HMM
 	
 	const double logprob_noise_c = score_noise_c - z_c;
 	const double logprob_noise_m = score_noise_m - z_m;
-	
+
 	log_likelihood += logprob_c + logprob_noise_m;
 	
 	const double loss_c = - 1.0 + std::exp(logprob_c);
@@ -1448,7 +1498,7 @@ struct HMM
 	dembedding_m.block(0, 0, theta.embedding_, 1).array() += loss_m * trans_next.array();
 	dembedding_m.block(theta.embedding_, 0, 1, 1).array() += loss_m;
 	
-	delta_trans_ = (trans_next.array().unaryExpr(dhtanh())
+	delta_trans_ = (trans_next.array().unaryExpr(dhinge())
 			* (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1) * loss_c * theta.scale_
 			   + theta.target_.col(target_sampled.id()).block(0, 0, theta.embedding_, 1) * loss_m * theta.scale_).array());
 	
@@ -1465,7 +1515,7 @@ struct HMM
 	     + beta_next.block(offset_word, 0, theta.embedding_, 1));
 	
 	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1)
-	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhtanh())
+	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhinge())
 	      * (delta_alpha_.block(offset_matrix, 0, theta.hidden_, 1)
 		 + beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
 
@@ -1600,7 +1650,7 @@ struct HMM
 	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	  
 	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			   * theta.source_.col(source_next.id()) * theta.scale_)
@@ -1608,7 +1658,7 @@ struct HMM
 			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
-			  + theta.bt_).array().unaryExpr(htanh());
+			  + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_ * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
@@ -1636,7 +1686,7 @@ struct HMM
 	       + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
 		  * matrix_type(state.matrix(), theta.hidden_, 1))
 	       
-	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	       + theta.bn_.block(0, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	  
 	  layer_trans_ = ((theta.Wt_.block(0, offset_word, theta.embedding_, theta.embedding_)
 			   * theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_)
@@ -1644,7 +1694,7 @@ struct HMM
 			  + (theta.Wt_.block(0, offset_matrix, theta.embedding_, theta.hidden_)
 			     * layer_alpha)
 			  
-			  + theta.bt_).array().unaryExpr(htanh());
+			  + theta.bt_).array().unaryExpr(hinge());
 	  
 	  const double score = (theta.target_.col(target_next.id()).block(0, 0, theta.embedding_, 1).transpose() * layer_trans_ * theta.scale_
 				+ theta.target_.col(target_next.id()).block(theta.embedding_, 0, 1, 1))(0, 0);
@@ -2437,6 +2487,8 @@ struct TaskAccumulate
   typedef Gradient gradient_type;
 
   typedef HMM hmm_type;
+
+  typedef hmm_type::log_likelihood_type log_likelihood_type;
   
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
@@ -2504,9 +2556,7 @@ struct TaskAccumulate
 			      theta_source_target.alignment_),
       gradient_target_source_(theta_target_source.embedding_,
 			      theta_target_source.hidden_,
-			      theta_target_source.alignment_),
-      log_likelihood_source_target_(0),
-      log_likelihood_target_source_(0) {}
+			      theta_target_source.alignment_) {}
 
   void operator()()
   {
@@ -2568,8 +2618,8 @@ struct TaskAccumulate
   {
     gradient_source_target_.clear();
     gradient_target_source_.clear();
-    log_likelihood_source_target_ = 0;
-    log_likelihood_target_source_ = 0;
+    log_likelihood_source_target_ = log_likelihood_type();
+    log_likelihood_target_source_ = log_likelihood_type();
   }
 
   const bitext_set_type& bitexts_;
@@ -2586,8 +2636,9 @@ struct TaskAccumulate
   
   gradient_type gradient_source_target_;
   gradient_type gradient_target_source_;
-  double        log_likelihood_source_target_;
-  double        log_likelihood_target_source_;
+  
+  log_likelihood_type log_likelihood_source_target_;
+  log_likelihood_type log_likelihood_target_source_;
 };
 
 inline
@@ -2633,6 +2684,8 @@ void learn_online(const Learner& learner,
   typedef OutputAlignment  output_alignment_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
+  
+  typedef task_type::log_likelihood_type log_likelihood_type;
   
   task_type::queue_type   mapper(256 * threads);
   task_type::counter_type reducer;
@@ -2682,11 +2735,8 @@ void learn_online(const Learner& learner,
     id_set_type::const_iterator biter     = ids.begin();
     id_set_type::const_iterator biter_end = ids.end();
 
-    double log_likelihood_source_target = 0.0;
-    double log_likelihood_target_source = 0.0;
-    size_type samples = 0;
-    size_type words_source = 0;
-    size_type words_target = 0;
+    log_likelihood_type log_likelihood_source_target;
+    log_likelihood_type log_likelihood_target_source;
     size_type num_text = 0;
 
     utils::resource start;
@@ -2702,12 +2752,6 @@ void learn_online(const Learner& learner,
       // map bitexts
       id_set_type::const_iterator iter_end = std::min(biter + batch_size, biter_end);
       for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter) {
-	if (! bitexts[*iter].source_.empty() && ! bitexts[*iter].target_.empty()) {
-	  ++ samples;
-	  words_source += bitexts[*iter].source_.size();
-	  words_target += bitexts[*iter].target_.size();
-	}
-	
 	mapper.push(*iter);
 	
 	++ num_text;
@@ -2751,10 +2795,10 @@ void learn_online(const Learner& learner,
       std::cerr << std::endl;
     
     if (debug)
-      std::cerr << "log-likelihood P(target | source) (per sentence): " << (log_likelihood_source_target / samples) << std::endl
-		<< "log-likelihood P(target | source) (per word): "     << (log_likelihood_source_target / words_target) << std::endl
-		<< "log-likelihood P(source | target) (per sentence): " << (log_likelihood_target_source / samples) << std::endl
-		<< "log-likelihood P(source | target) (per word): "     << (log_likelihood_target_source / words_source) << std::endl;
+      std::cerr << "log-likelihood P(target | source): " << static_cast<double>(log_likelihood_source_target) << std::endl
+		<< "perplexity     P(target | source): " << std::exp(- static_cast<double>(log_likelihood_source_target)) << std::endl
+		<< "log-likelihood P(source | target): " << static_cast<double>(log_likelihood_target_source) << std::endl
+		<< "perplexity     P(source | target): " << std::exp(- static_cast<double>(log_likelihood_target_source)) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
@@ -2823,9 +2867,7 @@ struct TaskViterbi
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
       hmm_source_target_(dict_source_target, beam_size),
-      hmm_target_source_(dict_target_source, beam_size),
-      log_likelihood_source_target_(0),
-      log_likelihood_target_source_(0) {}
+      hmm_target_source_(dict_target_source, beam_size) {}
 
   void operator()()
   {
@@ -2849,12 +2891,11 @@ struct TaskViterbi
       bitext_target_source.bitext_.source_ = bitext.target_;
       bitext_target_source.bitext_.target_ = bitext.source_;
       bitext_target_source.alignment_.clear();
-
+      
       if (! bitext.source_.empty() && ! bitext.target_.empty()) {
-	log_likelihood_source_target_
-	  += hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
-	log_likelihood_target_source_
-	  += hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
+	hmm_source_target_.viterbi(bitext.source_, bitext.target_, theta_source_target_, bitext_source_target.alignment_);
+	
+	hmm_target_source_.viterbi(bitext.target_, bitext.source_, theta_target_source_, bitext_target_source.alignment_);
       }
       
       // reduce alignment
@@ -2865,8 +2906,6 @@ struct TaskViterbi
 
   void clear()
   {
-    log_likelihood_source_target_ = 0;
-    log_likelihood_target_source_ = 0;
   }
 
   const bitext_set_type& bitexts_;
@@ -2879,10 +2918,6 @@ struct TaskViterbi
   
   hmm_type hmm_source_target_;
   hmm_type hmm_target_source_;
-  
-  double        log_likelihood_source_target_;
-  double        log_likelihood_target_source_;
-
 };
 
 void viterbi(const bitext_set_type& bitexts,
@@ -3109,6 +3144,9 @@ void read_data(const path_type& source_file,
 
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
   dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
+
+  dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
+  dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
   
   dict_source_target.initialize();
   dict_target_source.initialize();

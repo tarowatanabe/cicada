@@ -1104,6 +1104,11 @@ struct Dictionary
       return dicts_[vocab_type::UNK.id()].draw(gen);
   }
 
+  size_type size(const word_type& source) const
+  {
+    return (dicts_.exists(source.id()) ? dicts_[source.id()].words_.size() : size_type(0));
+  }
+
   dict_set_type dicts_;
 };
 
@@ -1319,6 +1324,8 @@ struct HMM
     
     heaps_[0].push_back(state_bos);
     heaps_viterbi_[0].push_back(state_bos);
+
+    boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     
     for (size_type trg = 1; trg != target_size + 2; ++ trg) {
       const word_type target_next = (trg == 0
@@ -1380,10 +1387,10 @@ struct HMM
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
 	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	    
 	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh());
+	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
 	    
@@ -1392,36 +1399,37 @@ struct HMM
 	    heap_next.push_back(state_next);
 	    std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
 	    
-	    for (size_type k = 0; k != sample_; ++ k) {
-	      const word_type target_sampled = dict_.draw(source_next, gen);
+	    if (dict_.size(source_next) > 1)
+	      for (size_type k = 0; k != sample_; ++ k) {
+		word_type target_sampled = dict_.draw(source_next, gen);
+		while (target_sampled == target_next)
+		  target_sampled = dict_.draw(source_next, gen);
+		
+		state_type state_sampled = state_allocator_.allocate();
+		state_sampled.prev() = state;
+		state_sampled.index() = next;
+		state_sampled.target() = target_sampled;
+		state_sampled.error() = state.error() + 1;
 	      
-	      if (target_sampled == target_next) continue;
+		matrix_type alpha_sampled(state_sampled.matrix(), state_size, 1);
+		matrix_type trans_sampled(state_sampled.matrix() + state_size, theta.hidden_, 1);
 	      
-	      state_type state_sampled = state_allocator_.allocate();
-	      state_sampled.prev() = state;
-	      state_sampled.index() = next;
-	      state_sampled.target() = target_sampled;
-	      state_sampled.error() = state.error() + 1;
+		// compute alpha-sampled
+		alpha_sampled = alpha_next;
 	      
-	      matrix_type alpha_sampled(state_sampled.matrix(), state_size, 1);
-	      matrix_type trans_sampled(state_sampled.matrix() + state_size, theta.hidden_, 1);
+		alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
+		  = theta.target_.col(target_sampled.id()) * theta.scale_;
 	      
-	      // compute alpha-sampled
-	      alpha_sampled = alpha_next;
-	      
-	      alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
-		= theta.target_.col(target_sampled.id()) * theta.scale_;
-	      
-	      // compute trans-sampled
-	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(htanh());
+		// compute trans-sampled
+		trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(hinge());
 	    
-	      const double score = (theta.Wc_ * trans_sampled + theta.bc_)(0, 0);
+		const double score = (theta.Wc_ * trans_sampled + theta.bc_)(0, 0);
 	      
-	      state_sampled.score() = score + state.score();
-	      
-	      heap_next.push_back(state_sampled);
-	      std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
-	    }
+		state_sampled.score() = score + state.score();
+		
+		heap_next.push_back(state_sampled);
+		std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
+	      }
 	  }
 	  
 	  // none...
@@ -1441,10 +1449,10 @@ struct HMM
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(htanh());
+	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
 	    
 	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh());
+	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
 	    
@@ -1454,9 +1462,10 @@ struct HMM
 	    std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
 	    
 	    for (size_type k = 0; k != sample_; ++ k) {
-	      const word_type target_sampled = dict_.draw(vocab_type::EPSILON, gen);
+	      word_type target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      if (target_sampled == target_next) continue;
+	      while (target_sampled == target_next)
+		target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
 	      state_type state_sampled = state_allocator_.allocate();
 	      state_sampled.prev() = state;
@@ -1474,7 +1483,7 @@ struct HMM
 		= theta.target_.col(target_sampled.id()) * theta.scale_;
 	      
 	      // compute trans-sampled
-	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(htanh());
+	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(hinge());
 	    
 	      const double score = (theta.Wc_ * trans_sampled + theta.bc_)(0, 0);
 	      
@@ -1532,10 +1541,10 @@ struct HMM
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
 	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	    
 	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh());
+	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
 	    
@@ -1562,10 +1571,10 @@ struct HMM
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(htanh());
+	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
 	    
 	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh());
+	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
 	    
 	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
 	    
@@ -1741,7 +1750,7 @@ struct HMM
 	gradient.Wc_         += loss_next * trans_next.transpose();
 	gradient.bc_.array() += loss_next;
 	
-	delta_trans_ = trans_next.array().unaryExpr(dhtanh()) * (theta.Wc_.transpose() * loss_next).array();
+	delta_trans_ = trans_next.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_next).array();
 	
 	gradient.Wt_ += delta_trans_ * alpha_next.transpose();
 	gradient.bt_ += delta_trans_;
@@ -1755,7 +1764,7 @@ struct HMM
 	  = (delta_alpha_.block(0, 0, offset_matrix, 1) + beta_next.block(0, 0, offset_matrix, 1));
 
 	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1)
-	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhtanh())
+	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhinge())
 	     * (delta_alpha_.block(offset_matrix, 0, theta.hidden_, 1)
 		+ beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
 	
@@ -1942,9 +1951,9 @@ struct HMM
 	  // compute alpha-next
 	  alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
 	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(htanh());
+	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
 	  
-	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh()).matrix()
+	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge()).matrix()
 				+ theta.bc_)(0, 0);
 	  
 	  state_next.score() = score + state.score();
@@ -1967,9 +1976,9 @@ struct HMM
 	  
 	  // compute alpha-next
 	  alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(htanh());
+	    = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
 	  
-	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(htanh()).matrix()
+	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge()).matrix()
 				+ theta.bc_)(0, 0);
 	  
 	  state_next.score() = score + state.score();
@@ -3446,6 +3455,9 @@ void read_data(const path_type& source_file,
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
   dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
   
+  dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
+  dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
+
   dict_source_target.initialize();
   dict_target_source.initialize();
 }

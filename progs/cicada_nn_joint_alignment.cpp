@@ -1240,13 +1240,11 @@ struct Lexicon
       
       for (size_type src = 0; src <= source_size; ++ src) {
 	matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-	matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
 	
 	copy_embedding(source, target, src, trg, theta, embedding);
 	
-	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
-	
-	const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
+	const double score = (theta.Wc_ * (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge()).matrix()
+			      + theta.bc_)(0, 0);
 	
 	if (score > score_best) {
 	  align_best = src;
