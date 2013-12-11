@@ -57,6 +57,7 @@
 #include <boost/thread.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
+#include <boost/progress.hpp>
 
 struct Average
 {
@@ -104,12 +105,13 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), window_(0), count_(0) {}
+  Gradient() : embedding_(0), window_(0), count_(0), shared_(0) {}
   Gradient(const size_type& embedding,
 	   const size_type& window) 
     : embedding_(embedding),
       window_(window),
-      count_(0)
+      count_(0),
+      shared_(0)
   { initialize(embedding, window); }
   
   Gradient& operator-=(const Gradient& x)
@@ -192,6 +194,7 @@ struct Gradient
     bt_.setZero();
 
     count_ = 0;
+    shared_ = 0;
   }
 
   
@@ -231,8 +234,22 @@ struct Gradient
     bt_ = tensor_type::Zero(embedding_, 1);
 
     count_ = 0;
+    shared_ = 0;
   }
   
+public:
+  void increment()
+  {
+    utils::atomicop::add_and_fetch(shared_, size_type(1));
+  }
+
+  size_type shared() const
+  {
+    const size_type ret = shared_;
+    utils::atomicop::memory_barrier();
+    return ret;
+  }
+
   // dimension...
   size_type embedding_;
   size_type window_;
@@ -245,6 +262,7 @@ struct Gradient
   tensor_type bt_;
   
   size_type count_;
+  size_type shared_;
 };
 
 struct Embedding
@@ -501,8 +519,6 @@ struct Model
     }
   }
   
-  boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
-  
   void write(const path_type& path) const
   {
     // we use a repository structure...
@@ -544,6 +560,8 @@ struct Model
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
+    karma::real_generator<parameter_type, real_policy> float10;
+    
     const word_type::id_type rows = matrix.rows();
     const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());
     
@@ -1465,10 +1483,6 @@ typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 typedef Model      model_type;
 typedef Dictionary dictionary_type;
 
-static const size_t DEBUG_DOT  = 10000;
-static const size_t DEBUG_WRAP = 100;
-static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
-
 path_type source_file;
 path_type target_file;
 
@@ -1487,7 +1501,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
-int batch_size = 128;
+int batch_size = 4;
 int sample_size = 10;
 int cutoff = 3;
 double lambda = 0;
@@ -1846,6 +1860,7 @@ struct OutputAlignment : OutputMapReduce
   queue_type& queue_;
 };
 
+template <typename Learner>
 struct TaskAccumulate
 {
   typedef size_t    size_type;
@@ -1864,145 +1879,233 @@ struct TaskAccumulate
 
   typedef OutputMapReduce output_map_reduce_type;
   
-  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
-
   typedef output_map_reduce_type::queue_type queue_alignment_type;
   typedef output_map_reduce_type::value_type bitext_alignment_type;
-  
-  struct Counter
-  {
-    Counter() : counter(0) {}
-  
-    void increment()
-    {
-      utils::atomicop::fetch_and_add(counter, size_type(1));
-    }
-  
-    void wait(size_type target)
-    {
-      for (;;) {
-	for (int i = 0; i < 64; ++ i) {
-	  if (counter == target)
-	    return;
-	  else
-	    boost::thread::yield();
-	}
-      
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-    }
 
-    void clear() { counter = 0; }
+  typedef std::pair<gradient_type*, gradient_type*> gradient_pair_type;
   
-    volatile size_type counter;
-  };
-  typedef Counter counter_type;
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_mapper_type;
+  typedef utils::lockfree_list_queue<gradient_pair_type, std::allocator<gradient_pair_type> > queue_merger_type;
+  typedef std::vector<queue_merger_type, std::allocator<queue_merger_type> > queue_merger_set_type;
+  
+  typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
 
-  TaskAccumulate(const bitext_set_type& bitexts,
+  TaskAccumulate(const Learner& learner,
+		 const bitext_set_type& bitexts,
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
 		 const model_type& theta_source_target,
 		 const model_type& theta_target_source,
-		 queue_type& queue,
+		 const size_type batch_size,
+		 queue_mapper_type& mapper,
+		 queue_merger_set_type& mergers,
 		 queue_alignment_type& queue_source_target,
-		 queue_alignment_type& queue_target_source,
-		 counter_type& counter)
-    : bitexts_(bitexts),
+		 queue_alignment_type& queue_target_source)
+    : learner_source_target_(learner),
+      learner_target_source_(learner),
+      embedding_source_target_(theta_source_target.embedding_),
+      embedding_target_source_(theta_target_source.embedding_),
+      bitexts_(bitexts),
       theta_source_target_(theta_source_target),
       theta_target_source_(theta_target_source),
-      queue_(queue),
+      mapper_(mapper),
+      mergers_(mergers),
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
-      counter_(counter),
       lexicon_source_target_(dict_source_target, sample_size),
       lexicon_target_source_(dict_target_source, sample_size),
-      gradient_source_target_(theta_source_target.embedding_,
-			      theta_source_target.window_),
-      gradient_target_source_(theta_target_source.embedding_,
-			      theta_target_source.window_) {}
+      batch_size_(batch_size)
+  {
+    generator_.seed(utils::random_seed());
+  }
 
   void operator()()
   {
     clear();
-
-    boost::mt19937 generator;
-    generator.seed(utils::random_seed());
+    
+    const size_type shard_size = mergers_.size();
+    const size_type embedding_size = theta_source_target_.embedding_;
+    const size_type window_size    = theta_source_target_.window_;
+    
+    size_type batch = 0;
+    gradient_pair_type grads;
+    
+    size_type merge_finished = 0;
+    bool learn_finished = false;
+    
+    int non_found_iter = 0;
     
     bitext_alignment_type bitext_source_target;
     bitext_alignment_type bitext_target_source;
     
-    size_type sentence_id;
-    for (;;) {
-      queue_.pop(sentence_id);
+    while (merge_finished != shard_size || ! learn_finished) {
+      bool found = false;
       
-      if (sentence_id == size_type(-1)) break;
+      if (merge_finished != shard_size)
+	while (mergers_[shard_].pop(grads, true)) {
+	  if (! grads.first)
+	    ++ merge_finished;
+	  else {
+	    embedding_source_target_.assign(*grads.first);
+	    embedding_target_source_.assign(*grads.second);
+	    
+	    learner_source_target_(theta_source_target_, *grads.first,  embedding_target_source_);
+	    learner_target_source_(theta_target_source_, *grads.second, embedding_source_target_);
+	    
+	    grads.first->increment();
+	    grads.second->increment();
+	  }
+	  
+	  found = true;
+	}
       
-      const bitext_type& bitext = bitexts_[sentence_id];
-      
-      bitext_source_target.id_ = sentence_id;
-      bitext_source_target.bitext_.source_ = bitext.source_;
-      bitext_source_target.bitext_.target_ = bitext.target_;
-      bitext_source_target.alignment_.clear();
-      
-      bitext_target_source.id_ = sentence_id;
-      bitext_target_source.bitext_.source_ = bitext.target_;
-      bitext_target_source.bitext_.target_ = bitext.source_;
-      bitext_target_source.alignment_.clear();
-
-      if (! bitext.source_.empty() && ! bitext.target_.empty()) {
-	log_likelihood_source_target_
-	  += lexicon_source_target_.learn(bitext.source_,
-					  bitext.target_,
-					  theta_source_target_,
-					  gradient_source_target_,
-					  bitext_source_target.alignment_,
-					  generator);
+      if (! learn_finished && mapper_.pop(batch, true)) {
+	found = true;
 	
-	log_likelihood_target_source_
-	  += lexicon_target_source_.learn(bitext.target_,
-					  bitext.source_,
-					  theta_target_source_,
-					  gradient_target_source_,
-					  bitext_target_source.alignment_,
-					  generator);
+	if (batch == size_type(-1)) {
+	  // send termination!
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    mergers_[i].push(std::make_pair(static_cast<gradient_type*>(0), static_cast<gradient_type*>(0)));
+	  
+	  learn_finished = true;
+	} else {
+	  gradient_type* grad_source_target = 0;
+	  gradient_type* grad_target_source = 0;
+	  
+	  for (size_type j = 0; j != gradients_.size(); ++ j)
+	    if (gradients_[j].shared() == shard_size) {
+	      if (! grad_source_target)
+		grad_source_target = &gradients_[j];
+	      else if (! grad_target_source)
+		grad_target_source = &gradients_[j];
+	      
+	      if (grad_source_target && grad_target_source) break;
+	    }
+	  
+	  if (! grad_source_target) {
+	    gradients_.push_back(gradient_type(embedding_size, window_size));
+	    grad_source_target = &gradients_.back();
+	  }
+	  
+	  if (! grad_target_source) {
+	    gradients_.push_back(gradient_type(embedding_size, window_size));
+	    grad_target_source = &gradients_.back();
+	  }
+	  
+	  grad_source_target->clear();
+	  grad_target_source->clear();
+	  
+	  const size_type first = batch * batch_size_;
+	  const size_type last  = utils::bithack::min(first + batch_size_, bitexts_.size());
+	  
+	  for (size_type id = first; id != last; ++ id) {
+	    const bitext_type& bitext = bitexts_[id];
+	    
+	    bitext_source_target.id_ = id;
+	    bitext_source_target.bitext_.source_ = bitext.source_;
+	    bitext_source_target.bitext_.target_ = bitext.target_;
+	    bitext_source_target.alignment_.clear();
+	    
+	    bitext_target_source.id_ = id;
+	    bitext_target_source.bitext_.source_ = bitext.target_;
+	    bitext_target_source.bitext_.target_ = bitext.source_;
+	    bitext_target_source.alignment_.clear();
+	    
+	    if (! bitext.source_.empty() && ! bitext.target_.empty()) {
+	      log_likelihood_source_target_
+		+= lexicon_source_target_.learn(bitext.source_,
+						bitext.target_,
+						theta_source_target_,
+						*grad_source_target,
+						bitext_source_target.alignment_,
+						generator_);
+	      
+	      log_likelihood_target_source_
+		+= lexicon_target_source_.learn(bitext.target_,
+						bitext.source_,
+						theta_target_source_,
+						*grad_target_source,
+						bitext_target_source.alignment_,
+						generator_);
+	    }
+	    
+	    // reduce alignment
+	    queue_source_target_.push_swap(bitext_source_target);
+	    queue_target_source_.push_swap(bitext_target_source);
+	  }
+	  
+	  embedding_source_target_.assign(*grad_source_target);
+	  embedding_target_source_.assign(*grad_target_source);
+	  
+	  learner_source_target_(theta_source_target_, *grad_source_target, embedding_target_source_);
+	  learner_target_source_(theta_target_source_, *grad_target_source, embedding_source_target_);
+	  
+	  grad_source_target->increment();
+	  grad_target_source->increment();
+	  
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    if (i != shard_)
+	      mergers_[i].push(std::make_pair(grad_source_target, grad_target_source));
+	}
       }
       
-      // reduce alignment
-      queue_source_target_.push_swap(bitext_source_target);
-      queue_target_source_.push_swap(bitext_target_source);
-      
-      // increment counter for synchronization
-      counter_.increment();
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
+    
+    theta_source_target_.finalize();
+    theta_target_source_.finalize();
+  }
+
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+    
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+      
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
 
   void clear()
   {
-    gradient_source_target_.clear();
-    gradient_target_source_.clear();
     log_likelihood_source_target_ = log_likelihood_type();
     log_likelihood_target_source_ = log_likelihood_type();
   }
-
-  const bitext_set_type& bitexts_;
-  const model_type& theta_source_target_;
-  const model_type& theta_target_source_;
   
-  queue_type&           queue_;
+  Learner   learner_source_target_;
+  Learner   learner_target_source_;
+  Embedding embedding_source_target_;
+  Embedding embedding_target_source_;
+  
+  const bitext_set_type& bitexts_;
+  model_type             theta_source_target_;
+  model_type             theta_target_source_;
+
+  queue_mapper_type&     mapper_;
+  queue_merger_set_type& mergers_;
   queue_alignment_type& queue_source_target_;
   queue_alignment_type& queue_target_source_;
-  counter_type&         counter_;
   
   lexicon_type lexicon_source_target_;
   lexicon_type lexicon_target_source_;
   
-  gradient_type gradient_source_target_;
-  gradient_type gradient_target_source_;
+  gradient_set_type   gradients_;
   log_likelihood_type log_likelihood_source_target_;
   log_likelihood_type log_likelihood_target_source_;
+
+  int            shard_;
+  size_type      batch_size_;
+  boost::mt19937 generator_;
 };
 
 inline
@@ -2039,51 +2142,56 @@ void learn_online(const Learner& learner,
 		  model_type& theta_source_target,
 		  model_type& theta_target_source)
 {
-  typedef TaskAccumulate task_type;
+  typedef TaskAccumulate<Learner> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
-  typedef task_type::size_type size_type;
+  typedef typename task_type::size_type size_type;
 
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputAlignment  output_alignment_type;
 
-  typedef task_type::log_likelihood_type log_likelihood_type;
-
-  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
+  typedef typename task_type::queue_mapper_type     queue_mapper_type;
+  typedef typename task_type::queue_merger_set_type queue_merger_set_type;
   
-  task_type::queue_type   mapper(256 * threads);
-  task_type::counter_type reducer;
-  
-  output_map_reduce_type::queue_type queue_source_target;
-  output_map_reduce_type::queue_type queue_target_source;
+  typedef typename task_type::log_likelihood_type log_likelihood_type;
 
-  Learner learner_source_target = learner;
-  Learner learner_target_source = learner;
-
-  Embedding embedding_source_target(theta_source_target.embedding_);
-  Embedding embedding_target_source(theta_target_source.embedding_);
+  typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
   
-  task_set_type tasks(threads, task_type(bitexts,
+  const size_type batches_size = (bitexts.size() + batch_size - 1) / batch_size;
+  
+  batch_set_type batches(batches_size);
+  for (size_type batch = 0; batch != batches_size; ++ batch)
+    batches[batch] = batch;
+  
+  queue_mapper_type     mapper(threads);
+  queue_merger_set_type mergers(threads);
+  
+  typename output_map_reduce_type::queue_type queue_source_target;
+  typename output_map_reduce_type::queue_type queue_target_source;
+  
+  task_set_type tasks(threads, task_type(learner,
+					 bitexts,
 					 dict_source_target,
 					 dict_target_source,
 					 theta_source_target,
 					 theta_target_source,
+					 batch_size, 
 					 mapper,
+					 mergers,
 					 queue_source_target,
-					 queue_target_source,
-					 reducer));
+					 queue_target_source));
   
-  id_set_type ids(bitexts.size());
-  for (size_type i = 0; i != ids.size(); ++ i)
-    ids[i] = i;
-  
-  boost::thread_group workers;
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
-  
+  // assign shard id
+  for (size_type shard = 0; shard != tasks.size(); ++ shard)
+    tasks[shard].shard_ = shard;
+    
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
+
+    std::auto_ptr<boost::progress_display> progress(debug
+						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
+						    : 0);
 
     const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
     
@@ -2096,69 +2204,39 @@ void learn_online(const Learner& learner,
 							     : path_type(),
 							     queue_target_source));
     
-    id_set_type::const_iterator biter     = ids.begin();
-    id_set_type::const_iterator biter_end = ids.end();
-
-    log_likelihood_type log_likelihood_source_target;
-    log_likelihood_type log_likelihood_target_source;
-    size_type samples = 0;
-    size_type num_text = 0;
-
     utils::resource start;
     
-    while (biter < biter_end) {
-      // clear gradients...
-      for (size_type i = 0; i != tasks.size(); ++ i)
-	tasks[i].clear();
+    boost::thread_group workers;
+    
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    typename batch_set_type::const_iterator biter_end = batches.end();
+    for (typename batch_set_type::const_iterator biter = batches.begin(); biter != biter_end; ++ biter) {
+      mapper.push(*biter);
       
-      // clear reducer
-      reducer.clear();
-      
-      // map bitexts
-      id_set_type::const_iterator iter_end = std::min(biter + batch_size, biter_end);
-      for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter) {
-	
-	mapper.push(*iter);
-	
-	++ num_text;
-	if (debug) {
-	  if (num_text % DEBUG_DOT == 0)
-	    std::cerr << '.';
-	  if (num_text % DEBUG_LINE == 0)
-	    std::cerr << '\n';
-	}
-      }
-      
-      // wait...
-      reducer.wait(iter_end - biter);
-      biter = iter_end;
-      
-      // merge gradients
-      log_likelihood_source_target += tasks.front().log_likelihood_source_target_;
-      log_likelihood_target_source += tasks.front().log_likelihood_target_source_;
-      for (size_type i = 1; i != tasks.size(); ++ i) {
-	tasks.front().gradient_source_target_ += tasks[i].gradient_source_target_;
-	tasks.front().gradient_target_source_ += tasks[i].gradient_target_source_;
-	
-	log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
-	log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
-      }
-
-      embedding_source_target.assign(tasks.front().gradient_source_target_);
-      embedding_target_source.assign(tasks.front().gradient_target_source_);
-      
-      // update model parameters
-      learner_source_target(theta_source_target, tasks.front().gradient_source_target_, embedding_target_source);
-      learner_target_source(theta_target_source, tasks.front().gradient_target_source_, embedding_source_target);
+      if (debug)
+	++ (*progress);
     }
+    
+    // termination
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      mapper.push(size_type(-1));
+    
+    workers.join_all();
+    
+    queue_source_target.push(typename output_map_reduce_type::value_type());
+    queue_target_source.push(typename output_map_reduce_type::value_type());
     
     utils::resource end;
     
-    queue_source_target.push(output_map_reduce_type::value_type());
-    queue_target_source.push(output_map_reduce_type::value_type());
+    log_likelihood_type log_likelihood_source_target;
+    log_likelihood_type log_likelihood_target_source;
     
-    if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
-      std::cerr << std::endl;
+    for (size_type i = 0; i != tasks.size(); ++ i) {
+      log_likelihood_source_target += tasks[i].log_likelihood_source_target_;
+      log_likelihood_target_source += tasks[i].log_likelihood_target_source_;
+    }
     
     if (debug)
       std::cerr << "log-likelihood P(target | source): " << static_cast<double>(log_likelihood_source_target) << std::endl
@@ -2172,11 +2250,11 @@ void learn_online(const Learner& learner,
     
     // shuffle bitexts!
     {
-      id_set_type::iterator biter     = ids.begin();
-      id_set_type::iterator biter_end = ids.end();
+      typename batch_set_type::iterator biter     = batches.begin();
+      typename batch_set_type::iterator biter_end = batches.end();
       
       while (biter < biter_end) {
-	id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	typename batch_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
 	
 	std::random_shuffle(biter, iter_end);
 	biter = iter_end;
@@ -2187,15 +2265,9 @@ void learn_online(const Learner& learner,
     output_target_source.join();
   }
 
-  // termination
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    mapper.push(size_type(-1));
-
-  workers.join_all();
-
-  // finalize model...
-  theta_source_target.finalize();
-  theta_target_source.finalize();
+  // copy models
+  theta_source_target = tasks.front().theta_source_target_;
+  theta_target_source = tasks.front().theta_target_source_;
 }
 
 struct TaskViterbi
@@ -2300,7 +2372,7 @@ void viterbi(const bitext_set_type& bitexts,
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputAlignment  output_alignment_type;
 
-  task_type::queue_type   mapper(256 * threads);
+  task_type::queue_type   mapper(64 * threads);
   
   output_map_reduce_type::queue_type queue_source_target;
   output_map_reduce_type::queue_type queue_target_source;
@@ -2331,25 +2403,20 @@ void viterbi(const bitext_set_type& bitexts,
   if (debug)
     std::cerr << "Viterbi alignment" << std::endl;
 
+  std::auto_ptr<boost::progress_display> progress(debug
+						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
+						  : 0);
+
   utils::resource start;
   
   // actually run...
-  size_type num_text = 0;
   for (size_type id = 0; id != bitexts.size(); ++ id) {
     mapper.push(id);
     
-    ++ num_text;
-    if (debug) {
-      if (num_text % DEBUG_DOT == 0)
-	std::cerr << '.';
-      if (num_text % DEBUG_LINE == 0)
-	std::cerr << '\n';
-    }
+    if (debug)
+      ++ (*progress);
   }
-  
-  if (debug && ((num_text / DEBUG_DOT) % DEBUG_WRAP))
-    std::cerr << std::endl;
-  
+    
   // termination
   for (size_type i = 0; i != tasks.size(); ++ i)
     mapper.push(size_type(-1));
@@ -2510,6 +2577,9 @@ void read_data(const path_type& source_file,
 
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
   dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
+
+  dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
+  dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
   
   dict_source_target.initialize();
   dict_target_source.initialize();

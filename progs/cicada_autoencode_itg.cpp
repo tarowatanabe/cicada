@@ -123,7 +123,7 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), hidden_(0), count_(0) {}
+  Gradient() : embedding_(0), hidden_(0), count_(0), shared_(0) {}
   Gradient(const size_type& embedding,
 	   const size_type& hidden) 
     : embedding_(embedding),
@@ -940,6 +940,8 @@ struct ITG
   
   typedef bitext_type::word_type     word_type;
   typedef bitext_type::sentence_type sentence_type;
+
+  typedef std::vector<parameter_type, std::allocator<parameter_type> > buffer_type;
   
   struct Span
   {
@@ -1051,22 +1053,32 @@ struct ITG
   {
     typedef State state_type;
     
-    State() : span_(), left_(0), right_(0) {}
-    State(const span_pair_type& span, const state_type* left=0, const state_type* right=0)
-      : span_(span), left_(left), right_(right) {}
+    State() : span_(),
+	      left_(),
+	      right_(),
+	      loss_(std::numeric_limits<double>::infinity()) {}
+    State(const span_pair_type& span)
+      : span_(span),
+	left_(),
+	right_(),
+	loss_(std::numeric_limits<double>::infinity()) {}
+    State(const span_pair_type& span, const span_pair_type left, const span_pair_type& right)
+      : span_(span),
+	left_(left),
+	right_(right),
+	loss_(std::numeric_limits<double>::infinity()) {}
     
     bool aligned()  const { return ! span_.source_.empty() && ! span_.target_.empty(); }
-    bool terminal() const { return ! left_  && ! right_; }
-    bool straight() const { return ! terminal() && left_->span_.target_.last_ == right_->span_.target_.first_; }
-    bool inverted() const { return ! terminal() && left_->span_.target_.first_ == right_->span_.target_.last_; }
+    bool terminal() const { return left_.empty() && right_.empty(); }
+    bool straight() const { return ! terminal() && left_.target_.last_  == right_.target_.first_; }
+    bool inverted() const { return ! terminal() && left_.target_.first_ == right_.target_.last_; }
     
-    span_pair_type    span_;
-    const state_type* left_;
-    const state_type* right_;
+    span_pair_type span_;
+    span_pair_type left_;
+    span_pair_type right_;
     
     // other state related data
     double loss_;
-    double cost_;
     
     tensor_type layer_;
     tensor_type layer_norm_;
@@ -1076,31 +1088,45 @@ struct ITG
   };
 
   typedef State state_type;
+    
+  typedef utils::vector2<state_type, std::allocator<state_type> > terminal_set_type;
+  typedef utils::bichart<state_type, std::allocator<state_type> > chart_type;
+
+  typedef std::pair<double, span_pair_type> loss_span_pair_type;
+  typedef std::vector<loss_span_pair_type, std::allocator<loss_span_pair_type> > heap_type;  
   
   struct heap_compare
   {
     // sort by greater item so that we can pop from less items
-    bool operator()(const state_type* x, const state_type* y) const
+    bool operator()(const loss_span_pair_type& x, const loss_span_pair_type& y) const
     {
-      return x->cost_ > y->cost_;
+      return x.first > y.first;
     }
   };
-
-  typedef utils::chunk_vector<state_type, 1024 * 16 / sizeof(state_type), std::allocator<state_type> > state_set_type;
-  typedef utils::vector2<state_type, std::allocator<state_type> > terminal_set_type;
-
-  typedef std::vector<const state_type*, std::allocator<const state_type*> > heap_type;
-  typedef std::vector<heap_type, std::allocator<heap_type> > agenda_type;
-  typedef utils::bichart<heap_type, std::allocator<heap_type> > chart_type;
+  
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
+  typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
 
   typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > derivation_type;
-  typedef std::vector<const state_type*, std::allocator<const state_type*> > stack_type;
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
 
-  typedef std::pair<const state_type*, const state_type*> state_pair_type;
-  typedef utils::compact_set<state_pair_type,
-			     utils::unassigned<state_pair_type>, utils::unassigned<state_pair_type>,
-			     utils::hashmurmur3<size_t>, std::equal_to<state_pair_type>,
-			     std::allocator<state_pair_type> > state_pair_unique_type;
+  typedef std::pair<span_pair_type, span_pair_type> tail_set_type;
+  
+  struct tail_set_unassigned
+  {
+    tail_set_type operator()() const
+    {
+      return tail_set_type(span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
+					  span_type::index_type(-1), span_type::index_type(-1)),
+			   span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
+					  span_type::index_type(-1), span_type::index_type(-1)));
+    }
+  };
+  
+  typedef utils::compact_set<tail_set_type,
+			     tail_set_unassigned, tail_set_unassigned,
+			     utils::hashmurmur3<size_t>, std::equal_to<tail_set_type>,
+			     std::allocator<tail_set_type> > tail_set_unique_type;
 
   struct RestCost
   {
@@ -1130,17 +1156,23 @@ struct ITG
 
   size_type beam_;
   
-  chart_type     chart_;
-  agenda_type    agenda_;
-  state_set_type states_;
+  chart_type  chart_;
+  agenda_type agenda_;
+  heap_type   heap_;
 
   terminal_set_type terminals_;
 
   rest_cost_set_type costs_source_;
   rest_cost_set_type costs_target_;
   
-  state_pair_unique_type uniques_;
+  tail_set_unique_type uniques_;
   stack_type stack_;
+
+  buffer_type buffer_layer_;
+  buffer_type buffer_layer_norm_;
+
+  buffer_type buffer_y_;
+  buffer_type buffer_y_minus_c_;
 
   struct tanh
   {
@@ -1202,7 +1234,7 @@ struct ITG
   {
     chart_.clear();
     agenda_.clear();
-    states_.clear();
+    heap_.clear();
 
     terminals_.clear();
     costs_source_.clear();
@@ -1268,6 +1300,7 @@ struct ITG
 #endif
 
     // forward actual forward path
+    const double infty = std::numeric_limits<double>::infinity();
     const size_type length_max = source_size + target_size;
     
     for (size_type length = 1; length != length_max; ++ length) 
@@ -1275,11 +1308,27 @@ struct ITG
 	
 	//std::cerr << "length: " << length << std::endl;
 
-	heap_type& heap = agenda_[length];
+	span_pair_set_type& spans = agenda_[length];
+	
+	heap_.clear();
+	heap_.reserve(spans.size());
 
-	heap_type::iterator hiter_begin = heap.begin();
-	heap_type::iterator hiter       = heap.end();
-	heap_type::iterator hiter_end   = heap.end();
+	span_pair_set_type::const_iterator siter_end = spans.end();
+	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter) {
+	  const double loss = (chart_(siter->source_.first_, siter->source_.last_,
+				      siter->target_.first_, siter->target_.last_).loss_
+			       + std::max(costs_source_[siter->source_.first_].alpha_
+					  + costs_source_[siter->source_.last_].beta_,
+					  costs_target_[siter->target_.first_].alpha_
+					  + costs_target_[siter->target_.last_].beta_));
+	  
+	  heap_.push_back(loss_span_pair_type(loss, *siter));
+	  std::push_heap(heap_.begin(), heap_.end(), heap_compare());
+	}
+	
+	heap_type::iterator hiter_begin = heap_.begin();
+	heap_type::iterator hiter       = heap_.end();
+	heap_type::iterator hiter_end   = heap_.end();
 	
 	if (length > 2 && std::distance(hiter_begin, hiter_end) > beam_) {
 	  std::make_heap(hiter_begin, hiter_end, heap_compare());
@@ -1291,21 +1340,12 @@ struct ITG
 	
 	// clear uniques
 	uniques_.clear();
-
-	// first, put into chart
-	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
-	  const state_type* state = *iter;
-	  const span_pair_type& span = state->span_;
-	  
-	  if (! state->terminal())
-	    chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(state);
-	}
 	
 	// then, enumerate new hypotheses
 	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
-	  const state_type* state = *iter;
+	  //std::cerr << "length: " << length << " loss: " << iter->first << std::endl;
 	  
-	  const span_pair_type& span = state->span_;
+	  const span_pair_type& span = iter->second;
 	  
 	  // we borrow the notation...
 	  const difference_type l = length;
@@ -1329,12 +1369,14 @@ struct ITG
 	      // span1: SsUu
 	      // span2: stuv
 	      
-	      const heap_type& states = chart_(S, s, U, u);
+	      if (chart_(S, s, U, u).loss_ == infty) continue;
 	      
-	      heap_type::const_iterator siter_end = states.end();
-	      for (heap_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
-		if (uniques_.insert(std::make_pair(*siter, state)).second)
-		  forward(source, target, span_pair_type(S, t, U, v), *siter, state, theta, true);
+	      const span_pair_type  span1(S, s, U, u);
+	      const span_pair_type& span2(span);
+	      
+	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      forward(source, target, span_pair_type(S, t, U, v), span1, span2, theta, true);
 	    }
 
 	    // inversion
@@ -1343,12 +1385,14 @@ struct ITG
 	      // span1: SsvU
 	      // span2: stuv
 
-	      const heap_type& states = chart_(S, s, v, U);
-		
-	      heap_type::const_iterator siter_end = states.end();
-	      for (heap_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
-		if (uniques_.insert(std::make_pair(*siter, state)).second)
-		  forward(source, target, span_pair_type(S, t, u, U), *siter, state, theta, false);
+	      if (chart_(S, s, v, U).loss_ == infty) continue;
+	      
+	      const span_pair_type  span1(S, s, v, U);
+	      const span_pair_type& span2(span);
+	      
+	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      forward(source, target, span_pair_type(S, t, u, U), span1, span2, theta, false);
 	    }
 	  }
 	  
@@ -1361,12 +1405,14 @@ struct ITG
 	      // span1: stuv
 	      // span2: tSUu
 	      
-	      const heap_type& states = chart_(t, S, U, u);
+	      if (chart_(t, S, U, u).loss_ == infty) continue;
 	      
-	      heap_type::const_iterator siter_end = states.end();
-	      for (heap_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
-		if (uniques_.insert(std::make_pair(state, *siter)).second)
-		  forward(source, target, span_pair_type(s, S, U, v), state, *siter, theta, false);
+	      const span_pair_type& span1(span);
+	      const span_pair_type  span2(t, S, U, u);
+	      
+	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      forward(source, target, span_pair_type(s, S, U, v), span1, span2, theta, false);
 	    }
 	    
 	    // straight
@@ -1375,32 +1421,28 @@ struct ITG
 	      // span1: stuv
 	      // span2: tSvU
 		
-	      const heap_type& states = chart_(t, S, v, U);
+	      if (chart_(t, S, v, U).loss_ == infty) continue;
+
+	      const span_pair_type& span1(span);
+	      const span_pair_type  span2(t, S, v, U);
 	      
-	      heap_type::const_iterator siter_end = states.end();
-	      for (heap_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
-		if (uniques_.insert(std::make_pair(state, *siter)).second)
-		  forward(source, target, span_pair_type(s, S, u, U), state, *siter, theta, true);
+	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      
+	      forward(source, target, span_pair_type(s, S, u, U), span1, span2, theta, true);
 	    }
 	  }
 	}
       }
     
-    if (agenda_[length_max].empty())
-      return std::numeric_limits<double>::infinity();
-    else {
-      heap_type& heap = agenda_[length_max];
-      
-      std::make_heap(heap.begin(), heap.end(), heap_compare());
-      
-      return heap.front()->loss_;
-    }
+    return chart_(0, source_size, 0, target_size).loss_;
   }
   
   void forward_terminals(const sentence_type& source,
 			 const sentence_type& target,
 			 const model_type& theta)
   {
+    typedef Eigen::Map<tensor_type> matrix_type;
+
 #if 0
     std::cerr << "terminals source: " << source << std::endl
 	      << "terminals target: " << target << std::endl;
@@ -1414,6 +1456,12 @@ struct ITG
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
+
+    buffer_y_.resize(embedding_size * 2);
+    buffer_y_minus_c_.resize(embedding_size * 2);
+    
+    matrix_type y(&(*buffer_y_.begin()), embedding_size * 2, 1);
+    matrix_type y_minus_c(&(*buffer_y_minus_c_.begin()), embedding_size * 2, 1);
     
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
@@ -1421,7 +1469,7 @@ struct ITG
 	
 	const word_type& word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
 	const word_type& word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
-
+	
 	state.layer_ = (theta.bt1_
 			+ (theta.Wt1_.block(0, offset_source, hidden_size, embedding_size)
 			   * theta.source_.col(word_source.id())
@@ -1432,9 +1480,8 @@ struct ITG
 	
 	state.layer_norm_ = state.layer_.normalized();
 	
-	const tensor_type y = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
+	y = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
 	
-	tensor_type y_minus_c = tensor_type::Zero(embedding_size * 2, 1);
 	y_minus_c.block(offset_source, 0, embedding_size, 1) = (y.block(offset_source, 0, embedding_size, 1).normalized()
 								- theta.source_.col(word_source.id()) * theta.scale_);
 	y_minus_c.block(offset_target, 0, embedding_size, 1) = (y.block(offset_target, 0, embedding_size, 1).normalized()
@@ -1482,69 +1529,84 @@ struct ITG
 	       const span_pair_type& span,
 	       const model_type& theta)
   {
-    state_type& state = allocate(span);
+
+    state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
     
     state = terminals_(span.source_.empty() ? 0 : span.source_.first_ + 1, span.target_.empty() ? 0 : span.target_.first_ + 1);
     
     state.span_ = span;
-    state.cost_ = state.loss_ + std::max(costs_source_[span.source_.first_].alpha_ + costs_source_[span.source_.last_].beta_,
-					 costs_target_[span.target_.first_].alpha_ + costs_target_[span.target_.last_].beta_);
     
-    chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
-    agenda_[span.size()].push_back(&state);
+    agenda_[span.size()].push_back(span);
   }
   
   // binary rules
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& span,
-	       const state_type* state1,
-	       const state_type* state2,
+	       const span_pair_type& span1,
+	       const span_pair_type& span2,
 	       const model_type& theta,
 	       const bool straight)
   {
+    typedef Eigen::Map<tensor_type> matrix_type;
+    
     const size_type hidden_size    = theta.hidden_;
     const size_type embedding_size = theta.embedding_;
 
     const size_type offset_left  = 0;
     const size_type offset_right = hidden_size;
-
-    state_type& state = allocate(span, state1, state2);
     
-    const span_pair_type& span1 = state1->span_;
-    const span_pair_type& span2 = state2->span_;
-
     //std::cerr << "span: " << span << " left: " << span1 << " right: " << span2 << std::endl;
 
+    /**/  state_type& state  = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+    const state_type& state1 = chart_(span1.source_.first_, span1.source_.last_, span1.target_.first_, span1.target_.last_);
+    const state_type& state2 = chart_(span2.source_.first_, span2.source_.last_, span2.target_.first_, span2.target_.last_);
+    
     const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
     const tensor_type& br1 = (straight ? theta.bs1_ : theta.bi1_);
     const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
     const tensor_type& br2 = (straight ? theta.bs2_ : theta.bi2_);
     
-    state.layer_ = (br1
-		    + Wr1.block(0, offset_left, hidden_size, hidden_size) * state1->layer_
-		    + Wr1.block(0, offset_right, hidden_size, hidden_size) * state2->layer_).array().unaryExpr(htanh());
+    buffer_layer_.resize(hidden_size);
+    buffer_layer_norm_.resize(hidden_size);
+    buffer_y_.resize(hidden_size * 2);
+    buffer_y_minus_c_.resize(hidden_size * 2);
     
-    state.layer_norm_ = state.layer_.normalized();
+    matrix_type layer(&(*buffer_layer_.begin()), hidden_size, 1);
+    matrix_type layer_norm(&(*buffer_layer_norm_.begin()), hidden_size, 1);
+    matrix_type y(&(*buffer_y_.begin()), hidden_size * 2, 1);
+    matrix_type y_minus_c(&(*buffer_y_minus_c_.begin()), hidden_size * 2, 1);
+
+    layer = (br1
+	     + Wr1.block(0, offset_left, hidden_size, hidden_size) * state1.layer_
+	     + Wr1.block(0, offset_right, hidden_size, hidden_size) * state2.layer_).array().unaryExpr(htanh());
     
-    const tensor_type y = (Wr2 * state.layer_norm_ + br2).array().unaryExpr(htanh());
+    layer_norm = layer.normalized();
     
-    tensor_type y_minus_c = tensor_type::Zero(hidden_size * 2, 1);
+    y = (Wr2 * layer_norm + br2).array().unaryExpr(htanh());
+    
     y_minus_c.block(offset_left, 0, hidden_size, 1)  = (y.block(offset_left, 0, hidden_size, 1).normalized()
-							- state1->layer_);
+							- state1.layer_);
     y_minus_c.block(offset_right, 0, hidden_size, 1) = (y.block(offset_right, 0, hidden_size, 1).normalized()
-							- state2->layer_);
+							- state2.layer_);
     
-    state.loss_                 = 0.5 * y_minus_c.squaredNorm() + state1->loss_ + state2->loss_;
-    state.cost_                 = state.loss_ + std::max(costs_source_[span.source_.first_].alpha_
-							 + costs_source_[span.source_.last_].beta_,
-							 costs_target_[span.target_.first_].alpha_
-							 + costs_target_[span.target_.last_].beta_);
-    state.reconstruction_       = y_minus_c;
-    state.delta_reconstruction_ = y.array().unaryExpr(dhtanh()) * y_minus_c.array();
+    const double loss = 0.5 * y_minus_c.squaredNorm() + state1.loss_ + state2.loss_;
     
-    //chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
-    agenda_[span.size()].push_back(&state);
+    if (loss < state.loss_) {
+      if (state.loss_ == std::numeric_limits<double>::infinity())
+	agenda_[span.size()].push_back(span);
+
+      state.span_  = span;
+      state.left_  = span1;
+      state.right_ = span2;
+      
+      state.loss_ = loss;
+      
+      state.layer_                = layer;
+      state.layer_norm_           = layer_norm;
+      state.reconstruction_       = y_minus_c;
+      state.delta_reconstruction_ = y.array().unaryExpr(dhtanh()) * y_minus_c.array();
+    }
   }
   
   template <typename Gen>
@@ -1554,15 +1616,11 @@ struct ITG
 		gradient_type& gradient,
 		Gen& gen)
   {
-    const heap_type& heap = agenda_[source.size() + target.size()];
-    
 #if 0
     std::cerr << "backward source: " << source << std::endl
 	      << "backward target: " << target << std::endl;
 #endif
 
-    if (heap.empty()) return;
-    
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
@@ -1577,47 +1635,49 @@ struct ITG
 
     ++ gradient.count_;
 
-    const_cast<tensor_type&>(heap.front()->delta_) = tensor_type::Zero(hidden_size, 1);
+    state_type& root = chart_(0, source_size, 0, target_size);
+    
+    root.delta_ = tensor_type::Zero(hidden_size, 1);
     
     stack_.clear();
-    stack_.push_back(heap.front());
+    stack_.push_back(span_pair_type(0, source_size, 0, target_size));
     
     while (! stack_.empty()) {
-      const state_type* state = stack_.back();
+      const span_pair_type span = stack_.back();
       stack_.pop_back();
-
-      if (state->terminal()) {
-	const span_pair_type& span = state->span_;
-
+      
+      state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+      
+      if (state.terminal()) {
 	const word_type& word_source = (span.source_.empty() ? vocab_type::EPSILON : source[span.source_.first_]);
 	const word_type& word_target = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
 	
 	// increment delta from reconstruction
-	const_cast<tensor_type&>(state->delta_).array() += (state->layer_.array().unaryExpr(dhtanh())
-							    * (theta.Wt2_.transpose() * state->delta_reconstruction_).array());
+	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
+				 * (theta.Wt2_.transpose() * state.delta_reconstruction_).array());
 	
-	gradient.Wt1_.block(0, offset_source, hidden_size, embedding_size) += (state->delta_
+	gradient.Wt1_.block(0, offset_source, hidden_size, embedding_size) += (state.delta_
 									       * theta.source_.col(word_source.id()).transpose()
 									       * theta.scale_);
-	gradient.Wt1_.block(0, offset_target, hidden_size, embedding_size) += (state->delta_
+	gradient.Wt1_.block(0, offset_target, hidden_size, embedding_size) += (state.delta_
 									       * theta.target_.col(word_target.id()).transpose()
 									       * theta.scale_);
-	gradient.bt1_ += state->delta_;
+	gradient.bt1_ += state.delta_;
 	
-	gradient.Wt2_ += state->delta_reconstruction_ * state->layer_norm_.transpose();
-	gradient.bt2_ += state->delta_reconstruction_;
+	gradient.Wt2_ += state.delta_reconstruction_ * state.layer_norm_.transpose();
+	gradient.bt2_ += state.delta_reconstruction_;
 	
 	gradient.source(word_source) += (theta.Wt1_.block(0, offset_source, hidden_size, embedding_size).transpose()
-					 * state->delta_
-					 - state->reconstruction_.block(offset_source, 0, embedding_size, 1));
+					 * state.delta_
+					 - state.reconstruction_.block(offset_source, 0, embedding_size, 1));
 	gradient.target(word_target) += (theta.Wt1_.block(0, offset_target, hidden_size, embedding_size).transpose()
-					 * state->delta_
-					 - state->reconstruction_.block(offset_target, 0, embedding_size, 1));
+					 * state.delta_
+					 - state.reconstruction_.block(offset_target, 0, embedding_size, 1));
       } else {
-	stack_.push_back(state->left_);
-	stack_.push_back(state->right_);
+	stack_.push_back(state.left_);
+	stack_.push_back(state.right_);
 	
-	const bool straight = state->straight();
+	const bool straight = state.straight();
 
 	const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
 	const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
@@ -1628,27 +1688,30 @@ struct ITG
 	tensor_type& dbr2 = (straight ? gradient.bs2_ : gradient.bi2_);
 
 	// increment delta from reconstruction
-	const_cast<tensor_type&>(state->delta_).array() += (state->layer_.array().unaryExpr(dhtanh())
-							    * (Wr2.transpose() * state->delta_reconstruction_).array());
+	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
+				 * (Wr2.transpose() * state.delta_reconstruction_).array());
 
+	state_type& state_left  = chart_(state.left_.source_.first_, state.left_.source_.last_,
+					 state.left_.target_.first_, state.left_.target_.last_);
+	state_type& state_right = chart_(state.right_.source_.first_, state.right_.source_.last_,
+					 state.right_.target_.first_, state.right_.target_.last_);
 	
+	dWr1.block(0, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
+	dWr1.block(0, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
+	dbr1 += state.delta_;
 	
-	dWr1.block(0, offset_left,  hidden_size, hidden_size) += state->delta_ * state->left_->layer_.transpose();
-	dWr1.block(0, offset_right, hidden_size, hidden_size) += state->delta_ * state->right_->layer_.transpose();
-	dbr1 += state->delta_;
+	dWr2 += state.delta_reconstruction_ * state.layer_norm_.transpose();
+	dbr2 += state.delta_reconstruction_;
 	
-	dWr2 += state->delta_reconstruction_ * state->layer_norm_.transpose();
-	dbr2 += state->delta_reconstruction_;
+	tensor_type& delta_left  = state_left.delta_;
+	tensor_type& delta_right = state_right.delta_;
 	
-	tensor_type& delta_left  = const_cast<tensor_type&>(state->left_->delta_);
-	tensor_type& delta_right = const_cast<tensor_type&>(state->right_->delta_);
-	
-	delta_left  = (state->left_->layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(0, offset_left, hidden_size, hidden_size).transpose() * state->delta_
-			  - state->reconstruction_.block(offset_left, 0, hidden_size, 1)).array());
-	delta_right = (state->right_->layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(0, offset_right, hidden_size, hidden_size).transpose() * state->delta_
-			  - state->reconstruction_.block(offset_right, 0, hidden_size, 1)).array());
+	delta_left  = (state_left.layer_.array().unaryExpr(dhtanh())
+		       * (Wr1.block(0, offset_left, hidden_size, hidden_size).transpose() * state.delta_
+			  - state.reconstruction_.block(offset_left, 0, hidden_size, 1)).array());
+	delta_right = (state_right.layer_.array().unaryExpr(dhtanh())
+		       * (Wr1.block(0, offset_right, hidden_size, hidden_size).transpose() * state.delta_
+			  - state.reconstruction_.block(offset_right, 0, hidden_size, 1)).array());
       }
     }
   }
@@ -1659,37 +1722,27 @@ struct ITG
   {
     d.clear();
     
-    const heap_type& heap = agenda_[source.size() + target.size()];
-    
-    if (heap.empty()) return;
-    
     stack_.clear();
-    stack_.push_back(heap.front());
-
+    stack_.push_back(span_pair_type(0, source.size(), 0, target.size()));
+    
     while (! stack_.empty()) {
-      const state_type* state = stack_.back();
+      const span_pair_type span = stack_.back();
       stack_.pop_back();
+
+      const state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
       
-      if (state->terminal())
-	d.push_back(hyperedge_type(state->span_));
+      if (state.terminal())
+	d.push_back(hyperedge_type(span));
       else {
-	d.push_back(hyperedge_type(state->span_, state->left_->span_, state->right_->span_));
+	d.push_back(hyperedge_type(span, state.left_, state.right_));
 	
 	// we will push in right-to-left order...!
-	stack_.push_back(state->right_);
-	stack_.push_back(state->left_);
+	stack_.push_back(state.right_);
+	stack_.push_back(state.left_);
       }
     }
   }
 
-  state_type& allocate(const span_pair_type& span,
-		       const state_type* state1 = 0,
-		       const state_type* state2 = 0)
-  {
-    states_.push_back(state_type(span, state1, state2));
-    
-    return states_.back();
-  }
 };
 
 struct LearnAdaGrad
@@ -2024,10 +2077,6 @@ typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
 typedef Model model_type;
 typedef Dictionary dictionary_type;
-
-static const size_t DEBUG_DOT  = 10000;
-static const size_t DEBUG_WRAP = 100;
-static const size_t DEBUG_LINE = DEBUG_DOT * DEBUG_WRAP;
 
 path_type source_file;
 path_type target_file;
@@ -2869,7 +2918,6 @@ void learn_online(const Learner& learner,
       loss   += tasks[i].loss_;
       parsed += tasks[i].parsed_;
     }
-    
 
     if (debug)
       std::cerr << "reconstruction error: " << static_cast<double>(loss) << std::endl
@@ -3004,7 +3052,7 @@ void derivation(const bitext_set_type& bitexts,
   typedef OutputDerivation output_derivation_type;
   typedef OutputAlignment  output_alignment_type;
 
-  task_type::queue_type   mapper(256 * threads);
+  task_type::queue_type   mapper(8 * threads);
   output_map_reduce_type::queue_type queue_derivation;
   output_map_reduce_type::queue_type queue_alignment;
   
@@ -3037,10 +3085,18 @@ void derivation(const bitext_set_type& bitexts,
   if (debug)
     std::cerr << "max derivation" << std::endl;
 
+  std::auto_ptr<boost::progress_display> progress(debug
+						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
+						  : 0);
+
   utils::resource start;
   
-  for (size_type i = 0; i != bitexts.size(); ++ i)
+  for (size_type i = 0; i != bitexts.size(); ++ i) {
     mapper.push(i);
+    
+    if (debug)
+      ++ (*progress);
+  }
   
   // termination
   for (size_type i = 0; i != tasks.size(); ++ i)
