@@ -777,6 +777,11 @@ struct Dictionary
       return dicts_[vocab_type::UNK.id()].draw(gen);
   }
 
+  size_type size(const word_type& source) const
+  {
+    return (dicts_.exists(source.id()) ? dicts_[source.id()].words_.size() : size_type(0));
+  }
+
   dict_set_type dicts_;
 };
 
