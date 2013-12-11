@@ -1130,11 +1130,14 @@ struct HMM
   };
   
   HMM(const dictionary_type& dict,
+      const size_type& samples,
       const size_type& beam)
-    : dict_(dict), beam_(beam) {}
+    : dict_(dict), samples_(samples), log_samples_(std::log(double(samples))), beam_(beam) {}
   
   const dictionary_type& dict_;
-
+  
+  size_type samples_;
+  double log_samples_;
   size_type beam_;
   
   tensor_type layer_trans_;
@@ -1403,9 +1406,15 @@ struct HMM
       const heap_type& heap = heaps_[target_size + 1];
       
       heap_type::const_iterator hiter_end = heap.end();
+      
+      double logsum = - std::numeric_limits<double>::infinity();
+      for (heap_type::const_iterator hiter = std::max(heap.begin(), hiter_end - beam_); hiter != hiter_end; ++ hiter)
+	logsum = utils::mathop::logsum(logsum, double(hiter->score()));
+
       for (heap_type::const_iterator hiter = std::max(heap.begin(), hiter_end - beam_); hiter != hiter_end; ++ hiter) {
 	state_type buffer = state_allocator_.allocate();
 	
+	buffer.score() = std::exp(double(hiter->score()) - logsum);
 	matrix_type(buffer.matrix(), state_size, 1).setZero();
 	
 	states[*hiter] = buffer;
@@ -1437,6 +1446,7 @@ struct HMM
 	if (piter == states_prev.end()) {
 	  state_type buffer = state_allocator_.allocate();
 	  
+	  buffer.score() = 0.0;
 	  matrix_type(buffer.matrix(), state_size, 1).setZero();
 	  
 	  piter = states_prev.insert(std::make_pair(state_prev, buffer)).first;
@@ -1447,6 +1457,11 @@ struct HMM
 	
 	const size_type next = state_next.index();
 	const size_type prev = state_prev.index();
+
+	const double weight = siter->second.score();
+	piter->second.score() += siter->second.score();
+
+	//std::cerr << "target: " << trg << " weight: " << weight << std::endl;
 	
 	const word_type source_next(next >= source_size + 2
 				    ? vocab_type::EPSILON
@@ -1500,11 +1515,11 @@ struct HMM
 	
 	const double logprob_noise_c = score_noise_c - z_c;
 	const double logprob_noise_m = score_noise_m - z_m;
-
-	log_likelihood += logprob_c + logprob_noise_m;
 	
-	const double loss_c = - 1.0 + std::exp(logprob_c);
-	const double loss_m =         std::exp(logprob_m);
+	log_likelihood += (logprob_c + logprob_noise_m) * weight;
+	
+	const double loss_c = weight * (- 1.0 + std::exp(logprob_c));
+	const double loss_m = weight * (        std::exp(logprob_m));
 	
 	tensor_type& dembedding_c = gradient.target(target_next);
 	tensor_type& dembedding_m = gradient.target(target_sampled);
@@ -2130,6 +2145,7 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 4;
+int sample_size = 10;
 int beam_size = 10;
 int cutoff = 3;
 double lambda = 0;
@@ -2177,6 +2193,10 @@ int main(int argc, char** argv)
     if (alignment <= 1)
       throw std::runtime_error("order size should be positive");
 
+    if (sample_size <= 0)
+      throw std::runtime_error("invalid sample size");
+    if (beam_size <= 0)
+      throw std::runtime_error("invalid beam size");
     if (batch_size <= 0)
       throw std::runtime_error("invalid batch size");
 
@@ -2542,8 +2562,8 @@ struct TaskAccumulate
       mergers_(mergers),
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
-      hmm_source_target_(dict_source_target, beam_size),
-      hmm_target_source_(dict_target_source, beam_size),
+      hmm_source_target_(dict_source_target, sample_size, beam_size),
+      hmm_target_source_(dict_target_source, sample_size, beam_size),
       batch_size_(batch_size)
   {
     generator_.seed(utils::random_seed());
@@ -2936,8 +2956,8 @@ struct TaskViterbi
       queue_(queue),
       queue_source_target_(queue_source_target),
       queue_target_source_(queue_target_source),
-      hmm_source_target_(dict_source_target, beam_size),
-      hmm_target_source_(dict_target_source, beam_size) {}
+      hmm_source_target_(dict_source_target, sample_size, beam_size),
+      hmm_target_source_(dict_target_source, sample_size, beam_size) {}
 
   void operator()()
   {
@@ -3243,13 +3263,14 @@ void options(int argc, char** argv)
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
-    ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
-    ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
-    ("beam",              po::value<int>(&beam_size)->default_value(beam_size),   "histogram beam size")
-    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
-    ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
-    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
-    ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
+    ("iteration",         po::value<int>(&iteration)->default_value(iteration),     "max # of iterations")
+    ("batch",             po::value<int>(&batch_size)->default_value(batch_size),   "mini-batch size")
+    ("sample",            po::value<int>(&sample_size)->default_value(sample_size), "sampling size")
+    ("beam",              po::value<int>(&beam_size)->default_value(beam_size),     "histogram beam size")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),           "cutoff count for vocabulary (<= 1 to keep all)")
+    ("lambda",            po::value<double>(&lambda)->default_value(lambda),        "regularization constant")
+    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),      "regularization constant for bilingual agreement")
+    ("eta0",              po::value<double>(&eta0)->default_value(eta0),            "\\eta_0 for decay")
 
     ("moses",      po::bool_switch(&moses_mode),       "dump alignment in Moses format")
     ("giza",       po::bool_switch(&giza_mode),        "dump alignment in Giza format")

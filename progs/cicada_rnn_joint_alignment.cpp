@@ -2491,6 +2491,10 @@ int main(int argc, char** argv)
     if (window < 0)
       throw std::runtime_error("window size should be zero or positive");
 
+    if (sample_size <= 0)
+      throw std::runtime_error("invalid sample size");
+    if (beam_size <= 0)
+      throw std::runtime_error("invalid beam size");
     if (batch_size <= 0)
       throw std::runtime_error("invalid batch size");
 

@@ -25,7 +25,7 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
-#include <set>
+#include <deque>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -37,6 +37,7 @@
 #include "cicada/sentence.hpp"
 #include "cicada/vocab.hpp"
 #include "cicada/alignment.hpp"
+#include "cicada/bitext.hpp"
 
 #include "utils/alloc_vector.hpp"
 #include "utils/lexical_cast.hpp"
@@ -57,45 +58,35 @@
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
-#include <boost/math/special_functions/expm1.hpp>
-#include <boost/math/special_functions/log1p.hpp>
+#include <boost/progress.hpp>
 
-struct Bitext
+struct Average
 {
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-
-  typedef cicada::Symbol word_type;
-  typedef cicada::Sentence sentence_type;
-  typedef cicada::Vocab vocab_type;
+  Average() : average_(0), count_(0) {}
+  Average(const double& x) : average_(x), count_(1) {}
   
-  Bitext() : source_(), target_() {}
-  Bitext(const sentence_type& source, const sentence_type& target) : source_(source), target_(target) {}
-
-  void clear()
+  Average& operator+=(const double& x)
   {
-    source_.clear();
-    target_.clear();
-  }
-
-  void swap(Bitext& x)
-  {
-    source_.swap(x.source_);
-    target_.swap(x.target_);
+    average_ += (x - average_) / (++ count_);
+    return *this;
   }
   
-  sentence_type source_;
-  sentence_type target_;
+  Average& operator+=(const Average& x)
+  {
+    const uint64_t total = count_ + x.count_;
+    
+    average_ = average_ * (double(count_) / total) + x.average_ * (double(x.count_) / total);
+    count_ = total;
+    
+    return *this;
+  }
+  
+  operator const double&() const { return average_; }
+  
+  double   average_;
+  uint64_t count_;
 };
 
-namespace std
-{
-  inline
-  void swap(Bitext& x, Bitext& y)
-  {
-    x.swap(y);
-  }
-};
 
 struct Gradient
 {
@@ -108,22 +99,22 @@ struct Gradient
   typedef float parameter_type;
   typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
 
-  typedef Bitext bitext_type;
+  typedef cicada::Bitext bitext_type;
+  typedef cicada::Vocab vocab_type;
   
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
-
+  
   typedef utils::unordered_map<word_type, tensor_type,
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
 
   typedef boost::filesystem::path path_type;
   
-  Gradient() : dimension_embedding_(0), dimension_hidden_(0), window_(0), count_(0) {}
+  Gradient() : dimension_embedding_(0), dimension_hidden_(0), window_(0), count_(0), shared_(0) {}
   Gradient(const size_type& dimension_embedding, const size_type& dimension_hidden, const size_type& window) 
     : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden),
-      window_(window), count_(0) { initialize(dimension_embedding, dimension_hidden, window); }
+      window_(window), count_(0), shared_(0) { initialize(dimension_embedding, dimension_hidden, window); }
 
   Gradient& operator-=(const Gradient& x)
   {
@@ -211,6 +202,7 @@ struct Gradient
     bc_.setZero();
 
     count_ = 0;
+    shared_ = 0;
   }
     
   void initialize(const size_type dimension_embedding,
@@ -243,8 +235,21 @@ struct Gradient
     bc_ = tensor_type::Zero(1, 1);
 
     count_ = 0;
+    shared_ = 0;
   }
   
+public:
+  void increment()
+  {
+    utils::atomicop::add_and_fetch(shared_, size_type(1));
+  }
+
+  size_type shared() const
+  {
+    const size_type ret = shared_;
+    utils::atomicop::memory_barrier();
+    return ret;
+  }
   
   // dimension...
   size_type dimension_embedding_;
@@ -268,6 +273,7 @@ struct Gradient
   tensor_type bc_;
 
   size_type count_;
+  size_type shared_;
 };
 
 struct Model
@@ -281,22 +287,28 @@ struct Model
   typedef float parameter_type;
   typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic> tensor_type;
 
-  typedef Bitext bitext_type;
+  typedef cicada::Bitext bitext_type;
+  typedef cicada::Vocab vocab_type;
   
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
 
   typedef std::vector<bool, std::allocator<bool> > unique_set_type;
 
   typedef boost::filesystem::path path_type;
   
   Model() : dimension_embedding_(0), dimension_hidden_(0), window_(0), alpha_(0), beta_(0), scale_(1) {}
-  template <typename Gen>
+  template <typename Words, typename Gen>
   Model(const size_type& dimension_embedding, const size_type& dimension_hidden, const size_type& window,
-	const double& alpha, const double& beta, Gen& gen) 
+	const double& alpha, const double& beta,
+	Words& words_source,
+	Words& words_target,
+	Gen& gen) 
     : dimension_embedding_(dimension_embedding), dimension_hidden_(dimension_hidden),
-      window_(window), alpha_(alpha), beta_(beta), scale_(1) { initialize(dimension_embedding, dimension_hidden, window, gen); }
+      window_(window), alpha_(alpha), beta_(beta), scale_(1)
+  {
+    initialize(dimension_embedding, dimension_hidden, window, words_source, words_target, gen);
+  }
 
   
   void clear()
@@ -342,10 +354,12 @@ struct Model
     double range_;
   };
 
-  template <typename Gen>
+  template <typename Words, typename Gen>
   void initialize(const size_type dimension_embedding,
 		  const size_type dimension_hidden,
 		  const size_type window,
+		  Words& words_source,
+		  Words& words_target,
 		  Gen& gen)
   {
     if (dimension_embedding <= 0)
@@ -382,37 +396,26 @@ struct Model
     bc_ = tensor_type::Ones(1, 1).array();
 
     scale_ = 1;
-  }
-  
-  template <typename IteratorSource, typename IteratorTarget>
-  void embedding(IteratorSource sfirst, IteratorSource slast,
-		 IteratorTarget tfirst, IteratorTarget tlast)
-  {
-    const size_type vocabulary_size = word_type::allocated();
+
     
     words_source_.clear();
     words_target_.clear();
-
-    words_source_.reserve(vocabulary_size);
-    words_target_.reserve(vocabulary_size);
-    
     words_source_.resize(vocabulary_size, false);
     words_target_.resize(vocabulary_size, false);
-    
-    embedding(sfirst, slast, words_source_);
-    embedding(tfirst, tlast, words_target_);
+
+    words_source_[vocab_type::EPSILON.id()] = true;
+    words_target_[vocab_type::EPSILON.id()] = true;
+    words_source_[vocab_type::BOS.id()] = true;
+    words_target_[vocab_type::BOS.id()] = true;
+    words_source_[vocab_type::EOS.id()] = true;
+    words_target_[vocab_type::EOS.id()] = true;
+
+    for (typename Words::const_iterator siter = words_source.begin(); siter != words_source.end(); ++ siter)
+      words_source_[siter->id()] = true;
+    for (typename Words::const_iterator titer = words_target.begin(); titer != words_target.end(); ++ titer)
+      words_target_[titer->id()] = true;
   }
   
-  template <typename Iterator, typename Uniques>
-  void embedding(Iterator first, Iterator last, Uniques& uniques)
-  {
-    uniques[vocab_type::EPSILON.id()] = true;
-    uniques[vocab_type::BOS.id()] = true;
-    uniques[vocab_type::EOS.id()] = true;
-    
-    for (/**/; first != last; ++ first)
-      uniques[first->id()] = true;
-  }
   
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
   {
@@ -422,7 +425,7 @@ struct Model
     }
   };
 
-  boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+  
   
   void read_embedding(const path_type& source_file, const path_type& target_file)
   {
@@ -513,6 +516,8 @@ struct Model
     
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
+
+    karma::real_generator<parameter_type, real_policy> float10;
     
     repository_type rep(path, repository_type::write);
     
@@ -773,12 +778,14 @@ struct Lexicon
 
   typedef model_type::parameter_type parameter_type;
   typedef model_type::tensor_type tensor_type;
+
+  typedef Average loss_type;
   
-  typedef Bitext bitext_type;
+  typedef cicada::Bitext bitext_type;
+  typedef cicada::Vocab vocab_type;
   
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
   
   Lexicon(const dictionary_type& dict_source_target,
 	  const dictionary_type& dict_target_source)
@@ -786,13 +793,13 @@ struct Lexicon
       dict_target_source_(dict_target_source) {}
   
   template <typename Function, typename Derivative, typename Gen>
-  std::pair<double, double> operator()(const sentence_type& source,
-				       const sentence_type& target,
-				       const model_type& theta,
-				       gradient_type& gradient,
-				       Function   func,
-				       Derivative deriv,
-				       Gen& gen)
+  std::pair<loss_type, loss_type> operator()(const sentence_type& source,
+					     const sentence_type& target,
+					     const model_type& theta,
+					     gradient_type& gradient,
+					     Function   func,
+					     Derivative deriv,
+					     Gen& gen)
   {
     typedef gradient_type::embedding_type embedding_type;
     
@@ -803,9 +810,9 @@ struct Lexicon
     const size_type dimension_hidden    = theta.dimension_hidden_;
     const size_type window    = theta.window_;
     
-    double error = 0.0;
-    double error_classification = 0.0;
-
+    loss_type error;
+    loss_type error_classification;
+    
     tensor_type input(dimension_embedding * 2 * (window * 2 + 1), 1);
     tensor_type input_sampled(dimension_embedding * 2 * (window * 2 + 1), 1);
     
@@ -1312,7 +1319,7 @@ struct LearnSGD
 
 typedef boost::filesystem::path path_type;
 
-typedef Bitext bitext_type;
+typedef cicada::Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
 typedef Model model_type;
@@ -1340,7 +1347,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
-int batch_size = 32;
+int batch_size = 4;
 double lambda = 0;
 double eta0 = 0.1;
 int cutoff = 3;
@@ -1355,11 +1362,11 @@ void learn_online(const Learner& learner,
 		  const dictionary_type& dict_source_target,
 		  const dictionary_type& dict_target_source,
 		  model_type& theta);
-void read_bitext(const path_type& source_file,
-		 const path_type& target_file,
-		 bitext_set_type& bitexts,
-		 dictionary_type& dict_source_target,
-		 dictionary_type& dict_target_source);
+void read_data(const path_type& source_file,
+	       const path_type& target_file,
+	       bitext_set_type& bitexts,
+	       dictionary_type& dict_source_target,
+	       dictionary_type& dict_target_source);
 
 void options(int argc, char** argv);
 
@@ -1407,9 +1414,12 @@ int main(int argc, char** argv)
     dictionary_type dict_source_target;
     dictionary_type dict_target_source;
     
-    read_bitext(source_file, target_file, bitexts, dict_source_target, dict_target_source);
+    read_data(source_file, target_file, bitexts, dict_source_target, dict_target_source);
     
-    model_type theta(dimension_embedding, dimension_hidden, window, alpha, beta, generator);
+    const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
+    const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
+    
+    model_type theta(dimension_embedding, dimension_hidden, window, alpha, beta, sources, targets, generator);
 
     if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
       if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
@@ -1420,11 +1430,6 @@ int main(int argc, char** argv)
       
       theta.read_embedding(embedding_source_file, embedding_target_file);
     }
-
-    const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
-    const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
-    
-    theta.embedding(sources.begin(), sources.end(), targets.begin(), targets.end());
     
     if (iteration > 0) {
       if (optimize_adagrad)
@@ -1471,7 +1476,7 @@ int main(int argc, char** argv)
 // Basically, we split data into mini batch, and compute gradient only over the minibatch
 //
 
-
+template <typename Learner>
 struct TaskAccumulate
 {
   typedef size_t    size_type;
@@ -1481,60 +1486,39 @@ struct TaskAccumulate
   typedef Gradient gradient_type;
 
   typedef Lexicon lexicon_type;
+
+  typedef lexicon_type::loss_type loss_type;
+
+  typedef cicada::Bitext bitext_type;
+  typedef cicada::Vocab  vocab_type;
   
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
-  typedef bitext_type::vocab_type vocab_type;
   
-  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_type;
+  typedef utils::lockfree_list_queue<size_type, std::allocator<size_type> > queue_mapper_type;
+  typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_merger_type;
+  typedef std::vector<queue_merger_type, std::allocator<queue_merger_type> > queue_merger_set_type;
   
-  struct Counter
-  {
-    Counter() : counter(0) {}
-  
-    void increment()
-    {
-      utils::atomicop::fetch_and_add(counter, size_type(1));
-    }
-  
-    void wait(size_type target)
-    {
-      for (;;) {
-	for (int i = 0; i < 64; ++ i) {
-	  if (counter == target)
-	    return;
-	  else
-	    boost::thread::yield();
-	}
-      
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 2000001;
-	nanosleep(&tm, NULL);
-      }
-    }
+  typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
 
-    void clear() { counter = 0; }
-  
-    volatile size_type counter;
-  };
-  typedef Counter counter_type;
-
-  TaskAccumulate(const bitext_set_type& bitexts,
+  TaskAccumulate(const Learner& learner,
+		 const bitext_set_type& bitexts,
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
 		 const model_type& theta,
-		 queue_type& queue,
-		 counter_type& counter)
-    : bitexts_(bitexts),
+		 const size_type batch_size,
+		 queue_mapper_type& mapper,
+		 queue_merger_set_type& mergers)
+    : learner_(learner),
+      bitexts_(bitexts),
       theta_(theta),
-      queue_(queue),
-      counter_(counter),
+      mapper_(mapper),
+      mergers_(mergers),
       lexicon_(dict_source_target, dict_target_source),
-      gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.window_),
-      error_(0),
-      classification_(0),
-      samples_(0) {}
+      batch_size_(batch_size)
+  {
+    generator_.seed(utils::random_seed());
+  }
   
   struct sigmoid
   {
@@ -1610,58 +1594,131 @@ struct TaskAccumulate
   void operator()()
   {
     clear();
-
-    boost::mt19937 generator;
-    generator.seed(utils::random_seed());
     
-    size_type bitext_id;
-    for (;;) {
-      queue_.pop(bitext_id);
+    const size_type shard_size = mergers_.size();
+    
+    size_type      batch = 0;
+    gradient_type* grad = 0;
+    
+    size_type merge_finished = 0;
+    bool learn_finished = false;
+    
+    int non_found_iter = 0;
+    
+    while (merge_finished != shard_size || ! learn_finished) {
+      bool found = false;
       
-      if (bitext_id == size_type(-1)) break;
-      
-      const sentence_type& source = bitexts_[bitext_id].source_;
-      const sentence_type& target = bitexts_[bitext_id].target_;
-      
-      if (! source.empty() && ! target.empty()) {
-
-#if 0
-	std::cerr << "source: " << source << std::endl
-		  << "target: " << target << std::endl;
-#endif
-	
-	std::pair<double, double> errors = lexicon_(source, target, theta_, gradient_, htanh(), dhtanh(),
-						    generator);
+      if (merge_finished != shard_size)
+	while (mergers_[shard_].pop(grad, true)) {
+	  if (! grad)
+	    ++ merge_finished;
+	  else {
+	    learner_(theta_, *grad);
+	    grad->increment();
+	  }
 	  
-	error_          += errors.first;
-	classification_ += errors.second;
-	++ samples_;
+	  found = true;
+	}
+      
+      if (! learn_finished && mapper_.pop(batch, true)) {
+	found = true;
+	
+	if (batch == size_type(-1)) {
+	  // send termination!
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    mergers_[i].push(0);
+	  
+	  learn_finished = true;
+	} else {
+	  gradient_type* grad = 0;
+	  
+	  for (size_type j = 0; j != gradients_.size(); ++ j)
+	    if (gradients_[j].shared() == shard_size) {
+	      grad = &gradients_[j];
+	      break;
+	    }
+	  
+	  if (! grad) {
+	    gradients_.push_back(gradient_type(theta_.dimension_embedding_, theta_.dimension_hidden_, theta_.window_));
+	    grad = &gradients_.back();
+	  }
+	  
+	  grad->clear();
+	  
+	  const size_type first = batch * batch_size_;
+	  const size_type last  = utils::bithack::min(first + batch_size_, bitexts_.size());
+	  
+	  for (size_type id = first; id != last; ++ id) {
+	    const sentence_type& source = bitexts_[id].source_;
+	    const sentence_type& target = bitexts_[id].target_;
+	    
+	    if (! source.empty() && ! target.empty()) {
+	      std::pair<loss_type, loss_type> errors = lexicon_(source, target, theta_, *grad, htanh(), dhtanh(),
+								generator_);
+	      
+	      error_          += errors.first;
+	      classification_ += errors.second;
+	    }
+	  }
+	  
+	  learner_(theta_, *grad);
+	  grad->increment();
+	  
+	  for (size_type i = 0; i != shard_size; ++ i)
+	    if (i != shard_)
+	      mergers_[i].push(grad);
+	}
       }
       
-      counter_.increment();
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
+    
+    theta_.finalize();
+  }
+
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+    
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+      
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
 
   void clear()
   {
-    gradient_.clear();
-    error_ = 0.0;
-    classification_ = 0.0;
-    samples_ = 0;
+    error_ = loss_type();
+    classification_ = loss_type();
   }
 
+  Learner                learner_;
   const bitext_set_type& bitexts_;
-  const model_type& theta_;
-  
-  queue_type&            queue_;
-  counter_type&          counter_;
+  model_type             theta_;
+
+  queue_mapper_type&     mapper_;
+  queue_merger_set_type& mergers_;
   
   lexicon_type lexicon_;
-
-  gradient_type gradient_;
-  double        error_;
-  double        classification_;
-  size_type     samples_;
+  
+  gradient_set_type gradients_;
+  
+  loss_type error_;
+  loss_type classification_;
+  
+  int            shard_;
+  size_type      batch_size_;
+  boost::mt19937 generator_;
 };
 
 inline
@@ -1697,123 +1754,99 @@ void learn_online(const Learner& learner,
 		  const dictionary_type& dict_target_source,
 		  model_type& theta)
 {
-  typedef TaskAccumulate task_type;
+  typedef TaskAccumulate<Learner> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
-  typedef task_type::size_type size_type;
+  typedef typename task_type::size_type size_type;
+  
+  typedef typename task_type::queue_mapper_type     queue_mapper_type;
+  typedef typename task_type::queue_merger_set_type queue_merger_set_type;
 
-  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
+  typedef typename task_type::loss_type loss_type;
+
+  typedef std::vector<size_type, std::allocator<size_type> > batch_set_type;
   
-  task_type::queue_type   mapper(256 * threads);
-  task_type::counter_type reducer;
+  const size_type batches_size = (bitexts.size() + batch_size - 1) / batch_size;
   
-  task_set_type tasks(threads, task_type(bitexts,
+  batch_set_type batches(batches_size);
+  for (size_type batch = 0; batch != batches_size; ++ batch)
+    batches[batch] = batch;
+  
+  queue_mapper_type     mapper(threads);
+  queue_merger_set_type mergers(threads);
+  
+  task_set_type tasks(threads, task_type(learner,
+					 bitexts,
 					 dict_source_target,
 					 dict_target_source,
 					 theta,
+					 batch_size,
 					 mapper,
-					 reducer));
+					 mergers));
   
-  id_set_type ids(bitexts.size());
-  for (size_type i = 0; i != ids.size(); ++ i)
-    ids[i] = i;
-  
-  boost::thread_group workers;
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  // assign shard id
+  for (size_type shard = 0; shard != tasks.size(); ++ shard)
+    tasks[shard].shard_ = shard;
   
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
-
-    const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
-
-    id_set_type::const_iterator biter     = ids.begin();
-    id_set_type::const_iterator biter_end = ids.end();
-
-    double error = 0.0;
-    double classification = 0.0;
-    size_type samples = 0;
-    size_type num_bitext = 0;
+    
+    std::auto_ptr<boost::progress_display> progress(debug
+						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
+						    : 0);
 
     utils::resource start;
     
-    while (biter < biter_end) {
-      // clear gradients...
-      for (size_type i = 0; i != tasks.size(); ++ i)
-	tasks[i].clear();
+    boost::thread_group workers;
+    
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    typename batch_set_type::const_iterator biter_end = batches.end();
+    for (typename batch_set_type::const_iterator biter = batches.begin(); biter != biter_end; ++ biter) {
+      mapper.push(*biter);
       
-      // clear reducer
-      reducer.clear();
-      
-      // map bitexts
-      id_set_type::const_iterator iter_end = std::min(biter + batch_size, biter_end);
-      for (id_set_type::const_iterator iter = biter; iter != iter_end; ++ iter) {
-	mapper.push(*iter);
-	
-	++ num_bitext;
-	if (debug) {
-	  if (num_bitext % DEBUG_DOT == 0)
-	    std::cerr << '.';
-	  if (num_bitext % DEBUG_LINE == 0)
-	    std::cerr << '\n';
-	}
-      }
-      
-      // wait...
-      reducer.wait(iter_end - biter);
-      biter = iter_end;
-      
-      // merge gradients
-      error          += tasks.front().error_;
-      classification += tasks.front().classification_;
-      samples        += tasks.front().samples_;
-      for (size_type i = 1; i != tasks.size(); ++ i) {
-	tasks.front().gradient_ += tasks[i].gradient_;
-	error          += tasks[i].error_;
-	classification += tasks[i].classification_;
-	samples        += tasks[i].samples_;
-      }
-      
-      // update model parameters
-      learner(theta, tasks.front().gradient_);
+      if (debug)
+	++ (*progress);
     }
+    
+    // termination
+    for (size_type i = 0; i != tasks.size(); ++ i)
+      mapper.push(size_type(-1));
+    
+    workers.join_all();
 
     utils::resource end;
-    
-    if (debug && ((num_bitext / DEBUG_DOT) % DEBUG_WRAP))
-      std::cerr << std::endl;
-    if (debug)
-      std::cerr << "# of bitexts: " << num_bitext << std::endl;
 
+    loss_type error;
+    loss_type classification;
+    for (size_type i = 0; i != tasks.size(); ++ i) {
+      error          += tasks[i].error_;
+      classification += tasks[i].classification_;
+    }
+    
     if (debug)
-      std::cerr << "reconstruction error: " << (error / samples) << std::endl
-		<< "classification error: " << (classification / samples) << std::endl;
+      std::cerr << "reconstruction error: " << static_cast<double>(error) << std::endl
+		<< "classification error: " << static_cast<double>(classification) << std::endl;
     
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
-
+    
     // shuffle bitexts!
-    std::random_shuffle(ids.begin(), ids.end());
+    std::random_shuffle(batches.begin(), batches.end());
   }
-
-  // termination
-  for (size_type i = 0; i != tasks.size(); ++ i)
-    mapper.push(size_type(-1));
-
-  workers.join_all();
   
-  // call this after learning
-  theta.finalize();
+  theta = tasks.front().theta_;
 }
 
 
-void read_bitext(const path_type& source_file,
-		 const path_type& target_file,
-		 bitext_set_type& bitexts,
-		 dictionary_type& dict_source_target,
-		 dictionary_type& dict_target_source)
+void read_data(const path_type& source_file,
+	       const path_type& target_file,
+	       bitext_set_type& bitexts,
+	       dictionary_type& dict_source_target,
+	       dictionary_type& dict_target_source)
 {
   typedef cicada::Vocab vocab_type;
   typedef cicada::Symbol word_type;
@@ -1951,6 +1984,8 @@ void read_bitext(const path_type& source_file,
 
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
   dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
+  dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
+  dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
   
   dict_source_target.initialize();
   dict_target_source.initialize();
