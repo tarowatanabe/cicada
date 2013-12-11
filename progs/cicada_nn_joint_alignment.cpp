@@ -55,8 +55,6 @@
 
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
-#include <boost/math/special_functions/expm1.hpp>
-#include <boost/math/special_functions/log1p.hpp>
 #include <boost/progress.hpp>
 
 struct Average
