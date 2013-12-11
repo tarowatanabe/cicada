@@ -1415,10 +1415,10 @@ struct HMM
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
 
     log_likelihood_type log_likelihood;
+
+    ++ gradient.count_;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
-      ++ gradient.count_;
-      
       const state_set_type& states_next = states_[trg];
       state_set_type& states_prev = states_[trg - 1];
 

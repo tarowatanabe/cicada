@@ -1750,10 +1750,10 @@ struct HMM
     const size_type offset_matrix = embedding_window_size * 2;
 
     double loss = 0.0;
+
+    ++ gradient.count_;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
-      ++ gradient.count_;
-
       const state_set_type& states_next = states_[trg];
       state_set_type& states_prev = states_[trg - 1];
       
