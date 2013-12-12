@@ -2290,16 +2290,6 @@ int main(int argc, char** argv)
     model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, sources, targets, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, targets, sources, generator);
 
-    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
-      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
-	throw std::runtime_error("no embedding: " + embedding_source_file.string());
-      
-      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
-	throw std::runtime_error("no embedding: " + embedding_target_file.string());
-      
-      theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
-    }
-    
     const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
 								theta_source_target.target_.cols()),
 					    utils::bithack::min(theta_target_source.source_.cols(),
@@ -2309,7 +2299,18 @@ int main(int argc, char** argv)
       = theta_target_source.target_.block(0, 0, dimension_embedding, cols);
     theta_source_target.target_.block(0, 0, dimension_embedding, cols)
       = theta_target_source.source_.block(0, 0, dimension_embedding, cols);
-    
+
+    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
+      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
+	throw std::runtime_error("no embedding: " + embedding_source_file.string());
+      
+      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
+	throw std::runtime_error("no embedding: " + embedding_target_file.string());
+      
+      theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
+      theta_target_source.read_embedding(embedding_target_file, embedding_source_file);
+    }
+        
     if (iteration > 0) {
       if (optimize_adagrad)
 	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),

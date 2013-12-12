@@ -671,17 +671,110 @@ struct Model
       }
     }
   }
+  
+  template <typename Rep, typename Tp>
+  inline
+  bool key_value(const Rep& rep, const std::string& key, Tp& value)
+  {
+    typename Rep::const_iterator iter = rep.find(key);
+    if (iter == rep.end())
+      return false;
+    value = utils::lexical_cast<Tp>(iter->second);
+    return true;
+  }
 
   void read(const path_type& path) 
   {
     // we use a repository structure...
     typedef utils::repository repository_type;
+
+    if (! boost::filesystem::exists(path))
+      throw std::runtime_error("no file? " + path.string());
     
     repository_type rep(path, repository_type::read);
     
+    size_type embedding;
+    size_type hidden;
+    int       window;
+    int       alignment;
     
+    if (! key_value(rep, "embedding", embedding))
+      throw std::runtime_error("no embedding?");
+    if (! key_value(rep, "hidden", hidden))
+      throw std::runtime_error("no hidden?");
+    if (! key_value(rep, "window", window))
+      throw std::runtime_error("no window?");
+
+    if (embedding_ != embedding)
+      throw std::runtime_error("embedding size differ");
+    if (hidden_ != hidden)
+      throw std::runtime_error("hidden size differ");
+    if (window_ != window)
+      throw std::runtime_error("window size differ");
+
+    if (! boost::filesystem::exists(rep.path("source.gz")))
+      throw std::runtime_error("no source embedding?");
+    if (! boost::filesystem::exists(rep.path("target.gz")))
+      throw std::runtime_error("no target embedding?");
+    
+    // read embedding...
+    read_embedding(rep.path("source.gz"), rep.path("target.gz"));
+    
+    const bool has_alignment =  key_value(rep, "alignment", alignment);
+    
+    if (has_alignment) {
+      // we are reading a complete data
+      
+      read(rep.path("Wc.bin"), Wc_);
+      read(rep.path("bc.bin"), bc_);
+
+      read(rep.path("Wt.bin"), Wt_);
+      read(rep.path("bt.bin"), bt_);
+
+      read(rep.path("Wa.bin"), Wa_);
+      read(rep.path("ba.bin"), ba_);
+
+      read(rep.path("Wn.bin"), Wn_);
+      read(rep.path("bn.bin"), bn_);
+
+      read(rep.path("bi.bin"), bi_);
+    } else {
+      // we are reading an incomplete data... we do not read Wa,ba,Wn,bn,bi
+      // also, Wt and bt is assumed to be partially trained
+      
+      read(rep.path("Wc.bin"), Wc_);
+      read(rep.path("bc.bin"), bc_);
+      
+      read(rep.path("Wt.bin"), Wt_, hidden_, embedding_ * (window_ * 2 + 1) * 2);
+      read(rep.path("bt.bin"), bt_, hidden_, 1);
+    }
   }
+  
+  
+  void read(const path_type& path, tensor_type& matrix, size_type rows=0, size_type cols=0)
+  {
+    if (! boost::filesystem::exists(path))
+      throw std::runtime_error("no file? " + path.string());
     
+    const size_type file_size = boost::filesystem::file_size(path);
+    
+    if (rows && cols) {
+      if (file_size != sizeof(tensor_type::Scalar) * rows * cols)
+	throw std::runtime_error("read size differ!");
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      is.read((char*) matrix.block(0, 0, rows, cols).data(), sizeof(tensor_type::Scalar) * rows * cols);
+    } else {
+      if (file_size != sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols())
+	throw std::runtime_error("read size differ!");
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      
+      is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols());
+    }
+  }
+  
   void write(const path_type& path) const
   {
     // we use a repository structure...
@@ -775,7 +868,7 @@ struct Model
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
   }
-  
+
   // dimension...
   size_type embedding_;
   size_type hidden_;
@@ -2434,6 +2527,9 @@ path_type target_file;
 path_type embedding_source_file;
 path_type embedding_target_file;
 
+path_type model_source_target_file;
+path_type model_target_source_file;
+
 path_type output_source_target_file;
 path_type output_target_source_file;
 path_type alignment_source_target_file;
@@ -2554,16 +2650,6 @@ int main(int argc, char** argv)
 
     model_type theta_source_target(dimension_embedding, dimension_hidden, window, alignment, sources, targets, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, window, alignment, targets, sources, generator);
-
-    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
-      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
-	throw std::runtime_error("no embedding: " + embedding_source_file.string());
-      
-      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
-	throw std::runtime_error("no embedding: " + embedding_target_file.string());
-      
-      theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
-    }
     
     const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
 								theta_source_target.target_.cols()),
@@ -2574,6 +2660,23 @@ int main(int argc, char** argv)
       = theta_target_source.target_.block(0, 0, dimension_embedding, cols);
     theta_source_target.target_.block(0, 0, dimension_embedding, cols)
       = theta_target_source.source_.block(0, 0, dimension_embedding, cols);
+    
+    if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
+      if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
+	throw std::runtime_error("no embedding: " + embedding_source_file.string());
+      
+      if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
+	throw std::runtime_error("no embedding: " + embedding_target_file.string());
+      
+      theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
+      theta_target_source.read_embedding(embedding_target_file, embedding_source_file);
+    }
+    
+    if (! model_source_target_file.empty())
+      theta_source_target.read(model_source_target_file);
+    
+    if (! model_target_source_file.empty())
+      theta_target_source.read(model_target_source_file);
     
     if (iteration > 0) {
       if (optimize_adagrad)
@@ -3574,6 +3677,9 @@ void options(int argc, char** argv)
     ("embedding-source", po::value<path_type>(&embedding_source_file), "initial source embedding")
     ("embedding-target", po::value<path_type>(&embedding_target_file), "initial target embedding")
     
+    ("model-source-target", po::value<path_type>(&model_source_target_file), "model parameter for P(target | source)")
+    ("model-target-source", po::value<path_type>(&model_target_source_file), "model parameter for P(source | target)")
+
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output model parameter for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output model parameter for P(source | target)")
 
