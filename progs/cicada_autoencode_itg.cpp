@@ -713,7 +713,7 @@ struct Model
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
-    karma::real_generator<parameter_type, real_policy> float10;
+    karma::real_generator<double, real_policy> float10;
 
     const word_type::id_type rows = matrix.rows();
     const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());

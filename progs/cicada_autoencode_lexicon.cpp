@@ -515,7 +515,7 @@ struct Model
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
-    karma::real_generator<parameter_type, real_policy> float10;
+    karma::real_generator<double, real_policy> float10;
     
     repository_type rep(path, repository_type::write);
     

@@ -558,10 +558,10 @@ struct Model
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
 
-    karma::real_generator<parameter_type, real_policy> float10;
+    karma::real_generator<double, real_policy> float10;
     
     const word_type::id_type rows = matrix.rows();
-    const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());
+    const word_type::id_type cols = utils::bithack::min(static_cast<size_type>(matrix.cols()), words.size());
     
     utils::compress_ostream os_txt(path_text, 1024 * 1024);
     utils::compress_ostream os_bin(path_binary, 1024 * 1024);
@@ -1224,7 +1224,7 @@ struct LearnAdaGrad
 	     theta.target_,
 	     const_cast<tensor_type&>(target_),
 	     titer->second,
-	     embedding.source_.col(titer->first.id()),
+	     //embedding.source_.col(titer->first.id()),
 	     scale,
 	     true);
     
@@ -1343,6 +1343,34 @@ struct LearnAdaGrad
       }
     }
   }
+
+  template <typename Theta, typename GradVar, typename Grad>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool bias_last=false) const
+  {
+    for (int row = 0; row != g.rows() - bias_last; ++ row) 
+      if (g(row, 0) != 0) {
+	G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
+	
+	const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
+	const double f = theta(row, word.id()) - rate * scale * g(row, 0);
+	
+	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      }
+    
+    if (bias_last) {
+      const int row = g.rows() - 1;
+      
+      if (g(row, 0) != 0) {
+	G(row, word.id()) += g(row, 0) * g(row, 0) * scale * scale;
+	theta(row, word.id()) -= eta0_ * scale * g(row, 0) / std::sqrt(double(1.0) + G(row, word.id()));
+      }
+    }
+  }
   
   size_type embedding_;
   size_type window_;
@@ -1421,7 +1449,7 @@ struct LearnSGD
       update(titer->first,
 	     theta.target_,
 	     titer->second,
-	     embedding.source_.col(titer->first.id()),
+	     //embedding.source_.col(titer->first.id()),
 	     scale,
 	     theta.scale_,
 	     true);
@@ -1449,6 +1477,27 @@ struct LearnSGD
 	      Eigen::MatrixBase<Theta>& theta,
 	      const Eigen::MatrixBase<Grad>& g,
 	      const Eigen::MatrixBase<GradCross>& c,
+	      const double scale,
+	      const double theta_scale,
+	      const bool bias_last=false) const
+  {
+    // TODO: implement lambda2 regularization
+    
+    const double eta = eta0_ / (epoch_ + 1);
+
+    if (bias_last) {
+      const size_type rows = g.rows();
+      
+      theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
+      theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
+    } else
+      theta.col(word.id()) -= (eta * scale / theta_scale) * g;
+  }
+
+  template <typename Theta, typename Grad>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      const Eigen::MatrixBase<Grad>& g,
 	      const double scale,
 	      const double theta_scale,
 	      const bool bias_last=false) const

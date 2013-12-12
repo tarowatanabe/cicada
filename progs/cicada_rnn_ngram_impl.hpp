@@ -615,7 +615,7 @@ struct Model
     const tensor_type::Index rows = matrix.rows();
     const tensor_type::Index cols = matrix.cols();
 
-    boost::spirit::karma::real_generator<parameter_type, real_policy> float10;
+    karma::real_generator<double, real_policy> float10;
     
     utils::compress_ostream os_txt(path_text, 1024 * 1024);
     utils::compress_ostream os_bin(path_binary, 1024 * 1024);
