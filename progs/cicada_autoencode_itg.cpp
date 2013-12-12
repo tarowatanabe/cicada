@@ -65,7 +65,6 @@
 #include "utils/repository.hpp"
 #include "utils/program_options.hpp"
 #include "utils/random_seed.hpp"
-#include "utils/repository.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/vector2.hpp"
 #include "utils/sampler.hpp"
@@ -1082,8 +1081,8 @@ struct ITG
     
     tensor_type layer_;
     tensor_type layer_norm_;
+    tensor_type output_;
     tensor_type reconstruction_;
-    tensor_type delta_reconstruction_;
     tensor_type delta_;
   };
 
@@ -1171,8 +1170,10 @@ struct ITG
   buffer_type buffer_layer_;
   buffer_type buffer_layer_norm_;
 
-  buffer_type buffer_y_;
-  buffer_type buffer_y_minus_c_;
+  buffer_type buffer_output_;
+  buffer_type buffer_reconstruction_;
+
+  buffer_type buffer_delta_;
 
   struct tanh
   {
@@ -1456,12 +1457,6 @@ struct ITG
     
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-
-    buffer_y_.resize(embedding_size * 2);
-    buffer_y_minus_c_.resize(embedding_size * 2);
-    
-    matrix_type y(&(*buffer_y_.begin()), embedding_size * 2, 1);
-    matrix_type y_minus_c(&(*buffer_y_minus_c_.begin()), embedding_size * 2, 1);
     
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
@@ -1480,16 +1475,18 @@ struct ITG
 	
 	state.layer_norm_ = state.layer_.normalized();
 	
-	y = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
+	state.output_ = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
 	
-	y_minus_c.block(offset_source, 0, embedding_size, 1) = (y.block(offset_source, 0, embedding_size, 1).normalized()
-								- theta.source_.col(word_source.id()) * theta.scale_);
-	y_minus_c.block(offset_target, 0, embedding_size, 1) = (y.block(offset_target, 0, embedding_size, 1).normalized()
-								- theta.target_.col(word_target.id()) * theta.scale_);
+	state.reconstruction_.resize(embedding_size * 2, 1);
 	
-	state.loss_                 = 0.5 * y_minus_c.squaredNorm();
-	state.reconstruction_       = y_minus_c;
-	state.delta_reconstruction_ = y.array().unaryExpr(dhtanh()) * y_minus_c.array();
+	state.reconstruction_.block(offset_source, 0, embedding_size, 1)
+	  = (state.output_.block(offset_source, 0, embedding_size, 1).normalized()
+	     - theta.source_.col(word_source.id()) * theta.scale_);
+	state.reconstruction_.block(offset_target, 0, embedding_size, 1)
+	  = (state.output_.block(offset_target, 0, embedding_size, 1).normalized()
+	     - theta.target_.col(word_target.id()) * theta.scale_);
+	
+	state.loss_ = 0.5 * state.reconstruction_.squaredNorm();
 	
 	if (src)
 	  costs_source_[src - 1].cost_ = std::min(costs_source_[src - 1].cost_, state.loss_);
@@ -1569,28 +1566,28 @@ struct ITG
     
     buffer_layer_.resize(hidden_size);
     buffer_layer_norm_.resize(hidden_size);
-    buffer_y_.resize(hidden_size * 2);
-    buffer_y_minus_c_.resize(hidden_size * 2);
+    buffer_output_.resize(hidden_size * 2);
+    buffer_reconstruction_.resize(hidden_size * 2);
     
     matrix_type layer(&(*buffer_layer_.begin()), hidden_size, 1);
     matrix_type layer_norm(&(*buffer_layer_norm_.begin()), hidden_size, 1);
-    matrix_type y(&(*buffer_y_.begin()), hidden_size * 2, 1);
-    matrix_type y_minus_c(&(*buffer_y_minus_c_.begin()), hidden_size * 2, 1);
-
+    matrix_type output(&(*buffer_output_.begin()), hidden_size * 2, 1);
+    matrix_type reconstruction(&(*buffer_reconstruction_.begin()), hidden_size * 2, 1);
+    
     layer = (br1
 	     + Wr1.block(0, offset_left, hidden_size, hidden_size) * state1.layer_
 	     + Wr1.block(0, offset_right, hidden_size, hidden_size) * state2.layer_).array().unaryExpr(htanh());
     
     layer_norm = layer.normalized();
     
-    y = (Wr2 * layer_norm + br2).array().unaryExpr(htanh());
+    output = (Wr2 * layer_norm + br2).array().unaryExpr(htanh());
     
-    y_minus_c.block(offset_left, 0, hidden_size, 1)  = (y.block(offset_left, 0, hidden_size, 1).normalized()
-							- state1.layer_);
-    y_minus_c.block(offset_right, 0, hidden_size, 1) = (y.block(offset_right, 0, hidden_size, 1).normalized()
-							- state2.layer_);
+    reconstruction.block(offset_left, 0, hidden_size, 1)  = (output.block(offset_left, 0, hidden_size, 1).normalized()
+							     - state1.layer_);
+    reconstruction.block(offset_right, 0, hidden_size, 1) = (output.block(offset_right, 0, hidden_size, 1).normalized()
+							     - state2.layer_);
     
-    const double loss = 0.5 * y_minus_c.squaredNorm() + state1.loss_ + state2.loss_;
+    const double loss = 0.5 * reconstruction.squaredNorm() + state1.loss_ + state2.loss_;
     
     if (loss < state.loss_) {
       if (state.loss_ == std::numeric_limits<double>::infinity())
@@ -1602,10 +1599,10 @@ struct ITG
       
       state.loss_ = loss;
       
-      state.layer_                = layer;
-      state.layer_norm_           = layer_norm;
-      state.reconstruction_       = y_minus_c;
-      state.delta_reconstruction_ = y.array().unaryExpr(dhtanh()) * y_minus_c.array();
+      state.layer_          = layer;
+      state.layer_norm_     = layer_norm;
+      state.output_         = output;
+      state.reconstruction_ = reconstruction;
     }
   }
   
@@ -1616,6 +1613,8 @@ struct ITG
 		gradient_type& gradient,
 		Gen& gen)
   {
+    typedef Eigen::Map<tensor_type> matrix_type;
+    
 #if 0
     std::cerr << "backward source: " << source << std::endl
 	      << "backward target: " << target << std::endl;
@@ -1641,6 +1640,8 @@ struct ITG
     
     stack_.clear();
     stack_.push_back(span_pair_type(0, source_size, 0, target_size));
+
+    buffer_delta_.resize(utils::bithack::max(hidden_size, embedding_size) * 2);
     
     while (! stack_.empty()) {
       const span_pair_type span = stack_.back();
@@ -1651,10 +1652,17 @@ struct ITG
       if (state.terminal()) {
 	const word_type& word_source = (span.source_.empty() ? vocab_type::EPSILON : source[span.source_.first_]);
 	const word_type& word_target = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
-	
+
 	// increment delta from reconstruction
+	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), embedding_size * 2, 1);
+	
+	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
+	
+	gradient.Wt2_ += delta_reconstruction * state.layer_norm_.transpose();
+	gradient.bt2_ += delta_reconstruction;
+	
 	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
-				 * (theta.Wt2_.transpose() * state.delta_reconstruction_).array());
+				 * (theta.Wt2_.transpose() * delta_reconstruction).array());
 	
 	gradient.Wt1_.block(0, offset_source, hidden_size, embedding_size) += (state.delta_
 									       * theta.source_.col(word_source.id()).transpose()
@@ -1663,9 +1671,6 @@ struct ITG
 									       * theta.target_.col(word_target.id()).transpose()
 									       * theta.scale_);
 	gradient.bt1_ += state.delta_;
-	
-	gradient.Wt2_ += state.delta_reconstruction_ * state.layer_norm_.transpose();
-	gradient.bt2_ += state.delta_reconstruction_;
 	
 	gradient.source(word_source) += (theta.Wt1_.block(0, offset_source, hidden_size, embedding_size).transpose()
 					 * state.delta_
@@ -1688,9 +1693,16 @@ struct ITG
 	tensor_type& dbr2 = (straight ? gradient.bs2_ : gradient.bi2_);
 
 	// increment delta from reconstruction
+	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), hidden_size * 2, 1);
+	
+	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
+	
+	dWr2 += delta_reconstruction * state.layer_norm_.transpose();
+	dbr2 += delta_reconstruction;
+	
 	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
-				 * (Wr2.transpose() * state.delta_reconstruction_).array());
-
+				 * (Wr2.transpose() * delta_reconstruction).array());
+	
 	state_type& state_left  = chart_(state.left_.source_.first_, state.left_.source_.last_,
 					 state.left_.target_.first_, state.left_.target_.last_);
 	state_type& state_right = chart_(state.right_.source_.first_, state.right_.source_.last_,
@@ -1699,9 +1711,6 @@ struct ITG
 	dWr1.block(0, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
 	dWr1.block(0, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
 	dbr1 += state.delta_;
-	
-	dWr2 += state.delta_reconstruction_ * state.layer_norm_.transpose();
-	dbr2 += state.delta_reconstruction_;
 	
 	tensor_type& delta_left  = state_left.delta_;
 	tensor_type& delta_right = state_right.delta_;

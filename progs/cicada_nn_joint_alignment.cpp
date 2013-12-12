@@ -1637,7 +1637,7 @@ path_type output_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 
-int dimension_embedding = 64;
+int dimension_embedding = 32;
 int dimension_hidden = 128;
 int window = 0;
 

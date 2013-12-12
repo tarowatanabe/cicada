@@ -138,10 +138,10 @@ struct Gradient
 	embedding -= titer->second;
     }
         
-    Wl1_ -= x.Wl1_;
-    bl1_ -= x.bl1_;
-    Wl2_ -= x.Wl2_;
-    bl2_ -= x.bl2_;
+    Wt1_ -= x.Wt1_;
+    bt1_ -= x.bt1_;
+    Wt2_ -= x.Wt2_;
+    bt2_ -= x.bt2_;
     
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
@@ -173,10 +173,10 @@ struct Gradient
 	embedding += titer->second;
     }
     
-    Wl1_ += x.Wl1_;
-    bl1_ += x.bl1_;
-    Wl2_ += x.Wl2_;
-    bl2_ += x.bl2_;
+    Wt1_ += x.Wt1_;
+    bt1_ += x.bt1_;
+    Wt2_ += x.Wt2_;
+    bt2_ += x.bt2_;
     
     Wc_ += x.Wc_;
     bc_ += x.bc_;
@@ -193,10 +193,10 @@ struct Gradient
     target_.clear();
     
     // matrices
-    Wl1_.setZero();
-    bl1_.setZero();
-    Wl2_.setZero();
-    bl2_.setZero();    
+    Wt1_.setZero();
+    bt1_.setZero();
+    Wt2_.setZero();
+    bt2_.setZero();    
 
     Wc_.setZero();
     bc_.setZero();
@@ -223,12 +223,12 @@ struct Gradient
     target_.clear();
         
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1));
-    bl1_ = tensor_type::Zero(dimension_hidden, 1);
+    Wt1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1));
+    bt1_ = tensor_type::Zero(dimension_hidden, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden);
-    bl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);
+    Wt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden);
+    bt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);
 
     // classification
     Wc_ = tensor_type::Zero(1, dimension_hidden);
@@ -260,13 +260,13 @@ public:
   embedding_type source_;
   embedding_type target_;
   
-  // Wl1 and bl1 for encoding
-  tensor_type Wl1_;
-  tensor_type bl1_;
+  // Wt1 and bt1 for encoding
+  tensor_type Wt1_;
+  tensor_type bt1_;
   
-  // Wl2 and bl2 for reconstruction
-  tensor_type Wl2_;
-  tensor_type bl2_;  
+  // Wt2 and bt2 for reconstruction
+  tensor_type Wt2_;
+  tensor_type bt2_;  
 
   // Wc and bc for classification
   tensor_type Wc_;
@@ -318,10 +318,10 @@ struct Model
     target_.setZero();
     
     // matrices
-    Wl1_.setZero();
-    bl1_.setZero();
-    Wl2_.setZero();
-    bl2_.setZero();    
+    Wt1_.setZero();
+    bt1_.setZero();
+    Wt2_.setZero();
+    bt2_.setZero();    
 
     Wc_.setZero();
     bc_.setZero();
@@ -384,12 +384,12 @@ struct Model
     target_ = tensor_type::Zero(dimension_embedding, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
     
     // lexicon
-    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1)).array().unaryExpr(randomize<Gen>(gen, range_l));
-    bl1_ = tensor_type::Zero(dimension_hidden, 1);
+    Wt1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1)).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bt1_ = tensor_type::Zero(dimension_hidden, 1);
     
     // lexicon reconstruction
-    Wl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_l));
-    bl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);
+    Wt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_l));
+    bt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);
 
     // classification
     Wc_ = tensor_type::Zero(1, dimension_hidden).array().unaryExpr(randomize<Gen>(gen, range_c));
@@ -424,8 +424,6 @@ struct Model
       return 10;
     }
   };
-
-  
   
   void read_embedding(const path_type& source_file, const path_type& target_file)
   {
@@ -521,8 +519,8 @@ struct Model
     
     repository_type rep(path, repository_type::write);
     
-    rep["dimension-embedding"] = utils::lexical_cast<std::string>(dimension_embedding_);
-    rep["dimension-hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);
+    rep["embedding"] = utils::lexical_cast<std::string>(dimension_embedding_);
+    rep["hidden"]    = utils::lexical_cast<std::string>(dimension_hidden_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
     rep["beta"]      = utils::lexical_cast<std::string>(beta_);
@@ -573,11 +571,11 @@ struct Model
     }
     
     // dump matrices...
-    write(rep.path("Wl1.txt.gz"), rep.path("Wl1.bin"), Wl1_);
-    write(rep.path("bl1.txt.gz"), rep.path("bl1.bin"), bl1_);
+    write(rep.path("Wt1.txt.gz"), rep.path("Wt1.bin"), Wt1_);
+    write(rep.path("bt1.txt.gz"), rep.path("bt1.bin"), bt1_);
 
-    write(rep.path("Wl2.txt.gz"), rep.path("Wl2.bin"), Wl2_);
-    write(rep.path("bl2.txt.gz"), rep.path("bl2.bin"), bl2_);
+    write(rep.path("Wt2.txt.gz"), rep.path("Wt2.bin"), Wt2_);
+    write(rep.path("bt2.txt.gz"), rep.path("bt2.bin"), bt2_);
 
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
@@ -619,13 +617,13 @@ struct Model
   unique_set_type words_source_;
   unique_set_type words_target_;
   
-  // Wl1 and bl1 for encoding
-  tensor_type Wl1_;
-  tensor_type bl1_;
+  // Wt1 and bt1 for encoding
+  tensor_type Wt1_;
+  tensor_type bt1_;
   
-  // Wl2 and bl2 for reconstruction
-  tensor_type Wl2_;
-  tensor_type bl2_;  
+  // Wt2 and bt2 for reconstruction
+  tensor_type Wt2_;
+  tensor_type bt2_;  
 
   // Wc and bc for classification
   tensor_type Wc_;
@@ -764,6 +762,11 @@ struct Dictionary
       return dicts_[vocab_type::UNK.id()].draw(gen);
   }
 
+  size_type size(const word_type& source) const
+  {
+    return (dicts_.exists(source.id()) ? dicts_[source.id()].words_.size() : size_type(0));
+  }
+
   dict_set_type dicts_;
 };
 
@@ -791,7 +794,7 @@ struct Lexicon
 	  const dictionary_type& dict_target_source)
     : dict_source_target_(dict_source_target),
       dict_target_source_(dict_target_source) {}
-  
+
   template <typename Function, typename Derivative, typename Gen>
   std::pair<loss_type, loss_type> operator()(const sentence_type& source,
 					     const sentence_type& target,
@@ -801,6 +804,7 @@ struct Lexicon
 					     Derivative deriv,
 					     Gen& gen)
   {
+    typedef Eigen::Map<tensor_type> matrix_type;
     typedef gradient_type::embedding_type embedding_type;
     
     const size_type source_size = source.size();
@@ -812,20 +816,25 @@ struct Lexicon
     
     loss_type error;
     loss_type error_classification;
+
+    const size_type input_size = dimension_embedding * 2 * (window * 2 + 1);
     
-    tensor_type input(dimension_embedding * 2 * (window * 2 + 1), 1);
-    tensor_type input_sampled(dimension_embedding * 2 * (window * 2 + 1), 1);
+    tensor_type input(input_size, 1);
+    tensor_type input_sampled(input_size, 1);
+    tensor_type y_minus_c(input_size, 1);
+    
+    boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
+    boost::random::uniform_int_distribution<> uniform_target(0, target_size - 1);
     
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-
 	++ gradient.count_;
 	
 	// forward...
-
 	if (! src) {
 	  for (size_type i = 0; i != window * 2 + 1; ++ i)
-	    input.block(dimension_embedding * i, 0, dimension_embedding, 1) = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
+	    input.block(dimension_embedding * i, 0, dimension_embedding, 1)
+	      = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	} else {
 	  for (size_type i = 0; i != window * 2 + 1; ++ i) {
 	    const difference_type shift = difference_type(i) - window;
@@ -836,7 +845,8 @@ struct Lexicon
 						    ? vocab_type::EOS
 						    : source[src + shift - 1]));
 	    
-	    input.block(dimension_embedding * i, 0, dimension_embedding, 1) = theta.source_.col(embedding_source.id()) * theta.scale_;
+	    input.block(dimension_embedding * i, 0, dimension_embedding, 1)
+	      = theta.source_.col(embedding_source.id()) * theta.scale_;
 	  }
 	}
 	
@@ -844,7 +854,8 @@ struct Lexicon
 	  const size_type offset = dimension_embedding * (window * 2 + 1);
 	  
 	  for (size_type i = 0; i != window * 2 + 1; ++ i)
-	    input.block(dimension_embedding * i + offset, 0, dimension_embedding, 1) = theta.target_.col(vocab_type::EPSILON.id()) * theta.scale_;
+	    input.block(dimension_embedding * i + offset, 0, dimension_embedding, 1)
+	      = theta.target_.col(vocab_type::EPSILON.id()) * theta.scale_;
 	} else {
 	  const size_type offset = dimension_embedding * (window * 2 + 1);
 	  
@@ -857,7 +868,8 @@ struct Lexicon
 						    ? vocab_type::EOS
 						    : target[trg + shift - 1]));
 	    
-	    input.block(dimension_embedding * i + offset, 0, dimension_embedding, 1) = theta.target_.col(embedding_target.id()) * theta.scale_;
+	    input.block(dimension_embedding * i + offset, 0, dimension_embedding, 1)
+	      = theta.target_.col(embedding_target.id()) * theta.scale_;
 	  }
 	}
 	
@@ -869,17 +881,35 @@ struct Lexicon
 	word_type target_sampled = vocab_type::EPSILON;
 	
 	if (src) {
-	  source_sampled = dict_target_source_.draw(trg ? target[trg - 1] : vocab_type::EPSILON, gen);
-	  	  
-	  input_sampled.block(dimension_embedding * window, 0, dimension_embedding, 1) = theta.source_.col(source_sampled.id()) * theta.scale_;
+	  if (trg && dict_target_source_.size(target[trg - 1]) > 1) {
+	    source_sampled = dict_target_source_.draw(target[trg - 1], gen);
+	    while (source_sampled == source[src - 1])
+	      source_sampled = dict_target_source_.draw(target[trg - 1], gen);
+	  } else {
+	    source_sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
+	    while (source_sampled == source[src - 1])
+	      source_sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
+	  }
+	  
+	  input_sampled.block(dimension_embedding * window, 0, dimension_embedding, 1)
+	    = theta.source_.col(source_sampled.id()) * theta.scale_;
 	}
 	
 	if (trg) {
-	  target_sampled = dict_source_target_.draw(src ? source[src - 1] : vocab_type::EPSILON, gen);
+	  if (src && dict_source_target_.size(source[src - 1]) > 1) {
+	    target_sampled = dict_source_target_.draw(source[src - 1], gen);
+	    while (target_sampled == target[trg - 1])
+	      target_sampled = dict_source_target_.draw(source[src - 1], gen);
+	  } else {
+	    target_sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
+	    while (target_sampled == target[trg - 1])
+	      target_sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
+	  }
 	  
 	  const size_type offset = dimension_embedding * (window * 2 + 1);
 	  
-	  input_sampled.block(offset + dimension_embedding * window, 0, dimension_embedding, 1) = theta.target_.col(target_sampled.id()) * theta.scale_;
+	  input_sampled.block(offset + dimension_embedding * window, 0, dimension_embedding, 1)
+	    = theta.target_.col(target_sampled.id()) * theta.scale_;
 	}
 
 #if 0
@@ -887,17 +917,17 @@ struct Lexicon
 		  << "sampled: rows: " << input_sampled.rows() << " cols: " << input_sampled.cols() << std::endl;
 #endif
 	
-	const tensor_type p = (theta.Wl1_ * input + theta.bl1_).array().unaryExpr(func);
+	const tensor_type p = (theta.Wt1_ * input + theta.bt1_).array().unaryExpr(func);
 	const tensor_type p_norm = p.normalized();
-	const tensor_type y = (theta.Wl2_ * p_norm + theta.bl2_).array().unaryExpr(func);
 	
-	tensor_type y_normalized = y;
+	const tensor_type y = (theta.Wt2_ * p_norm + theta.bt2_).array().unaryExpr(func);
+	
 	for (size_type i = 0; i != 2 * (window * 2 + 1); ++ i)
-	  y_normalized.block(i * dimension_embedding, 0, dimension_embedding, 1).normalize();
+	  y_minus_c.block(i * dimension_embedding, 0, dimension_embedding, 1)
+	    = (y.block(i * dimension_embedding, 0, dimension_embedding, 1).normalized()
+	       - input.block(i * dimension_embedding, 0, dimension_embedding, 1));
 	
-	const tensor_type y_minus_c = y_normalized - input;
-	
-	const tensor_type p_sampled = (theta.Wl1_ * input_sampled + theta.bl1_).array().unaryExpr(func);
+	const tensor_type p_sampled = (theta.Wt1_ * input_sampled + theta.bt1_).array().unaryExpr(func);
 	const tensor_type p_sampled_norm = p_sampled.normalized();
 	
 	const double e = theta.alpha_ * 0.5 * y_minus_c.squaredNorm();
@@ -905,7 +935,7 @@ struct Lexicon
 	//std::cerr << "error: " << e << std::endl;
 	
 	const tensor_type reconstruction       = y_minus_c.array() * theta.alpha_;
-	const tensor_type delta_reconstruction = y.array().unaryExpr(deriv) * reconstruction.array();
+	const tensor_type delta_reconstruction = y.array().unaryExpr(deriv) * y_minus_c.array() * theta.alpha_;
 	
 	const double y_p = (theta.Wc_ * p_norm + theta.bc_)(0,0);
 	const double y_m = (theta.Wc_ * p_sampled_norm + theta.bc_)(0,0);
@@ -924,7 +954,7 @@ struct Lexicon
 	// backward...
 	
 	const tensor_type delta = (p.array().unaryExpr(deriv)
-				   * (theta.Wl2_.transpose() * delta_reconstruction
+				   * (theta.Wt2_.transpose() * delta_reconstruction
 				      + theta.Wc_.transpose() * delta_classification_p).array());
 	
 	const tensor_type delta_sampled = (p_sampled.array().unaryExpr(deriv)
@@ -935,14 +965,14 @@ struct Lexicon
 		  << "sampled: rows: " << delta_sampled.rows() << " cols: " << delta_sampled.cols() << std::endl;
 #endif
 	
-	gradient.Wl1_ += delta * input.transpose();
-	gradient.bl1_ += delta;
+	gradient.Wt1_ += delta * input.transpose();
+	gradient.bt1_ += delta;
 	
-	gradient.Wl1_ += delta_sampled * input_sampled.transpose();
-	gradient.bl1_ += delta_sampled;
+	gradient.Wt1_ += delta_sampled * input_sampled.transpose();
+	gradient.bt1_ += delta_sampled;
 	
-	gradient.Wl2_ += delta_reconstruction * p_norm.transpose();
-	gradient.bl2_ += delta_reconstruction;
+	gradient.Wt2_ += delta_reconstruction * p_norm.transpose();
+	gradient.bt2_ += delta_reconstruction;
 
 	//std::cerr << "update classification" << std::endl;
 	
@@ -955,8 +985,8 @@ struct Lexicon
 	//std::cerr << "update embedding" << std::endl;
 	
 	// update embedding
-	const tensor_type delta_embedding_p = theta.Wl1_.transpose() * delta - reconstruction;
-	const tensor_type delta_embedding_m = theta.Wl1_.transpose() * delta_sampled;
+	const tensor_type delta_embedding_p = theta.Wt1_.transpose() * delta - reconstruction;
+	const tensor_type delta_embedding_m = theta.Wt1_.transpose() * delta_sampled;
 	
 	if (! src) {
 	  tensor_type& dsource = gradient.source_[vocab_type::EPSILON];
@@ -1081,11 +1111,11 @@ struct LearnAdaGrad
     target_ = tensor_type::Zero(dimension_embedding, vocabulary_size);
     
     // initialize...
-    Wl1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1));
-    bl1_ = tensor_type::Zero(dimension_hidden, 1);
+    Wt1_ = tensor_type::Zero(dimension_hidden, dimension_embedding * 2 * (window * 2 + 1));
+    bt1_ = tensor_type::Zero(dimension_hidden, 1);
     
-    Wl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden);
-    bl2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);    
+    Wt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), dimension_hidden);
+    bt2_ = tensor_type::Zero(dimension_embedding * 2 * (window * 2 + 1), 1);    
     
     Wc_ = tensor_type::Zero(1, dimension_hidden);
     bc_ = tensor_type::Zero(1, 1);
@@ -1105,11 +1135,11 @@ struct LearnAdaGrad
     for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first, theta.target_, const_cast<tensor_type&>(target_), titer->second, scale, lambda_ != 0.0);
     
-    update(theta.Wl1_, const_cast<tensor_type&>(Wl1_), gradient.Wl1_, scale, lambda_ != 0.0);
-    update(theta.bl1_, const_cast<tensor_type&>(bl1_), gradient.bl1_, scale, false);
+    update(theta.Wt1_, const_cast<tensor_type&>(Wt1_), gradient.Wt1_, scale, lambda_ != 0.0);
+    update(theta.bt1_, const_cast<tensor_type&>(bt1_), gradient.bt1_, scale, false);
 
-    update(theta.Wl2_, const_cast<tensor_type&>(Wl2_), gradient.Wl2_, scale, lambda_ != 0.0);
-    update(theta.bl2_, const_cast<tensor_type&>(bl2_), gradient.bl2_, scale, false);
+    update(theta.Wt2_, const_cast<tensor_type&>(Wt2_), gradient.Wt2_, scale, lambda_ != 0.0);
+    update(theta.bt2_, const_cast<tensor_type&>(bt2_), gradient.bt2_, scale, false);
 
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
@@ -1212,13 +1242,13 @@ struct LearnAdaGrad
   tensor_type source_;
   tensor_type target_;
   
-  // Wl1 and bl1 for encoding
-  tensor_type Wl1_;
-  tensor_type bl1_;
+  // Wt1 and bt1 for encoding
+  tensor_type Wt1_;
+  tensor_type bt1_;
   
-  // Wl2 and bl2 for reconstruction
-  tensor_type Wl2_;
-  tensor_type bl2_;
+  // Wt2 and bt2 for reconstruction
+  tensor_type Wt2_;
+  tensor_type bt2_;
 
   // Wc and bc for classification
   tensor_type Wc_;
@@ -1274,11 +1304,11 @@ struct LearnSGD
     for (embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first, theta.target_, titer->second, scale, theta.scale_);
     
-    update(theta.Wl1_, gradient.Wl1_, scale, lambda_ != 0.0);
-    update(theta.bl1_, gradient.bl1_, scale, false);
+    update(theta.Wt1_, gradient.Wt1_, scale, lambda_ != 0.0);
+    update(theta.bt1_, gradient.bt1_, scale, false);
 
-    update(theta.Wl2_, gradient.Wl2_, scale, lambda_ != 0.0);
-    update(theta.bl2_, gradient.bl2_, scale, false);
+    update(theta.Wt2_, gradient.Wt2_, scale, lambda_ != 0.0);
+    update(theta.bt2_, gradient.bt2_, scale, false);
 
     update(theta.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, gradient.bc_, scale, false);

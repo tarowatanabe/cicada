@@ -1492,7 +1492,7 @@ path_type output_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
 
-int dimension = 64;
+int dimension = 32;
 int window = 0;
 
 bool optimize_sgd = false;
@@ -2601,8 +2601,8 @@ void options(int argc, char** argv)
     ("alignment-source-target", po::value<path_type>(&alignment_source_target_file), "output alignment for P(target | source)")
     ("alignment-target-source", po::value<path_type>(&alignment_target_source_file), "output alignment for P(source | target)")
     
-    ("dimension",    po::value<int>(&dimension)->default_value(dimension), "dimension for embedding")
-    ("window",       po::value<int>(&window)->default_value(window),       "context window size")
+    ("dimension-embedding", po::value<int>(&dimension)->default_value(dimension), "dimension for embedding")
+    ("window",              po::value<int>(&window)->default_value(window),       "context window size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
