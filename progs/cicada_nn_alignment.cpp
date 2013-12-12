@@ -283,21 +283,22 @@ struct Embedding
     
     const size_type vocabulary_size = word_type::allocated();
     
-    source_ = tensor_type::Zero(embedding_,     vocabulary_size);
+    source_ = tensor_type::Zero(embedding_    , vocabulary_size);
     target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size);
   }
 
-  void assign(const gradient_type& x)
+  template <typename Model>
+  void assign(const gradient_type& x, const Model& theta)
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
 
     gradient_embedding_type::const_iterator siter_end = x.source_.end();
     for (gradient_embedding_type::const_iterator siter = x.source_.begin(); siter != siter_end; ++ siter)
-      source_.col(siter->first.id()) = siter->second;
+      source_.col(siter->first.id()) = theta.source_.col(siter->first.id()) * theta.scale_;
     
     gradient_embedding_type::const_iterator titer_end = x.target_.end();
     for (gradient_embedding_type::const_iterator titer = x.target_.begin(); titer != titer_end; ++ titer)
-      target_.col(titer->first.id()) = titer->second;
+      target_.col(titer->first.id()) = theta.target_.col(titer->first.id()) * theta.scale_;
   }
   
   size_type embedding_;
@@ -1224,7 +1225,7 @@ struct LearnAdaGrad
 	     theta.target_,
 	     const_cast<tensor_type&>(target_),
 	     titer->second,
-	     //embedding.source_.col(titer->first.id()),
+	     embedding.source_.col(titer->first.id()),
 	     scale,
 	     true);
     
@@ -1343,34 +1344,6 @@ struct LearnAdaGrad
       }
     }
   }
-
-  template <typename Theta, typename GradVar, typename Grad>
-  void update(const word_type& word,
-	      Eigen::MatrixBase<Theta>& theta,
-	      Eigen::MatrixBase<GradVar>& G,
-	      const Eigen::MatrixBase<Grad>& g,
-	      const double scale,
-	      const bool bias_last=false) const
-  {
-    for (int row = 0; row != g.rows() - bias_last; ++ row) 
-      if (g(row, 0) != 0) {
-	G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
-	
-	const double rate = eta0_ / std::sqrt(double(1.0) + G(row, word.id()));
-	const double f = theta(row, word.id()) - rate * scale * g(row, 0);
-	
-	theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
-      }
-    
-    if (bias_last) {
-      const int row = g.rows() - 1;
-      
-      if (g(row, 0) != 0) {
-	G(row, word.id()) += g(row, 0) * g(row, 0) * scale * scale;
-	theta(row, word.id()) -= eta0_ * scale * g(row, 0) / std::sqrt(double(1.0) + G(row, word.id()));
-      }
-    }
-  }
   
   size_type embedding_;
   size_type window_;
@@ -1449,7 +1422,7 @@ struct LearnSGD
       update(titer->first,
 	     theta.target_,
 	     titer->second,
-	     //embedding.source_.col(titer->first.id()),
+	     embedding.source_.col(titer->first.id()),
 	     scale,
 	     theta.scale_,
 	     true);
@@ -1481,36 +1454,30 @@ struct LearnSGD
 	      const double theta_scale,
 	      const bool bias_last=false) const
   {
-    // TODO: implement lambda2 regularization
+    const double eta = eta0_ / (epoch_ + 1);
     
-    const double eta = eta0_ / (epoch_ + 1);
-
-    if (bias_last) {
+    if (lambda2_ != 0.0) {
       const size_type rows = g.rows();
       
-      theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
-      theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
-    } else
-      theta.col(word.id()) -= (eta * scale / theta_scale) * g;
-  }
-
-  template <typename Theta, typename Grad>
-  void update(const word_type& word,
-	      Eigen::MatrixBase<Theta>& theta,
-	      const Eigen::MatrixBase<Grad>& g,
-	      const double scale,
-	      const double theta_scale,
-	      const bool bias_last=false) const
-  {
-    const double eta = eta0_ / (epoch_ + 1);
-
-    if (bias_last) {
-      const size_type rows = g.rows();
+      if (bias_last) {
+	theta.col(word.id()).block(0, 0, rows - 1, 1) -= eta * lambda2_ * (theta.col(word.id()).block(0, 0, rows - 1, 1)
+									   - c.block(0, 0, rows - 1, 1) / theta_scale);
+	theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
+	theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
+      } else {
+	theta.col(word.id()) -= eta * lambda2_ * (theta.col(word.id()) - c.block(0, 0, rows, 1) / theta_scale);
+	theta.col(word.id()) -= (eta * scale / theta_scale) * g;
+      }
       
-      theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
-      theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
-    } else
-      theta.col(word.id()) -= (eta * scale / theta_scale) * g;
+    } else {
+      if (bias_last) {
+	const size_type rows = g.rows();
+	
+	theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
+	theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
+      } else
+	theta.col(word.id()) -= (eta * scale / theta_scale) * g;
+    }
   }
 
   double lambda_;
@@ -1993,8 +1960,8 @@ struct TaskAccumulate
 	  if (! grads.first)
 	    ++ merge_finished;
 	  else {
-	    embedding_source_target_.assign(*grads.first);
-	    embedding_target_source_.assign(*grads.second);
+	    embedding_source_target_.assign(*grads.first,  theta_source_target_);
+	    embedding_target_source_.assign(*grads.second, theta_target_source_);
 	    
 	    learner_source_target_(theta_source_target_, *grads.first,  embedding_target_source_);
 	    learner_target_source_(theta_target_source_, *grads.second, embedding_source_target_);
@@ -2081,8 +2048,8 @@ struct TaskAccumulate
 	    queue_target_source_.push_swap(bitext_target_source);
 	  }
 	  
-	  embedding_source_target_.assign(*grad_source_target);
-	  embedding_target_source_.assign(*grad_target_source);
+	  embedding_source_target_.assign(*grad_source_target, theta_source_target_);
+	  embedding_target_source_.assign(*grad_target_source, theta_target_source_);
 	  
 	  learner_source_target_(theta_source_target_, *grad_source_target, embedding_target_source_);
 	  learner_target_source_(theta_target_source_, *grad_target_source, embedding_source_target_);
