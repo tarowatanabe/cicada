@@ -671,14 +671,21 @@ struct Model
       }
     }
   }
+
+  void read(const path_type& path) 
+  {
+    // we use a repository structure...
+    typedef utils::repository repository_type;
+    
+    repository_type rep(path, repository_type::read);
+    
+    
+  }
     
   void write(const path_type& path) const
   {
     // we use a repository structure...
     typedef utils::repository repository_type;
-    
-    namespace karma = boost::spirit::karma;
-    namespace standard = boost::spirit::standard;
     
     repository_type rep(path, repository_type::write);
     
@@ -708,12 +715,12 @@ struct Model
     // vocabulary...
     vocab_type vocab;
 
-    const word_type::id_type vocabulary_size = utils::bithack::min(words_source_.size(), words_target_.size());
+    const word_type::id_type vocabulary_size = utils::bithack::max(words_source_.size(), words_target_.size());
     
     vocab.open(rep.path("vocab"), vocabulary_size >> 1);
     
     for (word_type::id_type id = 0; id != vocabulary_size; ++ id)
-      if (words_source_[id] || words_target_[id]) {
+      if ((id < words_source_.size() && words_source_[id]) || (id < words_target_.size() && words_target_[id])) {
 	const word_type word(id);
 	
 	vocab.insert(word);

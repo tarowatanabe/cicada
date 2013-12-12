@@ -568,7 +568,9 @@ struct Model
     repository_type rep(path, repository_type::write);
     
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
+    rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
+    rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
     write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_, words_source_);
     write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_, words_target_);
@@ -582,12 +584,12 @@ struct Model
     // vocabulary...
     vocab_type vocab;
 
-    const word_type::id_type vocabulary_size = utils::bithack::min(words_source_.size(), words_target_.size());
+    const word_type::id_type vocabulary_size = utils::bithack::max(words_source_.size(), words_target_.size());
     
     vocab.open(rep.path("vocab"), vocabulary_size >> 1);
     
     for (word_type::id_type id = 0; id != vocabulary_size; ++ id)
-      if (words_source_[id] || words_target_[id]) {
+      if ((id < words_source_.size() && words_source_[id]) || (id < words_target_.size() && words_target_[id])) {
 	const word_type word(id);
 	
 	vocab.insert(word);

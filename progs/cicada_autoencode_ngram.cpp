@@ -384,8 +384,6 @@ struct Model
       const tensor_type::Index rows = matrix.rows();
       const tensor_type::Index cols = matrix.cols();
       
-      os.write((char*) &rows, sizeof(tensor_type::Index));
-      os.write((char*) &cols, sizeof(tensor_type::Index));
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
   }
