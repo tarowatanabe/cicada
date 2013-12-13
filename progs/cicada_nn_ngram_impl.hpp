@@ -32,10 +32,13 @@
 
 struct Average
 {
+  typedef double   average_type;
+  typedef uint64_t count_type;
+
   Average() : average_(0), count_(0) {}
-  Average(const double& x) : average_(x), count_(1) {}
+  Average(const average_type& x) : average_(x), count_(1) {}
   
-  Average& operator+=(const double& x)
+  Average& operator+=(const average_type& x)
   {
     average_ += (x - average_) / (++ count_);
     return *this;
@@ -43,18 +46,18 @@ struct Average
   
   Average& operator+=(const Average& x)
   {
-    const uint64_t total = count_ + x.count_;
+    const count_type total = count_ + x.count_;
     
-    average_ = average_ * (double(count_) / total) + x.average_ * (double(x.count_) / total);
+    average_ = average_ * (average_type(count_) / total) + x.average_ * (average_type(x.count_) / total);
     count_ = total;
     
     return *this;
   }
   
-  operator const double&() const { return average_; }
+  operator const average_type&() const { return average_; }
   
-  double   average_;
-  uint64_t count_;
+  average_type average_;
+  count_type   count_;
 };
 
 
@@ -1488,11 +1491,18 @@ struct Data
   size_type size() const { return data_.size() / order_; }
   bool empty() const { return data_.empty(); }
   
-  const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
-  const_iterator end(size_type pos) const { return data_.begin() + (pos + 1) * order_; }
+  inline const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
+  inline       iterator begin(size_type pos) { return data_.begin() + pos * order_; }
+  inline const_iterator end(size_type pos) const { return data_.begin() + (pos + 1) * order_; }
+  inline       iterator end(size_type pos) { return data_.begin() + (pos + 1) * order_; }
 
   iterator begin() { return data_.begin(); }
   iterator end() { return data_.end(); }
+
+  void erase(iterator first, iterator last)
+  {
+    data_.erase(first, last);
+  }
   
   data_type buffer_;
   data_type data_;

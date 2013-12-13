@@ -53,7 +53,7 @@ path_type list_file;
 path_type embedding_file;
 path_type output_model_file;
 
-int dimension = 64;
+int dimension_embedding = 64;
 int order = 5;
 
 bool optimize_sgd = false;
@@ -90,7 +90,7 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (dimension <= 0)
+    if (dimension_embedding <= 0)
       throw std::runtime_error("dimension must be positive");
     if (order <= 1)
       throw std::runtime_error("order size should be positive");
@@ -142,11 +142,11 @@ int main(int argc, char** argv)
     
     unigram_type unigram(words.begin(), words.end());
     
-    model_type theta(dimension, order, unigram, generator);
+    model_type theta(dimension_embedding, order, unigram, generator);
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension, order, lambda, eta0), data, unigram, theta);
+	learn_online(LearnAdaGrad(dimension_embedding, order, lambda, eta0), data, unigram, theta);
       else
 	learn_online(LearnSGD(lambda, eta0), data, unigram, theta);
     }
@@ -709,8 +709,8 @@ void options(int argc, char** argv)
     
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
-    ("dimension", po::value<int>(&dimension)->default_value(dimension), "dimension")
-    ("order",     po::value<int>(&order)->default_value(order),         "context order size")
+    ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension")
+    ("order",               po::value<int>(&order)->default_value(order),                             "context order size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD fixed rate optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
