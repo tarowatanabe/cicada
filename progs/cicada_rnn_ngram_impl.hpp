@@ -1443,11 +1443,18 @@ struct Data
   size_type size() const { return data_.size() / order_; }
   bool empty() const { return data_.empty(); }
   
-  const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
-  const_iterator end(size_type pos) const { return data_.begin() + (pos + 1) * order_; }
+  inline const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
+  inline       iterator begin(size_type pos) { return data_.begin() + pos * order_; }
+  inline const_iterator end(size_type pos) const { return data_.begin() + (pos + 1) * order_; }
+  inline       iterator end(size_type pos) { return data_.begin() + (pos + 1) * order_; }
 
   iterator begin() { return data_.begin(); }
   iterator end() { return data_.end(); }
+
+  void erase(iterator first, iterator last)
+  {
+    data_.erase(first, last);
+  }
   
   data_type buffer_;
   data_type data_;

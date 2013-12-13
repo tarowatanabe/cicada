@@ -490,6 +490,10 @@ cicada_rnn_joint_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 cicada_rnn_ngram_SOURCES = cicada_rnn_ngram.cpp cicada_rnn_ngram_impl.hpp
 cicada_rnn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
+cicada_rnn_ngram_mpi_SOURCES  = cicada_rnn_ngram_mpi.cpp cicada_rnn_ngram_impl.hpp
+cicada_rnn_ngram_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_rnn_ngram_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+
 cicada_rnn_sentence_SOURCES = cicada_rnn_sentence.cpp cicada_rnn_sentence_impl.hpp
 cicada_rnn_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 

@@ -21,9 +21,8 @@
 #include <deque>
 #include <memory>
 
-#include "cicada_nn_ngram_impl.hpp"
+#include "cicada_rnn_ngram_impl.hpp"
 
-#include "utils/piece.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/unordered_map.hpp"
@@ -63,8 +62,7 @@ path_type list_file;
 path_type embedding_file;
 path_type output_model_file;
 
-int dimension_embedding = 32;
-int dimension_hidden = 256;
+int dimension_embedding = 64;
 int order = 5;
 
 bool optimize_sgd = false;
@@ -107,8 +105,6 @@ int main(int argc, char** argv)
 
     if (dimension_embedding <= 0)
       throw std::runtime_error("dimension must be positive");
-    if (dimension_hidden <= 0)
-      throw std::runtime_error("dimension must be positive");
     if (order <= 1)
       throw std::runtime_error("order size should be positive");
 
@@ -122,7 +118,7 @@ int main(int argc, char** argv)
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
-    
+
     if (int(mix_simple) + mix_average > 1)
       throw std::runtime_error("either one of mix-{simple,average}");
     
@@ -131,13 +127,13 @@ int main(int argc, char** argv)
   
     // this is optional, but safe to set this
     ::srandom(utils::random_seed());
-    
+        
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
 
     if (input_file.empty() && list_file.empty())
       throw std::runtime_error("no data?");
-    
+
     if (! input_file.empty())
       if (input_file != "-" && ! boost::filesystem::exists(input_file))
 	throw std::runtime_error("no input file? " + input_file.string());
@@ -157,23 +153,22 @@ int main(int argc, char** argv)
     
     unigram_type unigram(words.begin(), words.end());
     
-    model_type theta(dimension_embedding, dimension_hidden, order, unigram, generator);
+    model_type theta(dimension_embedding, order, unigram, generator);
 
     bcast_model(theta);
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, order, lambda, eta0), data, unigram, theta);
+	learn_online(LearnAdaGrad(dimension_embedding, order, lambda, eta0), data, unigram, theta);
       else
 	learn_online(LearnSGD(lambda, eta0), data, unigram, theta);
     }
     
-    if (mpi_rank == 0 && ! output_model_file.empty())
+    if (! output_model_file.empty())
       theta.write(output_model_file);
     
   } catch (std::exception& err) {
     std::cerr << err.what() << std::endl;
-    MPI::COMM_WORLD.Abort(1);
     return 1;
   }
   
@@ -245,9 +240,9 @@ struct TaskAccumulate
       mapper_(mapper),
       reducer_(reducer),
       ngram_(unigram, samples),
-      gradient_(theta.dimension_embedding_, theta.dimension_hidden_, theta.order_),
+      gradient_(theta.dimension_, theta.order_),
       log_likelihood_(),
-      batch_size_(batch_size),
+      batch_size_(batch_size)
       root_(root)
   {
     generator_.seed(utils::random_seed());
@@ -353,7 +348,6 @@ struct TaskAccumulate
   log_likelihood_type log_likelihood_;
   
   size_type batch_size_;
-  bool      root_;
 
   boost::mt19937 generator_;
 };
@@ -980,9 +974,8 @@ void options(int argc, char** argv)
     
     ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
     
-    ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
-    ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
-    ("order",     po::value<int>(&order)->default_value(order),         "context order size")
+    ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension")
+    ("order",               po::value<int>(&order)->default_value(order),                             "context order size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD fixed rate optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
