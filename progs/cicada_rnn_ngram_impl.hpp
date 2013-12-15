@@ -241,11 +241,13 @@ struct Gradient
     buffer_type& buffer = const_cast<buffer_type&>(buffer_);
     buffer.clear();
     
-    boost::iostreams::filtering_ostream os;
-    os.push(codec::lz4_compressor());
-    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
-    
-    write(os);
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(codec::lz4_compressor());
+      os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+      
+      write(os);
+    }
     
     encoded = std::string(buffer.begin(), buffer.end());
   }

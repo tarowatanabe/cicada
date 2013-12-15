@@ -151,9 +151,15 @@ int main(int argc, char** argv)
     
     read_data(input_file, list_file, data, words);
 
-    if (debug && mpi_rank == 0)
-      std::cerr << "# of ngrams: " << data.size() << std::endl
-		<< "vocabulary: " << (words.size() - 1) << std::endl;
+    if (debug) {
+      size_t data_size = data.size();
+      size_t data_size_sum = 0;
+      MPI::COMM_WORLD.Reduce(&data_size, &data_size_sum, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM, 0);
+      
+      if (mpi_rank == 0)
+	std::cerr << "# of ngrams: " << data_size_sum << std::endl
+		  << "vocabulary: " << (words.size() - 1) << std::endl;
+    }
     
     unigram_type unigram(words.begin(), words.end());
     
@@ -185,6 +191,7 @@ enum {
   ngram_tag,
   word_count_tag,
   model_tag,
+  gradient_tag,
   log_likelihood_tag,
   file_tag,
 };
@@ -229,6 +236,8 @@ struct TaskAccumulate
   typedef std::string encoded_type;
   
   typedef utils::lockfree_list_queue<encoded_type, std::allocator<encoded_type> > queue_type;
+
+  typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
   
   TaskAccumulate(const Learner& learner,
 		 const data_type& data,
@@ -251,6 +260,12 @@ struct TaskAccumulate
       progress_(progress)
   {
     generator_.seed(utils::random_seed());
+
+    ids_.reserve(data.size());
+    ids_.resize(data.size());
+    
+    for (size_type id = 0; id != ids_.size(); ++ id)
+      ids_[id] = id;
   }
   
   void operator()()
@@ -263,7 +278,7 @@ struct TaskAccumulate
     
     bool merge_finished = false;
     bool learn_finished = (batch == data_.size());
-    
+
     std::auto_ptr<boost::progress_display> progress(progress_
 						    ? new boost::progress_display(data_.size(), std::cerr, "", "", "")
 						    : 0);
@@ -294,19 +309,22 @@ struct TaskAccumulate
 	
 	const size_type last = utils::bithack::min(batch + batch_size_, data_.size());
 	for (/**/; batch != last; ++ batch) {
-	  log_likelihood_ += ngram_.learn(data_.begin(batch), data_.end(batch), theta_, gradient_, generator_);
+	  log_likelihood_ += ngram_.learn(data_.begin(ids_[batch]), data_.end(ids_[batch]), theta_, gradient_, generator_);
 	  
 	  if (progress_)
 	    ++ (*progress);
 	}
-	
-	learn_finished = (batch == data_.size());
 	
 	learner_(theta_, gradient_);
 	
 	gradient_.encode(buffer);
 	
 	mapper_.push_swap(buffer);
+
+	learn_finished = (batch == data_.size());
+	
+	if (learn_finished)
+	  mapper_.push(encoded_type());
       }
       
       non_found_iter = loop_sleep(found, non_found_iter);
@@ -314,6 +332,10 @@ struct TaskAccumulate
     
     // rescale current model
     theta_.rescale();
+
+    // shuffle
+    boost::random_number_generator<boost::mt19937> gen(generator_);
+    std::random_shuffle(ids_.begin(), ids_.end(), gen);
   }
   
   inline
@@ -348,6 +370,7 @@ struct TaskAccumulate
   queue_type&      reducer_;
   
   ngram_type ngram_;
+  id_set_type ids_;
   
   gradient_type       gradient_;
   log_likelihood_type log_likelihood_;
@@ -415,6 +438,13 @@ void learn_online(const Learner& learner,
   buffer_map_type      buffers(mpi_size);
   ostream_ptr_set_type ostreams(mpi_size);
   istream_ptr_set_type istreams(mpi_size);
+
+  // prepare iostreams...
+  for (int rank = 0; rank < mpi_size; ++ rank)
+    if (rank != mpi_rank) {
+      ostreams[rank].reset(new utils::mpi_ostream_simple(rank, gradient_tag, 4096));
+      istreams[rank].reset(new utils::mpi_istream_simple(rank, gradient_tag, 4096));
+    }
   
   queue_type mapper;
   queue_type reducer;
