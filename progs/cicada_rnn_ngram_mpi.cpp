@@ -233,7 +233,7 @@ struct TaskAccumulate
 		 queue_type& mapper,
 		 queue_type& reducer,
 		 size_type batch_size,
-		 bool root)
+		 bool progress)
     : learner_(learner),
       data_(data),
       theta_(theta),
@@ -242,8 +242,8 @@ struct TaskAccumulate
       ngram_(unigram, samples),
       gradient_(theta.dimension_, theta.order_),
       log_likelihood_(),
-      batch_size_(batch_size)
-      root_(root)
+      batch_size_(batch_size),
+      progress_(progress)
   {
     generator_.seed(utils::random_seed());
   }
@@ -257,9 +257,9 @@ struct TaskAccumulate
     encoded_type buffer;
     
     bool merge_finished = false;
-    bool learn_finished = batch != data_.size();
+    bool learn_finished = (batch == data_.size());
 
-    std::auto_ptr<boost::progress_display> progress(debug && root_
+    std::auto_ptr<boost::progress_display> progress(progress_
 						    ? new boost::progress_display(data_.size(), std::cerr, "", "", "")
 						    : 0);
     
@@ -291,7 +291,7 @@ struct TaskAccumulate
 	for (/**/; batch != last; ++ batch) {
 	  log_likelihood_ += ngram_.learn(data_.begin(batch), data_.end(batch), theta_, gradient_, generator_);
 	  
-	  if (debug && root_)
+	  if (progress_)
 	    ++ (*progress);
 	}
 	
@@ -348,6 +348,7 @@ struct TaskAccumulate
   log_likelihood_type log_likelihood_;
   
   size_type batch_size_;
+  bool      progress_;
 
   boost::mt19937 generator_;
 };
@@ -421,7 +422,7 @@ void learn_online(const Learner& learner,
 		 mapper,
 		 reducer,
 		 batch_size,
-		 mpi_rank == 0);
+		 debug && mpi_rank == 0);
   
   for (int t = 0; t < iteration; ++ t) {
     if (debug && mpi_rank == 0)

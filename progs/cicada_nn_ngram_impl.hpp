@@ -786,7 +786,7 @@ private:
     is.read((char*) &dimension_hidden_, sizeof(size_type));
     is.read((char*) &order_, sizeof(size_type));
     is.read((char*) &scale_, sizeof(double));
-    
+
     read(is, Wc_);
     read(is, bc_);
     read(is, Wh_);
@@ -834,7 +834,7 @@ private:
       is.read((char*) &(*buffer.begin()), word_size);
       
       const word_type word(buffer.begin(), buffer.end());
-      
+
       if (word.id() >= embedding.cols())
 	embedding.conservativeResize(dimension_embedding_ + bias_last, word.id() + 1);
       

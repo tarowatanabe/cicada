@@ -122,6 +122,7 @@ bin_PROGRAMS = \
 	cicada_rnn_alignment \
 	cicada_rnn_joint_alignment \
 	cicada_rnn_ngram \
+	cicada_rnn_ngram_mpi \
 	cicada_rnn_sentence \
 	cicada_pyp_itg_learn \
 	cicada_pyp_ngram_learn \
