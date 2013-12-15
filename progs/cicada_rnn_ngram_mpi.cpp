@@ -435,13 +435,6 @@ void learn_online(const Learner& learner,
   ostream_ptr_set_type ostreams(mpi_size);
   istream_ptr_set_type istreams(mpi_size);
   
-  // prepare iostreams...
-  for (int rank = 0; rank < mpi_size; ++ rank)
-    if (rank != mpi_rank) {
-      ostreams[rank].reset(new utils::mpi_ostream_simple(rank, gradient_tag, 4096));
-      istreams[rank].reset(new utils::mpi_istream_simple(rank, gradient_tag, 4096));
-    }
-  
   queue_type mapper;
   queue_type reducer;
   
@@ -458,6 +451,13 @@ void learn_online(const Learner& learner,
   for (int t = 0; t < iteration; ++ t) {
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (t + 1) << std::endl;
+    
+    // prepare iostreams...
+    for (int rank = 0; rank < mpi_size; ++ rank)
+      if (rank != mpi_rank) {
+	ostreams[rank].reset(new utils::mpi_ostream_simple(rank, gradient_tag, 4096));
+	istreams[rank].reset(new utils::mpi_istream_simple(rank, gradient_tag, 4096));
+      }
     
     utils::resource start;
     
