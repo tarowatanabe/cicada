@@ -845,7 +845,7 @@ void read_data(const path_type& input_file,
   
   // balancing...  it is very stupid, but probably easier to implement...
   size_type data_size = data.size();
-  size_type data_size_min = data.size();
+  size_type data_size_min = 0;
   MPI::COMM_WORLD.Allreduce(&data_size, &data_size_min, 1, utils::mpi_traits<size_type>::data_type(), MPI::MIN);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
@@ -875,7 +875,7 @@ void read_data(const path_type& input_file,
 	  stream[rank]->push(codec::lz4_compressor());
 	  stream[rank]->push(*device[rank]);
 	  
-	  std::copy(data.begin(pos), data.end(pos + send_size),
+	  std::copy(data.begin(pos), data.begin(pos + send_size),
 		    std::ostream_iterator<data_type::word_type>(*stream[rank], " "));
 	  
 	  pos += send_size;

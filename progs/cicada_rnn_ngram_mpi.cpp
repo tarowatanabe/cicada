@@ -871,7 +871,7 @@ void read_data(const path_type& input_file,
 	  stream[rank]->push(codec::lz4_compressor());
 	  stream[rank]->push(*device[rank]);
 	  
-	  std::copy(data.begin(pos), data.end(pos + send_size),
+	  std::copy(data.begin(pos), data.begin(pos + send_size),
 		    std::ostream_iterator<data_type::word_type>(*stream[rank], " "));
 	  
 	  pos += send_size;
