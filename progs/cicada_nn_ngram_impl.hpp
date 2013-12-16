@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #ifndef __CICADA_NN_NGRAM_IMPL__HPP__
 #define __CICADA_NN_NGRAM_IMPL__HPP__ 1
 

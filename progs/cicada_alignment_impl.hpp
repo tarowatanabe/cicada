@@ -52,6 +52,36 @@ typedef double count_type;
 typedef double prob_type;
 typedef double logprob_type;
 
+struct log_likelihood_type
+{
+  typedef double   logprob_type;
+  typedef uint64_t count_type;
+  
+  log_likelihood_type() : average_(0), count_(0) {}
+  log_likelihood_type(const logprob_type& x) : average_(x), count_(1) {}
+  
+  log_likelihood_type& operator+=(const logprob_type& x)
+  {
+    average_ += (x - average_) / (++ count_);
+    return *this;
+  }
+  
+  log_likelihood_type& operator+=(const log_likelihood_type& x)
+  {
+    const count_type total = count_ + x.count_;
+    
+    average_ = average_ * (logprob_type(count_) / total) + x.average_ * (logprob_type(x.count_) / total);
+    count_ = total;
+    
+    return *this;
+  }
+  
+  operator const logprob_type&() const { return average_; }
+  
+  logprob_type average_;
+  count_type   count_;
+};
+
 struct classes_type
 {
   typedef size_t    size_type;
