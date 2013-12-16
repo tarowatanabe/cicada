@@ -841,7 +841,7 @@ void read_data(const path_type& input_file,
   
   // balancing...  it is very stupid, but probably easier to implement...
   size_type data_size = data.size();
-  size_type data_size_min = data.size();
+  size_type data_size_min = 0;
   MPI::COMM_WORLD.Allreduce(&data_size, &data_size_min, 1, utils::mpi_traits<size_type>::data_type(), MPI::MIN);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
@@ -908,6 +908,9 @@ void read_data(const path_type& input_file,
 	data.data_.push_back(word);
     }
   }
+
+  if (! data.verify())
+    throw std::runtime_error("invalid data");
   
   // bcast word + counts to everybody...
   {
@@ -924,12 +927,12 @@ void read_data(const path_type& input_file,
 
 	std::ostream_iterator<char> iter(os);
 
-	karma::uint_generator<count_type> count;
+	karma::uint_generator<count_type> generate_count;
 	
 	word_set_type::const_iterator witer_end = words_rank.end();
 	for (word_set_type::const_iterator witer = words_rank.begin(); witer != witer_end; ++ witer)
 	  karma::generate(iter,
-			  standard::string << karma::lit(' ') << count << karma::lit('\n'),
+			  standard::string << karma::lit(' ') << generate_count << karma::lit('\n'),
 			  witer->first, witer->second);
       } else {
 	namespace qi = boost::spirit::qi;
@@ -962,7 +965,7 @@ void read_data(const path_type& input_file,
 				 standard::blank, word, count))				 
 	    if (iter != iter_end)
 	      throw std::runtime_error("parsing failed");
-	  
+
 	  words[word] += count;
 	}
       }

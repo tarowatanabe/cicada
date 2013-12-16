@@ -1492,6 +1492,7 @@ struct Data
   
   size_type size() const { return data_.size() / order_; }
   bool empty() const { return data_.empty(); }
+  bool verify() const { return data_.size() % order_ == 0; }
   
   inline const_iterator begin(size_type pos) const { return data_.begin() + pos * order_; }
   inline       iterator begin(size_type pos) { return data_.begin() + pos * order_; }
