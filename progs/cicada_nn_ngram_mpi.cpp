@@ -846,7 +846,12 @@ void read_data(const path_type& input_file,
   // balancing...  it is very stupid, but probably easier to implement...
   size_type data_size = data.size();
   size_type data_size_min = 0;
+  size_type data_size_sum = 0;
   MPI::COMM_WORLD.Allreduce(&data_size, &data_size_min, 1, utils::mpi_traits<size_type>::data_type(), MPI::MIN);
+  MPI::COMM_WORLD.Allreduce(&data_size, &data_size_sum, 1, utils::mpi_traits<size_type>::data_type(), MPI::SUM);
+  
+  // reserve enough space
+  data.reserve((data_size_sum + mpi_size - 1) / mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
     if (rank == mpi_rank) {

@@ -53,6 +53,8 @@
 #include "utils/resource.hpp"
 #include "utils/simple_vector.hpp"
 
+#include "codec/lz4.hpp"
+
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 #include <boost/progress.hpp>
@@ -194,7 +196,6 @@ struct Gradient
     count_ = 0;
     shared_ = 0;
   }
-
   
   tensor_type& source(const word_type& word)
   {
@@ -248,6 +249,145 @@ public:
     return ret;
   }
 
+public:
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  buffer_type buffer_;
+  
+  void encode(std::string& encoded) const
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    buffer.clear();
+    
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(codec::lz4_compressor());
+      os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+      
+      write(os);
+    }
+
+    encoded = std::string(buffer.begin(), buffer.end());
+  }
+
+  void decode(const std::string& encoded) 
+  {
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
+    
+    read(is);
+  }
+
+  friend
+  std::ostream& operator<<(std::ostream& os, const Gradient& x)
+  {
+    x.write(os);
+    return os;
+  }
+
+  friend
+  std::istream& operator>>(std::istream& is, Gradient& x)
+  {
+    x.read(is);
+    return is;
+  }
+
+private:
+  void write(std::ostream& os) const
+  {
+    os.write((char*) &embedding_, sizeof(size_type));
+    os.write((char*) &window_,    sizeof(size_type));
+    os.write((char*) &count_,     sizeof(size_type));
+    
+    write(os, Wt_);
+    write(os, bt_);
+    
+    write(os, source_, false);
+    write(os, target_, true);
+  }
+  
+  void read(std::istream& is)
+  {
+    clear();
+    
+    is.read((char*) &embedding_, sizeof(size_type));
+    is.read((char*) &window_,    sizeof(size_type));
+    is.read((char*) &count_,     sizeof(size_type));
+    
+    read(is, Wt_);
+    read(is, bt_);
+    
+    read(is, source_, false);
+    read(is, target_, true);
+  }
+
+  void write(std::ostream& os, const embedding_type& embedding, const bool bias_last) const
+  {
+    const size_type size = embedding.size();
+    
+    os.write((char*) &size, sizeof(size_type));
+    
+    embedding_type::const_iterator eiter_end = embedding.end();
+    for (embedding_type::const_iterator eiter = embedding.begin(); eiter != eiter_end; ++ eiter) {
+      const size_type word_size = eiter->first.size();
+      
+      os.write((char*) &word_size, sizeof(size_type));
+      os.write((char*) &(*eiter->first.begin()), word_size);
+      os.write((char*) eiter->second.data(), sizeof(tensor_type::Scalar) * eiter->second.rows());
+    }
+  }
+
+  void read(std::istream& is, embedding_type& embedding, const bool bias_last)
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    
+    embedding.clear();
+    
+    size_type size = 0;
+    
+    is.read((char*) &size, sizeof(size_type));
+    
+    for (size_type i = 0; i != size; ++ i) {
+      size_type word_size = 0;
+      is.read((char*) &word_size, sizeof(size_type));
+      
+      buffer.resize(word_size);
+      is.read((char*) &(*buffer.begin()), word_size);
+      
+      tensor_type& matrix = embedding[word_type(buffer.begin(), buffer.end())];
+      
+      matrix.resize(embedding_ + bias_last, 1);
+      
+      is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows());
+    }
+  }
+
+  void write(std::ostream& os, const tensor_type& matrix) const
+  {
+    const tensor_type::Index rows = matrix.rows();
+    const tensor_type::Index cols = matrix.cols();
+
+    os.write((char*) &rows, sizeof(tensor_type::Index));
+    os.write((char*) &cols, sizeof(tensor_type::Index));
+    
+    os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+  
+  void read(std::istream& is, tensor_type& matrix)
+  {
+    tensor_type::Index rows = 0;
+    tensor_type::Index cols = 0;
+    
+    is.read((char*) &rows, sizeof(tensor_type::Index));
+    is.read((char*) &cols, sizeof(tensor_type::Index));
+    
+    matrix.resize(rows, cols);
+    
+    is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+  
+public:
   // dimension...
   size_type embedding_;
   size_type window_;
@@ -555,6 +695,7 @@ struct Model
     vocab.close();
   }
   
+private:
   void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix, const word_unique_type& words) const
   {
     namespace karma = boost::spirit::karma;
@@ -601,7 +742,151 @@ struct Model
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
   }
-  
+
+public:
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  buffer_type buffer_;
+
+  void encode(std::string& encoded) const
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    buffer.clear();
+    
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(codec::lz4_compressor());
+      os.push(boost::iostreams::back_insert_device<buffer_type>(buffer));
+      
+      write(os);
+    }
+    
+    encoded = std::string(buffer.begin(), buffer.end());
+  }
+
+  void decode(const std::string& encoded) 
+  {
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
+    
+    read(is);
+  }
+
+  friend
+  std::ostream& operator<<(std::ostream& os, const Model& x)
+  {
+    x.write(os);
+    return os;
+  }
+
+  friend
+  std::istream& operator>>(std::istream& is, Model& x)
+  {
+    x.read(is);
+    return is;
+  }
+
+private:
+  void write(std::ostream& os) const
+  {
+    os.write((char*) &embedding_, sizeof(size_type));
+    os.write((char*) &window_,    sizeof(size_type));
+    os.write((char*) &scale_,     sizeof(double));
+    
+    write(os, Wt_);
+    write(os, bt_);
+    
+    write_embedding(os, source_, false);
+    write_embedding(os, target_, true);
+  }
+
+  void read(std::istream& is)
+  {
+    clear();
+    
+    is.read((char*) &embedding_, sizeof(size_type));
+    is.read((char*) &window_,    sizeof(size_type));
+    is.read((char*) &scale_,     sizeof(double));
+
+    read(is, Wt_);
+    read(is, bt_);
+    
+    read_embedding(is, source_, false);
+    read_embedding(is, target_, true);
+
+    // checking...
+  }
+
+  void write_embedding(std::ostream& os, const tensor_type& embedding, const bool bias_last) const
+  {
+    const size_type rows = embedding.rows();
+    const size_type cols = embedding.cols();
+    
+    os.write((char*) &cols, sizeof(size_type));
+    
+    for (word_type::id_type id = 0; id != cols; ++ id) {
+      const word_type word(id);
+      
+      const size_type word_size = word.size();
+      
+      os.write((char*) &word_size, sizeof(size_type));
+      os.write((char*) &(*word.begin()), word_size);
+      os.write((char*) embedding.col(id).data(), sizeof(tensor_type::Scalar) * rows);
+    }
+  }
+
+  void read_embedding(std::istream& is, tensor_type& embedding, const bool bias_last)
+  {
+    buffer_type& buffer = const_cast<buffer_type&>(buffer_);
+    
+    size_type cols = 0;
+    is.read((char*) &cols, sizeof(size_type));
+    
+    if (cols > embedding.cols())
+      embedding.conservativeResize(embedding_ + bias_last, cols);
+    
+    for (size_type i = 0; i != cols; ++ i) {
+      size_type word_size = 0;
+      is.read((char*) &word_size, sizeof(size_type));
+      
+      buffer.resize(word_size);
+      is.read((char*) &(*buffer.begin()), word_size);
+      
+      const word_type word(buffer.begin(), buffer.end());
+
+      if (word.id() >= embedding.cols())
+	embedding.conservativeResize(embedding_ + bias_last, word.id() + 1);
+      
+      is.read((char*) embedding.col(word.id()).data(), sizeof(tensor_type::Scalar) * (embedding_ + bias_last));
+    }
+  }
+
+  void write(std::ostream& os, const tensor_type& matrix) const
+  {
+    const tensor_type::Index rows = matrix.rows();
+    const tensor_type::Index cols = matrix.cols();
+
+    os.write((char*) &rows, sizeof(tensor_type::Index));
+    os.write((char*) &cols, sizeof(tensor_type::Index));
+    
+    os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+
+  void read(std::istream& is, tensor_type& matrix)
+  {
+    tensor_type::Index rows = 0;
+    tensor_type::Index cols = 0;
+    
+    is.read((char*) &rows, sizeof(tensor_type::Index));
+    is.read((char*) &cols, sizeof(tensor_type::Index));
+    
+    matrix.resize(rows, cols);
+    
+    is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
+  }
+
+public:  
   // dimension...
   size_type embedding_;
   size_type window_;
