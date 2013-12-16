@@ -66,7 +66,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int batch_size = 4;
 int sample_size = 10;
-int beam_size = 10;
+int beam_size = 50;
 int cutoff = 3;
 double lambda = 0;
 double lambda2 = 0;
@@ -160,11 +160,13 @@ int main(int argc, char** argv)
     
     read_data(source_file, target_file, bitexts, dict_source_target, dict_target_source);
 
-    if (debug)
-      std::cerr << "# of sentences: " << bitexts.size() << std::endl;
-    
     const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
     const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
+
+    if (debug)
+      std::cerr << "# of unique source words: " << sources.size() << std::endl
+		<< "# of unique target words: " << targets.size() << std::endl
+		<< "# of sentences: " << bitexts.size() << std::endl;
 
     model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, sources, targets, generator);
     model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, targets, sources, generator);

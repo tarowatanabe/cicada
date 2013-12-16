@@ -170,7 +170,7 @@ cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 cicada_alignment_SOURCES = cicada_alignment.cpp itg_alignment.hpp kuhn_munkres.hpp
 cicada_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_autoencode_itg_SOURCES = cicada_autoencode_itg.cpp
+cicada_autoencode_itg_SOURCES = cicada_autoencode_itg.cpp cicada_autoencode_itg_impl.hpp
 cicada_autoencode_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_autoencode_lexicon_SOURCES = cicada_autoencode_lexicon.cpp

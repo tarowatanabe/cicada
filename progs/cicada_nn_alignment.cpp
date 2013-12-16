@@ -151,12 +151,14 @@ int main(int argc, char** argv)
     dictionary_type dict_target_source;
     
     read_data(source_file, target_file, bitexts, dict_source_target, dict_target_source);
-
-    if (debug)
-      std::cerr << "# of sentences: " << bitexts.size() << std::endl;
     
     const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
     const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
+
+    if (debug)
+      std::cerr << "# of unique source words: " << sources.size() << std::endl
+		<< "# of unique target words: " << targets.size() << std::endl
+		<< "# of sentences: " << bitexts.size() << std::endl;
 
     model_type theta_source_target(dimension, window, sources, targets, generator);
     model_type theta_target_source(dimension, window, targets, sources, generator);
