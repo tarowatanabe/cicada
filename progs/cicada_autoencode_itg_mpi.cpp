@@ -990,6 +990,8 @@ void learn_online_root(const Learner& learner,
 	gradient_ostream[rank].reset(new gradient_ostream_type(rank, gradient_tag));
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
+
+    MPI::COMM_WORLD.Barrier();
     
     std::auto_ptr<boost::progress_display> progress(debug && mpi_rank == 0
 						    ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
@@ -1007,11 +1009,11 @@ void learn_online_root(const Learner& learner,
 						? add_suffix(alignment_target_source_file, iter_tag)
 						: path_type(),
 						bitext_reducer));
-    
-    utils::resource start;
-    
+
     // create thread!
     boost::thread worker(boost::ref(task));
+    
+    utils::resource start;
     
     bool gradient_finished = false; // for gradients
     bool bitext_finished   = false; // for bitext
@@ -1160,6 +1162,8 @@ void learn_online_root(const Learner& learner,
     bitext_reducer.push(typename map_reduce_type::value_type());
     
     utils::resource end;
+
+    MPI::COMM_WORLD.Barrier();
     
     loss_type loss   = task.loss_;
     size_type parsed = task.parsed_;
@@ -1292,6 +1296,8 @@ void learn_online_others(const Learner& learner,
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
 
+    MPI::COMM_WORLD.Barrier();
+
     // create thread!
     boost::thread worker(boost::ref(task));
     
@@ -1408,6 +1414,8 @@ void learn_online_others(const Learner& learner,
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
+    MPI::COMM_WORLD.Barrier();
+
     // reduce loss and # of parsed
     {
       boost::iostreams::filtering_ostream os;
