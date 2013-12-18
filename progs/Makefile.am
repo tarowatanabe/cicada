@@ -176,7 +176,7 @@ cicada_autoencode_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_autoencode_itg_mpi_SOURCES  = cicada_autoencode_itg_mpi.cpp cicada_autoencode_itg_impl.hpp
 cicada_autoencode_itg_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_autoencode_itg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_autoencode_itg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_autoencode_lexicon_SOURCES = cicada_autoencode_lexicon.cpp
 cicada_autoencode_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
