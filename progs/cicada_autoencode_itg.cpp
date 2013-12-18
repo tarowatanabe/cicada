@@ -265,26 +265,22 @@ struct OutputMapReduce
   struct bitext_derivation_type
   {
     size_type       id_;
-    bitext_type     bitext_;
     derivation_type derivation_;
     
-    bitext_derivation_type() : id_(size_type(-1)), bitext_(), derivation_() {}
+    bitext_derivation_type() : id_(size_type(-1)), derivation_() {}
     bitext_derivation_type(const size_type& id,
-			   const bitext_type& bitext,
 			   const derivation_type& derivation)
-      : id_(id), bitext_(bitext), derivation_(derivation) {}
+      : id_(id), derivation_(derivation) {}
     
     void swap(bitext_derivation_type& x)
     {
       std::swap(id_, x.id_);
-      bitext_.swap(x.bitext_);
       derivation_.swap(x.derivation_);
     }
 
     void clear()
     {
       id_ = size_type(-1);
-      bitext_.clear();
       derivation_.clear();
     }
   };
@@ -300,7 +296,7 @@ struct OutputMapReduce
       return x.id_ < y.id_;
     }
   };
-  typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_set_type;
+  typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_reduced_type;
 
 };
 
@@ -318,9 +314,10 @@ struct OutputDerivation : OutputMapReduce
 {
   typedef std::vector<std::string, std::allocator<std::string> > stack_type;
 	  
-  OutputDerivation(const path_type& path,
+  OutputDerivation(const bitext_set_type& bitexts,
+		   const path_type& path,
 		   queue_type& queue)
-    : path_(path), queue_(queue) {}
+    : bitexts_(bitexts), path_(path), queue_(queue) {}
   
   void operator()()
   {
@@ -333,7 +330,7 @@ struct OutputDerivation : OutputMapReduce
 	if (bitext.id_ == size_type(-1)) break;
       }
     } else {
-      bitext_set_type bitexts;
+      bitext_reduced_type bitexts;
       bitext_derivation_type bitext;
       size_type id = 0;
       
@@ -376,10 +373,10 @@ struct OutputDerivation : OutputMapReduce
     for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter) {
       if (diter->terminal()) {
 	const word_type& source = (! diter->span_.source_.empty()
-				   ? bitext.bitext_.source_[diter->span_.source_.first_]
+				   ? bitexts_[bitext.id_].source_[diter->span_.source_.first_]
 				   : vocab_type::EPSILON);
 	const word_type& target = (! diter->span_.target_.empty()
-				   ? bitext.bitext_.target_[diter->span_.target_.first_]
+				   ? bitexts_[bitext.id_].target_[diter->span_.target_.first_]
 				   : vocab_type::EPSILON);
 	
 	os << "((( " << source << " ||| " << target << " )))";
@@ -407,8 +404,9 @@ struct OutputDerivation : OutputMapReduce
     os << '\n';
   }
   
-  path_type   path_;
-  queue_type& queue_;
+  const bitext_set_type& bitexts_;
+  path_type              path_;
+  queue_type&            queue_;
   
   stack_type stack_;
 };
@@ -417,10 +415,12 @@ struct OutputAlignment : OutputMapReduce
 {
   typedef cicada::Alignment alignment_type;
 
-  OutputAlignment(const path_type& path_source_target,
+  OutputAlignment(const bitext_set_type& bitexts,
+		  const path_type& path_source_target,
 		  const path_type& path_target_source,
 		  queue_type& queue)
-    : path_source_target_(path_source_target),
+    : bitexts_(bitexts),
+      path_source_target_(path_source_target),
       path_target_source_(path_target_source),
       queue_(queue) {}
   
@@ -435,7 +435,7 @@ struct OutputAlignment : OutputMapReduce
 	if (bitext.id_ == size_type(-1)) break;
       }
     } else {
-      bitext_set_type bitexts;
+      bitext_reduced_type bitexts;
       bitext_derivation_type bitext;
       size_type id = 0;
       
@@ -490,7 +490,7 @@ struct OutputAlignment : OutputMapReduce
       if (moses_mode)
 	*os_source_target << alignment_ << '\n';
       else
-	output(*os_source_target, bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, alignment_);
+	output(*os_source_target, bitext.id_, bitexts_[bitext.id_].source_, bitexts_[bitext.id_].target_, alignment_);
     }
     
     if (os_target_source) {
@@ -501,7 +501,7 @@ struct OutputAlignment : OutputMapReduce
       if (moses_mode)
 	*os_target_source << alignment_ << '\n';
       else
-	output(*os_target_source, bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, alignment_);
+	output(*os_target_source, bitext.id_, bitexts_[bitext.id_].target_, bitexts_[bitext.id_].source_, alignment_);
     }
   }
 
@@ -560,9 +560,10 @@ struct OutputAlignment : OutputMapReduce
     }
   }
 
-  path_type  path_source_target_;
-  path_type  path_target_source_;
-  queue_type& queue_;
+  const bitext_set_type& bitexts_;
+  path_type              path_source_target_;
+  path_type              path_target_source_;
+  queue_type&            queue_;
   
   alignment_type alignment_;
 };
@@ -686,8 +687,7 @@ struct TaskAccumulate
 	    const sentence_type& source = bitexts_[id].source_;
 	    const sentence_type& target = bitexts_[id].target_;
 	    
-	    bitext_derivation.id_     = id;
-	    bitext_derivation.bitext_ = bitexts_[id];
+	    bitext_derivation.id_ = id;
 	    bitext_derivation.derivation_.clear();
 	    
 	    if (! source.empty() && ! target.empty()) {
@@ -867,11 +867,13 @@ void learn_online(const Learner& learner,
     
     const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
 
-    boost::thread output_derivation(output_derivation_type(! derivation_file.empty() && dump_mode
+    boost::thread output_derivation(output_derivation_type(bitexts,
+							   ! derivation_file.empty() && dump_mode
 							   ? add_suffix(derivation_file, iter_tag)
 							   : path_type(),
 							   queue_derivation));
-    boost::thread output_alignment(output_alignment_type(! alignment_source_target_file.empty() && dump_mode
+    boost::thread output_alignment(output_alignment_type(bitexts,
+							 ! alignment_source_target_file.empty() && dump_mode
 							 ? add_suffix(alignment_source_target_file, iter_tag)
 							 : path_type(),
 							 ! alignment_target_source_file.empty() && dump_mode
@@ -927,7 +929,7 @@ void learn_online(const Learner& learner,
       typename batch_set_type::iterator biter_end = batches.end();
       
       while (biter < biter_end) {
-	typename batch_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	typename batch_set_type::iterator iter_end = std::min(biter + 1024, biter_end);
 	
 	std::random_shuffle(biter, iter_end);
 	biter = iter_end;
@@ -994,8 +996,7 @@ struct TaskDerivation
       const sentence_type& source = bitexts_[bitext_id].source_;
       const sentence_type& target = bitexts_[bitext_id].target_;
       
-      bitext_derivation.id_     = bitext_id;
-      bitext_derivation.bitext_ = bitexts_[bitext_id];
+      bitext_derivation.id_ = bitext_id;
       bitext_derivation.derivation_.clear();
       
       if (! source.empty() && ! target.empty()) {
@@ -1064,11 +1065,13 @@ void derivation(const bitext_set_type& bitexts,
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   boost::thread_group workers_dump;
-  workers_dump.add_thread(new boost::thread(output_derivation_type(! derivation_file.empty()
+  workers_dump.add_thread(new boost::thread(output_derivation_type(bitexts,
+								   ! derivation_file.empty()
 								   ? derivation_file
 								   : path_type(),
 								   queue_derivation)));
-  workers_dump.add_thread(new boost::thread(output_alignment_type(! alignment_source_target_file.empty()
+  workers_dump.add_thread(new boost::thread(output_alignment_type(bitexts,
+								  ! alignment_source_target_file.empty()
 								  ? alignment_source_target_file
 								  : path_type(),
 								  ! alignment_target_source_file.empty()
