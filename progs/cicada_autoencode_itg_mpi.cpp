@@ -723,8 +723,8 @@ struct TaskAccumulate
     bool merge_finished = false;
     bool learn_finished = false;
     
-    size_type learned = 0;
-    size_type merged = 0;
+    //size_type learned = 0;
+    //size_type merged = 0;
     
     int non_found_iter = 0;
     
@@ -740,7 +740,7 @@ struct TaskAccumulate
 	    
 	    learner_(theta_, gradient_);
 
-	    ++ merged;
+	    //++ merged;
 	  }
 	  
 	  found = true;
@@ -748,7 +748,7 @@ struct TaskAccumulate
       
       if (! learn_finished && bitext_mapper_.pop_swap(bitext, true)) {
 	found = true;
-	
+
 	if (bitext.id_ != size_type(-1)) {
 	  const sentence_type& source = bitext.bitext_.source_;
 	  const sentence_type& target = bitext.bitext_.target_;
@@ -775,21 +775,23 @@ struct TaskAccumulate
 	      ++ batch_learn;
 	      
 	      itg_.derivation(source, target, bitext.derivation_);
-	    } else
+	    } else {
+#if 0
 	      std::cerr << "failed parsing: " << std::endl
 			<< "source: " << source << std::endl
 			<< "target: " << target << std::endl;
+#endif
+	    }
 	  }
 
-	  bitext_reducer_.push(bitext);
-	}
-	
-	learn_finished |= (bitext.id_ == size_type(-1));
+	  bitext_reducer_.push_swap(bitext);
+	} else
+	  learn_finished = true;
 	
 	if (batch_learn == batch_size_ || (learn_finished && batch_learn)) {
 	  learner_(theta_, gradient_batch_);
 	  
-	  ++ learned;
+	  //++ learned;
 	  
 	  gradient_batch_.encode(buffer);
 	  gradient_batch_.clear();
@@ -801,7 +803,8 @@ struct TaskAccumulate
 	
 	if (learn_finished) {
 	  gradient_mapper_.push(encoded_type());
-	  if (rank_ != 0)
+	  
+	  if (rank_)
 	    bitext_reducer_.push(bitext_derivation_type());
 	}
       }
@@ -809,7 +812,7 @@ struct TaskAccumulate
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
-    std::cerr << "rank: " << rank_ << " learned: " << learned << " merged: " << merged << std::endl;
+    //std::cerr << "rank: " << rank_ << " parsed: " << parsed_ << " learned: " << learned << " merged: " << merged << std::endl;
 
     theta_.finalize();
   }
@@ -982,7 +985,7 @@ void learn_online_root(const Learner& learner,
     MPI::COMM_WORLD.Barrier();
 
     // prepare iostreams...
-    for (int rank = 0; rank < mpi_size; ++ rank)
+    for (int rank = 0; rank != mpi_size; ++ rank)
       if (rank != mpi_rank) {
 	bitext_ostream[rank].reset(new bitext_ostream_type(rank, bitext_tag));
 	bitext_istream[rank].reset(new bitext_istream_type(rank, bitext_tag));
@@ -991,8 +994,6 @@ void learn_online_root(const Learner& learner,
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
 
-    MPI::COMM_WORLD.Barrier();
-    
     std::auto_ptr<boost::progress_display> progress(debug && mpi_rank == 0
 						    ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						    : 0);
@@ -1015,7 +1016,8 @@ void learn_online_root(const Learner& learner,
     
     utils::resource start;
     
-    bool gradient_finished = false; // for gradients
+    bool gradient_mapper_finished = false; // for gradients
+    bool gradient_reducer_finished = false; // for gradients
     bool bitext_finished   = false; // for bitext
 
     size_type id = 0;
@@ -1105,21 +1107,23 @@ void learn_online_root(const Learner& learner,
 	}
       
       // check termination...
-      if (! gradient_finished && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
+      if (! gradient_reducer_finished
+	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
 	gradient_reducer.push(buffer_type());
-	gradient_finished = true;
+	gradient_reducer_finished = true;
       }
       
       // bcast...
       // first, get the encoded buffer from mapper
-      if (gradient_mapper.pop_swap(buffer, true)) {
+      if (! gradient_mapper_finished && gradient_mapper.pop_swap(buffer, true)) {
 	buffer_ptr_type buffer_ptr;
 	
 	if (! buffer.empty()) {
 	  buffer_ptr.reset(new buffer_type());
 	  buffer_ptr->swap(buffer);
 	  buffer.clear();
-	}
+	} else
+	  gradient_mapper_finished = true;
 	
 	for (int rank = 0; rank != mpi_size; ++ rank) 
 	  if (rank != mpi_rank)
@@ -1148,7 +1152,7 @@ void learn_online_root(const Learner& learner,
 	}
       
       // termination condition
-      if (bitext_finished && gradient_finished
+      if (bitext_finished && gradient_reducer_finished && gradient_mapper_finished
 	  && std::count(bitext_istream.begin(), bitext_istream.end(), bitext_istream_ptr_type()) == mpi_size
 	  && std::count(bitext_ostream.begin(), bitext_ostream.end(), bitext_ostream_ptr_type()) == mpi_size
 	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size
@@ -1159,11 +1163,9 @@ void learn_online_root(const Learner& learner,
     
     worker.join();
     
-    bitext_reducer.push(typename map_reduce_type::value_type());
-    
     utils::resource end;
 
-    MPI::COMM_WORLD.Barrier();
+    bitext_reducer.push(bitext_derivation_type());
     
     loss_type loss   = task.loss_;
     size_type parsed = task.parsed_;
@@ -1283,25 +1285,23 @@ void learn_online_others(const Learner& learner,
   typename map_reduce_type::codec_type codec;
   
   for (int t = 0; t < iteration; ++ t) {
-    
     MPI::COMM_WORLD.Barrier();
-
-    std::auto_ptr<bitext_istream_type> bitext_istream(new bitext_istream_type(0, bitext_tag));
-    std::auto_ptr<bitext_ostream_type> bitext_ostream(new bitext_ostream_type(0, bitext_tag));
+    
+    bitext_istream_ptr_type bitext_istream(new bitext_istream_type(0, bitext_tag));
+    bitext_ostream_ptr_type bitext_ostream(new bitext_ostream_type(0, bitext_tag));
     
     // prepare iostreams...
-    for (int rank = 0; rank < mpi_size; ++ rank)
+    for (int rank = 0; rank != mpi_size; ++ rank)
       if (rank != mpi_rank) {
 	gradient_ostream[rank].reset(new gradient_ostream_type(rank, gradient_tag));
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
 
-    MPI::COMM_WORLD.Barrier();
-
     // create thread!
     boost::thread worker(boost::ref(task));
     
-    bool gradient_finished = false; // for gradients
+    bool gradient_mapper_finished = false; // for gradients
+    bool gradient_reducer_finished = false; // for gradients
     bool bitext_finished   = false; // for bitext
     
     int non_found_iter = 0;
@@ -1309,7 +1309,7 @@ void learn_online_others(const Learner& learner,
       bool found = false;
       
       // read bitexts mapped from root
-      if (bitext_istream.get() && bitext_istream->test() && bitext_mapper.empty()) {
+      if (bitext_istream && bitext_istream->test() && bitext_mapper.empty()) {
 	if (bitext_istream->read(line)) {
 	  codec.decode(bitext, line);
 	  
@@ -1325,8 +1325,8 @@ void learn_online_others(const Learner& learner,
       }
       
       // reduce derivations to root
-      if (! bitext_finished) {
-	if (bitext_ostream.get() && bitext_ostream->test() && bitext_reducer.pop_swap(bitext, true)) {
+      if (! bitext_finished)
+	if (bitext_ostream && bitext_ostream->test() && bitext_reducer.pop_swap(bitext, true)) {
 	  if (bitext.id_ == size_type(-1))
 	    bitext_finished = true;
 	  else {
@@ -1339,15 +1339,14 @@ void learn_online_others(const Learner& learner,
 	  
 	  found = true;
 	}
-      } else {
-	if (bitext_ostream.get() && bitext_ostream->test()) {
-	  if (! bitext_ostream->terminated())
-	    bitext_ostream->terminate();
-	  else
-	    bitext_ostream.reset();
-	  
-	  found = true;
-	}
+      
+      if (bitext_finished && bitext_ostream && bitext_ostream->test()) {
+	if (! bitext_ostream->terminated())
+	  bitext_ostream->terminate();
+	else
+	  bitext_ostream.reset();
+	
+	found = true;
       }
       
       // reduce gradients
@@ -1363,21 +1362,23 @@ void learn_online_others(const Learner& learner,
 	}
       
       // check termination...
-      if (! gradient_finished && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
+      if (! gradient_reducer_finished
+	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
 	gradient_reducer.push(buffer_type());
-	gradient_finished = true;
+	gradient_reducer_finished = true;
       }
       
       // bcast...
       // first, get the encoded buffer from mapper
-      if (gradient_mapper.pop_swap(buffer, true)) {
+      if (! gradient_mapper_finished && gradient_mapper.pop_swap(buffer, true)) {
 	buffer_ptr_type buffer_ptr;
 	
 	if (! buffer.empty()) {
 	  buffer_ptr.reset(new buffer_type());
 	  buffer_ptr->swap(buffer);
 	  buffer.clear();
-	}
+	} else
+	  gradient_mapper_finished = true;
 	
 	for (int rank = 0; rank != mpi_size; ++ rank) 
 	  if (rank != mpi_rank)
@@ -1406,16 +1407,17 @@ void learn_online_others(const Learner& learner,
 	}
 
       // termination condition
-      if (! bitext_istream.get() && ! bitext_ostream.get()
-	  && gradient_finished
+      if (! bitext_istream && ! bitext_ostream
+	  && gradient_reducer_finished
+	  && gradient_mapper_finished
 	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size
 	  && std::count(gradient_ostream.begin(), gradient_ostream.end(), gradient_ostream_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-    
-    MPI::COMM_WORLD.Barrier();
 
+    worker.join();
+    
     // reduce loss and # of parsed
     {
       boost::iostreams::filtering_ostream os;
@@ -1433,7 +1435,7 @@ void learn_online(const Learner& learner,
 		  const dictionary_type& dict_target_source,
 		  model_type& theta)
 {
-  if (MPI::COMM_WORLD.Get_rank()== 0)
+  if (MPI::COMM_WORLD.Get_rank() == 0)
     learn_online_root(learner, bitexts, dict_source_target, dict_target_source, theta);
   else
     learn_online_others(learner, bitexts, dict_source_target, dict_target_source, theta);
@@ -1465,17 +1467,19 @@ struct TaskDerivation
 		 const model_type& theta,
 		 const int& beam,
 		 queue_type& mapper,
-		 queue_type& reducer)
+		 queue_type& reducer,
+		 const int rank)
     : theta_(theta),
       mapper_(mapper),
       reducer_(reducer),
-      itg_(dict_source_target, dict_target_source, beam) {}
+      itg_(dict_source_target, dict_target_source, beam),
+      rank_(rank) {}
   
   void operator()()
   {
     bitext_derivation_type bitext;
     for (;;) {
-      mapper_.pop(bitext);
+      mapper_.pop_swap(bitext);
       
       if (bitext.id_ == size_type(-1)) break;
       
@@ -1503,8 +1507,11 @@ struct TaskDerivation
 		    << "target: " << target << std::endl;
       }
       
-      reducer_.push(bitext);
+      reducer_.push_swap(bitext);
     }
+
+    if (rank_)
+      reducer_.push(bitext_derivation_type());
   }
   
   const model_type& theta_;
@@ -1513,6 +1520,8 @@ struct TaskDerivation
   queue_type& reducer_;
   
   itg_type itg_;
+
+  int rank_;
 };
 
 void derivation_root(const bitext_set_type& bitexts,
@@ -1541,10 +1550,7 @@ void derivation_root(const bitext_set_type& bitexts,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  std::auto_ptr<boost::progress_display> progress(debug
-						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
-						  : 0);
+
   task_type::queue_type mapper(1);
   task_type::queue_type reducer;
   
@@ -1553,7 +1559,8 @@ void derivation_root(const bitext_set_type& bitexts,
 				 theta,
 				 beam,
 				 mapper,
-				 reducer));
+				 reducer,
+				 mpi_rank));
   
   boost::thread output(output_derivation_type(derivation_file,
 					      alignment_source_target_file,
@@ -1562,7 +1569,7 @@ void derivation_root(const bitext_set_type& bitexts,
   ostream_ptr_set_type ostream(mpi_size);
   istream_ptr_set_type istream(mpi_size);
   
-  for (int rank = 1; rank < mpi_size; ++ rank) {
+  for (int rank = 1; rank != mpi_size; ++ rank) {
     ostream[rank].reset(new ostream_type(rank, bitext_tag));
     istream[rank].reset(new istream_type(rank, bitext_tag));
   }
@@ -1572,6 +1579,13 @@ void derivation_root(const bitext_set_type& bitexts,
 
   map_reduce_type::codec_type codec;
 
+  if (debug)
+    std::cerr << "max derivation" << std::endl;
+  
+  std::auto_ptr<boost::progress_display> progress(debug
+						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
+						  : 0);
+  
   utils::resource start;
 
   int non_found_iter = 0;
@@ -1701,10 +1715,11 @@ void derivation_others(const bitext_set_type& bitexts,
 				 theta,
 				 beam,
 				 mapper,
-				 reducer));
+				 reducer,
+				 mpi_rank));
   
-  std::auto_ptr<utils::mpi_istream>        is(new utils::mpi_istream(0, bitext_tag));
-  std::auto_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, bitext_tag));
+  boost::shared_ptr<utils::mpi_istream>        is(new utils::mpi_istream(0, bitext_tag));
+  boost::shared_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, bitext_tag));
   
   std::string            line;
   bitext_derivation_type bitext;
@@ -1718,7 +1733,7 @@ void derivation_others(const bitext_set_type& bitexts,
     bool found = false;
     
     // read bitexts mapped from root
-    if (is.get() && is->test() && mapper.empty()) {
+    if (is && is->test() && mapper.empty()) {
       if (is->read(line)) {
 	codec.decode(bitext, line);
 	mapper.push_swap(bitext);
@@ -1732,7 +1747,7 @@ void derivation_others(const bitext_set_type& bitexts,
       
     // reduce derivations to root
     if (! terminated) {
-      if (os.get() && os->test() && reducer.pop_swap(bitext, true)) {
+      if (os && os->test() && reducer.pop_swap(bitext, true)) {
 	if (bitext.id_ == size_type(-1))
 	  terminated = true;
 	else {
@@ -1743,7 +1758,7 @@ void derivation_others(const bitext_set_type& bitexts,
 	found = true;
       }
     } else {
-      if (os.get() && os->test()) {
+      if (os && os->test()) {
 	if (! os->terminated())
 	  os->terminate();
 	else
@@ -1753,7 +1768,7 @@ void derivation_others(const bitext_set_type& bitexts,
       }
     }
     
-    if (! is.get() && ! os.get()) break;
+    if (! is && ! os) break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
@@ -1766,7 +1781,7 @@ void derivation(const bitext_set_type& bitexts,
 		const dictionary_type& dict_target_source,
 		const model_type& theta)
 {
-  if (MPI::COMM_WORLD.Get_rank()== 0)
+  if (MPI::COMM_WORLD.Get_rank() == 0)
     derivation_root(bitexts, dict_source_target, dict_target_source, theta);
   else
     derivation_others(bitexts, dict_source_target, dict_target_source, theta);
