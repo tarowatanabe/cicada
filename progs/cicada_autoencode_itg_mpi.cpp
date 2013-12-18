@@ -224,7 +224,7 @@ int main(int argc, char** argv)
     if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
       derivation(bitexts, dict_source_target, dict_target_source, theta);
     
-    if (! output_model_file.empty())
+    if (mpi_rank == 0 && ! output_model_file.empty())
       theta.write(output_model_file);
     
   } catch (std::exception& err) {
@@ -693,7 +693,8 @@ struct TaskAccumulate
 		 queue_bitext_type& bitext_mapper,
 		 queue_bitext_type& bitext_reducer,
 		 queue_gradient_type& gradient_mapper,
-		 queue_gradient_type& gradient_reducer)
+		 queue_gradient_type& gradient_reducer,
+		 const int rank)
     : learner_(learner),
       theta_(theta),
       bitext_mapper_(bitext_mapper),
@@ -704,7 +705,8 @@ struct TaskAccumulate
       gradient_batch_(theta.embedding_, theta.hidden_),
       itg_(dict_source_target, dict_target_source, beam),
       parsed_(0),
-      batch_size_(batch_size)
+      batch_size_(batch_size),
+      rank_(rank)
   {
     generator_.seed(utils::random_seed());
   }
@@ -720,11 +722,12 @@ struct TaskAccumulate
     
     bool merge_finished = false;
     bool learn_finished = false;
-
+    
+    size_type learned = 0;
+    size_type merged = 0;
+    
     int non_found_iter = 0;
     
-    bitext_derivation_type bitext_derivation;
-
     while (! merge_finished || ! learn_finished) {
       bool found = false;
       
@@ -736,6 +739,8 @@ struct TaskAccumulate
 	    gradient_.decode(buffer);
 	    
 	    learner_(theta_, gradient_);
+
+	    ++ merged;
 	  }
 	  
 	  found = true;
@@ -775,14 +780,16 @@ struct TaskAccumulate
 			<< "source: " << source << std::endl
 			<< "target: " << target << std::endl;
 	  }
-	  
-	  bitext_reducer_.push(bitext_derivation);
+
+	  bitext_reducer_.push(bitext);
 	}
 	
 	learn_finished |= (bitext.id_ == size_type(-1));
 	
 	if (batch_learn == batch_size_ || (learn_finished && batch_learn)) {
 	  learner_(theta_, gradient_batch_);
+	  
+	  ++ learned;
 	  
 	  gradient_batch_.encode(buffer);
 	  gradient_batch_.clear();
@@ -794,13 +801,16 @@ struct TaskAccumulate
 	
 	if (learn_finished) {
 	  gradient_mapper_.push(encoded_type());
-	  bitext_reducer_.push(bitext_derivation_type());
+	  if (rank_ != 0)
+	    bitext_reducer_.push(bitext_derivation_type());
 	}
       }
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
+    std::cerr << "rank: " << rank_ << " learned: " << learned << " merged: " << merged << std::endl;
+
     theta_.finalize();
   }
 
@@ -850,6 +860,7 @@ struct TaskAccumulate
   size_type         parsed_;
     
   size_type      batch_size_;
+  int            rank_;
   boost::mt19937 generator_;
 };
 
@@ -906,14 +917,23 @@ void learn_online_root(const Learner& learner,
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> >  buffer_set_type;
   typedef std::vector<buffer_set_type, std::allocator<buffer_set_type> > buffer_map_type;
 
-  typedef utils::mpi_ostream_simple ostream_type;
-  typedef utils::mpi_istream_simple istream_type;
-
-  typedef boost::shared_ptr<utils::mpi_ostream_simple> ostream_ptr_type;
-  typedef boost::shared_ptr<utils::mpi_istream_simple> istream_ptr_type;
+  typedef utils::mpi_ostream        bitext_ostream_type;
+  typedef utils::mpi_istream_simple bitext_istream_type;
   
-  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
-  typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+  typedef utils::mpi_ostream_simple gradient_ostream_type;
+  typedef utils::mpi_istream_simple gradient_istream_type;
+
+  typedef boost::shared_ptr<bitext_ostream_type> bitext_ostream_ptr_type;
+  typedef boost::shared_ptr<bitext_istream_type> bitext_istream_ptr_type;
+
+  typedef boost::shared_ptr<gradient_ostream_type> gradient_ostream_ptr_type;
+  typedef boost::shared_ptr<gradient_istream_type> gradient_istream_ptr_type;
+
+  typedef std::vector<bitext_ostream_ptr_type, std::allocator<bitext_ostream_ptr_type> > bitext_ostream_ptr_set_type;
+  typedef std::vector<bitext_istream_ptr_type, std::allocator<bitext_istream_ptr_type> > bitext_istream_ptr_set_type;
+  
+  typedef std::vector<gradient_ostream_ptr_type, std::allocator<gradient_ostream_ptr_type> > gradient_ostream_ptr_set_type;
+  typedef std::vector<gradient_istream_ptr_type, std::allocator<gradient_istream_ptr_type> > gradient_istream_ptr_set_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
 
@@ -938,7 +958,8 @@ void learn_online_root(const Learner& learner,
 		 bitext_mapper,
 		 bitext_reducer,
 		 gradient_mapper,
-		 gradient_reducer);
+		 gradient_reducer,
+		 mpi_rank);
 
   std::string            line;
   bitext_derivation_type bitext;
@@ -946,11 +967,11 @@ void learn_online_root(const Learner& learner,
   buffer_type          buffer;
   buffer_map_type      buffers(mpi_size);
   
-  ostream_ptr_set_type bitext_ostream(mpi_size);
-  istream_ptr_set_type bitext_istream(mpi_size);
+  bitext_ostream_ptr_set_type bitext_ostream(mpi_size);
+  bitext_istream_ptr_set_type bitext_istream(mpi_size);
 
-  ostream_ptr_set_type gradient_ostream(mpi_size);
-  istream_ptr_set_type gradient_istream(mpi_size);
+  gradient_ostream_ptr_set_type gradient_ostream(mpi_size);
+  gradient_istream_ptr_set_type gradient_istream(mpi_size);
   
   typename map_reduce_type::codec_type codec;
   
@@ -958,14 +979,16 @@ void learn_online_root(const Learner& learner,
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
 
+    MPI::COMM_WORLD.Barrier();
+
     // prepare iostreams...
     for (int rank = 0; rank < mpi_size; ++ rank)
       if (rank != mpi_rank) {
-	bitext_ostream[rank].reset(new utils::mpi_ostream_simple(rank, bitext_tag));
-	bitext_istream[rank].reset(new utils::mpi_istream_simple(rank, bitext_tag));
+	bitext_ostream[rank].reset(new bitext_ostream_type(rank, bitext_tag));
+	bitext_istream[rank].reset(new bitext_istream_type(rank, bitext_tag));
 	
-	gradient_ostream[rank].reset(new utils::mpi_ostream_simple(rank, gradient_tag));
-	gradient_istream[rank].reset(new utils::mpi_istream_simple(rank, gradient_tag));
+	gradient_ostream[rank].reset(new gradient_ostream_type(rank, gradient_tag));
+	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
     
     std::auto_ptr<boost::progress_display> progress(debug && mpi_rank == 0
@@ -1022,6 +1045,8 @@ void learn_online_root(const Learner& learner,
 	  bitext.id_     = id;
 	  bitext.bitext_ = bitexts[id];
 	  bitext.derivation_.clear();
+
+	  //std::cerr << "rank: " << mpi_rank << " bitext: " << bitext.id_ << std::endl;
 	  
 	  bitext_mapper.push_swap(bitext);
 	  
@@ -1055,14 +1080,15 @@ void learn_online_root(const Learner& learner,
 	if (bitext_istream[rank] && bitext_istream[rank]->test()) {
 	  if (bitext_istream[rank]->read(line)) {
 	    codec.decode(bitext, line);
+	    
+	    //std::cerr << "reduced: " << rank << " bitext: " << bitext.id_ << std::endl;
+
 	    bitext_reducer.push_swap(bitext);
 	  } else
 	    bitext_istream[rank].reset();
 	  
 	  found = true;
 	}
-      
-      
       
       // reduce gradients
       for (int rank = 0; rank != mpi_size; ++ rank)
@@ -1077,7 +1103,7 @@ void learn_online_root(const Learner& learner,
 	}
       
       // check termination...
-      if (! gradient_finished && std::count(gradient_istream.begin(), gradient_istream.end(), istream_ptr_type()) == mpi_size) {
+      if (! gradient_finished && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
 	gradient_reducer.push(buffer_type());
 	gradient_finished = true;
       }
@@ -1121,10 +1147,10 @@ void learn_online_root(const Learner& learner,
       
       // termination condition
       if (bitext_finished && gradient_finished
-	  && std::count(bitext_istream.begin(), bitext_istream.end(), istream_ptr_type()) == mpi_size
-	  && std::count(bitext_ostream.begin(), bitext_ostream.end(), ostream_ptr_type()) == mpi_size
-	  && std::count(gradient_istream.begin(), gradient_istream.end(), istream_ptr_type()) == mpi_size
-	  && std::count(gradient_ostream.begin(), gradient_ostream.end(), ostream_ptr_type()) == mpi_size) break;
+	  && std::count(bitext_istream.begin(), bitext_istream.end(), bitext_istream_ptr_type()) == mpi_size
+	  && std::count(bitext_ostream.begin(), bitext_ostream.end(), bitext_ostream_ptr_type()) == mpi_size
+	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size
+	  && std::count(gradient_ostream.begin(), gradient_ostream.end(), gradient_ostream_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
@@ -1203,14 +1229,23 @@ void learn_online_others(const Learner& learner,
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> >  buffer_set_type;
   typedef std::vector<buffer_set_type, std::allocator<buffer_set_type> > buffer_map_type;
 
-  typedef utils::mpi_ostream_simple ostream_type;
-  typedef utils::mpi_istream_simple istream_type;
+  typedef utils::mpi_ostream_simple bitext_ostream_type;
+  typedef utils::mpi_istream        bitext_istream_type;
   
-  typedef boost::shared_ptr<utils::mpi_ostream_simple> ostream_ptr_type;
-  typedef boost::shared_ptr<utils::mpi_istream_simple> istream_ptr_type;
+  typedef utils::mpi_ostream_simple gradient_ostream_type;
+  typedef utils::mpi_istream_simple gradient_istream_type;
+
+  typedef boost::shared_ptr<bitext_ostream_type> bitext_ostream_ptr_type;
+  typedef boost::shared_ptr<bitext_istream_type> bitext_istream_ptr_type;
+
+  typedef boost::shared_ptr<gradient_ostream_type> gradient_ostream_ptr_type;
+  typedef boost::shared_ptr<gradient_istream_type> gradient_istream_ptr_type;
+
+  typedef std::vector<bitext_ostream_ptr_type, std::allocator<bitext_ostream_ptr_type> > bitext_ostream_ptr_set_type;
+  typedef std::vector<bitext_istream_ptr_type, std::allocator<bitext_istream_ptr_type> > bitext_istream_ptr_set_type;
   
-  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
-  typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+  typedef std::vector<gradient_ostream_ptr_type, std::allocator<gradient_ostream_ptr_type> > gradient_ostream_ptr_set_type;
+  typedef std::vector<gradient_istream_ptr_type, std::allocator<gradient_istream_ptr_type> > gradient_istream_ptr_set_type;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1229,27 +1264,32 @@ void learn_online_others(const Learner& learner,
 		 bitext_mapper,
 		 bitext_reducer,
 		 gradient_mapper,
-		 gradient_reducer);
+		 gradient_reducer,
+		 mpi_rank);
 
   std::string            line;
   bitext_derivation_type bitext;
   
   buffer_type          buffer;
   buffer_map_type      buffers(mpi_size);
-  ostream_ptr_set_type ostreams(mpi_size);
-  istream_ptr_set_type istreams(mpi_size);
+  
+  gradient_ostream_ptr_set_type gradient_ostream(mpi_size);
+  gradient_istream_ptr_set_type gradient_istream(mpi_size);
   
   typename map_reduce_type::codec_type codec;
   
   for (int t = 0; t < iteration; ++ t) {
-    std::auto_ptr<utils::mpi_istream_simple> is(new utils::mpi_istream_simple(0, bitext_tag));
-    std::auto_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, bitext_tag));
+    
+    MPI::COMM_WORLD.Barrier();
+
+    std::auto_ptr<bitext_istream_type> bitext_istream(new bitext_istream_type(0, bitext_tag));
+    std::auto_ptr<bitext_ostream_type> bitext_ostream(new bitext_ostream_type(0, bitext_tag));
     
     // prepare iostreams...
     for (int rank = 0; rank < mpi_size; ++ rank)
       if (rank != mpi_rank) {
-	ostreams[rank].reset(new utils::mpi_ostream_simple(rank, gradient_tag));
-	istreams[rank].reset(new utils::mpi_istream_simple(rank, gradient_tag));
+	gradient_ostream[rank].reset(new gradient_ostream_type(rank, gradient_tag));
+	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
 
     // create thread!
@@ -1263,13 +1303,16 @@ void learn_online_others(const Learner& learner,
       bool found = false;
       
       // read bitexts mapped from root
-      if (is.get() && is->test() && bitext_mapper.empty()) {
-	if (is->read(line)) {
+      if (bitext_istream.get() && bitext_istream->test() && bitext_mapper.empty()) {
+	if (bitext_istream->read(line)) {
 	  codec.decode(bitext, line);
+	  
+	  //std::cerr << "rank: " << mpi_rank << " bitext: " << bitext.id_ << std::endl;
+
 	  bitext_mapper.push_swap(bitext);
 	} else {
 	  bitext_mapper.push(bitext_derivation_type());
-	  is.reset();
+	  bitext_istream.reset();
 	}
 	
 	found = true;
@@ -1277,22 +1320,25 @@ void learn_online_others(const Learner& learner,
       
       // reduce derivations to root
       if (! bitext_finished) {
-	if (os.get() && os->test() && bitext_reducer.pop_swap(bitext, true)) {
+	if (bitext_ostream.get() && bitext_ostream->test() && bitext_reducer.pop_swap(bitext, true)) {
 	  if (bitext.id_ == size_type(-1))
 	    bitext_finished = true;
 	  else {
 	    codec.encode(bitext, line);
-	    os->write(line);
+	    
+	    //std::cerr << "rank: " << mpi_rank << " bitext: " << bitext.id_ << std::endl;
+
+	    bitext_ostream->write(line);
 	  }
 	  
 	  found = true;
 	}
       } else {
-	if (os.get() && os->test()) {
-	  if (! os->terminated())
-	    os->terminate();
+	if (bitext_ostream.get() && bitext_ostream->test()) {
+	  if (! bitext_ostream->terminated())
+	    bitext_ostream->terminate();
 	  else
-	    os.reset();
+	    bitext_ostream.reset();
 	  
 	  found = true;
 	}
@@ -1300,18 +1346,18 @@ void learn_online_others(const Learner& learner,
       
       // reduce gradients
       for (int rank = 0; rank != mpi_size; ++ rank)
-	if (rank != mpi_rank && istreams[rank] && istreams[rank]->test()) {
-	  if (istreams[rank]->read(buffer))
+	if (rank != mpi_rank && gradient_istream[rank] && gradient_istream[rank]->test()) {
+	  if (gradient_istream[rank]->read(buffer))
 	    gradient_reducer.push_swap(buffer);
 	  else
-	    istreams[rank].reset();
+	    gradient_istream[rank].reset();
 	  
 	  buffer.clear();
 	  found = true;
 	}
       
       // check termination...
-      if (! gradient_finished && std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size) {
+      if (! gradient_finished && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size) {
 	gradient_reducer.push(buffer_type());
 	gradient_finished = true;
       }
@@ -1336,17 +1382,17 @@ void learn_online_others(const Learner& learner,
       
       // second, bcast...
       for (int rank = 0; rank != mpi_size; ++ rank)
-	if (rank != mpi_rank && ostreams[rank] && ostreams[rank]->test() && ! buffers[rank].empty()) {
+	if (rank != mpi_rank && gradient_ostream[rank] && gradient_ostream[rank]->test() && ! buffers[rank].empty()) {
 	  if (! buffers[rank].front()) {
 	    // termination!
-	    if (! ostreams[rank]->terminated())
-	      ostreams[rank]->terminate();
+	    if (! gradient_ostream[rank]->terminated())
+	      gradient_ostream[rank]->terminate();
 	    else {
-	      ostreams[rank].reset();
+	      gradient_ostream[rank].reset();
 	      buffers[rank].erase(buffers[rank].begin());
 	    }
 	  } else {
-	    ostreams[rank]->write(*(buffers[rank].front()));
+	    gradient_ostream[rank]->write(*(buffers[rank].front()));
 	    buffers[rank].erase(buffers[rank].begin());
 	  }
 	  
@@ -1354,10 +1400,10 @@ void learn_online_others(const Learner& learner,
 	}
 
       // termination condition
-      if (! is.get() && ! os.get()
+      if (! bitext_istream.get() && ! bitext_ostream.get()
 	  && gradient_finished
-	  && std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
-	  && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size) break;
+	  && std::count(gradient_istream.begin(), gradient_istream.end(), gradient_istream_ptr_type()) == mpi_size
+	  && std::count(gradient_ostream.begin(), gradient_ostream.end(), gradient_ostream_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
@@ -1476,7 +1522,7 @@ void derivation_root(const bitext_set_type& bitexts,
 
   typedef map_reduce_type::bitext_derivation_type bitext_derivation_type;
   
-  typedef utils::mpi_ostream_simple ostream_type;
+  typedef utils::mpi_ostream        ostream_type;
   typedef utils::mpi_istream_simple istream_type;
   
   typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
@@ -1649,7 +1695,7 @@ void derivation_others(const bitext_set_type& bitexts,
 				 mapper,
 				 reducer));
   
-  std::auto_ptr<utils::mpi_istream_simple> is(new utils::mpi_istream_simple(0, bitext_tag));
+  std::auto_ptr<utils::mpi_istream>        is(new utils::mpi_istream(0, bitext_tag));
   std::auto_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, bitext_tag));
   
   std::string            line;
@@ -1784,7 +1830,7 @@ void bcast_dict(dictionary_type& dict)
 			     standard::blank, source, target, count))
 	if (iter != iter_end)
 	  throw std::runtime_error("parsing failed");
-      
+
       dict[source][target] = count;
     }
   }
@@ -1952,7 +1998,6 @@ void read_data(const path_type& source_file,
 	if (words_target.find(*titer) == words_target.end())
 	  *titer = vocab_type::UNK;	
     }
-    
   }
 
   dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
