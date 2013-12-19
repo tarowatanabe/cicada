@@ -2,33 +2,10 @@
 //  Copyright(C) 2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+//
+// an implementation for neural network alignment model with NCE estimate...
 // 
-// ITG-based autoencoder
-//
-// X -> f/e : [vec_f, vec_e]
-// X -> [X1, X2] : W_s [vec_x1_f, vec_x2_f, vec_x1_e, vec_x2_e] + B_s
-// X -> <X1, X2> : W_i [vec_x1_f, vec_x2_f, vec_x2_e, vec_x1_e] + B_i
-//
-// - Use ITG beam search of Saers et al., (2009)
-// - Learning is performed by autoencoding: recovering representation of children vectors
-//
-// word vector format: word dim1 dim2 dim3 ...
-// tensor: [[dim1, dim2, ...], [dim1, dim2, ...], ... ] (make it compatible with neuron package...?)
-// 
-
-// currently, we learn and output the last derivation in a format similar to pialign:
-//
-// < [ ((( word |||  word ))) ] <  ((( word ||| word ))) > >
-//
-// [ ] indicates straight and < > indicates inversion.
-
-// we will try four learning algorithms:
-//
-// SGD with L2 regularizer inspired by Pegasos (default)
-// SGD with L2 regularizer inspired by AdaGrad
-// SGD with L2/L2 regularizer from RDA
-//
-// + batch algorithm using LBFGS
+// we will try SGD with L2 regularizer inspired by AdaGrad (default)
 //
 
 #include <cstdlib>
@@ -36,7 +13,6 @@
 #include <climits>
 
 #include <set>
-#include <deque>
 
 #include "cicada/symbol.hpp"
 #include "cicada/sentence.hpp"
@@ -44,7 +20,6 @@
 #include "cicada/alignment.hpp"
 #include "cicada/bitext.hpp"
 
-#include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/mathop.hpp"
@@ -66,14 +41,15 @@
 #include <boost/thread.hpp>
 #include <boost/progress.hpp>
 
-#include "cicada_autoencode_itg_impl.hpp"
+#include "cicada_nn_joint_alignment_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 
+typedef cicada::Sentence sentence_type;
 typedef cicada::Bitext bitext_type;
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 
-typedef Model model_type;
+typedef Model      model_type;
 typedef Dictionary dictionary_type;
 
 path_type source_file;
@@ -82,25 +58,28 @@ path_type target_file;
 path_type embedding_source_file;
 path_type embedding_target_file;
 
-path_type derivation_file;
+path_type model_source_target_file;
+path_type model_target_source_file;
+
+path_type output_source_target_file;
+path_type output_target_source_file;
 path_type alignment_source_target_file;
 path_type alignment_target_source_file;
-path_type output_model_file;
 
-double alpha = 0.99;
-double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
+int window = 0;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 4;
-int beam = 10;
-double lambda = 0;
-double eta0 = 0.1;
+int sample_size = 10;
 int cutoff = 3;
+double lambda = 0;
+double lambda2 = 0;
+double eta0 = 0.1;
 
 bool moses_mode = false;
 bool giza_mode = false;
@@ -114,17 +93,19 @@ void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
 		  const dictionary_type& dict_source_target,
 		  const dictionary_type& dict_target_source,
-		  model_type& theta);
-void derivation(const bitext_set_type& bitexts,
-		const dictionary_type& dict_source_target,
-		const dictionary_type& dict_target_source,
-		const model_type& theta);
+		  model_type& theta_source_target,
+		  model_type& theta_target_source);
 void bcast_model(model_type& theta);
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
 	       bitext_set_type& bitexts,
 	       dictionary_type& dict_source_target,
 	       dictionary_type& dict_target_source);
+void viterbi(const bitext_set_type& bitexts,
+	     const dictionary_type& dict_source_target,
+	     const dictionary_type& dict_target_source,
+	     const model_type& theta_source_target,
+	     const model_type& theta_target_source);
 
 void options(int argc, char** argv);
 
@@ -142,48 +123,50 @@ int main(int argc, char** argv)
       throw std::runtime_error("dimension must be positive");
     if (dimension_hidden <= 0)
       throw std::runtime_error("dimension must be positive");
-    
-    if (alpha < 0.0)
-      throw std::runtime_error("alpha should be >= 0.0");
-    if (beta < 0.0)
-      throw std::runtime_error("beta should be >= 0.0");
+    if (window < 0)
+      throw std::runtime_error("window size should be positive");
 
-    if (beam <= 0)
-      throw std::runtime_error("beam width should be positive");
-    
+    if (batch_size <= 0)
+      throw std::runtime_error("invalid batch size");
+
     if (int(giza_mode) + moses_mode > 1)
       throw std::runtime_error("either giza style output or moses style output");
 
     if (int(giza_mode) + moses_mode == 0)
       moses_mode = true;
-
+        
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
-    
+        
     // srand is used in Eigen
     std::srand(utils::random_seed());
   
     // this is optional, but safe to set this
     ::srandom(utils::random_seed());
-
+        
     boost::mt19937 generator;
     generator.seed(utils::random_seed());
-        
-    if (source_file.empty())
-      throw std::runtime_error("no source data?");
-    if (target_file.empty())
-      throw std::runtime_error("no target data?");
+
+    if (source_file.empty() || target_file.empty())
+      throw std::runtime_error("no data?");
+
+    if (source_file != "-" && ! boost::filesystem::exists(source_file))
+      throw std::runtime_error("no source file? " + source_file.string());
     
+    if (target_file != "-" && ! boost::filesystem::exists(target_file))
+      throw std::runtime_error("no target file? " + target_file.string());
+    
+
     bitext_set_type bitexts;
-    
+        
     dictionary_type dict_source_target;
     dictionary_type dict_target_source;
-
-    read_data(source_file, target_file, bitexts, dict_source_target, dict_target_source);
     
+    read_data(source_file, target_file, bitexts, dict_source_target, dict_target_source);
+
     const dictionary_type::dict_type::word_set_type& sources = dict_target_source[cicada::Vocab::EPSILON].words_;
     const dictionary_type::dict_type::word_set_type& targets = dict_source_target[cicada::Vocab::EPSILON].words_;
 
@@ -191,8 +174,21 @@ int main(int argc, char** argv)
       std::cerr << "# of unique source words: " << sources.size() << std::endl
 		<< "# of unique target words: " << targets.size() << std::endl
 		<< "# of sentences: " << bitexts.size() << std::endl;
+
+    model_type theta_source_target(dimension_embedding, dimension_hidden, window, sources, targets, generator);
+    model_type theta_target_source(dimension_embedding, dimension_hidden, window, targets, sources, generator);
     
-    model_type theta(dimension_embedding, dimension_hidden, sources, targets, generator);
+    if (mpi_rank == 0) {
+      const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
+								  theta_source_target.target_.cols()),
+					      utils::bithack::min(theta_target_source.source_.cols(),
+								  theta_target_source.target_.cols()));
+      
+      theta_source_target.source_.block(0, 0, dimension_embedding, cols)
+	= theta_target_source.target_.block(0, 0, dimension_embedding, cols);
+      theta_source_target.target_.block(0, 0, dimension_embedding, cols)
+	= theta_target_source.source_.block(0, 0, dimension_embedding, cols);
+    }
     
     if (mpi_rank == 0)
       if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
@@ -202,31 +198,42 @@ int main(int argc, char** argv)
 	if (embedding_target_file != "-" && ! boost::filesystem::exists(embedding_target_file))
 	  throw std::runtime_error("no embedding: " + embedding_target_file.string());
 	
-	theta.read_embedding(embedding_source_file, embedding_target_file);
+	theta_source_target.read_embedding(embedding_source_file, embedding_target_file);
+	theta_target_source.read_embedding(embedding_target_file, embedding_source_file);
       }
     
-    bcast_model(theta);
-    
+    bcast_model(theta_source_target);
+    bcast_model(theta_target_source);
+        
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, lambda, eta0),
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, lambda, lambda2, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
-		     theta);
+		     theta_source_target,
+		     theta_target_source);
       else
-	learn_online(LearnSGD(lambda, eta0),
+	learn_online(LearnSGD(lambda, lambda2, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
-		     theta);
+		     theta_source_target,
+		     theta_target_source);
     }
+
+    if (! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
+      viterbi(bitexts,
+	      dict_source_target,
+	      dict_target_source,
+	      theta_source_target,
+	      theta_target_source);
     
-    if (! derivation_file.empty() || ! alignment_source_target_file.empty() || ! alignment_target_source_file.empty())
-      derivation(bitexts, dict_source_target, dict_target_source, theta);
+    if (mpi_rank == 0 && ! output_source_target_file.empty())
+      theta_source_target.write(output_source_target_file);
     
-    if (mpi_rank == 0 && ! output_model_file.empty())
-      theta.write(output_model_file);
+    if (mpi_rank == 0 && ! output_target_source_file.empty())
+      theta_target_source.write(output_target_source_file);
     
   } catch (std::exception& err) {
     std::cerr << err.what() << std::endl;
@@ -272,54 +279,54 @@ struct MapReduce
 
   typedef boost::filesystem::path path_type;
   
-  typedef cicada::Bitext bitext_type;
+  typedef cicada::Bitext    bitext_type;
+  typedef cicada::Alignment alignment_type;
   
   typedef bitext_type::word_type word_type;
   typedef bitext_type::sentence_type sentence_type;
 
-  typedef ITG itg_type;
-
-  typedef itg_type::vocab_type vocab_type;
-  
-  typedef itg_type::span_type       span_type;
-  typedef itg_type::span_pair_type  span_pair_type;
-  typedef itg_type::hyperedge_type  hyperedge_type;
-  typedef itg_type::derivation_type derivation_type;
-
-  struct bitext_derivation_type
+  struct bitext_alignment_type
   {
     size_type       id_;
     bitext_type     bitext_;
-    derivation_type derivation_;
+    alignment_type  alignment_source_target_;
+    alignment_type  alignment_target_source_;
     
-    bitext_derivation_type() : id_(size_type(-1)), bitext_(), derivation_() {}
-    bitext_derivation_type(const size_type& id,
-			   const derivation_type& derivation)
-      : id_(id), bitext_(), derivation_(derivation) {}
-    bitext_derivation_type(const size_type& id,
-			   const bitext_type& bitext,
-			   const derivation_type& derivation)
-      : id_(id), bitext_(bitext), derivation_(derivation) {}
+    bitext_alignment_type()
+      : id_(size_type(-1)),
+	bitext_(),
+	alignment_source_target_(),
+	alignment_target_source_() {}
+    bitext_alignment_type(const size_type& id,
+			  const bitext_type& bitext,
+			  const alignment_type& alignment_source_target,
+			  const alignment_type& alignment_target_source)
+      : id_(id),
+	bitext_(bitext),
+	alignment_source_target_(alignment_source_target),
+	alignment_target_source_(alignment_target_source) {}
     
-    void swap(bitext_derivation_type& x)
+    void swap(bitext_alignment_type& x)
     {
       std::swap(id_, x.id_);
       bitext_.swap(x.bitext_);
-      derivation_.swap(x.derivation_);
+      alignment_source_target_.swap(x.alignment_source_target_);
+      alignment_target_source_.swap(x.alignment_target_source_);
     }
 
     void clear()
     {
       id_ = size_type(-1);
       bitext_.clear();
-      derivation_.clear();
+      alignment_source_target_.clear();
+      alignment_target_source_.clear();
     }
   };
   
-  typedef bitext_derivation_type value_type;
+  typedef bitext_alignment_type value_type;
 
   typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
-
+  
   struct compare_value
   {
     bool operator()(const value_type& x, const value_type& y) const
@@ -328,14 +335,14 @@ struct MapReduce
     }
   };
   typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_reduced_type;
-
+  
   struct codec_type
   {
     typedef std::vector<char, std::allocator<char> > buffer_type;
     
     buffer_type buffer_;
 
-    void encode(const bitext_derivation_type& bitext, std::string& encoded) const
+    void encode(const bitext_alignment_type& bitext, std::string& encoded) const
     {
       buffer_type& buffer = const_cast<buffer_type&>(buffer_);
       buffer.clear();
@@ -371,17 +378,15 @@ struct MapReduce
 	  os.write((char*) &(*titer->begin()), word_size);
 	}
 	
-	// derivation
-	const size_type derivation_size = bitext.derivation_.size();
-	os.write((char*) &derivation_size, sizeof(size_type));
-	
-	os.write((char*) &(*bitext.derivation_.begin()), sizeof(hyperedge_type) * derivation_size);
+	// alignment
+	write(os, bitext.alignment_source_target_);
+	write(os, bitext.alignment_target_source_);
       }
       
       encoded = std::string(buffer.begin(), buffer.end());
     }
 
-    void decode(bitext_derivation_type& bitext, const std::string& encoded) const
+    void decode(bitext_alignment_type& bitext, const std::string& encoded) const
     {
       buffer_type& buffer = const_cast<buffer_type&>(buffer_);
       
@@ -420,16 +425,29 @@ struct MapReduce
 	
 	bitext.bitext_.target_.push_back(word_type(buffer.begin(), buffer.end()));
       }
-
-      // derivation
-      size_type derivation_size = 0;
-      is.read((char*) &derivation_size, sizeof(size_type));
-      bitext.derivation_.resize(derivation_size);
       
-      is.read((char*) &(*bitext.derivation_.begin()), sizeof(hyperedge_type) * derivation_size);
+      // alignment
+      read(is, bitext.alignment_source_target_);
+      read(is, bitext.alignment_target_source_);
+    }
+
+    void write(std::ostream& os, const alignment_type& alignment) const
+    {
+      const size_type alignment_size = alignment.size();
+      
+      os.write((char*) &alignment_size, sizeof(size_type));
+      os.write((char*) &(*alignment.begin()), sizeof(alignment_type::value_type) * alignment_size);
+    }
+
+    void read(std::istream& is, alignment_type& alignment) const
+    {
+      size_type alignment_size = 0;
+      is.read((char*) &alignment_size, sizeof(size_type));
+      
+      alignment.resize(alignment_size);
+      is.read((char*) &(*alignment.begin()), sizeof(alignment_type::value_type) * alignment_size);
     }
   };
-
 };
 
 namespace std
@@ -442,24 +460,19 @@ namespace std
   }
 };
 
-struct OutputDerivation : MapReduce
+struct OutputAlignment : MapReduce
 {
-  typedef cicada::Alignment alignment_type;
-  typedef std::vector<std::string, std::allocator<std::string> > stack_type;
-  
-  OutputDerivation(const path_type& path_derivation,
-		   const path_type& path_source_target,
-		   const path_type& path_target_source,
-		   queue_type& queue)
-    : path_derivation_(path_derivation),
-      path_source_target_(path_source_target),
+  OutputAlignment(const path_type& path_source_target,
+		  const path_type& path_target_source,
+		  queue_type& queue)
+    : path_source_target_(path_source_target),
       path_target_source_(path_target_source),
       queue_(queue) {}
   
   void operator()()
   {
-    if (path_derivation_.empty() && path_source_target_.empty() && path_target_source_.empty()) {
-      bitext_derivation_type bitext;
+    if (path_source_target_.empty() && path_target_source_.empty()) {
+      bitext_alignment_type bitext;
       
       for (;;) {
 	queue_.pop_swap(bitext);
@@ -468,39 +481,65 @@ struct OutputDerivation : MapReduce
       }
     } else {
       bitext_reduced_type bitexts;
-      bitext_derivation_type bitext;
+      bitext_alignment_type bitext;
       size_type id = 0;
       
-      std::auto_ptr<std::ostream> os_derivation(! path_derivation_.empty()
-						? new utils::compress_ostream(path_derivation_, 1024 * 1024)
-						: 0);
       std::auto_ptr<std::ostream> os_source_target(! path_source_target_.empty()
 						   ? new utils::compress_ostream(path_source_target_, 1024 * 1024)
 						   : 0);
       std::auto_ptr<std::ostream> os_target_source(! path_target_source_.empty()
 						   ? new utils::compress_ostream(path_target_source_, 1024 * 1024)
 						   : 0);
-
+      
       for (;;) {
 	queue_.pop_swap(bitext);
 	
 	if (bitext.id_ == size_type(-1)) break;
 	
+	// sort
+	std::sort(bitext.alignment_source_target_.begin(), bitext.alignment_source_target_.end());
+	std::sort(bitext.alignment_target_source_.begin(), bitext.alignment_target_source_.end());
+
 	if (bitext.id_ == id) {
-	  if (os_derivation.get())
-	    write_derivation(*os_derivation, bitext);
-	  if (os_source_target.get() || os_target_source.get())
-	    write_alignment(os_source_target.get(), os_target_source.get(), bitext);
-	    
+	  
+	  if (os_source_target.get()) {
+	    if (moses_mode)
+	      *os_source_target << bitext.alignment_source_target_ << '\n';
+	    else
+	      output(*os_source_target,
+		     bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, bitext.alignment_source_target_);
+	  }
+	  
+	  if (os_target_source.get()) {
+	    if (moses_mode)
+	      *os_target_source << bitext.alignment_target_source_ << '\n';
+	    else
+	      output(*os_target_source,
+		     bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, bitext.alignment_target_source_);
+	  }
+
 	  ++ id;
 	} else
 	  bitexts.insert(bitext);
-	
+
 	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	  if (os_derivation.get())
-	    write_derivation(*os_derivation, *bitexts.begin());
-	  if (os_source_target.get() || os_target_source.get())
-	    write_alignment(os_source_target.get(), os_target_source.get(), *bitexts.begin());
+	  const bitext_alignment_type& bitext = *(bitexts.begin());
+	  
+	  if (os_source_target.get()) {
+	    if (moses_mode)
+	      *os_source_target << bitext.alignment_source_target_ << '\n';
+	    else
+	      output(*os_source_target,
+		     bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, bitext.alignment_source_target_);
+	  }
+	  
+	  if (os_target_source.get()) {
+	    if (moses_mode)
+	      *os_target_source << bitext.alignment_target_source_ << '\n';
+	    else
+	      output(*os_target_source,
+		     bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, bitext.alignment_target_source_);
+	  }
 	  
 	  bitexts.erase(bitexts.begin());
 	  ++ id;
@@ -508,86 +547,30 @@ struct OutputDerivation : MapReduce
       }
       
       while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	if (os_derivation.get())
-	  write_derivation(*os_derivation, *bitexts.begin());
-	if (os_source_target.get() || os_target_source.get())
-	  write_alignment(os_source_target.get(), os_target_source.get(), *bitexts.begin());
+	const bitext_alignment_type& bitext = *(bitexts.begin());
+	
+	if (os_source_target.get()) {
+	  if (moses_mode)
+	    *os_source_target << bitext.alignment_source_target_ << '\n';
+	  else
+	    output(*os_source_target,
+		   bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, bitext.alignment_source_target_);
+	}
+	
+	if (os_target_source.get()) {
+	  if (moses_mode)
+	    *os_target_source << bitext.alignment_target_source_ << '\n';
+	  else
+	    output(*os_target_source,
+		   bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, bitext.alignment_target_source_);
+	}
 	
 	bitexts.erase(bitexts.begin());
 	++ id;
       }
       
       if (! bitexts.empty())
-	throw std::runtime_error("error while writing derivation output?");
-    }
-  }
-  
-  void write_derivation(std::ostream& os, const value_type& bitext)
-  {
-    stack_.clear();
-    
-    derivation_type::const_iterator diter_end = bitext.derivation_.end();
-    for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter) {
-      if (diter->terminal()) {
-	const word_type& source = (! diter->span_.source_.empty()
-				   ? bitext.bitext_.source_[diter->span_.source_.first_]
-				   : vocab_type::EPSILON);
-	const word_type& target = (! diter->span_.target_.empty()
-				   ? bitext.bitext_.target_[diter->span_.target_.first_]
-				   : vocab_type::EPSILON);
-	
-	os << "((( " << source << " ||| " << target << " )))";
-	
-	while (! stack_.empty() && stack_.back() != " ") {
-	  os << stack_.back();
-	  stack_.pop_back();
-	}
-	
-	if (! stack_.empty() && stack_.back() == " ") {
-	  os << stack_.back();
-	  stack_.pop_back();
-	}
-      } else if (diter->straight()) {
-	os << "[ ";
-	stack_.push_back(" ]");
-	stack_.push_back(" ");
-      } else {
-	os << "< ";
-	stack_.push_back(" >");
-	stack_.push_back(" ");
-      }
-    }
-    
-    os << '\n';
-  }
-
-  void write_alignment(std::ostream* os_source_target, std::ostream* os_target_source, const value_type& bitext)
-  {
-    alignment_.clear();
-    
-    derivation_type::const_iterator diter_end = bitext.derivation_.end();
-    for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter)
-      if (diter->terminal() && diter->aligned())
-	alignment_.push_back(std::make_pair(diter->span_.source_.first_, diter->span_.target_.first_));
-    
-    if (os_source_target) {
-      std::sort(alignment_.begin(), alignment_.end());
-
-      if (moses_mode)
-	*os_source_target << alignment_ << '\n';
-      else
-	output(*os_source_target, bitext.id_, bitext.bitext_.source_, bitext.bitext_.target_, alignment_);
-    }
-    
-    if (os_target_source) {
-      alignment_.inverse();
-      
-      std::sort(alignment_.begin(), alignment_.end());
-      
-      if (moses_mode)
-	*os_target_source << alignment_ << '\n';
-      else
-	output(*os_target_source, bitext.id_, bitext.bitext_.target_, bitext.bitext_.source_, alignment_);
+	throw std::runtime_error("error while writing alignment output?");
     }
   }
 
@@ -612,7 +595,10 @@ struct OutputDerivation : MapReduce
     os << target << '\n';
     
     if (source.empty() || target.empty()) {
-      os << "NULL ({ })";
+      os << "NULL ({ ";
+      for (size_type trg = 0; trg != target.size(); ++ trg)
+	os << (trg + 1) << ' ';
+      os << "})";
       sentence_type::const_iterator siter_end = source.end();
       for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
 	os << ' ' << *siter << " ({ })";
@@ -645,16 +631,11 @@ struct OutputDerivation : MapReduce
       os << '\n';
     }
   }
-  
-  path_type              path_derivation_;
-  path_type              path_source_target_;
-  path_type              path_target_source_;
-  queue_type&            queue_;
-  
-  stack_type stack_;
-  alignment_type alignment_;
-};
 
+  path_type   path_source_target_;
+  path_type   path_target_source_;
+  queue_type& queue_;
+};
 
 template <typename Learner>
 struct TaskAccumulate
@@ -665,137 +646,153 @@ struct TaskAccumulate
   typedef Model    model_type;
   typedef Gradient gradient_type;
 
-  typedef ITG itg_type;
+  typedef Lexicon lexicon_type;
   
-  typedef bitext_type::word_type word_type;
-  typedef bitext_type::sentence_type sentence_type;
+  typedef lexicon_type::loss_type loss_type;
   
-  typedef itg_type::vocab_type vocab_type;
-  
-  typedef Average loss_type;
-  
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+
   typedef MapReduce map_reduce_type;
   
-  typedef map_reduce_type::bitext_derivation_type bitext_derivation_type;
-  typedef map_reduce_type::queue_type             queue_bitext_type;
+  typedef map_reduce_type::queue_type queue_bitext_type;
+  typedef map_reduce_type::value_type bitext_alignment_type;
   
   typedef std::string encoded_type;
   
   typedef utils::lockfree_list_queue<encoded_type, std::allocator<encoded_type> > queue_gradient_type;
   
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
   TaskAccumulate(const Learner& learner,
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
-		 model_type& theta,
-		 const int& beam,
+		 model_type& theta_source_target,
+		 model_type& theta_target_source,
 		 const size_type batch_size,
 		 queue_bitext_type& bitext_mapper,
 		 queue_bitext_type& bitext_reducer,
 		 queue_gradient_type& gradient_mapper,
 		 queue_gradient_type& gradient_reducer,
 		 const int rank)
-    : learner_(learner),
-      theta_(theta),
+    : learner_source_target_(learner),
+      learner_target_source_(learner),
+      embedding_source_target_(theta_source_target.embedding_),
+      embedding_target_source_(theta_target_source.embedding_),
+      theta_source_target_(theta_source_target),
+      theta_target_source_(theta_target_source),
       bitext_mapper_(bitext_mapper),
       bitext_reducer_(bitext_reducer),
       gradient_mapper_(gradient_mapper),
       gradient_reducer_(gradient_reducer),
-      gradient_(theta.embedding_, theta.hidden_),
-      gradient_batch_(theta.embedding_, theta.hidden_),
-      itg_(dict_source_target, dict_target_source, beam),
-      parsed_(0),
+      lexicon_source_target_(dict_source_target, sample_size),
+      lexicon_target_source_(dict_target_source, sample_size),
+      gradient_source_target_(theta_source_target.embedding_, theta_source_target.hidden_, theta_source_target.window_),
+      gradient_target_source_(theta_target_source.embedding_, theta_target_source.hidden_, theta_target_source.window_),
+      gradient_source_target_batch_(theta_source_target.embedding_, theta_source_target.hidden_, theta_source_target.window_),
+      gradient_target_source_batch_(theta_target_source.embedding_, theta_target_source.hidden_, theta_target_source.window_),
       batch_size_(batch_size),
       rank_(rank)
   {
     generator_.seed(utils::random_seed());
   }
-  
+
   void operator()()
   {
     clear();
     
-    bitext_derivation_type bitext;
-    size_type     batch_learn = 0;
+    bitext_alignment_type bitext;
+    size_type batch_learn = 0;
     
-    encoded_type  buffer;
+    encoded_type encoded;
     
     bool merge_finished = false;
     bool learn_finished = false;
     
-    //size_type learned = 0;
-    //size_type merged = 0;
-    
     int non_found_iter = 0;
-    
+
     while (! merge_finished || ! learn_finished) {
       bool found = false;
       
       if (! merge_finished)
-	while (gradient_reducer_.pop(buffer, true)) {
-	  if (buffer.empty())
+	while (gradient_reducer_.pop(encoded, true)) {
+	  if (encoded.empty())
 	    merge_finished = true;
 	  else {
-	    gradient_.decode(buffer);
+	    boost::iostreams::filtering_istream is;
+	    is.push(codec::lz4_decompressor());
+	    is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
 	    
-	    learner_(theta_, gradient_);
-
-	    //++ merged;
+	    is >> gradient_source_target_;
+	    is >> gradient_target_source_;
+	    
+	    embedding_source_target_.assign(gradient_source_target_, theta_source_target_);
+	    embedding_target_source_.assign(gradient_target_source_, theta_target_source_);
+	    
+	    learner_source_target_(theta_source_target_, gradient_source_target_, embedding_target_source_);
+	    learner_target_source_(theta_target_source_, gradient_target_source_, embedding_source_target_);
 	  }
 	  
 	  found = true;
 	}
       
-      if (! learn_finished && bitext_mapper_.pop_swap(bitext, true)) {
+      if (! learn_finished && bitext_mapper_.pop(bitext, true)) {
 	found = true;
-
+	
 	if (bitext.id_ != size_type(-1)) {
 	  const sentence_type& source = bitext.bitext_.source_;
 	  const sentence_type& target = bitext.bitext_.target_;
 	  
-	  bitext.derivation_.clear();
+	  bitext.alignment_source_target_.clear();
+	  bitext.alignment_target_source_.clear();
 	  
 	  if (! source.empty() && ! target.empty()) {
-#if 0
-	    std::cerr << "source: " << source << std::endl
-		      << "target: " << target << std::endl;
-#endif
+	    loss_source_target_
+	      += lexicon_source_target_.learn(source,
+					      target,
+					      theta_source_target_,
+					      gradient_source_target_batch_,
+					      bitext.alignment_source_target_,
+					      generator_);
 	    
-	    const double error = itg_.forward(source, target, theta_);
+	    loss_target_source_
+	      += lexicon_target_source_.learn(target,
+					      source,
+					      theta_target_source_,
+					      gradient_target_source_batch_,
+					      bitext.alignment_target_source_,
+					      generator_);
 	    
-	    const bool parsed = (error != std::numeric_limits<double>::infinity());
-	    
-	    //std::cerr << "error: " << error << std::endl;
-	    
-	    if (parsed) {
-	      itg_.backward(source, target, theta_, gradient_batch_, generator_);
-	      
-	      loss_ += error;
-	      ++ parsed_;
-	      ++ batch_learn;
-	      
-	      itg_.derivation(source, target, bitext.derivation_);
-	    } else {
-#if 0
-	      std::cerr << "failed parsing: " << std::endl
-			<< "source: " << source << std::endl
-			<< "target: " << target << std::endl;
-#endif
-	    }
+	    ++ batch_learn;
 	  }
-
+	  
 	  bitext_reducer_.push_swap(bitext);
 	} else
 	  learn_finished = true;
 	
 	if (batch_learn == batch_size_ || (learn_finished && batch_learn)) {
-	  learner_(theta_, gradient_batch_);
+	  embedding_source_target_.assign(gradient_source_target_batch_, theta_source_target_);
+	  embedding_target_source_.assign(gradient_target_source_batch_, theta_target_source_);
 	  
-	  //++ learned;
+	  learner_source_target_(theta_source_target_, gradient_source_target_batch_, embedding_target_source_);
+	  learner_target_source_(theta_target_source_, gradient_target_source_batch_, embedding_source_target_);
 	  
-	  gradient_batch_.encode(buffer);
-	  gradient_batch_.clear();
+	  buffer_.clear();
 	  
-	  gradient_mapper_.push_swap(buffer);
+	  {
+	    boost::iostreams::filtering_ostream os;
+	    os.push(codec::lz4_compressor());
+	    os.push(boost::iostreams::back_insert_device<buffer_type>(buffer_));
+	    
+	    os << gradient_source_target_batch_;
+	    os << gradient_target_source_batch_;
+	  }
+	  
+	  gradient_source_target_batch_.clear();
+	  gradient_target_source_batch_.clear();
+	  
+	  gradient_mapper_.push(encoded_type(buffer_.begin(), buffer_.end()));
 	  
 	  batch_learn = 0;
 	}
@@ -804,16 +801,15 @@ struct TaskAccumulate
 	  gradient_mapper_.push(encoded_type());
 	  
 	  if (rank_)
-	    bitext_reducer_.push(bitext_derivation_type());
+	    bitext_reducer_.push(bitext_alignment_type());
 	}
       }
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
-    //std::cerr << "rank: " << rank_ << " parsed: " << parsed_ << " learned: " << learned << " merged: " << merged << std::endl;
-
-    theta_.finalize();
+    theta_source_target_.finalize();
+    theta_target_source_.finalize();
   }
 
   inline
@@ -835,35 +831,47 @@ struct TaskAccumulate
     }
     return non_found_iter;
   }
-  
+
   void clear()
   {
-    loss_ = loss_type();
-    parsed_ = 0;
-    
-    gradient_.clear();
-    gradient_batch_.clear();
+    loss_source_target_ = loss_type();
+    loss_target_source_ = loss_type();
+
+    gradient_source_target_.clear();
+    gradient_target_source_.clear();
+    gradient_source_target_batch_.clear();
+    gradient_target_source_batch_.clear();
   }
-
-  Learner                learner_;
-  model_type&            theta_;
-
+  
+  Learner   learner_source_target_;
+  Learner   learner_target_source_;
+  Embedding embedding_source_target_;
+  Embedding embedding_target_source_;
+  
+  model_type&             theta_source_target_;
+  model_type&             theta_target_source_;
+  
   queue_bitext_type& bitext_mapper_;
   queue_bitext_type& bitext_reducer_;
   queue_gradient_type& gradient_mapper_;
   queue_gradient_type& gradient_reducer_;
   
-  gradient_type gradient_;
-  gradient_type gradient_batch_;
+  lexicon_type lexicon_source_target_;
+  lexicon_type lexicon_target_source_;
+  
+  gradient_type gradient_source_target_;
+  gradient_type gradient_target_source_;
+  gradient_type gradient_source_target_batch_;
+  gradient_type gradient_target_source_batch_;
+  
+  loss_type loss_source_target_;
+  loss_type loss_target_source_;
 
-  itg_type itg_;
-
-  loss_type         loss_;
-  size_type         parsed_;
-    
   size_type      batch_size_;
   int            rank_;
   boost::mt19937 generator_;
+  
+  buffer_type buffer_;
 };
 
 inline
@@ -897,27 +905,29 @@ void learn_online_root(const Learner& learner,
 		       const bitext_set_type& bitexts,
 		       const dictionary_type& dict_source_target,
 		       const dictionary_type& dict_target_source,
-		       model_type& theta)
+		       model_type& theta_source_target,
+		       model_type& theta_target_source)
 {
   typedef TaskAccumulate<Learner> task_type;
 
   typedef typename task_type::size_type size_type;
 
   typedef MapReduce        map_reduce_type;
-  typedef OutputDerivation output_derivation_type;
+  typedef OutputAlignment  output_alignment_type;
 
-  typedef typename task_type::queue_bitext_type queue_bitext_type;
+  typedef typename task_type::queue_bitext_type   queue_bitext_type;
   typedef typename task_type::queue_gradient_type queue_gradient_type;
 
-  typedef typename task_type::bitext_derivation_type bitext_derivation_type;
-
-  typedef typename task_type::loss_type    loss_type;
-  typedef typename task_type::encoded_type buffer_type;
+  typedef typename task_type::bitext_alignment_type bitext_alignment_type;
   
+  typedef typename task_type::loss_type loss_type;
+  
+  typedef typename task_type::encoded_type buffer_type;
+
   typedef boost::shared_ptr<buffer_type> buffer_ptr_type;
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> >  buffer_set_type;
   typedef std::vector<buffer_set_type, std::allocator<buffer_set_type> > buffer_map_type;
-
+  
   typedef utils::mpi_ostream        bitext_ostream_type;
   typedef utils::mpi_istream_simple bitext_istream_type;
   
@@ -937,34 +947,34 @@ void learn_online_root(const Learner& learner,
   typedef std::vector<gradient_istream_ptr_type, std::allocator<gradient_istream_ptr_type> > gradient_istream_ptr_set_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > id_set_type;
-
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   id_set_type ids(bitexts.size());
   for (size_type id = 0; id != bitexts.size(); ++ id)
     ids[id] = id;
-
+  
   queue_bitext_type bitext_mapper(1);
   queue_bitext_type bitext_reducer;
   queue_gradient_type gradient_mapper;
   queue_gradient_type gradient_reducer;
-  
+
   task_type task(learner,
 		 dict_source_target,
 		 dict_target_source,
-		 theta,
-		 beam,
-		 batch_size,
+		 theta_source_target,
+		 theta_target_source,
+		 batch_size, 
 		 bitext_mapper,
 		 bitext_reducer,
 		 gradient_mapper,
 		 gradient_reducer,
 		 mpi_rank);
-
-  std::string            line;
-  bitext_derivation_type bitext;
-
+    
+  std::string           line;
+  bitext_alignment_type bitext;
+  
   buffer_type          buffer;
   buffer_map_type      buffers(mpi_size);
   
@@ -975,13 +985,13 @@ void learn_online_root(const Learner& learner,
   gradient_istream_ptr_set_type gradient_istream(mpi_size);
   
   typename map_reduce_type::codec_type codec;
-  
+
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
 
     MPI::COMM_WORLD.Barrier();
-
+    
     // prepare iostreams...
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (rank != mpi_rank) {
@@ -991,23 +1001,20 @@ void learn_online_root(const Learner& learner,
 	gradient_ostream[rank].reset(new gradient_ostream_type(rank, gradient_tag));
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
-
-    std::auto_ptr<boost::progress_display> progress(debug && mpi_rank == 0
+    
+    std::auto_ptr<boost::progress_display> progress(debug
 						    ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						    : 0);
-    
-    const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
 
-    boost::thread output(output_derivation_type(! derivation_file.empty() && dump_mode
-						? add_suffix(derivation_file, iter_tag)
-						: path_type(),
-						! alignment_source_target_file.empty() && dump_mode
-						? add_suffix(alignment_source_target_file, iter_tag)
-						: path_type(),
-						! alignment_target_source_file.empty() && dump_mode
-						? add_suffix(alignment_target_source_file, iter_tag)
-						: path_type(),
-						bitext_reducer));
+    const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
+    
+    boost::thread output(output_alignment_type(! alignment_source_target_file.empty() && dump_mode
+					       ? add_suffix(alignment_source_target_file, iter_tag)
+					       : path_type(),
+					       ! alignment_target_source_file.empty() && dump_mode
+					       ? add_suffix(alignment_target_source_file, iter_tag)
+					       : path_type(),
+					       bitext_reducer));
 
     // create thread!
     boost::thread worker(boost::ref(task));
@@ -1017,7 +1024,7 @@ void learn_online_root(const Learner& learner,
     bool gradient_mapper_finished = false; // for gradients
     bool gradient_reducer_finished = false; // for gradients
     bool bitext_finished   = false; // for bitext
-
+    
     size_type id = 0;
     
     int non_found_iter = 0;
@@ -1030,7 +1037,8 @@ void learn_online_root(const Learner& learner,
 	  if (bitext_ostream[rank]->test()) {
 	    bitext.id_     = id;
 	    bitext.bitext_ = bitexts[id];
-	    bitext.derivation_.clear();
+	    bitext.alignment_source_target_.clear();
+	    bitext.alignment_target_source_.clear();
 	    
 	    codec.encode(bitext, line);
 	    bitext_ostream[rank]->write(line);
@@ -1046,7 +1054,8 @@ void learn_online_root(const Learner& learner,
 	if (bitext_mapper.empty() && id != bitexts.size()) {
 	  bitext.id_     = id;
 	  bitext.bitext_ = bitexts[id];
-	  bitext.derivation_.clear();
+	  bitext.alignment_source_target_.clear();
+	  bitext.alignment_target_source_.clear();
 
 	  //std::cerr << "rank: " << mpi_rank << " bitext: " << bitext.id_ << std::endl;
 	  
@@ -1061,7 +1070,7 @@ void learn_online_root(const Learner& learner,
       
       // finished bitext mapping
       if (! bitext_finished && id == bitexts.size()) {
-	bitext_mapper.push(bitext_derivation_type());
+	bitext_mapper.push(bitext_alignment_type());
 	bitext_finished = true;
       }
       
@@ -1163,32 +1172,32 @@ void learn_online_root(const Learner& learner,
     
     utils::resource end;
 
-    bitext_reducer.push(bitext_derivation_type());
+    bitext_reducer.push(bitext_alignment_type());
     
-    loss_type loss   = task.loss_;
-    size_type parsed = task.parsed_;
-    
+    loss_type loss_source_target = task.loss_source_target_;
+    loss_type loss_target_source = task.loss_target_source_;
+
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      loss_type l;
-      size_type p;
+      loss_type lst;
+      loss_type lts;
       
       boost::iostreams::filtering_istream is;
       is.push(utils::mpi_device_source(rank, loss_tag, 4096));
-      is.read((char*) &l, sizeof(loss_type));
-      is.read((char*) &p, sizeof(size_type));
+      is.read((char*) &lst, sizeof(loss_type));
+      is.read((char*) &lts, sizeof(loss_type));
       
-      loss   += l;
-      parsed += p;
+      loss_source_target += lst;
+      loss_target_source += lts;
     }
     
     if (debug)
-      std::cerr << "reconstruction error: " << static_cast<double>(loss) << std::endl
-		<< "parsed: " << parsed << std::endl;
-    
+      std::cerr << "loss P(target | source): " << static_cast<double>(loss_source_target) << std::endl
+		<< "loss P(source | target): " << static_cast<double>(loss_target_source) << std::endl;
+
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
-
+    
     // shuffle bitexts!
     {
       typename id_set_type::iterator biter     = ids.begin();
@@ -1211,27 +1220,29 @@ void learn_online_others(const Learner& learner,
 			 const bitext_set_type& bitexts,
 			 const dictionary_type& dict_source_target,
 			 const dictionary_type& dict_target_source,
-			 model_type& theta)
+			 model_type& theta_source_target,
+			 model_type& theta_target_source)
 {
   typedef TaskAccumulate<Learner> task_type;
 
   typedef typename task_type::size_type size_type;
 
   typedef MapReduce        map_reduce_type;
-  typedef OutputDerivation output_derivation_type;
+  typedef OutputAlignment  output_alignment_type;
 
   typedef typename task_type::queue_bitext_type   queue_bitext_type;
   typedef typename task_type::queue_gradient_type queue_gradient_type;
-  
-  typedef typename task_type::bitext_derivation_type bitext_derivation_type;
 
-  typedef typename task_type::loss_type    loss_type;
-  typedef typename task_type::encoded_type buffer_type;
+  typedef typename task_type::bitext_alignment_type bitext_alignment_type;
   
+  typedef typename task_type::loss_type loss_type;
+  
+  typedef typename task_type::encoded_type buffer_type;
+
   typedef boost::shared_ptr<buffer_type> buffer_ptr_type;
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> >  buffer_set_type;
   typedef std::vector<buffer_set_type, std::allocator<buffer_set_type> > buffer_map_type;
-
+    
   typedef utils::mpi_ostream_simple bitext_ostream_type;
   typedef utils::mpi_istream        bitext_istream_type;
   
@@ -1257,21 +1268,21 @@ void learn_online_others(const Learner& learner,
   queue_bitext_type bitext_reducer;
   queue_gradient_type gradient_mapper;
   queue_gradient_type gradient_reducer;
-  
+
   task_type task(learner,
 		 dict_source_target,
 		 dict_target_source,
-		 theta,
-		 beam,
-		 batch_size,
+		 theta_source_target,
+		 theta_target_source,
+		 batch_size, 
 		 bitext_mapper,
 		 bitext_reducer,
 		 gradient_mapper,
 		 gradient_reducer,
 		 mpi_rank);
-
-  std::string            line;
-  bitext_derivation_type bitext;
+  
+  std::string           line;
+  bitext_alignment_type bitext;
   
   buffer_type          buffer;
   buffer_map_type      buffers(mpi_size);
@@ -1280,7 +1291,7 @@ void learn_online_others(const Learner& learner,
   gradient_istream_ptr_set_type gradient_istream(mpi_size);
   
   typename map_reduce_type::codec_type codec;
-  
+
   for (int t = 0; t < iteration; ++ t) {
     MPI::COMM_WORLD.Barrier();
     
@@ -1314,7 +1325,7 @@ void learn_online_others(const Learner& learner,
 
 	  bitext_mapper.push_swap(bitext);
 	} else {
-	  bitext_mapper.push(bitext_derivation_type());
+	  bitext_mapper.push(bitext_alignment_type());
 	  bitext_istream.reset();
 	}
 	
@@ -1419,122 +1430,120 @@ void learn_online_others(const Learner& learner,
     {
       boost::iostreams::filtering_ostream os;
       os.push(utils::mpi_device_sink(0, loss_tag, 4096));
-      os.write((char*) &task.loss_, sizeof(loss_type));
-      os.write((char*) &task.parsed_, sizeof(size_type));
+      os.write((char*) &task.loss_source_target_, sizeof(loss_type));
+      os.write((char*) &task.loss_target_source_, sizeof(loss_type));
     }
   }
 }
+
 
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
 		  const dictionary_type& dict_source_target,
 		  const dictionary_type& dict_target_source,
-		  model_type& theta)
+		  model_type& theta_source_target,
+		  model_type& theta_target_source)
 {
   if (MPI::COMM_WORLD.Get_rank() == 0)
-    learn_online_root(learner, bitexts, dict_source_target, dict_target_source, theta);
+    learn_online_root(learner, bitexts, dict_source_target, dict_target_source, theta_source_target, theta_target_source);
   else
-    learn_online_others(learner, bitexts, dict_source_target, dict_target_source, theta);
+    learn_online_others(learner, bitexts, dict_source_target, dict_target_source, theta_source_target, theta_target_source);
 }
 
-struct TaskDerivation
+struct TaskViterbi
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
   typedef Model    model_type;
-  typedef Gradient gradient_type;
 
-  typedef ITG itg_type;
+  typedef Lexicon lexicon_type;
   
-  typedef itg_type::vocab_type vocab_type;
-  typedef itg_type::bitext_type bitext_type;
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
 
-  typedef bitext_type::word_type word_type;
-  typedef bitext_type::sentence_type sentence_type;
-  
   typedef MapReduce map_reduce_type;
-
-  typedef map_reduce_type::bitext_derivation_type bitext_derivation_type;
-  typedef map_reduce_type::queue_type queue_type;
   
-  TaskDerivation(const dictionary_type& dict_source_target,
-		 const dictionary_type& dict_target_source,
-		 const model_type& theta,
-		 const int& beam,
-		 queue_type& mapper,
-		 queue_type& reducer,
-		 const int rank)
-    : theta_(theta),
+  typedef map_reduce_type::queue_type queue_type;
+  typedef map_reduce_type::value_type bitext_alignment_type;
+
+  TaskViterbi(const dictionary_type& dict_source_target,
+	      const dictionary_type& dict_target_source,
+	      const model_type& theta_source_target,
+	      const model_type& theta_target_source,
+	      queue_type& mapper,
+	      queue_type& reducer,
+	      const int rank)
+    : theta_source_target_(theta_source_target),
+      theta_target_source_(theta_target_source),
       mapper_(mapper),
       reducer_(reducer),
-      itg_(dict_source_target, dict_target_source, beam),
+      lexicon_source_target_(dict_source_target, sample_size),
+      lexicon_target_source_(dict_target_source, sample_size),
       rank_(rank) {}
-  
+
   void operator()()
   {
-    bitext_derivation_type bitext;
+    bitext_alignment_type bitext;
+    
     for (;;) {
       mapper_.pop_swap(bitext);
       
       if (bitext.id_ == size_type(-1)) break;
-      
+
       const sentence_type& source = bitext.bitext_.source_;
       const sentence_type& target = bitext.bitext_.target_;
 
-      bitext.derivation_.clear();
-      
-      if (! source.empty() && ! target.empty()) {
+      bitext.alignment_source_target_.clear();
+      bitext.alignment_target_source_.clear();
 
-#if 0
-	std::cerr << "source: " << source << std::endl
-		  << "target: " << target << std::endl;
-#endif
+      if (! source.empty() && ! target.empty()) {
+	lexicon_source_target_.viterbi(source, target, theta_source_target_, bitext.alignment_source_target_);
 	
-	const double error = itg_.forward(source, target, theta_);
-	
-	const bool parsed = (error != std::numeric_limits<double>::infinity());
-	
-	if (parsed)
-	  itg_.derivation(source, target, bitext.derivation_);
-	else
-	  std::cerr << "failed parsing: " << std::endl
-		    << "source: " << source << std::endl
-		    << "target: " << target << std::endl;
+	lexicon_target_source_.viterbi(target, source, theta_target_source_, bitext.alignment_target_source_);
       }
       
+      // reduce alignment
       reducer_.push_swap(bitext);
     }
-
+    
     if (rank_)
-      reducer_.push(bitext_derivation_type());
+      reducer_.push(bitext_alignment_type());
   }
-  
-  const model_type& theta_;
-  
-  queue_type& mapper_;
-  queue_type& reducer_;
-  
-  itg_type itg_;
 
+  void clear()
+  {
+  }
+
+  const model_type& theta_source_target_;
+  const model_type& theta_target_source_;
+
+  queue_type&           mapper_;
+  queue_type&           reducer_;  
+  
+  lexicon_type lexicon_source_target_;
+  lexicon_type lexicon_target_source_;
+  
   int rank_;
 };
 
-void derivation_root(const bitext_set_type& bitexts,
-		     const dictionary_type& dict_source_target,
-		     const dictionary_type& dict_target_source,
-		     const model_type& theta)
+void viterbi_root(const bitext_set_type& bitexts,
+		  const dictionary_type& dict_source_target,
+		  const dictionary_type& dict_target_source,
+		  const model_type& theta_source_target,
+		  const model_type& theta_target_source)
 {
-  typedef TaskDerivation task_type;
-  
-  typedef task_type::size_type size_type;
-  
-  typedef MapReduce        map_reduce_type;
-  typedef OutputDerivation output_derivation_type;
+  typedef TaskViterbi task_type;
 
-  typedef map_reduce_type::bitext_derivation_type bitext_derivation_type;
-  
+  typedef task_type::size_type size_type;
+
+  typedef MapReduce        map_reduce_type;
+  typedef OutputAlignment  output_alignment_type;
+
+  typedef map_reduce_type::bitext_alignment_type bitext_alignment_type;
+
   typedef utils::mpi_ostream        ostream_type;
   typedef utils::mpi_istream_simple istream_type;
   
@@ -1546,22 +1555,26 @@ void derivation_root(const bitext_set_type& bitexts,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
+  
   task_type::queue_type mapper(1);
   task_type::queue_type reducer;
   
   boost::thread worker(task_type(dict_source_target,
 				 dict_target_source,
-				 theta,
-				 beam,
+				 theta_source_target,
+				 theta_target_source,
 				 mapper,
 				 reducer,
 				 mpi_rank));
   
-  boost::thread output(output_derivation_type(derivation_file,
-					      alignment_source_target_file,
-					      alignment_target_source_file,
-					      reducer));
+  boost::thread output(output_alignment_type(! alignment_source_target_file.empty()
+					     ? alignment_source_target_file
+					     : path_type(),
+					     ! alignment_target_source_file.empty()
+					     ? alignment_target_source_file
+					     : path_type(),
+					     reducer));
+  
   ostream_ptr_set_type ostream(mpi_size);
   istream_ptr_set_type istream(mpi_size);
   
@@ -1569,23 +1582,23 @@ void derivation_root(const bitext_set_type& bitexts,
     ostream[rank].reset(new ostream_type(rank, bitext_tag));
     istream[rank].reset(new istream_type(rank, bitext_tag));
   }
-    
-  std::string            line;
-  bitext_derivation_type bitext;
+  
+  std::string           line;
+  bitext_alignment_type bitext;
 
   map_reduce_type::codec_type codec;
-
-  if (debug)
-    std::cerr << "max derivation" << std::endl;
   
+  if (debug)
+    std::cerr << "Viterbi alignment" << std::endl;
+
   std::auto_ptr<boost::progress_display> progress(debug
 						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						  : 0);
   
   utils::resource start;
-
+  
   int non_found_iter = 0;
-    
+  
   size_type id = 0;
   while (id != bitexts.size()) {
     bool found = false;
@@ -1595,7 +1608,8 @@ void derivation_root(const bitext_set_type& bitexts,
       if (ostream[rank]->test()) {
 	bitext.id_     = id;
 	bitext.bitext_ = bitexts[id];
-	bitext.derivation_.clear();
+	bitext.alignment_source_target_.clear();
+	bitext.alignment_target_source_.clear();
 	
 	codec.encode(bitext, line);
 	ostream[rank]->write(line);
@@ -1610,7 +1624,8 @@ void derivation_root(const bitext_set_type& bitexts,
     if (mapper.empty() && id != bitexts.size()) {
       bitext.id_     = id;
       bitext.bitext_ = bitexts[id];
-      bitext.derivation_.clear();
+      bitext.alignment_source_target_.clear();
+      bitext.alignment_target_source_.clear();
       
       mapper.push_swap(bitext);
       
@@ -1637,7 +1652,7 @@ void derivation_root(const bitext_set_type& bitexts,
   }
 
   // termination
-  mapper.push(bitext_derivation_type());
+  mapper.push(bitext_alignment_type());
   
   for (;;) {
     bool found = false;
@@ -1679,26 +1694,27 @@ void derivation_root(const bitext_set_type& bitexts,
     std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 	      << "user time:   " << end.user_time() - start.user_time() << std::endl;
   
-  reducer.push(bitext_derivation_type());
+  reducer.push(bitext_alignment_type());
   
   output.join();
   worker.join();
 }
 
-void derivation_others(const bitext_set_type& bitexts,
-		       const dictionary_type& dict_source_target,
-		       const dictionary_type& dict_target_source,
-		       const model_type& theta)
+void viterbi_others(const bitext_set_type& bitexts,
+		    const dictionary_type& dict_source_target,
+		    const dictionary_type& dict_target_source,
+		    const model_type& theta_source_target,
+		    const model_type& theta_target_source)
 {
-  typedef TaskDerivation task_type;
-  
+  typedef TaskViterbi task_type;
+
   typedef task_type::size_type size_type;
-  
+
   typedef MapReduce        map_reduce_type;
-  typedef OutputDerivation output_derivation_type;
-  
-  typedef map_reduce_type::bitext_derivation_type bitext_derivation_type;
-  
+  typedef OutputAlignment  output_alignment_type;
+
+  typedef map_reduce_type::bitext_alignment_type bitext_alignment_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
@@ -1707,22 +1723,22 @@ void derivation_others(const bitext_set_type& bitexts,
   
   boost::thread worker(task_type(dict_source_target,
 				 dict_target_source,
-				 theta,
-				 beam,
+				 theta_source_target,
+				 theta_target_source,
 				 mapper,
 				 reducer,
 				 mpi_rank));
-  
+
   boost::shared_ptr<utils::mpi_istream>        is(new utils::mpi_istream(0, bitext_tag));
   boost::shared_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, bitext_tag));
-  
-  std::string            line;
-  bitext_derivation_type bitext;
+
+  std::string           line;
+  bitext_alignment_type bitext;
   
   map_reduce_type::codec_type codec;
   
   bool terminated = false;
-    
+  
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
@@ -1733,7 +1749,7 @@ void derivation_others(const bitext_set_type& bitexts,
 	codec.decode(bitext, line);
 	mapper.push_swap(bitext);
       } else {
-	mapper.push(bitext_derivation_type());
+	mapper.push(bitext_alignment_type());
 	is.reset();
       }
 	
@@ -1771,15 +1787,37 @@ void derivation_others(const bitext_set_type& bitexts,
   worker.join();
 }
 
-void derivation(const bitext_set_type& bitexts,
-		const dictionary_type& dict_source_target,
-		const dictionary_type& dict_target_source,
-		const model_type& theta)
+void viterbi(const bitext_set_type& bitexts,
+	     const dictionary_type& dict_source_target,
+	     const dictionary_type& dict_target_source,
+	     const model_type& theta_source_target,
+	     const model_type& theta_target_source)
 {
   if (MPI::COMM_WORLD.Get_rank() == 0)
-    derivation_root(bitexts, dict_source_target, dict_target_source, theta);
+    viterbi_root(bitexts, dict_source_target, dict_target_source, theta_source_target, theta_target_source);
   else
-    derivation_others(bitexts, dict_source_target, dict_target_source, theta);
+    viterbi_others(bitexts, dict_source_target, dict_target_source, theta_source_target, theta_target_source);
+}
+
+
+void bcast_model(model_type& theta)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    boost::iostreams::filtering_ostream os;
+    os.push(codec::lz4_compressor());
+    os.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
+    
+    os << theta;
+  } else {
+    boost::iostreams::filtering_istream is;
+    is.push(codec::lz4_decompressor());
+    is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
+
+    is >> theta;
+  }
 }
 
 void bcast_dict(dictionary_type& dict)
@@ -1854,34 +1892,14 @@ void bcast_dict(dictionary_type& dict)
   }
 }
 
-void bcast_model(model_type& theta)
-{
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  if (mpi_rank == 0) {
-    boost::iostreams::filtering_ostream os;
-    os.push(codec::lz4_compressor());
-    os.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
-    
-    os << theta;
-  } else {
-    boost::iostreams::filtering_istream is;
-    is.push(codec::lz4_decompressor());
-    is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
-
-    is >> theta;
-  }
-}
-
 void read_data(const path_type& source_file,
 	       const path_type& target_file,
 	       bitext_set_type& bitexts,
 	       dictionary_type& dict_source_target,
 	       dictionary_type& dict_target_source)
 {
-  typedef cicada::Vocab vocab_type;
   typedef cicada::Symbol word_type;
+  typedef cicada::Vocab  vocab_type;
   typedef bitext_type::sentence_type sentence_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -1894,88 +1912,88 @@ void read_data(const path_type& source_file,
   if (mpi_rank == 0) {
     utils::compress_istream src(source_file, 1024 * 1024);
     utils::compress_istream trg(target_file, 1024 * 1024);
-  
+    
     sentence_type source;
     sentence_type target;
-  
-    while (src && trg) {
+    
+    for (;;) {
       src >> source;
       trg >> target;
-    
+      
       if (! src || ! trg) break;
       
       bitexts.push_back(bitext_type(source, target));
 
       if (source.empty() || target.empty()) continue;
-    
+      
       sentence_type::const_iterator siter_begin = source.begin();
       sentence_type::const_iterator siter_end   = source.end();
       sentence_type::const_iterator titer_begin = target.begin();
       sentence_type::const_iterator titer_end   = target.end();
-    
+      
       {
 	dictionary_type::dict_type& dict = dict_source_target[vocab_type::EPSILON];
-      
+	
 	for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	  ++ dict[*titer];
-      
+	
 	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	  dictionary_type::dict_type& dict = dict_source_target[*siter];
-	
+	  
 	  for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	    ++ dict[*titer];
 	}
       }
-
+      
       {
 	dictionary_type::dict_type& dict = dict_target_source[vocab_type::EPSILON];
-      
+	
 	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  ++ dict[*siter];
-      
+	
 	for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	  dictionary_type::dict_type& dict = dict_target_source[*titer];
-	
+	  
 	  for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	    ++ dict[*siter];
 	}
-      }
+      }    
     }
-  
+    
     if (src || trg)
-      throw std::runtime_error("# of sentnces do not match");
+      throw std::runtime_error("# of sentences does not match");
     
     if (cutoff > 1) {
       typedef dictionary_type::dict_type::count_set_type word_set_type;
       
       word_set_type words_source;
       word_set_type words_target;
-    
+      
       const word_set_type& counts_source = dict_target_source[vocab_type::EPSILON].counts_;
       const word_set_type& counts_target = dict_source_target[vocab_type::EPSILON].counts_;
-    
+      
       word_set_type::const_iterator siter_end = counts_source.end();
       for (word_set_type::const_iterator siter = counts_source.begin(); siter != siter_end; ++ siter)
 	if (siter->second >= cutoff)
 	  words_source.insert(*siter);
-    
+      
       word_set_type::const_iterator titer_end = counts_target.end();
       for (word_set_type::const_iterator titer = counts_target.begin(); titer != titer_end; ++ titer)
 	if (titer->second >= cutoff)
 	  words_target.insert(*titer);
-    
+      
       dictionary_type dict_source_target_new;
       dictionary_type dict_target_source_new;
-    
+      
       for (word_type::id_type i = 0; i != dict_source_target.dicts_.size(); ++ i)
 	if (dict_source_target.dicts_.exists(i)) {
 	  word_type source(i);
-	
+	  
 	  if (source != vocab_type::EPSILON && words_source.find(source) == words_source.end())
 	    source = vocab_type::UNK;
-	
+	  
 	  dictionary_type::dict_type& dict = dict_source_target_new[source];
-	
+	  
 	  word_set_type::const_iterator titer_end = dict_source_target[i].counts_.end();
 	  for (word_set_type::const_iterator titer = dict_source_target[i].counts_.begin(); titer != titer_end; ++ titer)
 	    if (words_target.find(titer->first) == words_target.end())
@@ -1983,16 +2001,16 @@ void read_data(const path_type& source_file,
 	    else
 	      dict[titer->first] += titer->second;
 	}
-    
+      
       for (word_type::id_type i = 0; i != dict_target_source.dicts_.size(); ++ i)
 	if (dict_target_source.dicts_.exists(i)) {
 	  word_type target(i);
-	
+	  
 	  if (target != vocab_type::EPSILON && words_target.find(target) == words_target.end())
 	    target = vocab_type::UNK;
-	
+	  
 	  dictionary_type::dict_type& dict = dict_target_source_new[target];
-	
+	  
 	  word_set_type::const_iterator siter_end = dict_target_source[i].counts_.end();
 	  for (word_set_type::const_iterator siter = dict_target_source[i].counts_.begin(); siter != siter_end; ++ siter)
 	    if (words_source.find(siter->first) == words_source.end())
@@ -2000,32 +2018,32 @@ void read_data(const path_type& source_file,
 	    else
 	      dict[siter->first] += siter->second;
 	}
-
+      
       dict_source_target.swap(dict_source_target_new);
       dict_target_source.swap(dict_target_source_new);
-    
+      
       bitext_set_type::iterator biter_end = bitexts.end();
       for (bitext_set_type::iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
-
+	
 	sentence_type::iterator siter_end = biter->source_.end();
 	for (sentence_type::iterator siter = biter->source_.begin(); siter != siter_end; ++ siter)
 	  if (words_source.find(*siter) == words_source.end())
 	    *siter = vocab_type::UNK;
-
+	
 	sentence_type::iterator titer_end = biter->target_.end();
 	for (sentence_type::iterator titer = biter->target_.begin(); titer != titer_end; ++ titer)
 	  if (words_target.find(*titer) == words_target.end())
-	    *titer = vocab_type::UNK;
+	    *titer = vocab_type::UNK;	
       }
     }
-
+      
     dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
     dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
     
     dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
     dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
   }
-  
+
   // bcast dict_source_target and dict_target_source
   bcast_dict(dict_source_target);
   bcast_dict(dict_target_source);
@@ -2034,43 +2052,46 @@ void read_data(const path_type& source_file,
   dict_target_source.initialize();
 }
 
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("source",    po::value<path_type>(&source_file),    "source file")
-    ("target",    po::value<path_type>(&target_file),    "target file")
+    ("source", po::value<path_type>(&source_file), "source file")
+    ("target", po::value<path_type>(&target_file), "target file")
     
     ("embedding-source", po::value<path_type>(&embedding_source_file), "initial source embedding")
     ("embedding-target", po::value<path_type>(&embedding_target_file), "initial target embedding")
 
-    ("derivation",               po::value<path_type>(&derivation_file),               "output derivation")
-    ("alignment-source-target",  po::value<path_type>(&alignment_source_target_file),  "output alignemnt for P(target | source)")
-    ("alignment-target-source",  po::value<path_type>(&alignment_target_source_file),  "output alignemnt for P(source | target)")
-
-    ("output-model", po::value<path_type>(&output_model_file), "output model parameter")
+    ("model-source-target", po::value<path_type>(&model_source_target_file), "model parameter for P(target | source)")
+    ("model-target-source", po::value<path_type>(&model_target_source_file), "model parameter for P(source | target)")
     
-    ("alpha",     po::value<double>(&alpha)->default_value(alpha),      "parameter for reconstruction error")
-    ("beta",      po::value<double>(&beta)->default_value(beta),        "parameter for classificaiton error")
+    ("output-source-target", po::value<path_type>(&output_source_target_file), "output model parameter for P(target | source)")
+    ("output-target-source", po::value<path_type>(&output_target_source_file), "output model parameter for P(source | target)")
+
+    ("alignment-source-target", po::value<path_type>(&alignment_source_target_file), "output alignment for P(target | source)")
+    ("alignment-target-source", po::value<path_type>(&alignment_target_source_file), "output alignment for P(source | target)")
     
     ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
+    ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
-    ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
-    ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
-    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
-    ("beam",              po::value<int>(&beam)->default_value(beam),             "beam width for parsing")
-    ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
-    ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
+    ("iteration",         po::value<int>(&iteration)->default_value(iteration),     "max # of iterations")
+    ("batch",             po::value<int>(&batch_size)->default_value(batch_size),   "mini-batch size")
+    ("sample",            po::value<int>(&sample_size)->default_value(sample_size), "sample size")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),           "cutoff count for vocabulary (<= 1 to keep all)")
+    ("lambda",            po::value<double>(&lambda)->default_value(lambda),        "regularization constant")
+    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),      "regularization constant for bilingual agreement")
+    ("eta0",              po::value<double>(&eta0)->default_value(eta0),            "\\eta_0 for decay")
 
-    ("moses", po::bool_switch(&moses_mode), "dump alignment in Moses format")
-    ("giza",  po::bool_switch(&giza_mode),  "dump alignment in Giza format")
-    ("dump",  po::bool_switch(&dump_mode),  "dump intermediate derivations and alignments")
+    ("moses",      po::bool_switch(&moses_mode),       "dump alignment in Moses format")
+    ("giza",       po::bool_switch(&giza_mode),        "dump alignment in Giza format")
+    ("dump",       po::bool_switch(&dump_mode),        "dump intermediate alignments")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
@@ -2082,7 +2103,7 @@ void options(int argc, char** argv)
   po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
   
   po::notify(variables);
-
+  
   if (variables.count("help")) {
     std::cout << argv[0] << " [options] [operations]\n"
 	      << opts_command << std::endl;

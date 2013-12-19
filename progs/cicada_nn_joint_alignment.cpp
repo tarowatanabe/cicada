@@ -297,7 +297,7 @@ struct OutputMapReduce
       return x.id_ < y.id_;
     }
   };
-  typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_set_type;
+  typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_reduced_type;
 };
 
 namespace std
@@ -328,7 +328,7 @@ struct OutputAlignment : OutputMapReduce
 	if (bitext.id_ == size_type(-1)) break;
       }
     } else {
-      bitext_set_type bitexts;
+      bitext_reduced_type bitexts;
       bitext_alignment_type bitext;
       size_type id = 0;
       

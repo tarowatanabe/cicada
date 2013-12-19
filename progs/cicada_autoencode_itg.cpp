@@ -1140,6 +1140,8 @@ void read_data(const path_type& source_file,
     if (! src || ! trg) break;
     
     bitexts.push_back(bitext_type(source, target));
+
+    if (source.empty() || target.empty()) continue;
     
     sentence_type::const_iterator siter_begin = source.begin();
     sentence_type::const_iterator siter_end   = source.end();
