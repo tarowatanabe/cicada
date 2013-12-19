@@ -1635,12 +1635,17 @@ void derivation_root(const bitext_set_type& bitexts,
       
     non_found_iter = loop_sleep(found, non_found_iter);
   }
-
-  // termination
-  mapper.push(bitext_derivation_type());
+  
+  bool terminated = false;
   
   for (;;) {
     bool found = false;
+    
+    // termination
+    if (! terminated && mapper.push(bitext_derivation_type(), true)) {
+      terminated = true;
+      found = true;
+    }
     
     // termination!
     for (int rank = 1; rank != mpi_size; ++ rank)
