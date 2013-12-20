@@ -91,6 +91,7 @@ double alpha = 0.99;
 double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
+int window = 0;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
@@ -142,7 +143,9 @@ int main(int argc, char** argv)
       throw std::runtime_error("dimension must be positive");
     if (dimension_hidden <= 0)
       throw std::runtime_error("dimension must be positive");
-    
+    if (window < 0)
+      throw std::runtime_error("window size should be positive");
+
     if (alpha < 0.0)
       throw std::runtime_error("alpha should be >= 0.0");
     if (beta < 0.0)
@@ -192,7 +195,7 @@ int main(int argc, char** argv)
 		<< "# of unique target words: " << targets.size() << std::endl
 		<< "# of sentences: " << bitexts.size() << std::endl;
     
-    model_type theta(dimension_embedding, dimension_hidden, sources, targets, generator);
+    model_type theta(dimension_embedding, dimension_hidden, window, sources, targets, generator);
     
     if (mpi_rank == 0)
       if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
@@ -209,7 +212,7 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, lambda, eta0),
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, lambda, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
@@ -700,8 +703,8 @@ struct TaskAccumulate
       bitext_reducer_(bitext_reducer),
       gradient_mapper_(gradient_mapper),
       gradient_reducer_(gradient_reducer),
-      gradient_(theta.embedding_, theta.hidden_),
-      gradient_batch_(theta.embedding_, theta.hidden_),
+      gradient_(theta.embedding_, theta.hidden_, theta.window_),
+      gradient_batch_(theta.embedding_, theta.hidden_, theta.window_),
       itg_(dict_source_target, dict_target_source, beam),
       parsed_(0),
       batch_size_(batch_size),
@@ -2068,6 +2071,7 @@ void options(int argc, char** argv)
     
     ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
+    ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
