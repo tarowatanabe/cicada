@@ -2095,7 +2095,7 @@ void options(int argc, char** argv)
     ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     ("alignment",           po::value<int>(&alignment)->default_value(alignment),                     "alignment model size")
     
-    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD (Pegasos) optimizer")
+    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),     "max # of iterations")
