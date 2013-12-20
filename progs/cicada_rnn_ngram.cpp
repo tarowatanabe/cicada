@@ -399,7 +399,7 @@ void learn_online(const Learner& learner,
   for (size_type batch = 0; batch != batches_size; ++ batch)
     batches[batch] = batch;
   
-  queue_mapper_type     mapper(threads * 256);
+  queue_mapper_type     mapper(threads);
   queue_merger_set_type mergers(threads);
   
   task_set_type tasks(threads, task_type(learner,
