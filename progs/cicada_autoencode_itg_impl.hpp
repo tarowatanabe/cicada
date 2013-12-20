@@ -1856,10 +1856,10 @@ struct ITG
 	state.layer_ = theta.Wt1_ * state.input_ + theta.bt1_;
 	
 	state.layer_norm_ = state.layer_.normalized();
-	
+
 	state.output_ = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
-	
-	state.reconstruction_.resize(embedding_size * 2, 1);
+
+	state.reconstruction_.resize(leaf_size, 1);
 
 	for (size_type i = 0; i != (window_size * 2 + 1) * 2; ++ i)
 	  state.reconstruction_.block(i * embedding_size, 0, embedding_size, 1)
@@ -2006,6 +2006,8 @@ struct ITG
     const size_type embedding_size = theta.embedding_;
     const size_type hidden_size    = theta.hidden_;
     const size_type window_size    = theta.window_;
+
+    const size_type leaf_size = embedding_size * (window_size * 2 + 1) * 2;
     
     const size_type offset_source = 0;
     const size_type offset_target = embedding_size;
@@ -2022,7 +2024,7 @@ struct ITG
     stack_.clear();
     stack_.push_back(span_pair_type(0, source_size, 0, target_size));
 
-    buffer_delta_.resize(utils::bithack::max(hidden_size, embedding_size) * 2);
+    buffer_delta_.resize(utils::bithack::max(hidden_size * 2, leaf_size));
     
     while (! stack_.empty()) {
       const span_pair_type span = stack_.back();
@@ -2035,7 +2037,7 @@ struct ITG
 	//const word_type& word_target = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
 
 	// increment delta from reconstruction
-	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), embedding_size * 2, 1);
+	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), leaf_size, 1);
 	
 	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
 	
