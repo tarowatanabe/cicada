@@ -1202,6 +1202,9 @@ void learn_online_root(const Learner& learner,
       }
     }
     
+    // mixing
+    bcast_model(theta);
+    
     output.join();
   }
 }
@@ -1422,6 +1425,9 @@ void learn_online_others(const Learner& learner,
       os.write((char*) &task.loss_, sizeof(loss_type));
       os.write((char*) &task.parsed_, sizeof(size_type));
     }
+    
+    // mixing
+    bcast_model(theta);
   }
 }
 

@@ -125,6 +125,9 @@ int main(int argc, char** argv)
     
     if (int(mix_simple) + mix_average > 1)
       throw std::runtime_error("either one of mix-{simple,average}");
+
+    if (int(mix_simple) + mix_average == 0)
+      mix_simple = true;
     
     // srand is used in Eigen
     std::srand(utils::random_seed());
@@ -568,6 +571,8 @@ void learn_online(const Learner& learner,
     if (debug && mpi_rank == 0)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
+    
+    bcast_model(theta);
   }
   
   // finalize model...

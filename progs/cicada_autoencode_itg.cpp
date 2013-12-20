@@ -935,6 +935,10 @@ void learn_online(const Learner& learner,
 	biter = iter_end;
       }
     }
+
+    // mixing
+    for (size_type i = 1; i != tasks.size(); ++ i)
+      tasks[i].theta_ = tasks.front().theta_;
     
     output_derivation.join();
     output_alignment.join();

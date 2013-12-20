@@ -1207,6 +1207,10 @@ void learn_online_root(const Learner& learner,
 	biter = iter_end;
       }
     }
+
+    // mixing
+    bcast_model(theta_source_target);
+    bcast_model(theta_target_source);
     
     output.join();
   }
@@ -1430,6 +1434,10 @@ void learn_online_others(const Learner& learner,
       os.write((char*) &task.log_likelihood_source_target_, sizeof(log_likelihood_type));
       os.write((char*) &task.log_likelihood_target_source_, sizeof(log_likelihood_type));
     }
+    
+    // mixing
+    bcast_model(theta_source_target);
+    bcast_model(theta_target_source);
   }
 }
 

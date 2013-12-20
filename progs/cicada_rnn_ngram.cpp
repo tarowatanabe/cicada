@@ -108,6 +108,9 @@ int main(int argc, char** argv)
 
     if (int(mix_simple) + mix_average > 1)
       throw std::runtime_error("either one of mix-{simple,average}");
+
+    if (int(mix_simple) + mix_average == 0)
+      mix_simple = true;
     
     threads = utils::bithack::max(threads, 1);
     

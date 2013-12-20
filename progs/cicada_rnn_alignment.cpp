@@ -836,10 +836,16 @@ void learn_online(const Learner& learner,
       }
     }
     
+    //mixing
+    for (size_type i = 1; i != tasks.size(); ++ i) {
+      tasks[i].theta_source_target_ = tasks.front().theta_source_target_;
+      tasks[i].theta_target_source_ = tasks.front().theta_target_source_;
+    }
+    
     output_source_target.join();
     output_target_source.join();
   }
-
+  
   // copy models
   theta_source_target = tasks.front().theta_source_target_;
   theta_target_source = tasks.front().theta_target_source_;
