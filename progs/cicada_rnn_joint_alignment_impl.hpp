@@ -125,13 +125,13 @@ struct Gradient
 
     if (! Wc_.rows())
       Wc_ = tensor_type::Zero(x.Wc_.rows(), x.Wc_.cols());
-    if (! bt_.rows())
+    if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    if (! Wt_.rows())
-      Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
-    if (! bt_.rows())
-      bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
+    //if (! Wt_.rows())
+    //  Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
+    //if (! bt_.rows())
+    //  bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
     
     if (! Wa_.rows())
       Wa_ = tensor_type::Zero(x.Wa_.rows(), x.Wa_.cols());
@@ -149,8 +149,8 @@ struct Gradient
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
     
-    Wt_ -= x.Wt_;
-    bt_ -= x.bt_;
+    //Wt_ -= x.Wt_;
+    //bt_ -= x.bt_;
     
     Wa_ -= x.Wa_;
     ba_ -= x.ba_;
@@ -192,10 +192,10 @@ struct Gradient
     if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    if (! Wt_.rows())
-      Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
-    if (! bt_.rows())
-      bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
+    //if (! Wt_.rows())
+    //  Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
+    //if (! bt_.rows())
+    //  bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
 
     if (! Wa_.rows())
       Wa_ = tensor_type::Zero(x.Wa_.rows(), x.Wa_.cols());
@@ -213,8 +213,8 @@ struct Gradient
     Wc_ += x.Wc_;
     bc_ += x.bc_;
 
-    Wt_ += x.Wt_;
-    bt_ += x.bt_;
+    //Wt_ += x.Wt_;
+    //bt_ += x.bt_;
     
     Wa_ += x.Wa_;
     ba_ += x.ba_;
@@ -238,8 +238,8 @@ struct Gradient
     Wc_.setZero();
     bc_.setZero();
     
-    Wt_.setZero();
-    bt_.setZero();
+    //Wt_.setZero();
+    //bt_.setZero();
     
     Wa_.setZero();
     ba_.setZero();
@@ -295,8 +295,8 @@ struct Gradient
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    Wt_ = tensor_type::Zero(hidden_, state_size);
-    bt_ = tensor_type::Zero(hidden_, 1);
+    //Wt_ = tensor_type::Zero(hidden_, state_size);
+    //bt_ = tensor_type::Zero(hidden_, 1);
 
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
@@ -380,8 +380,8 @@ private:
     write(os, Wc_);
     write(os, bc_);
     
-    write(os, Wt_);
-    write(os, bt_);
+    //write(os, Wt_);
+    //write(os, bt_);
 
     write(os, Wa_);
     write(os, ba_);
@@ -408,8 +408,8 @@ private:
     read(is, Wc_);
     read(is, bc_);
     
-    read(is, Wt_);
-    read(is, bt_);
+    //read(is, Wt_);
+    //read(is, bt_);
 
     read(is, Wa_);
     read(is, ba_);
@@ -502,8 +502,8 @@ public:
   tensor_type Wc_;
   tensor_type bc_;
   
-  tensor_type Wt_;
-  tensor_type bt_;
+  //tensor_type Wt_;
+  //tensor_type bt_;
   
   tensor_type Wa_;
   tensor_type ba_;
@@ -609,8 +609,8 @@ struct Model
     Wc_.setZero();
     bc_.setZero();
     
-    Wt_.setZero();
-    bt_.setZero();
+    //Wt_.setZero();
+    //bt_.setZero();
     
     Wa_.setZero();
     ba_.setZero();
@@ -696,8 +696,8 @@ struct Model
     Wc_ = tensor_type::Zero(1, hidden_).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Ones(1, 1);
     
-    Wt_ = tensor_type::Zero(hidden_, state_size).array().unaryExpr(randomize<Gen>(gen, range_t));
-    bt_ = tensor_type::Zero(hidden_, 1);
+    //Wt_ = tensor_type::Zero(hidden_, state_size).array().unaryExpr(randomize<Gen>(gen, range_t));
+    //bt_ = tensor_type::Zero(hidden_, 1);
     
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size).array().unaryExpr(randomize<Gen>(gen, range_a));
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
@@ -744,8 +744,8 @@ struct Model
     Wc_ += x.Wc_;
     bc_ += x.bc_;
     
-    Wt_ += x.Wt_;
-    bt_ += x.bt_;
+    //Wt_ += x.Wt_;
+    //bt_ += x.bt_;
 
     Wa_ += x.Wa_;
     ba_ += x.ba_;
@@ -766,8 +766,8 @@ struct Model
     Wc_ *= x;
     bc_ *= x;
     
-    Wt_ *= x;
-    bt_ *= x;
+    //Wt_ *= x;
+    //bt_ *= x;
 
     Wa_ *= x;
     ba_ *= x;
@@ -926,8 +926,8 @@ struct Model
       read(rep.path("Wc.bin"), Wc_);
       read(rep.path("bc.bin"), bc_);
 
-      read(rep.path("Wt.bin"), Wt_);
-      read(rep.path("bt.bin"), bt_);
+      //read(rep.path("Wt.bin"), Wt_);
+      //read(rep.path("bt.bin"), bt_);
 
       read(rep.path("Wa.bin"), Wa_);
       read(rep.path("ba.bin"), ba_);
@@ -942,35 +942,34 @@ struct Model
       
       read(rep.path("Wc.bin"), Wc_);
       read(rep.path("bc.bin"), bc_);
+
+      const size_type embedding_size = embedding_ * (window_ * 2 + 1) * 2;
+
+      tensor_type Wt(hidden_, embedding_size);
       
-      read(rep.path("Wt.bin"), Wt_, hidden_, embedding_ * (window_ * 2 + 1) * 2);
-      read(rep.path("bt.bin"), bt_, hidden_, 1);
+      read(rep.path("Wt.bin"), Wt);
+      
+      Wn_.block(0, 0, hidden_, embedding_size) = Wt;
+      
+      for (size_type shift = 0; shift != window_ * 2 + 1; ++ shift)
+	Wa_.block(hidden_ * shift, 0, hidden_, embedding_size) = Wt;
     }
   }
   
   
-  void read(const path_type& path, tensor_type& matrix, size_type rows=0, size_type cols=0)
+  void read(const path_type& path, tensor_type& matrix)
   {
     if (! boost::filesystem::exists(path))
       throw std::runtime_error("no file? " + path.string());
     
     const size_type file_size = boost::filesystem::file_size(path);
     
-    if (rows && cols) {
-      if (file_size != sizeof(tensor_type::Scalar) * rows * cols)
-	throw std::runtime_error("read size differ!");
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      
-      is.read((char*) matrix.block(0, 0, rows, cols).data(), sizeof(tensor_type::Scalar) * rows * cols);
-    } else {
-      if (file_size != sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols())
-	throw std::runtime_error("read size differ!");
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      
-      is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols());
-    }
+    if (file_size != sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols())
+      throw std::runtime_error("read size differ!");
+    
+    utils::compress_istream is(path, 1024 * 1024);
+    
+    is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows() * matrix.cols());
   }
   
   void write(const path_type& path) const
@@ -992,8 +991,8 @@ struct Model
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
     
-    write(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
-    write(rep.path("bt.txt.gz"), rep.path("bt.bin"), bt_);
+    //write(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
+    //write(rep.path("bt.txt.gz"), rep.path("bt.bin"), bt_);
     
     write(rep.path("Wa.txt.gz"), rep.path("Wa.bin"), Wa_);
     write(rep.path("ba.txt.gz"), rep.path("ba.bin"), ba_);
@@ -1123,8 +1122,8 @@ private:
     write(os, Wc_);
     write(os, bc_);
     
-    write(os, Wt_);
-    write(os, bt_);
+    //write(os, Wt_);
+    //write(os, bt_);
 
     write(os, Wa_);
     write(os, ba_);
@@ -1151,8 +1150,8 @@ private:
     read(is, Wc_);
     read(is, bc_);
 
-    read(is, Wt_);
-    read(is, bt_);
+    //read(is, Wt_);
+    //read(is, bt_);
 
     read(is, Wa_);
     read(is, ba_);
@@ -1253,8 +1252,8 @@ public:
   tensor_type Wc_;
   tensor_type bc_;
   
-  tensor_type Wt_;
-  tensor_type bt_;
+  //tensor_type Wt_;
+  //tensor_type bt_;
   
   tensor_type Wa_;
   tensor_type ba_;
@@ -1788,6 +1787,60 @@ struct HMM
     }    
   }
 
+  template <typename Embedding>
+  void propagate_embedding(const sentence_type& source,
+			   const sentence_type& target,
+			   const model_type& theta,
+			   gradient_type& gradient,
+			   const difference_type source_pos,
+			   const difference_type target_pos,
+			   const word_type& target_next,
+			   const Eigen::MatrixBase<Embedding>& embedding)
+  {
+    const difference_type source_size = source.size();
+    const difference_type target_size = target.size();
+    
+    const difference_type window_size = theta.window_;
+    const difference_type embedding_size = theta.embedding_;
+    const difference_type embedding_window_size = embedding_size * (theta.window_ * 2 + 1);
+    
+    const difference_type offset_source = 0;
+    const difference_type offset_target = embedding_window_size;
+    
+    if (source_pos >= source_size + 2) {
+      tensor_type& dembedding = gradient.source(vocab_type::EPSILON);
+      
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
+	dembedding += embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1);
+    } else {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	const difference_type shift = i - window_size;
+	const word_type& word = (source_pos + shift <= 0
+				 ? vocab_type::BOS
+				 : (source_pos + shift > source_size
+				    ? vocab_type::EOS
+				    : source[source_pos + shift - 1]));
+	
+	gradient.source(word) += embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1);
+      }
+    }
+    
+    for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+      if (i == window_size)
+	gradient.target(target_next) += embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1);
+      else {
+	const difference_type shift = i - window_size;
+	const word_type& word = (target_pos + shift <= 0
+				 ? vocab_type::BOS
+				 : (target_pos + shift > target_size
+				    ? vocab_type::EOS
+				    : target[target_pos + shift - 1]));
+	
+	gradient.target(word) += embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1);
+      }
+    }        
+  }
+
   template <typename Gen>
   double forward(const sentence_type& source,
 		 const sentence_type& target,
@@ -1807,12 +1860,14 @@ struct HMM
     
     const size_type embedding_window_size = theta.embedding_ * (theta.window_ * 2 + 1);
     const size_type state_size = embedding_window_size * 2 + theta.hidden_;
+    const size_type embedding_size = embedding_window_size * 2;
     
+    const size_type offset_embedding = 0;
     const size_type offset_source = 0;
     const size_type offset_target = embedding_window_size;
     const size_type offset_matrix = embedding_window_size * 2;
     
-    state_allocator_.assign(state_type::size(state_size + theta.hidden_));
+    state_allocator_.assign(state_type::size(state_size));
     
     alignment.clear();
     
@@ -1834,8 +1889,6 @@ struct HMM
     state_bos.target() = vocab_type::BOS;
     
     matrix_type alpha_bos(state_bos.matrix(), state_size, 1);
-    
-    copy_embedding(source, target, theta, 0, 0, alpha_bos);
     
     alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) = theta.bi_;
     
@@ -1897,20 +1950,19 @@ struct HMM
 	    state_next.target() = target_next;
 	    
 	    matrix_type alpha_next(state_next.matrix(), state_size, 1);
-	    matrix_type trans_next(state_next.matrix() + state_size, theta.hidden_, 1);
 	    
 	    copy_embedding(source, target, theta, next, trg, alpha_next);
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
+	      = (theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
+		 + (theta.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size)
+		    * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+		 + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+		    * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	    
-	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
-	    
-	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
-	    
+	    const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
+
 	    state_next.score() = score + state.score();
 	    
 	    heap_next.push_back(state_next);
@@ -1929,18 +1981,21 @@ struct HMM
 		state_sampled.error() = state.error() + 1;
 	      
 		matrix_type alpha_sampled(state_sampled.matrix(), state_size, 1);
-		matrix_type trans_sampled(state_sampled.matrix() + state_size, theta.hidden_, 1);
 	      
 		// compute alpha-sampled
 		alpha_sampled = alpha_next;
 	      
 		alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
 		  = theta.target_.col(target_sampled.id()) * theta.scale_;
-	      
-		// compute trans-sampled
-		trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(hinge());
-	    
-		const double score = (theta.Wc_ * trans_sampled + theta.bc_)(0, 0);
+		
+		alpha_sampled.block(offset_matrix, 0, theta.hidden_, 1)
+		  = (theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
+		     + (theta.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size)
+			* alpha_sampled.block(offset_embedding, 0, embedding_size, 1))
+		     + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+			* alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
+		
+		const double score = (theta.Wc_ * alpha_sampled.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	      
 		state_sampled.score() = score + state.score();
 		
@@ -1960,18 +2015,18 @@ struct HMM
 	    state_next.target() = target_next;
 	    
 	    matrix_type alpha_next(state_next.matrix(), state_size, 1);
-	    matrix_type trans_next(state_next.matrix() + state_size, theta.hidden_, 1);
-
+	    
 	    copy_embedding(source, target, theta, next, trg, alpha_next);
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
+	      = (theta.bn_
+		 + (theta.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size)
+		    * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+		 + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+		    * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	    
-	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
-	    
-	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
+	    const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	    
 	    state_next.score() = score + state.score();
 	    
@@ -1991,7 +2046,6 @@ struct HMM
 	      state_sampled.error() = state.error() + 1;
 	      
 	      matrix_type alpha_sampled(state_sampled.matrix(), state_size, 1);
-	      matrix_type trans_sampled(state_sampled.matrix() + state_size, theta.hidden_, 1);
 	      
 	      // compute alpha-sampled
 	      alpha_sampled = alpha_next;
@@ -1999,10 +2053,14 @@ struct HMM
 	      alpha_sampled.block(offset_target + theta.embedding_ * theta.window_, 0, theta.embedding_, 1)
 		= theta.target_.col(target_sampled.id()) * theta.scale_;
 	      
-	      // compute trans-sampled
-	      trans_sampled = (theta.Wt_ * alpha_sampled + theta.bt_).array().unaryExpr(hinge());
-	    
-	      const double score = (theta.Wc_ * trans_sampled + theta.bc_)(0, 0);
+	      alpha_sampled.block(offset_matrix, 0, theta.hidden_, 1)
+		= (theta.bn_
+		   + (theta.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size)
+		      * alpha_sampled.block(offset_embedding, 0, embedding_size, 1))
+		   + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+		      * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
+	      
+	      const double score = (theta.Wc_ * alpha_sampled.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	      
 	      state_sampled.score() = score + state.score();
 	      
@@ -2051,19 +2109,18 @@ struct HMM
 	    state_next.target() = target_next;
 	    
 	    matrix_type alpha_next(state_next.matrix(), state_size, 1);
-	    matrix_type trans_next(state_next.matrix() + state_size, theta.hidden_, 1);
 	    
 	    copy_embedding(source, target, theta, next, trg, alpha_next);
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-		 + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
+	      = (theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
+		 + (theta.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size)
+		    * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+		 + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+		    * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	    
-	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
-	    
-	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
+	    const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	    
 	    state_next.score() = score + state.score();
 	    
@@ -2082,18 +2139,18 @@ struct HMM
 	    state_next.target() = target_next;
 	    
 	    matrix_type alpha_next(state_next.matrix(), state_size, 1);
-	    matrix_type trans_next(state_next.matrix() + state_size, theta.hidden_, 1);
 
 	    copy_embedding(source, target, theta, next, trg, alpha_next);
 	    
 	    // compute alpha-next
 	    alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	      = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
+	      = (theta.bn_
+		 + (theta.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size)
+		    * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+		 + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+		    * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	    
-	    // compute trans-next
-	    trans_next = (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge());
-	    
-	    const double score = (theta.Wc_ * trans_next + theta.bc_)(0, 0);
+	    const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	    
 	    state_next.score() = score + state.score();
 	    
@@ -2145,22 +2202,24 @@ struct HMM
     for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
       if (miter->error() > 0)
 	pairs += viter_end - viter;
-    
-    if (pairs)
+
+    if (pairs) {
+      const double error_factor = 1.0 / pairs;
+
       for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
 	if (miter->error() > 0)
 	  for (heap_type::iterator citer = viter; citer != viter_end; ++ citer) {
-	    const double error = std::max(double(miter->error()) - (citer->score() - miter->score()), 0.0) / pairs;
+	    const double error = std::max(double(miter->error()) - (citer->score() - miter->score()), 0.0) * error_factor;
 	    
 	    if (error == 0.0) continue;
 	    
 	    state_set_type::iterator siter_c = states.find(*citer);
 	    if (siter_c != states.end())
-	      siter_c->second.loss() += - 1.0 / pairs;
+	      siter_c->second.loss() += - error_factor;
 	    else {
 	      state_type buffer = state_allocator_.allocate();
 	      
-	      buffer.loss() = - 1.0 / pairs;
+	      buffer.loss() = - error_factor;
 	      matrix_type(buffer.matrix(), state_size, 1).setZero();
 	      
 	      states[*citer] = buffer;
@@ -2168,11 +2227,11 @@ struct HMM
 	    
 	    state_set_type::iterator siter_m = states.find(*miter);
 	    if (siter_m != states.end())
-	      siter_m->second.loss() += 1.0 / pairs;
+	      siter_m->second.loss() += error_factor;
 	    else {
 	      state_type buffer = state_allocator_.allocate();
 	      
-	      buffer.loss() = 1.0 / pairs;
+	      buffer.loss() = error_factor;
 	      matrix_type(buffer.matrix(), state_size, 1).setZero();
 	      
 	      states[*miter] = buffer;
@@ -2180,6 +2239,7 @@ struct HMM
 	    
 	    loss += error;
 	  }
+    }
     
     //std::cerr << "# of pairs: " << pairs << " loss: " << loss << std::endl;
     
@@ -2216,7 +2276,9 @@ struct HMM
 
     const size_type embedding_window_size = theta.embedding_ * (theta.window_ * 2 + 1);
     const size_type state_size = embedding_window_size * 2 + theta.hidden_;
+    const size_type embedding_size = embedding_window_size * 2;
     
+    const size_type offset_embedding = 0;
     const size_type offset_source = 0;
     const size_type offset_target = embedding_window_size;
     const size_type offset_matrix = embedding_window_size * 2;
@@ -2240,9 +2302,6 @@ struct HMM
 	const matrix_type alpha_next(state_next.matrix(), state_size, 1);
 	const matrix_type alpha_prev(state_prev.matrix(), state_size, 1);
 	
-	const matrix_type trans_next(state_next.matrix() + state_size, theta.hidden_, 1);
-	const matrix_type trans_prev(state_prev.matrix() + state_size, theta.hidden_, 1);
-
 	state_set_type::iterator piter = states_prev.find(state_prev);
 	if (piter == states_prev.end()) {
 	  state_type buffer = state_allocator_.allocate();
@@ -2264,79 +2323,46 @@ struct HMM
 	const size_type next = state_next.index();
 	const size_type prev = state_prev.index();
 
-	gradient.Wc_         += loss_next * trans_next.transpose();
+	gradient.Wc_         += loss_next * alpha_next.block(offset_matrix, 0, theta.hidden_, 1).transpose();
 	gradient.bc_.array() += loss_next;
 	
-	delta_trans_ = trans_next.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * loss_next).array();
-	
-	gradient.Wt_ += delta_trans_ * alpha_next.transpose();
-	gradient.bt_ += delta_trans_;
-	
-	delta_alpha_ = theta.Wt_.transpose() * delta_trans_;
-	
-	if (! delta_beta_.rows())
-	  delta_beta_.resize(state_size, 1);
-
-	delta_beta_.block(0, 0, offset_matrix, 1)
-	  = (delta_alpha_.block(0, 0, offset_matrix, 1) + beta_next.block(0, 0, offset_matrix, 1));
-
-	delta_beta_.block(offset_matrix, 0, theta.hidden_, 1)
-	  = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhinge())
-	     * (delta_alpha_.block(offset_matrix, 0, theta.hidden_, 1)
-		+ beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
-	
-	// updated embedding 
-	if (next >= source_size + 2) {
-	  tensor_type& embedding = gradient.source(vocab_type::EPSILON);
-	  
-	  for (size_type i = 0; i != theta.window_ * 2 + 1; ++ i)
-	    embedding += delta_beta_.block(offset_source + theta.embedding_ * i, 0, theta.embedding_, 1);
-	} else {
-	  for (size_type i = 0; i != theta.window_ * 2 + 1; ++ i) {
-	    const difference_type pos = difference_type(next + i) - difference_type(theta.window_);
-	    const word_type& word = (pos <= 0
-				     ? vocab_type::BOS
-				     : (pos > static_cast<difference_type>(source_size)
-					? vocab_type::EOS
-					: source[pos - 1]));
-	    
-	    gradient.source(word) += delta_beta_.block(offset_source + theta.embedding_ * i, 0, theta.embedding_, 1);
-	  }
-	}
-	
-	for (size_type i = 0; i != theta.window_ * 2 + 1; ++ i) {
-	  if (i == theta.window_)
-	    gradient.target(target_next) += delta_beta_.block(offset_target + theta.embedding_ * i, 0, theta.embedding_, 1);
-	  else {
-	    const difference_type pos = difference_type(trg + i) - difference_type(theta.window_);
-	    
-	    const word_type& word = (pos <= 0
-				     ? vocab_type::BOS
-				     : (pos > static_cast<difference_type>(target_size)
-					? vocab_type::EOS
-					: target[pos - 1]));
-	    
-	    gradient.target(word) += delta_beta_.block(offset_target + theta.embedding_ * i, 0, theta.embedding_, 1);
-	  }
-	}
+	delta_alpha_ = (alpha_next.block(offset_matrix, 0, theta.hidden_, 1).array().unaryExpr(dhinge())
+			* (theta.Wc_.transpose() * loss_next
+			   + beta_next.block(offset_matrix, 0, theta.hidden_, 1)).array());
 	
 	// update Wa or Wn and propagate back to beta_prev...
 	if (next >= source_size + 2) {
-	  gradient.Wn_ += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1) * alpha_prev.transpose();
-	  gradient.bn_ += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1);
+	  gradient.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size)
+	    += delta_alpha_ * alpha_next.block(offset_embedding, 0, embedding_size, 1).transpose();
+	  gradient.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+	    += delta_alpha_ * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1).transpose();
+	  gradient.bn_
+	    += delta_alpha_;
 	  
-	  beta_prev += (theta.Wn_.transpose()
-			* delta_beta_.block(offset_matrix, 0, theta.hidden_, 1));
+	  propagate_embedding(source, target, theta, gradient, next, trg, target_next,
+			      theta.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size).transpose()
+			      * delta_alpha_);
+	  
+	  beta_prev.block(offset_matrix, 0, theta.hidden_, 1)
+	    += (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_).transpose()
+		* delta_alpha_);
 	} else {
-	  const size_type shift = theta.shift(source_size, target_size, prev, next);
+	  const size_type shift = theta.shift(source_size, target_size, prev, next); 
 	  
-	  gradient.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size)
-	    += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1) * alpha_prev.transpose();
+	  gradient.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size)
+	    += delta_alpha_ * alpha_next.block(offset_embedding, 0, embedding_size, 1).transpose();
+	  gradient.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+	    += delta_alpha_ * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1).transpose();
 	  gradient.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
-	    += delta_beta_.block(offset_matrix, 0, theta.hidden_, 1);
+	    += delta_alpha_;
 	  
-	  beta_prev += (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size).transpose()
-			* delta_beta_.block(offset_matrix, 0, theta.hidden_, 1));
+	  propagate_embedding(source, target, theta, gradient, next, trg, target_next,
+			      theta.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size).transpose()
+			      * delta_alpha_);
+	  
+	  beta_prev.block(offset_matrix, 0, theta.hidden_, 1)
+	    += (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_).transpose()
+		* delta_alpha_);
 	}
       }
     }
@@ -2348,31 +2374,6 @@ struct HMM
       throw std::runtime_error("multiple initial states?");
     
     const matrix_type beta_bos(states_[0].begin()->second.matrix(), state_size, 1);
-
-    // propagate to BOS!
-    for (size_type i = 0; i != theta.window_ * 2 + 1; ++ i) {
-      const difference_type pos = difference_type(i) - difference_type(theta.window_);
-      
-      const word_type& word = (pos <= 0
-			       ? vocab_type::BOS
-			       : (pos > static_cast<difference_type>(source_size)
-				  ? vocab_type::EOS
-				  : source[pos - 1]));
-      
-      gradient.source(word) += beta_bos.block(offset_source + theta.embedding_ * i, 0, theta.embedding_, 1);
-    }
-
-    for (size_type i = 0; i != theta.window_ * 2 + 1; ++ i) {
-      const difference_type pos = difference_type(i) - difference_type(theta.window_);
-      
-      const word_type& word = (pos <= 0
-			       ? vocab_type::BOS
-			       : (pos > static_cast<difference_type>(target_size)
-				  ? vocab_type::EOS
-				  : target[pos - 1]));
-      
-      gradient.target(word) += beta_bos.block(offset_target + theta.embedding_ * i, 0, theta.embedding_, 1);
-    }
     
     gradient.bi_ += beta_bos.block(offset_matrix, 0, theta.hidden_, 1);
     
@@ -2391,7 +2392,9 @@ struct HMM
     
     const size_type embedding_window_size = theta.embedding_ * (theta.window_ * 2 + 1);
     const size_type state_size = embedding_window_size * 2 + theta.hidden_;
+    const size_type embedding_size = embedding_window_size * 2;
 
+    const size_type offset_embedding = 0;
     const size_type offset_source = 0;
     const size_type offset_target = embedding_window_size;
     const size_type offset_matrix = embedding_window_size * 2;
@@ -2410,8 +2413,6 @@ struct HMM
     state_bos.score() = 0.0;
     
     matrix_type alpha_bos(state_bos.matrix(), state_size, 1);
-
-    copy_embedding(source, target, theta, 0, 0, alpha_bos);
     
     alpha_bos.block(offset_matrix, 0, theta.hidden_, 1) = theta.bi_;
     
@@ -2467,11 +2468,13 @@ struct HMM
 	  
 	  // compute alpha-next
 	  alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	    = (theta.Wa_.block(theta.hidden_ * shift, 0, theta.hidden_, state_size) * alpha_prev
-	       + theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)).array().unaryExpr(hinge());
+	    = (theta.ba_.block(theta.hidden_ * shift, 0, theta.hidden_, 1)
+	       + (theta.Wa_.block(theta.hidden_ * shift, offset_embedding, theta.hidden_, embedding_size)
+		  * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+	       + (theta.Wa_.block(theta.hidden_ * shift, offset_matrix, theta.hidden_, theta.hidden_)
+		  * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	  
-	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge()).matrix()
-				+ theta.bc_)(0, 0);
+	  const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	  
 	  state_next.score() = score + state.score();
 
@@ -2493,10 +2496,13 @@ struct HMM
 	  
 	  // compute alpha-next
 	  alpha_next.block(offset_matrix, 0, theta.hidden_, 1)
-	    = (theta.Wn_ * alpha_prev + theta.bn_).array().unaryExpr(hinge());
+	    = (theta.bn_
+	       + (theta.Wn_.block(0, offset_embedding, theta.hidden_, embedding_size)
+		  * alpha_next.block(offset_embedding, 0, embedding_size, 1))
+	       + (theta.Wn_.block(0, offset_matrix, theta.hidden_, theta.hidden_)
+		  * alpha_prev.block(offset_matrix, 0, theta.hidden_, 1))).array().unaryExpr(hinge());
 	  
-	  const double score = (theta.Wc_ * (theta.Wt_ * alpha_next + theta.bt_).array().unaryExpr(hinge()).matrix()
-				+ theta.bc_)(0, 0);
+	  const double score = (theta.Wc_ * alpha_next.block(offset_matrix, 0, theta.hidden_, 1) + theta.bc_)(0, 0);
 	  
 	  state_next.score() = score + state.score();
 	  
@@ -2580,8 +2586,8 @@ struct LearnAdaGrad
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    Wt_ = tensor_type::Zero(hidden_, state_size);
-    bt_ = tensor_type::Zero(hidden_, 1);
+    //Wt_ = tensor_type::Zero(hidden_, state_size);
+    //bt_ = tensor_type::Zero(hidden_, 1);
 
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
@@ -2622,8 +2628,8 @@ struct LearnAdaGrad
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
     
-    update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
-    update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
+    //update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
+    //update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
     
     update(theta.Wa_, const_cast<tensor_type&>(Wa_), gradient.Wa_, scale, lambda_ != 0.0);
     update(theta.ba_, const_cast<tensor_type&>(ba_), gradient.ba_, scale, false);
@@ -2752,8 +2758,8 @@ struct LearnAdaGrad
   tensor_type Wc_;
   tensor_type bc_;
   
-  tensor_type Wt_;
-  tensor_type bt_;
+  //tensor_type Wt_;
+  //tensor_type bt_;
   
   tensor_type Wa_;
   tensor_type ba_;
@@ -2833,8 +2839,8 @@ struct LearnSGD
     update(theta.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, gradient.bc_, scale, false);
     
-    update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
-    update(theta.bt_, gradient.bt_, scale, false);
+    //update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
+    //update(theta.bt_, gradient.bt_, scale, false);
     
     update(theta.Wa_, gradient.Wa_, scale, lambda_ != 0.0);
     update(theta.ba_, gradient.ba_, scale, false);

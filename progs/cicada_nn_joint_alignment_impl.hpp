@@ -1462,6 +1462,7 @@ struct Lexicon
       if (align_best)
 	alignment.push_back(std::make_pair(align_best - 1, trg - 1));
       
+      // we treat the loss uniformly, which is not correct (we need to weight by the expectation of alignment scores)
       const double loss_factor = 1.0 / ((source_size + 1) * samples_);
       
       double loss_target = 0.0;

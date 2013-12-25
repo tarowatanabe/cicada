@@ -29,6 +29,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/bichart.hpp"
 #include "utils/bithack.hpp"
+#include "utils/chunk_vector.hpp"
 #include "utils/compact_map.hpp"
 #include "utils/compact_set.hpp"
 #include "utils/mathop.hpp"
@@ -1402,6 +1403,10 @@ struct ITG
     span_pair_type span_;
     span_pair_type left_;
     span_pair_type right_;
+
+    // source word and target word... (for sampling...)
+    word_type source_;
+    word_type target_;
     
     // other state related data
     double loss_;
@@ -1415,7 +1420,7 @@ struct ITG
   };
 
   typedef State state_type;
-    
+
   typedef utils::vector2<state_type, std::allocator<state_type> > terminal_set_type;
   typedef utils::bichart<state_type, std::allocator<state_type> > chart_type;
 
