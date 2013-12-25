@@ -1928,7 +1928,7 @@ struct HMM
 	  }
 
 	  if (! has_error)
-	    for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_ && ! has_error; -- hiter) {
+	    for (/**/; hiter_begin != hiter && ! has_error; -- hiter) {
 	      std::pop_heap(hiter_begin, hiter, heap_compare());
 	      
 	      has_error |= ((hiter - 1)->error() > 0);
