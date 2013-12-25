@@ -1677,9 +1677,7 @@ struct HMM
   size_type sample_;
   size_type beam_;
   
-  tensor_type delta_beta_;
   tensor_type delta_alpha_;
-  tensor_type delta_trans_;
   
   state_allocator_type state_allocator_;
   heap_set_type  heaps_;
