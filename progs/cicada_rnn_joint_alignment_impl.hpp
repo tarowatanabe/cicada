@@ -1920,8 +1920,19 @@ struct HMM
 	heap_type::iterator hiter_end   = heap.end();
 	
 	if (heap.size() > beam_) {
-	  for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_; -- hiter)
+	  bool has_error = false;
+	  for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_; -- hiter) {
 	    std::pop_heap(hiter_begin, hiter, heap_compare());
+	    
+	    has_error |= ((hiter - 1)->error() > 0);
+	  }
+
+	  if (! has_error)
+	    for (/**/; hiter_begin != hiter && hiter_end - hiter != beam_ && ! has_error; -- hiter) {
+	      std::pop_heap(hiter_begin, hiter, heap_compare());
+	      
+	      has_error |= ((hiter - 1)->error() > 0);
+	    }
 	  
 	  // deallocate unused states
 	  for (/**/; hiter_begin != hiter; ++ hiter_begin)
@@ -2199,15 +2210,13 @@ struct HMM
     state_set_type& states = states_[target_size + 1];
     
     double loss = 0.0;
-    size_type pairs = 0;
-    
-    // first, count # of pairs
-    for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
-      if (miter->error() > 0)
-	pairs += viter_end - viter;
 
-    if (pairs) {
-      const double error_factor = 1.0 / pairs;
+    size_type num_mistake = 0;
+    for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
+      num_mistake += (miter->error() > 0);
+    
+    if (num_mistake) {
+      const double error_factor = 1.0 / (num_mistake * (viter_end - viter));
 
       for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
 	if (miter->error() > 0)
