@@ -946,13 +946,18 @@ struct Model
       const size_type embedding_size = embedding_ * (window_ * 2 + 1) * 2;
 
       tensor_type Wt(hidden_, embedding_size);
+      tensor_type bt(hidden_, 1);
       
       read(rep.path("Wt.bin"), Wt);
+      read(rep.path("bt.bin"), bt);
       
       Wn_.block(0, 0, hidden_, embedding_size) = Wt;
+      bn_.block(0, 0, hidden_, 1) = bt;
       
-      for (size_type shift = 0; shift != window_ * 2 + 1; ++ shift)
+      for (size_type shift = 0; shift != window_ * 2 + 1; ++ shift) {
 	Wa_.block(hidden_ * shift, 0, hidden_, embedding_size) = Wt;
+	ba_.block(hidden_ * shift, 0, hidden_, 1) = bt;
+      }
     }
   }
   
