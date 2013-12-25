@@ -940,13 +940,19 @@ public:
 	  throw std::runtime_error("invalid embedding size");
 
 	const word_type word = boost::fusion::get<0>(parsed);
+
+	if (word.id() >= source_.cols())
+	  source_.conservativeResize(Eigen::NoChange, word.id() + 1);
+	if (word.id() >= words_source_.size())
+	  words_source_.resize(word.id() + 1, false);
 	
-	if (word.id() < source_.cols())
-	  source_.col(word.id()).block(0, 0, embedding_, 1)
-	    = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+	source_.col(word.id()).block(0, 0, embedding_, 1)
+	  = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+	
+	words_source_[word.id()] = true;
       }
     }
-
+    
     if (! target_file.empty()) {
       
       if (target_file != "-" && ! boost::filesystem::exists(target_file))
@@ -973,9 +979,15 @@ public:
 	
 	const word_type word = boost::fusion::get<0>(parsed);
 
-	if (word.id() < target_.cols())
-	  target_.col(word.id()).block(0, 0, embedding_, 1)
-	    = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+	if (word.id() >= target_.cols())
+	  target_.conservativeResize(Eigen::NoChange, word.id() + 1);
+	if (word.id() >= words_target_.size())
+	  words_target_.resize(word.id() + 1, false);
+	
+	target_.col(word.id()).block(0, 0, embedding_, 1)
+	  = Eigen::Map<const tensor_type>(&(*boost::fusion::get<1>(parsed).begin()), embedding_, 1);
+	
+	words_target_[word.id()] = true;
       }
     }
   }
