@@ -282,7 +282,7 @@ private:
       if (! matrix.rows())
 	matrix = - siter->second;
       else
-	matrix += siter->second;
+	matrix -= siter->second;
     }
   }
   
