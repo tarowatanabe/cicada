@@ -1673,7 +1673,7 @@ struct HMM
     // comparison by less, so that we can pop in greater order
     bool operator()(const state_type& x, const state_type& y) const
     {
-      return x.score() < y.score();
+      return x.score() + x.error() < y.score() + y.error();
     }
   };
 

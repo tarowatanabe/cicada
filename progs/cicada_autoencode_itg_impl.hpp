@@ -1677,7 +1677,7 @@ struct ITG
 	heap_type::iterator hiter_end   = heap_.end();
 	
 	if (length > 2 && std::distance(hiter_begin, hiter_end) > beam_) {
-	  std::make_heap(hiter_begin, hiter_end, heap_compare());
+	  //std::make_heap(hiter_begin, hiter_end, heap_compare());
 	  
 	  for (/**/; hiter_begin != hiter && std::distance(hiter, hiter_end) != beam_; -- hiter)
 	    std::pop_heap(hiter_begin, hiter, heap_compare());

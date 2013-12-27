@@ -98,8 +98,8 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 4;
-int samples = 5;
-int beam = 10;
+int samples = 1;
+int beam = 50;
 double lambda = 0;
 double eta0 = 0.1;
 int cutoff = 3;
@@ -768,11 +768,22 @@ struct TaskAccumulate
 	    //std::cerr << "score: " << score << std::endl;
 	    
 	    if (parsed) {
-	      const double error = itg_.backward(source, target, theta_, gradient_batch_, generator_);
+	      score_ += score;
 	      
-	      loss_ += error;
-	      ++ parsed_;
-	      ++ batch_learn;
+	      const double score_sampled = itg_.forward(source, target, theta_, generator_);
+	      
+	      const bool parsed_sampled = (score_sampled != - std::numeric_limits<double>::infinity());
+	      
+	      if (parsed_sampled) {
+		const double error = itg_.backward(source, target, theta_, gradient_batch_, generator_);
+		
+		loss_ += error;
+		++ parsed_;
+		++ batch_learn;
+	      } else
+		std::cerr << "failed sampled parsing: " << std::endl
+			  << "source: " << source << std::endl
+			  << "target: " << target << std::endl;
 	      
 	      itg_.derivation(source, target, bitext.derivation_);
 	    } else {
@@ -839,7 +850,8 @@ struct TaskAccumulate
   
   void clear()
   {
-    loss_ = loss_type();
+    loss_  = loss_type();
+    score_ = loss_type();
     parsed_ = 0;
     
     gradient_.clear();
@@ -860,6 +872,7 @@ struct TaskAccumulate
   itg_type itg_;
 
   loss_type         loss_;
+  loss_type         score_;
   size_type         parsed_;
     
   size_type      batch_size_;
@@ -1167,23 +1180,28 @@ void learn_online_root(const Learner& learner,
     bitext_reducer.push(bitext_derivation_type());
     
     loss_type loss   = task.loss_;
+    loss_type score  = task.score_;
     size_type parsed = task.parsed_;
     
     for (int rank = 1; rank != mpi_size; ++ rank) {
       loss_type l;
+      loss_type s;
       size_type p;
       
       boost::iostreams::filtering_istream is;
       is.push(utils::mpi_device_source(rank, loss_tag, 4096));
       is.read((char*) &l, sizeof(loss_type));
+      is.read((char*) &s, sizeof(loss_type));
       is.read((char*) &p, sizeof(size_type));
       
       loss   += l;
+      score  += s;
       parsed += p;
     }
     
     if (debug)
       std::cerr << "loss: " << static_cast<double>(loss) << std::endl
+		<< "score: " << static_cast<double>(score) << std::endl
 		<< "parsed: " << parsed << std::endl;
     
     if (debug)
@@ -1424,6 +1442,7 @@ void learn_online_others(const Learner& learner,
       boost::iostreams::filtering_ostream os;
       os.push(utils::mpi_device_sink(0, loss_tag, 4096));
       os.write((char*) &task.loss_, sizeof(loss_type));
+      os.write((char*) &task.score_, sizeof(loss_type));
       os.write((char*) &task.parsed_, sizeof(size_type));
     }
     

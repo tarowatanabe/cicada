@@ -87,8 +87,8 @@ bool optimize_adagrad = false;
 
 int iteration = 10;
 int batch_size = 4;
-int samples = 5;
-int beam = 10;
+int samples = 1;
+int beam = 50;
 double lambda = 0;
 double eta0 = 0.1;
 int cutoff = 3;
@@ -702,10 +702,21 @@ struct TaskAccumulate
 	      //std::cerr << "score: " << score << std::endl;
 	      
 	      if (parsed) {
-		const double error = itg_.backward(source, target, theta_, *grad, generator_);
+		score_ += score;
+
+		const double score_sampled = itg_.forward(source, target, theta_, generator_);
 		
-		loss_ += error;
-		++ parsed_;
+		const bool parsed_sampled = (score_sampled != - std::numeric_limits<double>::infinity());
+		
+		if (parsed_sampled) {
+		  const double error = itg_.backward(source, target, theta_, *grad, generator_);
+		  
+		  loss_ += error;
+		  ++ parsed_;
+		} else
+		  std::cerr << "failed sampled parsing: " << std::endl
+			    << "source: " << source << std::endl
+			    << "target: " << target << std::endl;
 		
 		itg_.derivation(source, target, bitext_derivation.derivation_);
 	      } else
@@ -755,7 +766,8 @@ struct TaskAccumulate
   
   void clear()
   {
-    loss_ = loss_type();
+    loss_  = loss_type();
+    score_ = loss_type();
     parsed_ = 0;
   }
 
@@ -772,6 +784,7 @@ struct TaskAccumulate
 
   gradient_set_type gradients_;
   loss_type         loss_;
+  loss_type         score_;
   size_type         parsed_;
   
   int            shard_;
@@ -907,15 +920,18 @@ void learn_online(const Learner& learner,
     utils::resource end;
     
     loss_type loss;
+    loss_type score;
     size_type parsed = 0;
     
     for (size_type i = 0; i != tasks.size(); ++ i) {
       loss   += tasks[i].loss_;
+      score  += tasks[i].score_;
       parsed += tasks[i].parsed_;
     }
 
     if (debug)
       std::cerr << "loss: " << static_cast<double>(loss) << std::endl
+		<< "score: " << static_cast<double>(score) << std::endl
 		<< "parsed: " << parsed << std::endl;
     
     if (debug)
