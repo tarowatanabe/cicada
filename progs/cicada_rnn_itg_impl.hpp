@@ -2121,11 +2121,11 @@ struct ITG
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     boost::random::uniform_int_distribution<> uniform_target(0, target_size - 1);
     
-    if (! span.source_.empty())
+    if (! span.source_.empty() && dict_target_source_.size(word_target) > 1)
       for (size_type sample = 0; sample != samples_; ++ sample) {
 	word_type sampled = word_source;
 	
-	if (word_target == vocab_type::NONE || dict_target_source_.size(word_target) <= 1) {
+	if (word_target == vocab_type::NONE) {
 	  while (sampled == word_source)
 	    sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
@@ -2167,11 +2167,11 @@ struct ITG
 	errors_[span.size()] |= true;
       }
     
-    if (! span.target_.empty())
+    if (! span.target_.empty() && dict_source_target_.size(word_source) > 1)
       for (size_type sample = 0; sample != samples_; ++ sample) {
 	word_type sampled = word_target;
 	
-	if (word_source == vocab_type::NONE || dict_source_target_.size(word_source) <= 1) {
+	if (word_source == vocab_type::NONE) {
 	  while (sampled == word_target)
 	    sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
