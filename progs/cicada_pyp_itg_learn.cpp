@@ -406,8 +406,13 @@ struct PYPLexicon
   typedef utils::restaurant_sync<> table_type;
   
   PYPLexicon(const parameter_type& parameter,
-	     const double __p0)
-    : table(parameter), p0(__p0)
+	     const double __p0_source,
+	     const double __p0_target,
+	     const double __p0_epsilon)
+    : table(parameter),
+      p0_source(__p0_source),
+      p0_target(__p0_target),
+      p0_epsilon(__p0_epsilon)
   { }
 
   id_type word_pair_id(const word_type& source, const word_type& target)
@@ -421,25 +426,69 @@ struct PYPLexicon
     word_pair_set_type::const_iterator iter = word_pairs.find(word_pair_type(source, target));
     return std::make_pair(iter - word_pairs.begin(), iter != word_pairs.end());
   }
+
+  template <typename Iterator, typename Sampler>
+  void increment(Iterator first, Iterator last, Sampler& sampler, const double temperature)
+  {
+    for (/**/; first != last; ++ first)
+      table.increment(*first, prior(*first), sampler, temperature);
+  }
+
+  template <typename Iterator, typename Sampler>
+  void decrement(Iterator first, Iterator last, Sampler& sampler)
+  {
+    table.decrement(first, last, sampler);
+  }
   
   double prob(const id_type id) const
   {
-    return table.prob(id, p0);
+    return table.prob(id, prior(id));
   }
-
+  
   double prob(const word_type& source, const word_type& target) const
   {
     const std::pair<id_type, bool> result = find_word_pair(source, target);
     
     if (result.second)
-      return table.prob(result.first, p0);
+      return table.prob(result.first, prior(source, target));
     else
-      return table.prob(p0);
+      return table.prob(prior(source, target));
+  }
+  
+  double prior(const id_type id) const
+  {
+    return prior(word_pairs[id].source, word_pairs[id].target);
+  }
+  
+  double prior(const word_type& source, const word_type& target) const
+  {
+    return ((source != vocab_type::EPSILON ? (1.0 - p0_epsilon) * p0_source : p0_epsilon)
+	    * (target != vocab_type::EPSILON ? (1.0 - p0_epsilon) * p0_target : p0_epsilon));
   }
   
   double log_likelihood() const
   {
-    return std::log(p0) * table.size_table() + table.log_likelihood();
+    double ll = table.log_likelihood();
+    
+    size_type counts = 0;
+    size_type counts_epsilon_target = 0;
+    size_type counts_source_epsilon = 0;
+    
+    for (PYP::id_type id = 0; id != table.size(); ++ id)
+      if (! table[id].empty()) {
+	const word_type& source = word_pairs[id].source;
+	const word_type& target = word_pairs[id].target;
+	
+	counts                += (source != vocab_type::EPSILON && target != vocab_type::EPSILON) * table[id].size_table();
+	counts_epsilon_target += (source == vocab_type::EPSILON) * table[id].size_table();
+	counts_source_epsilon += (target == vocab_type::EPSILON) * table[id].size_table();
+      }
+    
+    ll += std::log((1.0 - p0_epsilon) * (1.0 - p0_epsilon) * p0_source * p0_target) * counts;
+    ll += std::log((1.0 - p0_epsilon) * p0_source * p0_epsilon) * counts_source_epsilon;
+    ll += std::log((1.0 - p0_epsilon) * p0_target * p0_epsilon) * counts_epsilon_target;
+    
+    return ll;
   }
 
   template <typename Sampler>
@@ -453,11 +502,14 @@ struct PYPLexicon
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
-
+  
   word_pair_set_type word_pairs;
   
   table_type table;
-  double    p0;
+  
+  double     p0_source;
+  double     p0_target;
+  double     p0_epsilon;
 };
 
 
@@ -573,17 +625,13 @@ struct PYPITG
   typedef double prob_type;
 
   PYPITG(const PYPRule&   __rule,
-	 const PYPLexicon& __lexicon,
-	 const double& __epsilon_prior)
-    : rule(__rule), lexicon(__lexicon), epsilon_prior(__epsilon_prior), counts0_epsilon(0), counts0(0) {}
+	 const PYPLexicon& __lexicon)
+    : rule(__rule), lexicon(__lexicon) {}
 
 
   double log_likelihood() const
   {
-    return (rule.log_likelihood()
-	    + lexicon.log_likelihood()
-	    + std::log(epsilon_prior) * counts0_epsilon
-	    + std::log(1.0 - epsilon_prior) * counts0);
+    return rule.log_likelihood() + lexicon.log_likelihood();
   }
   
   template <typename Sampler>
@@ -592,44 +640,18 @@ struct PYPITG
     rule.sample_parameters(sampler, num_loop, num_iterations);
 
     lexicon.sample_parameters(sampler, num_loop, num_iterations);
-    
-    // check lexicon...
-    counts0_epsilon = 0;
-    counts0 = 0;
-    for (PYP::id_type id = 0; id != lexicon.table.size(); ++ id)
-      if (! lexicon.table[id].empty()) {
-	counts0_epsilon += (lexicon.word_pairs[id].source == vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0_epsilon += (lexicon.word_pairs[id].target == vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0 += (lexicon.word_pairs[id].source != vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0 += (lexicon.word_pairs[id].target != vocab_type::EPSILON) * lexicon.table[id].size_customer();
-      }
   }
   
   template <typename Sampler>
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     rule.slice_sample_parameters(sampler, num_loop, num_iterations);
-
+    
     lexicon.slice_sample_parameters(sampler, num_loop, num_iterations);
-
-    // check lexicon...
-    counts0_epsilon = 0;
-    counts0 = 0;
-    for (PYP::id_type id = 0; id != lexicon.table.size(); ++ id)
-      if (! lexicon.table[id].empty()) {
-	counts0_epsilon += (lexicon.word_pairs[id].source == vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0_epsilon += (lexicon.word_pairs[id].target == vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0 += (lexicon.word_pairs[id].source != vocab_type::EPSILON) * lexicon.table[id].size_customer();
-	counts0 += (lexicon.word_pairs[id].target != vocab_type::EPSILON) * lexicon.table[id].size_customer();
-      }
   }
   
   PYPRule    rule;
   PYPLexicon lexicon;
-  
-  double epsilon_prior;
-  size_type counts0_epsilon;
-  size_type counts0;
 };
 
 struct PYPGraph
@@ -713,15 +735,10 @@ struct PYPGraph
     logprob_str  = model.rule.prob_straight();
     logprob_inv  = model.rule.prob_inverted();
 
-    const double prior_terminal = 1.0 - model.epsilon_prior;
-    const double prior_epsilon  = model.epsilon_prior;
-    
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = (model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					       trg == 0 ? vocab_type::EPSILON : target[trg - 1])
-			    * (src == 0 ? prior_epsilon : prior_terminal)
-			    * (trg == 0 ? prior_epsilon : prior_terminal));
+	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
   }
   
   void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
@@ -1191,15 +1208,10 @@ struct PYPViterbi
     logprob_str  = model.rule.prob_straight();
     logprob_inv  = model.rule.prob_inverted();
 
-    const double prior_terminal = 1.0 - model.epsilon_prior;
-    const double prior_epsilon  = model.epsilon_prior;
-    
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = (model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					       trg == 0 ? vocab_type::EPSILON : target[trg - 1])
-			    * (src == 0 ? prior_epsilon : prior_terminal)
-			    * (trg == 0 ? prior_epsilon : prior_terminal));
+	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
     
   }
   
@@ -1732,7 +1744,7 @@ struct Task
 	
 	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
 
-	model.lexicon.table.decrement(ids.begin(), ids.end(), sampler);
+	model.lexicon.decrement(ids.begin(), ids.end(), sampler);
       }
 
       utils::resource res2;
@@ -1773,7 +1785,7 @@ struct Task
 	
 	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
 	
-	model.lexicon.table.increment(ids.begin(), ids.end(), model.lexicon.p0, sampler, temperature);
+	model.lexicon.increment(ids.begin(), ids.end(), sampler, temperature);
       }
       
       utils::resource res6;
@@ -2121,10 +2133,11 @@ int main(int argc, char ** argv)
 							lexicon_discount_beta,
 							lexicon_strength_shape,
 							lexicon_strength_rate),
-			     1.0 / (double(source_vocab_size) * double(target_vocab_size)));
-
+			     1.0 / double(source_vocab_size),
+			     1.0 / double(target_vocab_size),
+			     epsilon_prior);
     
-    PYPITG model(model_rule, model_lexicon, epsilon_prior);
+    PYPITG model(model_rule, model_lexicon);
 
     // prepare model!
     prepare(sources, targets, model);
@@ -2361,7 +2374,7 @@ int main(int argc, char ** argv)
 	  if (! model.lexicon.table[id].empty())
 	    os << model.lexicon.word_pairs[id].source
 	       << ' ' << model.lexicon.word_pairs[id].target
-	       << ' ' << model.lexicon.table.prob(id, model.lexicon.p0) << '\n';  
+	       << ' ' << model.lexicon.prob(id) << '\n';  
       }
     }
     
