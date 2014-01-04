@@ -384,7 +384,7 @@ struct PYP
   };
 };
 
-struct PYPLexicon
+struct PYPTerminal
 {
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
@@ -405,10 +405,10 @@ struct PYPLexicon
 
   typedef utils::restaurant_sync<> table_type;
   
-  PYPLexicon(const parameter_type& parameter,
-	     const double __p0_source,
-	     const double __p0_target,
-	     const double __p0_epsilon)
+  PYPTerminal(const parameter_type& parameter,
+	      const double __p0_source,
+	      const double __p0_target,
+	      const double __p0_epsilon)
     : table(parameter),
       p0_source(__p0_source),
       p0_target(__p0_target),
@@ -536,10 +536,12 @@ struct PYPRule
   typedef utils::pyp_parameter parameter_type;
   typedef utils::restaurant_sync<> table_type;
 
-  typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;
-
   PYPRule(const double& __p0_terminal, const parameter_type& parameter)
-    : p0_terminal(__p0_terminal), p0((1.0 - __p0_terminal) * 0.5), counts0_terminal(0), counts0(0), table(parameter) {}
+    : p0_terminal(__p0_terminal), p0((1.0 - __p0_terminal) * 0.5), counts0_terminal(0), counts0(0), table(parameter)
+  {
+    table.reserve(3);
+    table.resize(3);
+  }
   
   template <typename Sampler>
   void increment(const rule_type& rule, Sampler& sampler, const double temperature=1.0)
@@ -610,6 +612,26 @@ struct PYPRule
   table_type table;
 };
 
+struct PYPTree
+{
+  typedef PYP::size_type       size_type;
+  typedef PYP::difference_type difference_type;
+
+  typedef PYP::phrase_type      phrase_type;
+  typedef PYP::phrase_pair_type phrase_pair_type;
+  
+  typedef PYP::rule_type rule_type;
+  typedef PYP::itg_type  itg_type;
+
+  typedef cicada::semiring::Logprob<double> logprob_type;
+  typedef double prob_type;
+  
+  typedef utils::pyp_parameter parameter_type;
+  typedef utils::restaurant_sync<> table_type;
+  
+  
+};
+
 struct PYPITG
 {
   typedef PYP::size_type       size_type;
@@ -625,13 +647,13 @@ struct PYPITG
   typedef double prob_type;
 
   PYPITG(const PYPRule&   __rule,
-	 const PYPLexicon& __lexicon)
-    : rule(__rule), lexicon(__lexicon) {}
+	 const PYPTerminal& __terminal)
+    : rule(__rule), terminal(__terminal) {}
 
 
   double log_likelihood() const
   {
-    return rule.log_likelihood() + lexicon.log_likelihood();
+    return rule.log_likelihood() + terminal.log_likelihood();
   }
   
   template <typename Sampler>
@@ -639,7 +661,7 @@ struct PYPITG
   {
     rule.sample_parameters(sampler, num_loop, num_iterations);
 
-    lexicon.sample_parameters(sampler, num_loop, num_iterations);
+    terminal.sample_parameters(sampler, num_loop, num_iterations);
   }
   
   template <typename Sampler>
@@ -647,11 +669,11 @@ struct PYPITG
   {
     rule.slice_sample_parameters(sampler, num_loop, num_iterations);
     
-    lexicon.slice_sample_parameters(sampler, num_loop, num_iterations);
+    terminal.slice_sample_parameters(sampler, num_loop, num_iterations);
   }
   
   PYPRule    rule;
-  PYPLexicon lexicon;
+  PYPTerminal terminal;
 };
 
 struct PYPGraph
@@ -671,8 +693,8 @@ struct PYPGraph
   
   typedef std::vector<rule_type, std::allocator<rule_type> > derivation_type;
 
-  typedef PYPLexicon::logprob_type logprob_type;
-  typedef PYPLexicon::prob_type    prob_type;
+  typedef PYPTerminal::logprob_type logprob_type;
+  typedef PYPTerminal::prob_type    prob_type;
   
   typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
   
@@ -737,7 +759,7 @@ struct PYPGraph
 
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+	matrix(src, trg) = model.terminal.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
 					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
   }
   
@@ -1144,8 +1166,8 @@ struct PYPViterbi
   
   typedef std::vector<rule_type, std::allocator<rule_type> > derivation_type;
 
-  typedef PYPLexicon::logprob_type logprob_type;
-  typedef PYPLexicon::prob_type    prob_type;
+  typedef PYPTerminal::logprob_type logprob_type;
+  typedef PYPTerminal::prob_type    prob_type;
   
   typedef std::vector<prob_type, std::allocator<prob_type> >       prob_set_type;
   
@@ -1210,8 +1232,8 @@ struct PYPViterbi
 
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
-	matrix(src, trg) = model.lexicon.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+	matrix(src, trg) = model.terminal.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
+					       trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
     
   }
   
@@ -1744,7 +1766,7 @@ struct Task
 	
 	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
 
-	model.lexicon.decrement(ids.begin(), ids.end(), sampler);
+	model.terminal.decrement(ids.begin(), ids.end(), sampler);
       }
 
       utils::resource res2;
@@ -1772,8 +1794,8 @@ struct Task
 	  ++ counts[diter->is_terminal() ? PYP::TERMINAL : (diter->is_straight() ? PYP::STRAIGHT : PYP::INVERTED)];
 	  
 	  if (diter->is_terminal()) {
-	    diter->word_pair = model.lexicon.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
-							  diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
+	    diter->word_pair = model.terminal.word_pair_id(diter->span.source.empty() ? vocab_type::EPSILON : sources[pos][diter->span.source.first],
+							   diter->span.target.empty() ? vocab_type::EPSILON : targets[pos][diter->span.target.first]);
 	    
 	    ids.push_back(diter->word_pair);
 	  }
@@ -1785,7 +1807,7 @@ struct Task
 	
 	std::sort(ids.begin(), ids.end(), std::greater<id_type>());
 	
-	model.lexicon.increment(ids.begin(), ids.end(), sampler, temperature);
+	model.terminal.increment(ids.begin(), ids.end(), sampler, temperature);
       }
       
       utils::resource res6;
@@ -1891,10 +1913,10 @@ double rule_discount_beta  = 1.0;
 double rule_strength_shape = 1.0;
 double rule_strength_rate  = 1.0;
 
-double lexicon_discount_alpha = 1.0;
-double lexicon_discount_beta  = 1.0;
-double lexicon_strength_shape = 1.0;
-double lexicon_strength_rate  = 1.0;
+double terminal_discount_alpha = 1.0;
+double terminal_discount_beta  = 1.0;
+double terminal_strength_shape = 10.0;
+double terminal_strength_rate  = 0.1;
 
 int blocks  = 64;
 int threads = 1;
@@ -2129,15 +2151,15 @@ int main(int argc, char ** argv)
 					       rule_strength_shape,
 					       rule_strength_rate));
 
-    PYPLexicon model_lexicon(PYPLexicon::parameter_type(lexicon_discount_alpha,
-							lexicon_discount_beta,
-							lexicon_strength_shape,
-							lexicon_strength_rate),
+    PYPTerminal model_terminal(PYPTerminal::parameter_type(terminal_discount_alpha,
+							terminal_discount_beta,
+							terminal_strength_shape,
+							terminal_strength_rate),
 			     1.0 / double(source_vocab_size),
 			     1.0 / double(target_vocab_size),
 			     epsilon_prior);
     
-    PYPITG model(model_rule, model_lexicon);
+    PYPITG model(model_rule, model_terminal);
 
     // prepare model!
     prepare(sources, targets, model);
@@ -2160,7 +2182,7 @@ int main(int argc, char ** argv)
     if (debug >= 2)
       std::cerr << "rule: discount=" << model.rule.table.discount() << " strength=" << model.rule.table.strength() << std::endl
 		<< "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
-		<< "lexicon: discount=" << model.lexicon.table.discount() << " strength=" << model.lexicon.table.strength() << std::endl;
+		<< "terminal: discount=" << model.terminal.table.discount() << " strength=" << model.terminal.table.strength() << std::endl;
     
     Task::queue_type queue_mapper;
     Counter reducer(debug);
@@ -2310,7 +2332,7 @@ int main(int argc, char ** argv)
 	if (debug >= 2)
 	  std::cerr << "rule: discount=" << model.rule.table.discount() << " strength=" << model.rule.table.strength() << std::endl
 		    << "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
-		    << "lexicon: discount=" << model.lexicon.table.discount() << " strength=" << model.lexicon.table.strength() << std::endl;
+		    << "terminal: discount=" << model.terminal.table.discount() << " strength=" << model.terminal.table.strength() << std::endl;
       }
       
       if (debug >= 2) {
@@ -2370,11 +2392,11 @@ int main(int argc, char ** argv)
 	utils::compress_ostream os(path, 1024 * 1024);
 	os.precision(20);
 
-	for (PYP::id_type id = 0; id != model.lexicon.table.size(); ++ id)
-	  if (! model.lexicon.table[id].empty())
-	    os << model.lexicon.word_pairs[id].source
-	       << ' ' << model.lexicon.word_pairs[id].target
-	       << ' ' << model.lexicon.prob(id) << '\n';  
+	for (PYP::id_type id = 0; id != model.terminal.table.size(); ++ id)
+	  if (! model.terminal.table[id].empty())
+	    os << model.terminal.word_pairs[id].source
+	       << ' ' << model.terminal.word_pairs[id].target
+	       << ' ' << model.terminal.prob(id) << '\n';  
       }
     }
     
@@ -2501,10 +2523,10 @@ void prepare(const sentence_set_type& sources,
 
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-    model.lexicon.word_pair_id((*siter)->first.source, (*siter)->first.target);
+    model.terminal.word_pair_id((*siter)->first.source, (*siter)->first.target);
   
-  model.lexicon.table.reserve(model.lexicon.word_pairs.size());
-  model.lexicon.table.resize(model.lexicon.word_pairs.size());
+  model.terminal.table.reserve(model.terminal.word_pairs.size());
+  model.terminal.table.resize(model.terminal.word_pairs.size());
   model.rule.table.reserve(3);
   model.rule.table.resize(3);
 }
@@ -2830,11 +2852,11 @@ void options(int argc, char** argv)
     ("rule-strength-rate",  po::value<double>(&rule_strength_rate)->default_value(rule_strength_rate),   "strength ~ Gamma(shape,rate)")
 
     
-    ("lexicon-discount-alpha", po::value<double>(&lexicon_discount_alpha)->default_value(lexicon_discount_alpha), "discount ~ Beta(alpha,beta)")
-    ("lexicon-discount-beta",  po::value<double>(&lexicon_discount_beta)->default_value(lexicon_discount_beta),   "discount ~ Beta(alpha,beta)")
+    ("terminal-discount-alpha", po::value<double>(&terminal_discount_alpha)->default_value(terminal_discount_alpha), "discount ~ Beta(alpha,beta)")
+    ("terminal-discount-beta",  po::value<double>(&terminal_discount_beta)->default_value(terminal_discount_beta),   "discount ~ Beta(alpha,beta)")
 
-    ("lexicon-strength-shape", po::value<double>(&lexicon_strength_shape)->default_value(lexicon_strength_shape), "strength ~ Gamma(shape,rate)")
-    ("lexicon-strength-rate",  po::value<double>(&lexicon_strength_rate)->default_value(lexicon_strength_rate),   "strength ~ Gamma(shape,rate)")
+    ("terminal-strength-shape", po::value<double>(&terminal_strength_shape)->default_value(terminal_strength_shape), "strength ~ Gamma(shape,rate)")
+    ("terminal-strength-rate",  po::value<double>(&terminal_strength_rate)->default_value(terminal_strength_rate),   "strength ~ Gamma(shape,rate)")
 
     ("blocks",  po::value<int>(&blocks),  "# of blocks")
     ("threads", po::value<int>(&threads), "# of threads")
