@@ -45,6 +45,7 @@
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
+#include <boost/progress.hpp>
 
 #include <map>
 #include <deque>
@@ -264,124 +265,6 @@ struct PYP
     bool is_straight() const { return ! is_terminal() && left.target.last  == right.target.first; }
     bool is_inverted() const { return ! is_terminal() && left.target.first == right.target.last; }
   };
-
-  struct phrase_type
-  {
-    typedef size_t    size_type;
-    typedef ptrdiff_t difference_type;
-    
-    typedef const word_type* iterator;
-    typedef const word_type* const_iterator;
-    
-    phrase_type() : first(0), last(0) {}
-    phrase_type(const_iterator __first, const_iterator __last)
-      : first(__first), last(__last) { }
-    template <typename Iterator>
-    phrase_type(Iterator __first, Iterator __last)
-      : first(&(*__first)), last(&(*__last)) { }
-    
-    bool empty() const { return first == last; }
-    size_type size() const { return last - first; }
-    
-    const_iterator begin() const { return first; }
-    const_iterator end() const { return last; }
-    
-    friend
-    bool operator==(const phrase_type& x, const phrase_type& y)
-    {
-      return (x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin()));
-    }
-    
-    friend
-    size_t hash_value(phrase_type const& x)
-    {
-      typedef utils::hashmurmur3<size_t> hasher_type;
-      
-      return hasher_type()(x.begin(), x.end(), 0);
-    }
-    
-    friend
-    std::ostream& operator<<(std::ostream& os, const phrase_type& x)
-    {
-      if (! x.empty()) {
-	std::copy(x.begin(), x.end() - 1, std::ostream_iterator<word_type>(os, " "));
-	os << *(x.end() - 1);
-      }
-      return os;
-    }
-    
-    const_iterator first;
-    const_iterator last;
-  };
-
-  struct phrase_pair_type
-  {
-    phrase_type source;
-    phrase_type target;
-    
-    phrase_pair_type() : source(), target() {}
-    phrase_pair_type(const phrase_type& __source, const phrase_type& __target)
-      : source(__source), target(__target) {}
-    template <typename IteratorSource, typename IteratorTarget>
-    phrase_pair_type(IteratorSource source_first, IteratorSource source_last,
-		     IteratorTarget target_first, IteratorTarget target_last)
-      : source(source_first, source_last), target(target_first, target_last) {}
-    
-    friend
-    bool operator==(const phrase_pair_type& x, const phrase_pair_type& y)
-    {
-      return x.source == y.source && x.target == y.target;
-    }
-    
-    friend
-    size_t hash_value(phrase_pair_type const& x)
-    {
-      typedef utils::hashmurmur3<size_t> hasher_type;
-      
-      return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
-    }
-  };
-  
-  struct non_terminal_trie_type
-  {
-    typedef size_t    size_type;
-    typedef ptrdiff_t difference_type;
-    typedef uint32_t  id_type;
-    
-    typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
-    
-    //
-    // multiple of 4: L, R, l, r
-    //
-    
-    void initialize(const size_type depth)
-    {
-      parent_.clear();
-      child_.clear();
-      last_.clear();
-      
-      // 4, 16, 64, 256, 1024 ...
-      
-      // compute parent_ and last_
-      parent_.resize(4, id_type(-1));
-      last_.push_back(parent_.size());
-      id_type prev = 0;
-      for (size_type order = 0; order != depth; ++ order) {
-	id_type last = parent_.size();
-	for (id_type id = prev; id != last; ++ id) {
-	  child_.push_back(parent_.size());
-	  parent_.resize(parent_.size() + 4, id);
-	}
-	
-	prev = last;
-	last_.push_back(parent_.size());
-      }
-    }
-    
-    id_set_type parent_;
-    id_set_type child_;
-    id_set_type last_;
-  };
 };
 
 struct PYPTerminal
@@ -393,8 +276,6 @@ struct PYPTerminal
   typedef cicada::semiring::Logprob<double> logprob_type;
   typedef double prob_type;
   
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
   typedef PYP::word_pair_type   word_pair_type;
 
   typedef utils::pyp_parameter parameter_type;
@@ -521,9 +402,6 @@ struct PYPRule
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
   
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
-
   typedef PYP::rule_type rule_type;
   
   typedef PYP::itg_type itg_type;
@@ -617,9 +495,6 @@ struct PYPTree
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
 
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
-  
   typedef PYP::rule_type rule_type;
   typedef PYP::itg_type  itg_type;
 
@@ -637,9 +512,6 @@ struct PYPITG
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
 
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
-  
   typedef PYP::rule_type rule_type;
   typedef PYP::itg_type  itg_type;
 
@@ -683,9 +555,6 @@ struct PYPGraph
 
   typedef PYP::id_type id_type;
 
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
-  
   typedef PYP::span_type      span_type;
   typedef PYP::span_pair_type span_pair_type;
   
@@ -760,7 +629,7 @@ struct PYPGraph
     for (size_type src = 0; src <= source.size(); ++ src)
       for (size_type trg = (src == 0); trg <= target.size(); ++ trg)
 	matrix(src, trg) = model.terminal.prob(src == 0 ? vocab_type::EPSILON : source[src - 1],
-					      trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
+					       trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
   }
   
   void forward_backward(const sentence_type& sentence, const chart_mono_type& chart, alpha_type& alpha, beta_type& beta)
@@ -1156,9 +1025,6 @@ struct PYPViterbi
   typedef PYP::size_type       size_type;
   typedef PYP::difference_type difference_type;
 
-  typedef PYP::phrase_type      phrase_type;
-  typedef PYP::phrase_pair_type phrase_pair_type;
-  
   typedef PYP::span_type      span_type;
   typedef PYP::span_pair_type span_pair_type;
   
@@ -1662,18 +1528,11 @@ struct Time
 
 struct Counter
 {
-  Counter(const int __debug=0) : counter(0), debug(__debug) {}
+  Counter() : counter(0) {}
   
   void increment()
   {
-    const size_type reduced = utils::atomicop::fetch_and_add(counter, size_type(1));
-    
-    if (debug) {
-      if ((reduced + 1) % 10000 == 0)
-	std::cerr << '.';
-      if ((reduced + 1) % 1000000 == 0)
-	std::cerr << '\n';
-    }
+    utils::atomicop::fetch_and_add(counter, size_type(1));
   }
   
   void wait(size_type target)
@@ -1696,7 +1555,6 @@ struct Counter
   void clear() { counter = 0; }
   
   volatile size_type counter;
-  int debug;
 };
 typedef Counter counter_type;
 
@@ -1718,6 +1576,7 @@ struct Task
   id_set_type    ids;
 
   Task(queue_type& __mapper,
+       queue_type& __reducer_derivation,
        counter_type& __reducer,
        const sentence_set_type& __sources,
        const sentence_set_type& __targets,
@@ -1726,6 +1585,7 @@ struct Task
        const sampler_type& __sampler,
        const logprob_type& __beam)
     : mapper(__mapper),
+      reducer_derivation(__reducer_derivation),
       reducer(__reducer),
       sources(__sources),
       targets(__targets),
@@ -1817,12 +1677,15 @@ struct Task
       time.forward    += res4.thread_time() - res3.thread_time();
       time.backward   += res5.thread_time() - res4.thread_time();
       time.increment  += res6.thread_time() - res5.thread_time();
+
+      reducer_derivation.push(pos);
       
       reducer.increment();
     }
   }
   
-  queue_type& mapper;
+  queue_type&   mapper;
+  queue_type&   reducer_derivation;
   counter_type& reducer;
   
   const sentence_set_type& sources;
@@ -1906,7 +1769,7 @@ bool sample_alignment = false;
 
 double epsilon_prior = 1e-2;
 
-double rule_prior_terminal = 0.1;
+double rule_prior_terminal = 1.0 / 3;
 
 double rule_discount_alpha = 1.0;
 double rule_discount_beta  = 1.0;
@@ -1918,7 +1781,6 @@ double terminal_discount_beta  = 1.0;
 double terminal_strength_shape = 10.0;
 double terminal_strength_rate  = 0.1;
 
-int blocks  = 64;
 int threads = 1;
 int debug = 0;
 
@@ -1935,6 +1797,102 @@ void viterbi(const path_type& output_file,
 	     const path_type& target_file,
 	     const PYPITG& model);
 
+template <typename Dumper>
+struct Reducer
+{
+  typedef typename Task::size_type  size_type;
+  typedef typename Task::queue_type queue_type;
+  
+  Reducer(const path_type& path,
+	  queue_type& queue,
+	  const sentence_set_type& sources,
+	  const sentence_set_type& targets,
+	  const derivation_set_type& derivations)
+    : path_(path),
+      queue_(queue),
+      sources_(sources),
+      targets_(targets),
+      derivations_(derivations) {}
+  
+
+  void operator()()
+  {
+    if (path_.empty()) {
+      size_type pos;
+      
+      for (;;) {
+	queue_.pop(pos);
+	if (pos == size_type(-1)) break;
+      }
+    } else {
+      typedef std::vector<size_type, std::allocator<size_type> > heap_type;
+      
+      utils::compress_ostream os(path_, 1024 * 1024);
+      
+      size_type pos;
+      
+      size_type id = 0;
+      heap_type heap;
+      
+      for (;;) {
+	queue_.pop(pos);
+	if (pos == size_type(-1)) break;
+	
+	if (id == pos) {
+	  if (! derivations_[id].empty())
+	    dumper_(os, sources_[id], targets_[id], derivations_[id]);
+	  os << '\n';
+	  ++ id;
+	} else {
+	  heap.push_back(pos);
+	  std::push_heap(heap.begin(), heap.end(), std::greater<size_type>());
+	}
+
+	while (! heap.empty() && id == heap.front()) {
+	  if (! derivations_[id].empty())
+	    dumper_(os, sources_[id], targets_[id], derivations_[id]);
+	  os << '\n';
+	  ++ id;
+	  
+	  std::pop_heap(heap.begin(), heap.end(), std::greater<size_type>());
+	  heap.pop_back();
+	}
+      }
+      
+      while (! heap.empty() && id == heap.front()) {
+	if (! derivations_[id].empty())
+	  dumper_(os, sources_[id], targets_[id], derivations_[id]);
+	os << '\n';
+	++ id;
+	
+	std::pop_heap(heap.begin(), heap.end(), std::greater<size_type>());
+	heap.pop_back();
+      }
+      
+      if (! heap.empty())
+	throw std::runtime_error("error while dumping...?");
+    }
+  }
+  
+  const path_type path_;
+  
+  queue_type& queue_;
+  
+  const sentence_set_type&   sources_;
+  const sentence_set_type&   targets_;
+  const derivation_set_type& derivations_;
+  
+  Dumper dumper_;
+};
+
+struct DumpNone
+{
+  std::ostream& operator()(std::ostream& os, const sentence_type& source, const sentence_type& target, const derivation_type& derivation)
+  {
+    return os;
+  }
+};
+
 struct DumpDerivation
 {
   typedef std::vector<std::string, std::allocator<std::string> > stack_type;
@@ -1945,11 +1903,11 @@ struct DumpDerivation
     derivation_type::const_iterator diter_end = derivation.end();
     for (derivation_type::const_iterator diter = derivation.begin(); diter != diter_end; ++ diter) {
       if (diter->is_terminal()) {
-	os << "((( "
-	   << PYP::phrase_type(source.begin() + diter->span.source.first, source.begin() + diter->span.source.last)
-	   << " ||| "
-	   << PYP::phrase_type(target.begin() + diter->span.target.first, target.begin() + diter->span.target.last)
-	   << " )))";
+	
+	const word_type& word_source = (! diter->span.source.empty() ? source[diter->span.source.first] : vocab_type::EPSILON);
+	const word_type& word_target = (! diter->span.target.empty() ? target[diter->span.target.first] : vocab_type::EPSILON);
+	
+	os << "((( " << word_source << " ||| " << word_target << " )))";
 	
 	while (! stack.empty() && stack.back() != " ") {
 	  os << stack.back();
@@ -2118,7 +2076,6 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    blocks  = utils::bithack::max(blocks, 1);
     threads = utils::bithack::max(threads, 1);
     
     if (samples < 0)
@@ -2184,10 +2141,12 @@ int main(int argc, char ** argv)
 		<< "terminal=" << model.rule.prob_terminal() << " straight=" << model.rule.prob_straight() << " inverted=" << model.rule.prob_inverted() << std::endl
 		<< "terminal: discount=" << model.terminal.table.discount() << " strength=" << model.terminal.table.strength() << std::endl;
     
-    Task::queue_type queue_mapper;
-    Counter reducer(debug);
+    Task::queue_type mapper(threads);
+    Task::queue_type reducer_derivation;
+    Counter          reducer;
     
-    std::vector<Task, std::allocator<Task> > tasks(threads, Task(queue_mapper,
+    std::vector<Task, std::allocator<Task> > tasks(threads, Task(mapper,
+								 reducer_derivation,
 								 reducer,
 								 sources,
 								 targets,
@@ -2247,7 +2206,38 @@ int main(int argc, char ** argv)
 	else
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
+      
+      std::auto_ptr<boost::thread> dumper;
+      
+      if (sampling && ! output_sample_file.empty()) {
+	// assign path...
+	const path_type path = add_suffix(output_sample_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 
+	if (sample_hypergraph)
+	  dumper.reset(new boost::thread(Reducer<DumpHypergraph>(path,
+								 reducer_derivation,
+								 sources,
+								 targets,
+								 derivations)));
+	else if (sample_alignment)
+	  dumper.reset(new boost::thread(Reducer<DumpAlignment>(path,
+								reducer_derivation,
+								sources,
+								targets,
+								derivations)));
+	else
+	  dumper.reset(new boost::thread(Reducer<DumpDerivation>(path,
+								 reducer_derivation,
+								 sources,
+								 targets,
+								 derivations)));
+      } else
+	dumper.reset(new boost::thread(Reducer<DumpNone>(path_type(),
+							 reducer_derivation,
+							 sources,
+							 targets,
+							 derivations)));
+      
       // assign temperature...
       Time time;
       
@@ -2263,66 +2253,22 @@ int main(int argc, char ** argv)
       
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
-
+      
+      std::auto_ptr<boost::progress_display> progress(debug
+						      ? new boost::progress_display(positions.size(), std::cerr, "", "", "")
+						      : 0);
+      
       position_set_type::const_iterator piter_end = positions.end();
-      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter)
-	queue_mapper.push(*piter);
+      for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
+	mapper.push(*piter);
+	
+	if (debug)
+	  ++ (*progress);
+      }
       
       reducer.wait(positions.size());
       reducer.clear();
-      
-#if 0
-      position_set_type::const_iterator piter_end = positions.end();
-      position_set_type::const_iterator piter = positions.begin();
-      
-      position_set_type mapped;
-      
-      size_type reduced_total = 0;
-      while (piter != piter_end) {
-	mapped.clear();
-	
-	position_set_type::const_iterator piter_last = std::min(piter + blocks, piter_end);
-	for (/**/; piter != piter_last; ++ piter) {
-	  const size_type pos = *piter;
-	  
-	  if (! derivations[pos].empty()) {
-	    derivation_type::const_reverse_iterator diter_end = derivations[pos].rend();
-	    for (derivation_type::const_reverse_iterator diter = derivations[pos].rbegin(); diter != diter_end; ++ diter)
-	      model.decrement(sources[pos], targets[pos], *diter, sampler);
-	  }
-	  
-	  mapped.push_back(pos);
-	}
-
-	reducer.clear();
-	
-	position_set_type::const_iterator miter_end = mapped.end();
-	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter)
-	  queue_mapper.push(*miter);
-
-	reducer.wait(mapped.size());
-	
-	if (debug)
-	  for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter, ++ reduced_total) {
-	    if ((reduced_total + 1) % 10000 == 0)
-	      std::cerr << '.';
-	    if ((reduced_total + 1) % 1000000 == 0)
-	      std::cerr << '\n';
-	  }
-	
-	for (position_set_type::const_iterator miter = mapped.begin(); miter != miter_end; ++ miter) {
-	  const size_type pos = *miter;
-	  
-	  derivation_type::const_iterator diter_end = derivations[pos].end();
-	  for (derivation_type::const_iterator diter = derivations[pos].begin(); diter != diter_end; ++ diter)
-	    model.increment(sources[pos], targets[pos], *diter, sampler, temperature);
-	}
-      }
-#endif
-      
-      if (debug && positions.size() >= 10000 && positions.size() % 1000000 != 0)
-	std::cerr << std::endl;
-      
+            
       if (static_cast<int>(iter) % resample_rate == resample_rate - 1) {
 	if (slice_sampling)
 	  model.slice_sample_parameters(sampler, resample_iterations);
@@ -2346,62 +2292,29 @@ int main(int argc, char ** argv)
 		  << "increment: " << (time_end.increment - time.increment) / tasks.size() << " seconds" << std::endl
 		  << "decrement: " << (time_end.decrement - time.decrement) / tasks.size() << " seconds" << std::endl;
       }
-
       
       if (debug)
 	std::cerr << "log-likelihood: " << model.log_likelihood() << std::endl;
-      
-      if (sampling && ! output_sample_file.empty()) {
-	// dump derivations..!
-	
-	const path_type path = add_suffix(output_sample_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
-	
-	utils::compress_ostream os(path, 1024 * 1024);
-
-	if (sample_hypergraph) {
-	  DumpHypergraph dumper;
-	  
-	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    if (! derivations[pos].empty())
-	      dumper(os, sources[pos], targets[pos], derivations[pos]);
-	    os << '\n';
-	  }
-	} else if (sample_alignment) {
-	  DumpAlignment dumper;
-	  
-	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    if (! derivations[pos].empty())
-	      dumper(os, sources[pos], targets[pos], derivations[pos]);
-	    os << '\n';
-	  }
-	  
-	} else {
-	  DumpDerivation dumper;
-	  
-	  for (size_type pos = 0; pos != derivations.size(); ++ pos) {
-	    if (! derivations[pos].empty())
-	      dumper(os, sources[pos], targets[pos], derivations[pos]);
-	    os << '\n';
-	  }
-	}
-      }
 
       if (sampling && ! output_model_file.empty()) {
 	const path_type path = add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(sample_iter + 1));
 	
 	utils::compress_ostream os(path, 1024 * 1024);
 	os.precision(20);
-
+	
 	for (PYP::id_type id = 0; id != model.terminal.table.size(); ++ id)
 	  if (! model.terminal.table[id].empty())
 	    os << model.terminal.word_pairs[id].source
 	       << ' ' << model.terminal.word_pairs[id].target
-	       << ' ' << model.terminal.prob(id) << '\n';  
+	       << ' ' << model.terminal.prob(id) << '\n';
       }
+      
+      reducer_derivation.push(size_type(-1));
+      dumper->join();
     }
     
     for (int i = 0; i != threads; ++ i)
-      queue_mapper.push(size_type(-1));
+      mapper.push(size_type(-1));
     
     workers.join_all();
     
@@ -2415,7 +2328,7 @@ int main(int argc, char ** argv)
       viterbi(output_test_file, test_source_file, test_target_file, model);
     }
     
-    // output final model file...
+    // TODO: output final model file...
     if (! output_file.empty()) {
       
       
@@ -2858,7 +2771,6 @@ void options(int argc, char** argv)
     ("terminal-strength-shape", po::value<double>(&terminal_strength_shape)->default_value(terminal_strength_shape), "strength ~ Gamma(shape,rate)")
     ("terminal-strength-rate",  po::value<double>(&terminal_strength_rate)->default_value(terminal_strength_rate),   "strength ~ Gamma(shape,rate)")
 
-    ("blocks",  po::value<int>(&blocks),  "# of blocks")
     ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")

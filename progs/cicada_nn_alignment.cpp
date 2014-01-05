@@ -63,6 +63,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
+int baby_steps = 1;
 int batch_size = 4;
 int sample_size = 10;
 int cutoff = 3;
@@ -699,6 +700,22 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
   return path_added;
 }
 
+template <typename Lengths>
+struct less_lengths
+{
+  typedef typename Lengths::size_type size_type;
+  
+  less_lengths(const Lengths& lengths)
+    : lengths_(lengths) {}
+
+  bool operator()(const size_type& x, const size_type& y) const
+  {
+    return lengths_[x] < lengths_[y];
+  }
+
+  const Lengths& lengths_;
+};
+
 template <typename Learner>
 void learn_online(const Learner& learner,
 		  const bitext_set_type& bitexts,
@@ -725,8 +742,17 @@ void learn_online(const Learner& learner,
   const size_type batches_size = (bitexts.size() + batch_size - 1) / batch_size;
   
   batch_set_type batches(batches_size);
-  for (size_type batch = 0; batch != batches_size; ++ batch)
+  batch_set_type lengths(batches_size);
+  for (size_type batch = 0; batch != batches_size; ++ batch) {
     batches[batch] = batch;
+    
+    const size_type first = batch * batch_size;
+    const size_type last  = utils::bithack::min(first + batch_size, bitexts.size());
+    
+    lengths[batch] = 0;
+    for (size_type pos = first; pos != last; ++ pos)
+      lengths[batch] += bitexts[pos].source_.size() + bitexts[pos].target_.size();
+  }
   
   queue_mapper_type     mapper(threads);
   queue_merger_set_type mergers(threads);
@@ -749,10 +775,34 @@ void learn_online(const Learner& learner,
   // assign shard id
   for (size_type shard = 0; shard != tasks.size(); ++ shard)
     tasks[shard].shard_ = shard;
+
+  // iterations for baby-steps
+  int baby_iter = 0;
+  const int baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
     
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
+
+    // baby-steps...
+    bool baby_finished = true;
+    if (baby_iter != baby_last) {
+      ++ baby_iter;
+      baby_finished = false;
+    }
+
+    if (! baby_finished) {
+      // sort bitexts...
+      typename batch_set_type::iterator biter     = batches.begin();
+      typename batch_set_type::iterator biter_end = batches.end();
+      
+      while (biter < biter_end) {
+	typename batch_set_type::iterator iter_end = std::min(biter + (1 << 5), biter_end);
+	
+	std::sort(biter, iter_end, less_lengths<batch_set_type>(lengths));
+	biter = iter_end;
+      }
+    }
 
     std::auto_ptr<boost::progress_display> progress(debug
 						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
@@ -1181,6 +1231,7 @@ void options(int argc, char** argv)
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),     "max # of iterations")
+    ("baby-steps",        po::value<int>(&baby_steps)->default_value(baby_steps),   "# of baby steps")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size),   "mini-batch size")
     ("sample",            po::value<int>(&sample_size)->default_value(sample_size), "sample size")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),           "cutoff count for vocabulary (<= 1 to keep all)")

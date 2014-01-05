@@ -76,6 +76,7 @@ bool optimize_sgd = false;
 bool optimize_adagrad = false;
 
 int iteration = 10;
+int baby_steps = 1;
 int batch_size = 4;
 int sample_size = 5;
 int beam_size = 50;
@@ -936,6 +937,22 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
   return path_added;
 }
 
+struct less_bitexts
+{
+  typedef size_t size_type;
+
+  less_bitexts(const bitext_set_type& bitexts)
+    : bitexts_(bitexts) {}
+  
+  bool operator()(const size_type& x, const size_type& y) const
+  {
+    return ((bitexts_[x].source_.size() + bitexts_[x].target_.size())
+	    < (bitexts_[y].source_.size() + bitexts_[y].target_.size()));
+  }
+
+  const bitext_set_type& bitexts_;
+};
+
 template <typename Learner>
 void learn_online_root(const Learner& learner,
 		       const bitext_set_type& bitexts,
@@ -1022,9 +1039,33 @@ void learn_online_root(const Learner& learner,
   
   typename map_reduce_type::codec_type codec;
 
+  // iterations for baby-steps
+  int baby_iter = 0;
+  const int baby_last = utils::bithack::branch(baby_steps > 0, baby_steps, 0);
+
   for (int t = 0; t < iteration; ++ t) {
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
+
+    // baby-steps...
+    bool baby_finished = true;
+    if (baby_iter != baby_last) {
+      ++ baby_iter;
+      baby_finished = false;
+    }
+    
+    if (! baby_finished) {
+      // sort bitexts...
+      typename id_set_type::iterator biter     = ids.begin();
+      typename id_set_type::iterator biter_end = ids.end();
+      
+      while (biter < biter_end) {
+	typename id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	
+	std::sort(biter, iter_end, less_bitexts(bitexts));
+	biter = iter_end;
+      }
+    }
 
     MPI::COMM_WORLD.Barrier();
     
@@ -2130,8 +2171,9 @@ void options(int argc, char** argv)
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
     
-    ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
-    ("batch",             po::value<int>(&batch_size)->default_value(batch_size), "mini-batch size")
+    ("iteration",         po::value<int>(&iteration)->default_value(iteration),     "max # of iterations")
+    ("baby-steps",        po::value<int>(&baby_steps)->default_value(baby_steps),   "# of baby steps")
+    ("batch",             po::value<int>(&batch_size)->default_value(batch_size),   "mini-batch size")
     ("sample",            po::value<int>(&sample_size)->default_value(sample_size), "sampling size")
     ("beam",              po::value<int>(&beam_size)->default_value(beam_size),   "histogram beam size")
     ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
