@@ -1028,7 +1028,7 @@ void learn_online_root(const Learner& learner,
       typename id_set_type::iterator biter_end = ids.end();
       
       while (biter < biter_end) {
-	typename id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	typename id_set_type::iterator iter_end = std::min(biter + 4096, biter_end);
 	
 	std::sort(biter, iter_end, less_bitexts(bitexts));
 	biter = iter_end;
@@ -1255,7 +1255,7 @@ void learn_online_root(const Learner& learner,
       typename id_set_type::iterator biter_end = ids.end();
       
       while (biter < biter_end) {
-	typename id_set_type::iterator iter_end = std::min(biter + (batch_size << 5), biter_end);
+	typename id_set_type::iterator iter_end = std::min(biter + 4096, biter_end);
 	
 	std::random_shuffle(biter, iter_end);
 	biter = iter_end;
