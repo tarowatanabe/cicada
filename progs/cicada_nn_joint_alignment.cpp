@@ -803,7 +803,7 @@ void learn_online(const Learner& learner,
       typename batch_set_type::iterator biter_end = batches.end();
       
       while (biter < biter_end) {
-	typename batch_set_type::iterator iter_end = std::min(biter + 1024, biter_end);
+	typename batch_set_type::iterator iter_end = std::min(biter + (1 << 5), biter_end);
 	
 	std::sort(biter, iter_end, less_lengths<batch_set_type>(lengths));
 	biter = iter_end;
