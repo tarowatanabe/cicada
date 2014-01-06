@@ -1755,11 +1755,11 @@ path_type output_test_file; // dump test output file
 path_type output_sample_file;
 path_type output_model_file;
 
-double beam = 1e-4;
+double beam = 1e-2;
 
 int samples = 1;
 int burns = 10;
-int baby_steps = 1;
+int baby_steps = 2;
 int anneal_steps = 1;
 int resample_rate = 1;
 int resample_iterations = 2;
