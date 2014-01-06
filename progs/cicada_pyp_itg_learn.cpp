@@ -789,8 +789,9 @@ struct PYPGraph
 	heap_type::iterator hiter_begin = heap.begin();
 	heap_type::iterator hiter       = heap.end();
 	heap_type::iterator hiter_end   = heap.end();
-	
+	  
 	const logprob_type logprob_threshold = hiter_begin->first * beam;
+	
 	for (/**/; hiter_begin != hiter && hiter_begin->first > logprob_threshold; -- hiter)
 	  std::pop_heap(hiter_begin, hiter, heap_compare());
 	
@@ -1754,7 +1755,7 @@ path_type output_test_file; // dump test output file
 path_type output_sample_file;
 path_type output_model_file;
 
-double beam = 1e-2;
+double beam = 1e-4;
 
 int samples = 1;
 int burns = 10;
@@ -1767,7 +1768,7 @@ bool slice_sampling = false;
 bool sample_hypergraph = false;
 bool sample_alignment = false;
 
-double epsilon_prior = 1e-2;
+double epsilon_prior = 1e-4;
 
 double rule_prior_terminal = 1.0 / 3;
 
