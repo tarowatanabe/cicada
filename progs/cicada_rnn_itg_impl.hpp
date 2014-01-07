@@ -2118,7 +2118,7 @@ struct ITG
       for (size_type sample = 0; sample != samples_; ++ sample) {
 	word_type sampled = word_source;
 	
-	if (word_target == vocab_type::NONE) {
+	if (word_target == vocab_type::EPSILON) {
 	  while (sampled == word_source)
 	    sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
@@ -2164,7 +2164,7 @@ struct ITG
       for (size_type sample = 0; sample != samples_; ++ sample) {
 	word_type sampled = word_target;
 	
-	if (word_source == vocab_type::NONE) {
+	if (word_source == vocab_type::EPSILON) {
 	  while (sampled == word_target)
 	    sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
