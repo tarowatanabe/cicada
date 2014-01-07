@@ -2136,7 +2136,7 @@ struct ExtractTree
     
     // compute scope
     {
-      symbol_type prev(vocab_type::NONE);
+      symbol_type prev(vocab_type::EMPTY);
       int scope = 0;
       
       tree_rule.frontier(ScopeFrontierIterator(prev, scope));
