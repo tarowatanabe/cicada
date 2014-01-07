@@ -178,6 +178,11 @@ int main(int argc, char** argv)
     const double base = 0.25;
     
     crp_type crp(0.1,5.0,1,1,1,1);
+
+    crp.slice_sample_parameters(sampler);
+
+    std::cout << "initial slice sampled discount: " << crp.discount() << std::endl;
+    std::cout << "initial slice sampled strength: " << crp.strength() << std::endl;
     
     crp.increment("hoge", base, sampler);
     crp.increment("foo", base, sampler);
