@@ -537,50 +537,8 @@ struct Model
     rep["alpha"]     = utils::lexical_cast<std::string>(alpha_);
     rep["beta"]      = utils::lexical_cast<std::string>(beta_);
     
-    const path_type source_file = rep.path("source.gz");
-    const path_type target_file = rep.path("target.gz");
-
-    {
-      utils::compress_ostream os(source_file, 1024 * 1024);
-      std::ostream_iterator<char> iter(os);
-
-      const word_type::id_type rows = source_.rows();
-      const word_type::id_type cols = source_.cols();
-      const word_type::id_type id_max = utils::bithack::min(words_source_.size(), static_cast<size_type>(cols));
-      
-      for (word_type::id_type id = 0; id != id_max; ++ id)
-	if (words_source_[id]) {
-	  const word_type word(id);
-	  
-	  karma::generate(iter, standard::string, word);
-	  
-	  for (word_type::id_type j = 0; j != rows; ++ j)
-	    karma::generate(iter, karma::lit(' ') << float10, source_(j, id));
-	  
-	  karma::generate(iter, karma::lit('\n'));
-	}
-    }
-
-    {
-      utils::compress_ostream os(target_file, 1024 * 1024);
-      std::ostream_iterator<char> iter(os);
-      
-      const word_type::id_type rows = target_.rows();
-      const word_type::id_type cols = target_.cols();
-      const word_type::id_type id_max = utils::bithack::min(words_target_.size(), static_cast<size_type>(cols));
-      
-      for (word_type::id_type id = 0; id != id_max; ++ id)
-	if (words_target_[id]) {
-	  const word_type word(id);
-	  
-	  karma::generate(iter, standard::string, word);
-	  
-	  for (word_type::id_type j = 0; j != rows; ++ j)
-	    karma::generate(iter, karma::lit(' ') << float10, target_(j, id));
-	  
-	  karma::generate(iter, karma::lit('\n'));
-	}
-    }
+    write_embedding(rep.path("source.gz"), rep.path("source.bin"), rep.path("vocab-source"), source_, words_source_);
+    write_embedding(rep.path("target.gz"), rep.path("target.bin"), rep.path("vocab-target"), target_, words_target_);
     
     // dump matrices...
     write(rep.path("Wt1.txt.gz"), rep.path("Wt1.bin"), Wt1_);
@@ -591,6 +549,44 @@ struct Model
 
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
+  }
+
+  void write_embedding(const path_type& path_text,
+		       const path_type& path_binary,
+		       const path_type& path_vocab,
+		       const tensor_type& matrix,
+		       const unique_set_type& words) const
+  {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    karma::real_generator<double, real_policy> float10;
+    
+    const word_type::id_type rows = matrix.rows();
+    const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());
+    
+    utils::compress_ostream os_txt(path_text, 1024 * 1024);
+    utils::compress_ostream os_bin(path_binary, 1024 * 1024);
+    std::ostream_iterator<char> iter(os_txt);
+    
+    vocab_type vocab;
+    vocab.open(path_vocab, words.size());
+    
+    for (word_type::id_type id = 0; id != cols; ++ id)  
+      if (words[id]) {
+	const word_type word(id);
+	
+	karma::generate(iter, standard::string, word);
+	
+	for (difference_type j = 0; j != rows; ++ j)
+	  karma::generate(iter, karma::lit(' ') << float10, matrix(j, id));
+	
+	karma::generate(iter, karma::lit('\n'));
+	
+	os_bin.write((char*) matrix.col(id).data(), sizeof(tensor_type::Scalar) * rows);
+	
+	vocab.insert(word);
+      }
   }
 
   void write(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix) const

@@ -1007,8 +1007,8 @@ public:
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
-    write_embedding(rep.path("source.gz"), rep.path("source.bin"), source_, words_source_);
-    write_embedding(rep.path("target.gz"), rep.path("target.bin"), target_, words_target_);
+    write_embedding(rep.path("source.gz"), rep.path("source.bin"), rep.path("vocab-source"), source_, words_source_);
+    write_embedding(rep.path("target.gz"), rep.path("target.bin"), rep.path("vocab-target"), target_, words_target_);
 
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
@@ -1027,38 +1027,29 @@ public:
     write(rep.path("bt1.txt.gz"), rep.path("bt1.bin"), bt1_);
     write(rep.path("Wt2.txt.gz"), rep.path("Wt2.bin"), Wt2_);
     write(rep.path("bt2.txt.gz"), rep.path("bt2.bin"), bt2_);
-    
-    // vocabulary...
-    vocab_type vocab;
-
-    const word_type::id_type vocabulary_size = utils::bithack::max(words_source_.size(), words_target_.size());
-    
-    vocab.open(rep.path("vocab"), vocabulary_size >> 1);
-    
-    for (word_type::id_type id = 0; id != vocabulary_size; ++ id)
-      if ((id < words_source_.size() && words_source_[id]) || (id < words_target_.size() && words_target_[id])) {
-	const word_type word(id);
-	
-	vocab.insert(word);
-      }
-    
-    vocab.close();
   }
   
 private:
-  void write_embedding(const path_type& path_text, const path_type& path_binary, const tensor_type& matrix, const word_unique_type& words) const
+  void write_embedding(const path_type& path_text,
+		       const path_type& path_binary,
+		       const path_type& path_vocab,
+		       const tensor_type& matrix,
+		       const word_unique_type& words) const
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
-
+    
     karma::real_generator<double, real_policy> float10;
-
+    
     const word_type::id_type rows = matrix.rows();
     const word_type::id_type cols = std::min(static_cast<size_type>(matrix.cols()), words.size());
     
     utils::compress_ostream os_txt(path_text, 1024 * 1024);
     utils::compress_ostream os_bin(path_binary, 1024 * 1024);
     std::ostream_iterator<char> iter(os_txt);
+    
+    vocab_type vocab;
+    vocab.open(path_vocab, words.size());
     
     for (word_type::id_type id = 0; id != cols; ++ id)  
       if (words[id]) {
@@ -1072,6 +1063,8 @@ private:
 	karma::generate(iter, karma::lit('\n'));
 	
 	os_bin.write((char*) matrix.col(id).data(), sizeof(tensor_type::Scalar) * rows);
+	
+	vocab.insert(word);
       }
   }
 
