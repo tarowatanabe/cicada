@@ -1415,7 +1415,7 @@ struct ExtractGHKM
     if (max_scope > 0) {
       // compute the maximum scope for the source-side
       
-      symbol_type prev(vocab_type::NONE);
+      symbol_type prev(vocab_type::EMPTY);
       int scope = 0;
       
       rule_source.frontier(ScopeFrontierIterator(prev, scope));
