@@ -42,8 +42,8 @@ namespace utils
     Uniform01& u01; //!< random number generator in range [0,1)
     const Fn& f;    //!< function to sample
 
-    slice_sampler1d_type(Uniform01& u01, const Fn& f)
-      : u01(u01), f(f)
+    slice_sampler1d_type(Uniform01& __u01, const Fn& __f)
+      : u01(__u01), f(__f)
     { }
 
     //! stepping_out() implements the "stepping out" procedure from Neal's Fig. 3.
@@ -85,20 +85,27 @@ namespace utils
     //! shrinkage() implements the "shrinkage" procedure from Neal's Fig. 5.
     //
     F shrinkage(F x0, F y, F w, F l, F r, bool always_accept) {
-      // TRACE6(x0, y, w, l, r, always_accept);
       F lbar = l;
       F rbar = r;
-      while (true) {
+      
+      int iter = 0;
+      for (;;) {
 	F u = u01();
 	F x1 = l + u*(rbar-lbar);
 	F fx1 = f(x1);
-	if (y < fx1 && (always_accept || acceptable(x0, x1, y, w, l, r)))
+	
+	if (std::fabs(y - fx1) < std::numeric_limits<F>::epsilon())
+	  ++ iter;
+	else
+	  iter = 0;
+	
+	if ((y < fx1 || iter >= 100) && (always_accept || acceptable(x0, x1, y, w, l, r)))
 	  return x1;
+	
 	if (x1 < x0)
 	  lbar = x1;
 	else
 	  rbar = x1;
-	// TRACE5(x1, fx1, y, lbar, rbar);
       }
     } // slice_sampler1d_type::shrinkage()
 
@@ -107,18 +114,18 @@ namespace utils
     bool acceptable(F x0, F x1, F y, F w, F l, F r) const {
       bool d = false;
       while (r - l > 1.1*w) {
-	//F m = (l+r)/2;
 	F m = (l+r) * 0.5;
+	
 	if ((x0 < m && x1 >= m) || (x0 >= m && x1 < m))
 	  d = true;
+	
 	if (x1 < m) 
 	  r = m;
 	else
 	  l = m;
-	if (d && y >= f(l) && y >= f(r)) {
-	  //TRACE1(false);
+	
+	if (d && y >= f(l) && y >= f(r))
 	  return false;
-	}
       }
       return true;
     }  // slice_sampler1d_type::acceptable()
@@ -211,7 +218,7 @@ namespace utils
     typedef bounded_domain_function_type<F, LogF> BDLogF;
     BDLogF bdLogF(logF, min_x, max_x);
     slice_sampler1d_type<F, Uniform01, BDLogF> sampler(u01, bdLogF);
-    
+
     for (U sample = 0; sample < nsamples; ++sample) {
       F x1 = sampler.stepping_out_sample(x0, w, nsteps);
       if (! std::isfinite(x1))

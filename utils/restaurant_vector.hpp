@@ -345,19 +345,21 @@ namespace utils
 	const double lg = utils::mathop::lgamma(1.0 - discount);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
-	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) {
-	  const location_type& loc = *diter;
-	  
-	  typename location_type::const_iterator titer_end = loc.end();
-	  for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
-	    logprob += (utils::mathop::lgamma(titer->first - discount) - lg) * titer->second;
-	}
+	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter) 
+	  if (! diter->empty()) {
+	    const location_type& loc = *diter;
+	    
+	    typename location_type::const_iterator titer_end = loc.end();
+	    for (typename location_type::const_iterator titer = loc.begin(); titer != titer_end; ++ titer)
+	      logprob += (utils::mathop::lgamma(titer->first - discount) - lg) * titer->second;
+	  }
       } else if (discount == 0.0) {
 	logprob += utils::mathop::lgamma(strength) + tables * std::log(strength) - utils::mathop::lgamma(strength + tables);
 	
 	typename dish_set_type::const_iterator diter_end = dishes.end();
 	for (typename dish_set_type::const_iterator diter = dishes.begin(); diter != diter_end; ++ diter)
-	  logprob += utils::mathop::lgamma(diter->size_table());
+	  if (! diter->empty())
+	    logprob += utils::mathop::lgamma(diter->size_table());
       } else
 	throw std::runtime_error("negative discount?");
       

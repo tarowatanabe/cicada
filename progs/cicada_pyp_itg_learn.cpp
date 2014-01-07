@@ -382,6 +382,8 @@ struct PYPTerminal
   void slice_sample_parameters(Sampler& sampler, const int num_loop = 2, const int num_iterations = 8)
   {
     table.slice_sample_parameters(sampler, num_loop, num_iterations);
+
+    //std::cerr << "lexicon:" << " discount=" << table.discount() << " strength=" << table.strength() << std::endl;
   }
   
   word_pair_set_type word_pairs;
@@ -481,6 +483,8 @@ struct PYPRule
 
     counts0_terminal = table[PYP::TERMINAL].size_table();
     counts0          = table.size_table() - table[PYP::TERMINAL].size_table();
+
+    //std::cerr << "rule:" << " discount=" << table.discount() << " strength=" << table.strength() << std::endl;
   }
   
   double     p0_terminal;
@@ -2110,9 +2114,9 @@ int main(int argc, char ** argv)
 					       rule_strength_rate));
 
     PYPTerminal model_terminal(PYPTerminal::parameter_type(terminal_discount_alpha,
-							terminal_discount_beta,
-							terminal_strength_shape,
-							terminal_strength_rate),
+							   terminal_discount_beta,
+							   terminal_strength_shape,
+							   terminal_strength_rate),
 			     1.0 / double(source_vocab_size),
 			     1.0 / double(target_vocab_size),
 			     epsilon_prior);
@@ -2132,10 +2136,7 @@ int main(int argc, char ** argv)
     sampler_type sampler;
     
     // sample parameters, first...
-    if (slice_sampling)
-      model.slice_sample_parameters(sampler, resample_iterations);
-    else
-      model.sample_parameters(sampler, resample_iterations);
+    model.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
       std::cerr << "rule: discount=" << model.rule.table.discount() << " strength=" << model.rule.table.strength() << std::endl

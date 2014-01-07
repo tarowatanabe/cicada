@@ -524,10 +524,7 @@ int main(int argc, char ** argv)
     PYPGraph graph;
     
     // sample parameters, first...
-    if (slice_sampling)
-      translit.slice_sample_parameters(sampler, resample_iterations);
-    else
-      translit.sample_parameters(sampler, resample_iterations);
+    translit.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
       std::cerr << "discount=" << translit.table.discount()

@@ -2514,10 +2514,7 @@ int main(int argc, char ** argv)
     sampler_type sampler;
     
     // sample parameters, first...
-    if (slice_sampling)
-      model.slice_sample_parameters(sampler, resample_iterations);
-    else
-      model.sample_parameters(sampler, resample_iterations);
+    model.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
       std::cerr << "rule: discount=" << model.rule.table.discount()

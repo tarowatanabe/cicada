@@ -1017,10 +1017,7 @@ void learn(const data_map_type& training,
   sampler_type sampler = samplers.front();
   
   // sample parameters, first...
-  if (slice_sampling)
-    model.slice_sample_parameters(sampler, resample_iterations);
-  else
-    model.sample_parameters(sampler, resample_iterations);
+  model.sample_parameters(sampler, resample_iterations);
   
   if (debug >= 2)
     for (int n = 0; n != order; ++ n)

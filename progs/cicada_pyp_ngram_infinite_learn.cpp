@@ -1031,10 +1031,7 @@ int main(int argc, char ** argv)
       positions[pos]= pos;
     
     // sample parameters, first...
-    if (slice_sampling)
-      lm.slice_sample_parameters(sampler, resample_iterations);
-    else
-      lm.sample_parameters(sampler, resample_iterations);
+    lm.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
       for (int n = 0; n != order; ++ n)

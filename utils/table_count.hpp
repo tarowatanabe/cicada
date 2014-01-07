@@ -120,6 +120,8 @@ namespace utils
     
     count_type customers() const { return customers_; }
     count_type tables() const { return tables_; }
+    
+    bool empty() const { return customers_ == 0; }
 
     void clear()
     {

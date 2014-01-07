@@ -1090,7 +1090,7 @@ int main(int argc, char ** argv)
       // sample other parameters...
       if (debug >= 3)
 	std::cerr << "sample parameters" << std::endl;
-	    
+      
       model.sample_parameters(sampler, resample_iterations);
       
       if (debug >= 2)

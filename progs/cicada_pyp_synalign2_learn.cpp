@@ -1958,10 +1958,7 @@ int main(int argc, char ** argv)
     sampler_type sampler;
     
     // sample parameters, first...
-    if (slice_sampling)
-      synalign.slice_sample_parameters(sampler, resample_iterations);
-    else
-      synalign.sample_parameters(sampler, resample_iterations);
+    synalign.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2)
       std::cerr << "rule: discount=" << synalign.table.discount() << " strength=" << synalign.table.strength() << std::endl

@@ -1614,10 +1614,7 @@ int main(int argc, char ** argv)
 	     strength_shape,
 	     strength_rate);
     
-    if (slice_sampling)
-      lm.slice_sample_parameters(sampler, resample_iterations);
-    else
-      lm.sample_parameters(sampler, resample_iterations);
+    lm.sample_parameters(sampler, resample_iterations);
     
     if (debug >= 2) {
       for (size_t n = 0; n != lm.discount.size(); ++ n)
