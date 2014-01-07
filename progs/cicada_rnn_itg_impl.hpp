@@ -1373,6 +1373,12 @@ struct ITG
   typedef RestCost rest_cost_type;
   typedef std::vector<rest_cost_type, std::allocator<rest_cost_type> > rest_cost_set_type;
   
+
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
+  
   
   ITG(const dictionary_type& dict_source_target,
       const dictionary_type& dict_target_source,
@@ -1413,6 +1419,9 @@ struct ITG
 
   state_pool_type   states_;
   const state_type* linked_;
+
+  word_set_type sources_;
+  word_set_type targets_;
 
   struct tanh
   {
@@ -1754,6 +1763,12 @@ struct ITG
 
     costs_source_.resize(source_size + 1);
     costs_target_.resize(target_size + 1);
+
+    sources_.clear();
+    targets_.clear();
+    
+    sources_.insert(source.begin(), source.end());
+    targets_.insert(target.begin(), target.end());
     
     // initialize chart...
     for (size_type src = 0; src <= source_size; ++ src)
@@ -1761,15 +1776,15 @@ struct ITG
 	if (src < source_size || trg < target_size) {
 	  // epsilon at target
 	  if (src < source_size)
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta, gen);
+	    forward(source, target, sources_, targets_, span_pair_type(span_type(src, src + 1), span_type(trg, trg)), theta, gen);
 	  
 	  // epsilon at source
 	  if (trg < target_size)
-	    forward(source, target, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta, gen);
+	    forward(source, target, sources_, targets_, span_pair_type(span_type(src, src), span_type(trg, trg + 1)), theta, gen);
 	  
 	  // word-pair
 	  if (src < source_size && trg < target_size)
-	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta, gen);
+	    forward(source, target, sources_, targets_, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta, gen);
 	}
     
     // estimate rest-costs
@@ -2060,6 +2075,8 @@ struct ITG
   template <typename Gen>
   void forward(const sentence_type& source,
 	       const sentence_type& target,
+	       const word_set_type& sources,
+	       const word_set_type& targets,
 	       const span_pair_type& span,
 	       const model_type& theta,
 	       Gen& gen)
@@ -2119,7 +2136,8 @@ struct ITG
 	word_type sampled = word_source;
 	
 	if (word_target == vocab_type::EPSILON) {
-	  while (sampled == word_source)
+	  //while (sampled == word_source)
+	  while (sources.find(sampled) != sources.end())
 	    sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
 	  while (sampled == word_source)
@@ -2165,7 +2183,8 @@ struct ITG
 	word_type sampled = word_target;
 	
 	if (word_source == vocab_type::EPSILON) {
-	  while (sampled == word_target)
+	  //while (sampled == word_target)
+	  while (targets.find(sampled) != targets.end())
 	    sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
 	  while (sampled == word_target)
