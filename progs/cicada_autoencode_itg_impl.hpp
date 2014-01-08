@@ -88,16 +88,18 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), hidden_(0), window_(0), count_(0), shared_(0) {}
+  Gradient() : embedding_(0), hidden_(0), span_(0), window_(0), count_(0), shared_(0) {}
   Gradient(const size_type& embedding,
 	   const size_type& hidden,
+	   const size_type& span,
 	   const size_type& window) 
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       window_(window),
       count_(0),
       shared_(0)
-  { initialize(embedding, hidden, window); }
+  { initialize(embedding, hidden, span, window); }
 
   Gradient& operator-=(const Gradient& x)
   {
@@ -267,7 +269,7 @@ struct Gradient
     return embedding;
   }
   
-  void initialize(const size_type embedding, const size_type hidden, const size_type window)
+  void initialize(const size_type embedding, const size_type hidden, const size_type span, const size_type window)
   {
     if (hidden <= 0)
       throw std::runtime_error("invalid dimension");
@@ -276,6 +278,7 @@ struct Gradient
     
     embedding_ = embedding;
     hidden_    = hidden;
+    span_      = span;
     window_    = window;
 
     const size_type leaf_size = embedding * (window * 2 + 1) * 2;
@@ -285,17 +288,17 @@ struct Gradient
     Wc_ = tensor_type::Zero(embedding, hidden_);
     bc_ = tensor_type::Zero(embedding, 1);
     
-    Ws1_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bs1_ = tensor_type::Zero(hidden_, 1);
+    Ws1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bs1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
 
-    Ws2_ = tensor_type::Zero(hidden_ + hidden_, hidden_);
-    bs2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Ws2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), hidden_);
+    bs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
 
-    Wi1_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bi1_ = tensor_type::Zero(hidden_, 1);
+    Wi1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bi1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
-    Wi2_ = tensor_type::Zero(hidden_ + hidden_,  hidden_);
-    bi2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Wi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1),  hidden_);
+    bi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
     
     Wt1_ = tensor_type::Zero(hidden_, leaf_size);
     bt1_ = tensor_type::Zero(hidden_, 1);
@@ -397,6 +400,7 @@ private:
   {
     os.write((char*) &embedding_, sizeof(size_type));
     os.write((char*) &hidden_,    sizeof(size_type));
+    os.write((char*) &span_,      sizeof(size_type));
     os.write((char*) &window_,    sizeof(size_type));
     os.write((char*) &count_,     sizeof(size_type));
     
@@ -428,6 +432,7 @@ private:
     
     is.read((char*) &embedding_, sizeof(size_type));
     is.read((char*) &hidden_,    sizeof(size_type));
+    is.read((char*) &span_,      sizeof(size_type));
     is.read((char*) &window_,    sizeof(size_type));
     is.read((char*) &count_,     sizeof(size_type));
 
@@ -522,6 +527,7 @@ public:
   // dimension...
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
   size_type window_;
   
   // embedding
@@ -578,19 +584,21 @@ struct Model
 
   typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
-  Model() : embedding_(0), hidden_(0), window_(0), scale_(1) {}  
+  Model() : embedding_(0), hidden_(0), span_(0), window_(0), scale_(1) {}  
   template <typename Words, typename Gen>
   Model(const size_type& embedding,
 	const size_type& hidden,
+	const size_type& span,
 	const size_type& window,
 	Words& words_source,
 	Words& words_target,
 	Gen& gen) 
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       window_(window),
       scale_(1)
-  { initialize(embedding, hidden, window, words_source, words_target, gen); }
+  { initialize(embedding, hidden, span, window, words_source, words_target, gen); }
   
   void clear()
   {
@@ -638,6 +646,7 @@ struct Model
   template <typename Words, typename Gen>
   void initialize(const size_type embedding,
 		  const size_type hidden,
+		  const size_type span,
 		  const size_type window,
 		  Words& words_source,
 		  Words& words_target,
@@ -650,6 +659,7 @@ struct Model
     
     embedding_ = embedding;
     hidden_    = hidden;
+    span_      = span;
     window_    = window;
     
     clear();
@@ -669,15 +679,15 @@ struct Model
     Wc_ = tensor_type::Zero(embedding, hidden_).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Zero(embedding, 1);
     
-    Ws1_ = tensor_type::Zero(hidden_, hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
-    bs1_ = tensor_type::Zero(hidden_, 1);
-    Ws2_ = tensor_type::Zero(hidden_ + hidden_,  hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
-    bs2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Ws1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
+    bs1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    Ws2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1),  hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
+    bs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
     
-    Wi1_ = tensor_type::Zero(hidden_, hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
-    bi1_ = tensor_type::Zero(hidden_, 1);
-    Wi2_ = tensor_type::Zero(hidden_ + hidden_, hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
-    bi2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Wi1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    Wi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
     
     Wt1_ = tensor_type::Zero(hidden_, leaf_size).array().unaryExpr(randomize<Gen>(gen, range_t));
     bt1_ = tensor_type::Zero(hidden_, 1);
@@ -763,6 +773,7 @@ private:
   {
     os.write((char*) &embedding_, sizeof(size_type));
     os.write((char*) &hidden_,    sizeof(size_type));
+    os.write((char*) &span_,      sizeof(size_type));
     os.write((char*) &window_,    sizeof(size_type));
     os.write((char*) &scale_,     sizeof(double));
     
@@ -794,6 +805,7 @@ private:
     
     is.read((char*) &embedding_, sizeof(size_type));
     is.read((char*) &hidden_,    sizeof(size_type));
+    is.read((char*) &span_,      sizeof(size_type));
     is.read((char*) &window_,    sizeof(size_type));
     is.read((char*) &scale_,     sizeof(double));
     
@@ -1004,6 +1016,7 @@ public:
     
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
+    rep["span"]      = utils::lexical_cast<std::string>(span_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
@@ -1090,6 +1103,7 @@ public:
   // dimension...
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
   size_type window_;
 
   word_unique_type words_source_;
@@ -1585,6 +1599,22 @@ struct ITG
     uniques_.clear();
     stack_.clear();
   }
+
+  size_type span_index(const span_pair_type& span, const model_type& theta)
+  {
+    // if span.size() is: (differentiate by the lengths of two)
+    //  1 --  4 will be 0
+    //  5 --  8 will be 1
+    //  9 -- 12 will be 2
+    // 13 -- 16 will be 3
+    // 17 -- 20 will be 4
+    // 21 -- 24 will be 5
+    // 25 -- 28 will be 6
+    // 29 -- 32 will be 7
+    // 33 -- 36 will be 8
+    
+    return utils::bithack::min((span.size() - 1) / 4, theta.span_);
+  }
   
   double forward(const sentence_type& source,
 		 const sentence_type& target,
@@ -1945,9 +1975,12 @@ struct ITG
 
     const size_type offset_left  = 0;
     const size_type offset_right = hidden_size;
+
+    const size_type offset_span1 = span_index(span, theta) * hidden_size;
+    const size_type offset_span2 = span_index(span, theta) * hidden_size * 2;
     
     //std::cerr << "span: " << span << " left: " << span1 << " right: " << span2 << std::endl;
-
+    
     /**/  state_type& state  = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
     const state_type& state1 = chart_(span1.source_.first_, span1.source_.last_, span1.target_.first_, span1.target_.last_);
     const state_type& state2 = chart_(span2.source_.first_, span2.source_.last_, span2.target_.first_, span2.target_.last_);
@@ -1967,13 +2000,14 @@ struct ITG
     matrix_type output(&(*buffer_output_.begin()), hidden_size * 2, 1);
     matrix_type reconstruction(&(*buffer_reconstruction_.begin()), hidden_size * 2, 1);
     
-    layer = (br1
-	     + Wr1.block(0, offset_left, hidden_size, hidden_size) * state1.layer_
-	     + Wr1.block(0, offset_right, hidden_size, hidden_size) * state2.layer_).array().unaryExpr(htanh());
+    layer = (br1.block(offset_span1, 0, hidden_size, 1)
+	     + Wr1.block(offset_span1, offset_left,  hidden_size, hidden_size) * state1.layer_
+	     + Wr1.block(offset_span1, offset_right, hidden_size, hidden_size) * state2.layer_).array().unaryExpr(htanh());
     
     layer_norm = layer.normalized();
     
-    output = (Wr2 * layer_norm + br2).array().unaryExpr(htanh());
+    output = (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size) * layer_norm
+	      + br2.block(offset_span2, 0, hidden_size * 2, 1)).array().unaryExpr(htanh());
     
     reconstruction.block(offset_left, 0, hidden_size, 1)  = (output.block(offset_left, 0, hidden_size, 1).normalized()
 							     - state1.layer_);
@@ -2120,6 +2154,9 @@ struct ITG
 	
 	const bool straight = state.straight();
 
+	const size_type offset_span1 = span_index(span, theta) * hidden_size;
+	const size_type offset_span2 = span_index(span, theta) * hidden_size * 2;
+
 	const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
 	const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
 	
@@ -2133,29 +2170,30 @@ struct ITG
 	
 	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
 	
-	dWr2 += delta_reconstruction * state.layer_norm_.transpose();
-	dbr2 += delta_reconstruction;
+	dWr2.block(offset_span2, 0, hidden_size * 2, hidden_size) += delta_reconstruction * state.layer_norm_.transpose();
+	dbr2.block(offset_span2, 0, hidden_size * 2, 1)           += delta_reconstruction;
 	
 	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
-				 * (Wr2.transpose() * delta_reconstruction).array());
+				 * (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size).transpose()
+				    * delta_reconstruction).array());
 	
 	state_type& state_left  = chart_(state.left_.source_.first_, state.left_.source_.last_,
 					 state.left_.target_.first_, state.left_.target_.last_);
 	state_type& state_right = chart_(state.right_.source_.first_, state.right_.source_.last_,
 					 state.right_.target_.first_, state.right_.target_.last_);
 	
-	dWr1.block(0, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
-	dWr1.block(0, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
-	dbr1 += state.delta_;
+	dWr1.block(offset_span1, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
+	dWr1.block(offset_span1, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
+	dbr1.block(offset_span1, 0, hidden_size, 1)                      += state.delta_;
 	
 	tensor_type& delta_left  = state_left.delta_;
 	tensor_type& delta_right = state_right.delta_;
 	
 	delta_left  = (state_left.layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(0, offset_left, hidden_size, hidden_size).transpose() * state.delta_
+		       * (Wr1.block(offset_span1, offset_left, hidden_size, hidden_size).transpose() * state.delta_
 			  - state.reconstruction_.block(offset_left, 0, hidden_size, 1)).array());
 	delta_right = (state_right.layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(0, offset_right, hidden_size, hidden_size).transpose() * state.delta_
+		       * (Wr1.block(offset_span1, offset_right, hidden_size, hidden_size).transpose() * state.delta_
 			  - state.reconstruction_.block(offset_right, 0, hidden_size, 1)).array());
       }
     }
@@ -2205,11 +2243,13 @@ struct LearnAdaGrad
   
   LearnAdaGrad(const size_type& embedding,
 	       const size_type& hidden,
+	       const size_type& span,
 	       const size_type& window,
 	       const double& lambda,
 	       const double& eta0)
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       window_(window),
       lambda_(lambda),
       eta0_(eta0)
@@ -2229,17 +2269,17 @@ struct LearnAdaGrad
     Wc_ = tensor_type::Zero(embedding, hidden_);
     bc_ = tensor_type::Zero(embedding, 1);
     
-    Ws1_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bs1_ = tensor_type::Zero(hidden_, 1);
+    Ws1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bs1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
 
-    Ws2_ = tensor_type::Zero(hidden_ + hidden_, hidden_);
-    bs2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Ws2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), hidden_);
+    bs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
 
-    Wi1_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bi1_ = tensor_type::Zero(hidden_, 1);
+    Wi1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bi1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
-    Wi2_ = tensor_type::Zero(hidden_ + hidden_,  hidden_);
-    bi2_ = tensor_type::Zero(hidden_ + hidden_, 1);
+    Wi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1),  hidden_);
+    bi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
     
     Wt1_ = tensor_type::Zero(hidden_, leaf_size);
     bt1_ = tensor_type::Zero(hidden_, 1);
@@ -2378,6 +2418,7 @@ struct LearnAdaGrad
   
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
   size_type window_;
   
   double lambda_;

@@ -82,6 +82,7 @@ double alpha = 0.99;
 double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
+int span = 8;
 int window = 0;
 
 bool optimize_sgd = false;
@@ -131,6 +132,8 @@ int main(int argc, char** argv)
       throw std::runtime_error("dimension must be positive");
     if (dimension_hidden <= 0)
       throw std::runtime_error("dimension must be positive");
+    if (span < 0)
+      throw std::runtime_error("span context size should be positive or zero");
     if (window < 0)
       throw std::runtime_error("window size should be positive");
     
@@ -185,7 +188,7 @@ int main(int argc, char** argv)
 		<< "# of unique target words: " << targets.size() << std::endl
 		<< "# of sentences: " << bitexts.size() << std::endl;
     
-    model_type theta(dimension_embedding, dimension_hidden, window, sources, targets, generator);
+    model_type theta(dimension_embedding, dimension_hidden, span, window, sources, targets, generator);
     
     if (! embedding_source_file.empty() || ! embedding_target_file.empty()) {
       if (embedding_source_file != "-" && ! boost::filesystem::exists(embedding_source_file))
@@ -199,7 +202,7 @@ int main(int argc, char** argv)
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, lambda, eta0),
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, span, window, lambda, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
@@ -678,7 +681,7 @@ struct TaskAccumulate
 	    }
 	  
 	  if (! grad) {
-	    gradients_.push_back(gradient_type(theta_.embedding_, theta_.hidden_, theta_.window_));
+	    gradients_.push_back(gradient_type(theta_.embedding_, theta_.hidden_, theta_.span_, theta_.window_));
 	    grad = &gradients_.back();
 	  }
 	  
@@ -1345,6 +1348,7 @@ void options(int argc, char** argv)
     
     ("dimension-embedding", po::value<int>(&dimension_embedding)->default_value(dimension_embedding), "dimension for embedding")
     ("dimension-hidden",    po::value<int>(&dimension_hidden)->default_value(dimension_hidden),       "dimension for hidden layer")
+    ("span",                po::value<int>(&span)->default_value(span),                               "span context size")
     ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")

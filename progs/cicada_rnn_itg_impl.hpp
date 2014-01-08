@@ -2010,7 +2010,7 @@ struct ITG
     chart_sampled_(0, source_size, 0, target_size).clear();
     for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter)
       chart_sampled_(0, source_size, 0, target_size).push_back(iter->second);
-    
+
     return chart_sampled_(0, source_size, 0, target_size).back()->score_;
   }
 
@@ -2135,11 +2135,11 @@ struct ITG
     
     state.source_ = word_source;
     state.target_ = word_target;
-
+    
     if (! span.source_.empty())
-      costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_);
+      costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_ + state.error_);
     if (! span.target_.empty())
-      costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_);
+      costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_ + state.error_);
     
     // put into chart and agenda!
     chart_sampled_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
@@ -2193,9 +2193,9 @@ struct ITG
 	
 	// here, we use loss-biased search...
 	if (! span.source_.empty())
-	  costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_ + 1);
+	  costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_ + state.error_);
 	if (! span.target_.empty())
-	  costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_ + 1);
+	  costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_ + state.error_);
 	
 	// put into chart and agenda!
 	chart_sampled_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
@@ -2248,9 +2248,9 @@ struct ITG
 	
 	// here, we use loss-biased search...
 	if (! span.source_.empty())
-	  costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_ + 1);
+	  costs_source_[span.source_.first_].score_ = std::max(costs_source_[span.source_.first_].score_, state.score_ + state.error_);
 	if (! span.target_.empty())
-	  costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_ + 1);
+	  costs_target_[span.target_.first_].score_ = std::max(costs_target_[span.target_.first_].score_, state.score_ + state.error_);
 	
 	// put into chart and agenda!
 	chart_sampled_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
