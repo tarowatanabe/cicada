@@ -1856,7 +1856,8 @@ struct HMM
 	  if (source_next == vocab_type::EPSILON) {
 	    target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	    
-	    while (targets_.find(target_sampled) != targets_.end())
+	    //while (targets_.find(target_sampled) != targets_.end())
+	    while (target_sampled == target_next)
 	      target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	  } else {
 	    target_sampled = dict_.draw(source_next, gen);

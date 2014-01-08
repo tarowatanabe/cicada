@@ -2084,7 +2084,8 @@ struct HMM
 	    for (size_type k = 0; k != sample_; ++ k) {
 	      word_type target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      while (targets_.find(target_sampled) != targets_.end())
+	      //while (targets_.find(target_sampled) != targets_.end())
+	      while (target_sampled == target_next)
 		target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
 	      if (! sampled_.empty() && sampled_.find(target_sampled) != sampled_.end()) continue;
