@@ -31,6 +31,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
 #include "utils/compact_map.hpp"
+#include "utils/compact_set.hpp"
 #include "utils/mathop.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/repository.hpp"
@@ -1363,8 +1364,11 @@ struct Dictionary
       for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
 	words_.push_back(witer->first);
 	probs.push_back(witer->second);
-	logprobs_[witer->first] = std::log(witer->second);
       }
+      
+      const double norm = 1.0 / std::accumulate(probs.begin(), probs.end(), double(0));
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer)
+	logprobs_[witer->first] = std::log(witer->second * norm);
       
       // initialize distribution
       distribution_ = distribution_type(probs.begin(), probs.end());
@@ -1477,6 +1481,11 @@ struct HMM
       return x.score() < y.score();
     }
   };
+
+  typedef utils::compact_set<word_type,
+			     utils::unassigned<word_type>, utils::unassigned<word_type>,
+			     boost::hash<word_type>, std::equal_to<word_type>,
+			     std::allocator<word_type> > word_set_type;
   
   HMM(const dictionary_type& dict,
       const size_type& samples,
@@ -1498,6 +1507,9 @@ struct HMM
   state_allocator_type state_allocator_;
   heap_set_type  heaps_;
   state_map_type states_;
+
+  word_set_type sources_;
+  word_set_type targets_;
 
   struct tanh
   {
@@ -1746,6 +1758,12 @@ struct HMM
 
     const size_type offset_word   = 0;
     const size_type offset_matrix = theta.embedding_;
+
+    sources_.clear();
+    targets_.clear();
+    
+    sources_.insert(source.begin(), source.end());
+    targets_.insert(target.begin(), target.end());
     
     states_.clear();
     states_.resize(target_size + 2);
@@ -1838,7 +1856,7 @@ struct HMM
 	  if (source_next == vocab_type::EPSILON) {
 	    target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	    
-	    while (target_sampled == target_next)
+	    while (targets_.find(target_sampled) != targets_.end())
 	      target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	  } else {
 	    target_sampled = dict_.draw(source_next, gen);

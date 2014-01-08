@@ -1553,13 +1553,16 @@ struct Dictionary
       prob_set_type probs;
       words_.reserve(word_probs.size());
       probs.reserve(word_probs.size());
-      
+
       word_prob_set_type::const_iterator witer_end = word_probs.end();
       for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
 	words_.push_back(witer->first);
 	probs.push_back(witer->second);
-	logprobs_[witer->first] = std::log(witer->second);
       }
+      
+      const double norm = 1.0 / std::accumulate(probs.begin(), probs.end(), double(0));
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer)
+	logprobs_[witer->first] = std::log(witer->second * norm);
       
       // initialize distribution
       distribution_ = distribution_type(probs.begin(), probs.end());
@@ -1697,6 +1700,7 @@ struct HMM
 
   word_set_type sources_;
   word_set_type targets_;
+  word_set_type sampled_;
 
   struct tanh
   {
@@ -2002,11 +2006,18 @@ struct HMM
 	    heap_next.push_back(state_next);
 	    std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
 	    
-	    if (dict_.size(source_next) > 1)
+	    if (dict_.size(source_next) > 1) {
+	      sampled_.clear();
+
 	      for (size_type k = 0; k != sample_; ++ k) {
 		word_type target_sampled = dict_.draw(source_next, gen);
+		
 		while (target_sampled == target_next)
 		  target_sampled = dict_.draw(source_next, gen);
+		
+		if (! sampled_.empty() && sampled_.find(target_sampled) != sampled_.end()) continue;
+		
+		sampled_.insert(target_sampled);
 		
 		state_type state_sampled = state_allocator_.allocate();
 		state_sampled.prev() = state;
@@ -2036,6 +2047,7 @@ struct HMM
 		heap_next.push_back(state_sampled);
 		std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
 	      }
+	    }
 	  }
 	  
 	  // none...
@@ -2066,13 +2078,18 @@ struct HMM
 	    
 	    heap_next.push_back(state_next);
 	    std::push_heap(heap_next.begin(), heap_next.end(), heap_compare());
+
+	    sampled_.clear();
 	    
 	    for (size_type k = 0; k != sample_; ++ k) {
 	      word_type target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      //while (target_sampled == target_next)
 	      while (targets_.find(target_sampled) != targets_.end())
 		target_sampled = dict_.draw(source[uniform_source(gen)], gen);
+	      
+	      if (! sampled_.empty() && sampled_.find(target_sampled) != sampled_.end()) continue;
+		
+	      sampled_.insert(target_sampled);
 	      
 	      state_type state_sampled = state_allocator_.allocate();
 	      state_sampled.prev() = state;

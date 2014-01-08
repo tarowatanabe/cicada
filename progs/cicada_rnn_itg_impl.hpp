@@ -1068,8 +1068,11 @@ struct Dictionary
       for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
 	words_.push_back(witer->first);
 	probs.push_back(witer->second);
-	logprobs_[witer->first] = std::log(witer->second);
       }
+      
+      const double norm = 1.0 / std::accumulate(probs.begin(), probs.end(), double(0));
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer)
+	logprobs_[witer->first] = std::log(witer->second * norm);
       
       // initialize distribution
       distribution_ = distribution_type(probs.begin(), probs.end());
@@ -1422,6 +1425,7 @@ struct ITG
 
   word_set_type sources_;
   word_set_type targets_;
+  word_set_type sampled_;
 
   struct tanh
   {
@@ -2131,18 +2135,24 @@ struct ITG
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     boost::random::uniform_int_distribution<> uniform_target(0, target_size - 1);
     
-    if (! span.source_.empty() && dict_target_source_.size(word_target) > 1)
+    if (! span.source_.empty() && dict_target_source_.size(word_target) > 1) {
+      sampled_.clear();
+
       for (size_type sample = 0; sample != samples_; ++ sample) {
-	word_type sampled = word_source;
+	word_type sampled_source = word_source;
 	
 	if (word_target == vocab_type::EPSILON) {
-	  //while (sampled == word_source)
-	  while (sources.find(sampled) != sources.end())
-	    sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
+	  while (sources.find(sampled_source) != sources.end())
+	    sampled_source = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
-	  while (sampled == word_source)
-	    sampled = dict_target_source_.draw(word_target, gen);
+	  while (sampled_source == word_source)
+	    sampled_source = dict_target_source_.draw(word_target, gen);
 	}
+	
+	// check if already sampled...
+	if (! sampled_.empty() && sampled_.find(sampled_source) != sampled_.end()) continue;
+	
+	sampled_.insert(sampled_source);
 	
 	state_type& state = allocate();
 	
@@ -2152,7 +2162,7 @@ struct ITG
 	
 	state.layer_ = (theta.bt_
 			+ (theta.Wt_.block(0, offset_source, hidden_size, embedding_size)
-			   * theta.source_.col(sampled.id())
+			   * theta.source_.col(sampled_source.id())
 			   * theta.scale_)
 			+ (theta.Wt_.block(0, offset_target, hidden_size, embedding_size)
 			   * theta.target_.col(word_target.id())
@@ -2163,7 +2173,7 @@ struct ITG
 	state.error_ = 1;
 	state.loss_  = 0;
 	
-	state.source_ = sampled;
+	state.source_ = sampled_source;
 	state.target_ = word_target;
 	
 	// here, we use loss-biased search...
@@ -2177,19 +2187,26 @@ struct ITG
 	agenda_[span.size()].push_back(&state);
 	errors_[span.size()] |= true;
       }
+    }
     
-    if (! span.target_.empty() && dict_source_target_.size(word_source) > 1)
+    if (! span.target_.empty() && dict_source_target_.size(word_source) > 1) {
+      sampled_.clear();
+      
       for (size_type sample = 0; sample != samples_; ++ sample) {
-	word_type sampled = word_target;
+	word_type sampled_target = word_target;
 	
 	if (word_source == vocab_type::EPSILON) {
-	  //while (sampled == word_target)
-	  while (targets.find(sampled) != targets.end())
-	    sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
+	  while (targets.find(sampled_target) != targets.end())
+	    sampled_target = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
-	  while (sampled == word_target)
-	    sampled = dict_source_target_.draw(word_source, gen);
+	  while (sampled_target == word_target)
+	    sampled_target = dict_source_target_.draw(word_source, gen);
 	}
+	
+	// check if already sampled...
+	if (! sampled_.empty() && sampled_.find(sampled_target) != sampled_.end()) continue;
+	
+	sampled_.insert(sampled_target);
 	
 	state_type& state = allocate();
 	
@@ -2202,7 +2219,7 @@ struct ITG
 			   * theta.source_.col(word_source.id())
 			   * theta.scale_)
 			+ (theta.Wt_.block(0, offset_target, hidden_size, embedding_size)
-			   * theta.target_.col(sampled.id())
+			   * theta.target_.col(sampled_target.id())
 			   * theta.scale_)).array().unaryExpr(hinge());
 	state.delta_.setZero();
 	
@@ -2211,7 +2228,7 @@ struct ITG
 	state.loss_  = 0;
 	
 	state.source_ = word_source;
-	state.target_ = sampled;
+	state.target_ = sampled_target;
 	
 	// here, we use loss-biased search...
 	if (! span.source_.empty())
@@ -2224,6 +2241,7 @@ struct ITG
 	agenda_[span.size()].push_back(&state);
 	errors_[span.size()] |= true;
       }
+    }
   }
   
   // binary rules

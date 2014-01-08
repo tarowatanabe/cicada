@@ -695,13 +695,16 @@ struct Dictionary
       prob_set_type probs;
       words_.reserve(word_probs.size());
       probs.reserve(word_probs.size());
-      
+
       word_prob_set_type::const_iterator witer_end = word_probs.end();
       for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
 	words_.push_back(witer->first);
 	probs.push_back(witer->second);
-	logprobs_[witer->first] = std::log(witer->second);
       }
+      
+      const double norm = 1.0 / std::accumulate(probs.begin(), probs.end(), double(0));
+      for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer)
+	logprobs_[witer->first] = std::log(witer->second * norm);
       
       // initialize distribution
       distribution_ = distribution_type(probs.begin(), probs.end());
