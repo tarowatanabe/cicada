@@ -124,6 +124,8 @@ bin_PROGRAMS = \
 	cicada_oracle_kbest_mpi \
 	cicada_rnn_alignment \
 	cicada_rnn_alignment_mpi \
+	cicada_rnn_bow_itg \
+	cicada_rnn_bow_itg_mpi \
 	cicada_rnn_itg \
 	cicada_rnn_itg_mpi \
 	cicada_rnn_joint_alignment \
@@ -507,6 +509,13 @@ cicada_rnn_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDAD
 cicada_rnn_alignment_mpi_SOURCES  = cicada_rnn_alignment_mpi.cpp cicada_rnn_alignment_impl.hpp
 cicada_rnn_alignment_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_rnn_alignment_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_rnn_bow_itg_SOURCES = cicada_rnn_bow_itg.cpp cicada_rnn_bow_itg_impl.hpp
+cicada_rnn_bow_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_rnn_bow_itg_mpi_SOURCES  = cicada_rnn_bow_itg_mpi.cpp cicada_rnn_bow_itg_impl.hpp
+cicada_rnn_bow_itg_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_rnn_bow_itg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_rnn_itg_SOURCES = cicada_rnn_itg.cpp cicada_rnn_itg_impl.hpp
 cicada_rnn_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
