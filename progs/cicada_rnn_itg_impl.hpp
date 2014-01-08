@@ -97,14 +97,16 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), hidden_(0), count_(0), shared_(0) {}
+  Gradient() : embedding_(0), hidden_(0), span_(0), count_(0), shared_(0) {}
   Gradient(const size_type& embedding,
-	   const size_type& hidden) 
+	   const size_type& hidden,
+	   const size_type& span) 
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       count_(0),
       shared_(0)
-  { initialize(embedding, hidden); }
+  { initialize(embedding, hidden, span); }
 
   Gradient& operator-=(const Gradient& x)
   {
@@ -231,7 +233,7 @@ struct Gradient
     return embedding;
   }
   
-  void initialize(const size_type embedding, const size_type hidden)
+  void initialize(const size_type embedding, const size_type hidden, const size_type span)
   {
     if (hidden <= 0)
       throw std::runtime_error("invalid dimension");
@@ -240,17 +242,18 @@ struct Gradient
     
     embedding_ = embedding;
     hidden_    = hidden;
+    span_      = span;
     
     clear();
 
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    Ws_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bs_ = tensor_type::Zero(hidden_, 1);
+    Ws_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bs_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
-    Wi_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bi_ = tensor_type::Zero(hidden_, 1);
+    Wi_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bi_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
     Wt_ = tensor_type::Zero(hidden_, embedding_ * 2);
     bt_ = tensor_type::Zero(hidden_, 1);
@@ -349,6 +352,7 @@ private:
   {
     os.write((char*) &embedding_, sizeof(size_type));
     os.write((char*) &hidden_,    sizeof(size_type));
+    os.write((char*) &span_,      sizeof(size_type));
     os.write((char*) &count_,     sizeof(size_type));
 
     write(os, Wc_);
@@ -373,6 +377,7 @@ private:
     
     is.read((char*) &embedding_, sizeof(size_type));
     is.read((char*) &hidden_,    sizeof(size_type));
+    is.read((char*) &span_,      sizeof(size_type));
     is.read((char*) &count_,     sizeof(size_type));
 
     read(is, Wc_);
@@ -460,6 +465,7 @@ public:
   // dimension...
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
   
   // embedding
   embedding_type source_;
@@ -509,18 +515,20 @@ struct Model
 
   typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
-  Model() : embedding_(0), hidden_(0), scale_(1) {}  
+  Model() : embedding_(0), hidden_(0), span_(0), scale_(1) {}  
   template <typename Words, typename Gen>
   Model(const size_type& embedding,
 	const size_type& hidden,
+	const size_type& span,
 	Words& words_source,
 	Words& words_target,
 	Gen& gen) 
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       scale_(1)
-  { initialize(embedding, hidden, words_source, words_target, gen); }
-  
+  { initialize(embedding, hidden, span, words_source, words_target, gen); }
+
   void clear()
   {
     // embedding
@@ -561,6 +569,7 @@ struct Model
   template <typename Words, typename Gen>
   void initialize(const size_type embedding,
 		  const size_type hidden,
+		  const size_type span,
 		  Words& words_source,
 		  Words& words_target,
 		  Gen& gen)
@@ -572,6 +581,7 @@ struct Model
     
     embedding_ = embedding;
     hidden_    = hidden;
+    span_      = span;
     
     clear();
     
@@ -589,11 +599,11 @@ struct Model
     Wc_ = tensor_type::Zero(1, hidden_).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Zero(1, 1);
     
-    Ws_ = tensor_type::Zero(hidden_, hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
-    bs_ = tensor_type::Zero(hidden_, 1);
+    Ws_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_s));
+    bs_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
-    Wi_ = tensor_type::Zero(hidden_, hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
-    bi_ = tensor_type::Zero(hidden_, 1);
+    Wi_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_).array().unaryExpr(randomize<Gen>(gen, range_i));
+    bi_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
     Wt_ = tensor_type::Zero(hidden_, embedding_ * 2).array().unaryExpr(randomize<Gen>(gen, range_t));
     bt_ = tensor_type::Zero(hidden_, 1);
@@ -677,6 +687,7 @@ private:
   {
     os.write((char*) &embedding_, sizeof(size_type));
     os.write((char*) &hidden_,    sizeof(size_type));
+    os.write((char*) &span_,      sizeof(size_type));
     os.write((char*) &scale_,     sizeof(double));
 
     write(os, Wc_);
@@ -701,6 +712,7 @@ private:
     
     is.read((char*) &embedding_, sizeof(size_type));
     is.read((char*) &hidden_,    sizeof(size_type));
+    is.read((char*) &span_,      sizeof(size_type));
     is.read((char*) &scale_,     sizeof(double));
 
     read(is, Wc_);
@@ -904,6 +916,7 @@ public:
     
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
+    rep["span"]      = utils::lexical_cast<std::string>(span_);
     rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
     write_embedding(rep.path("source.gz"), rep.path("source.bin"), rep.path("vocab-source"), source_, words_source_);
@@ -983,6 +996,7 @@ public:
   // dimension...
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
 
   word_unique_type words_source_;
   word_unique_type words_target_;
@@ -2142,7 +2156,8 @@ struct ITG
 	word_type sampled_source = word_source;
 	
 	if (word_target == vocab_type::EPSILON) {
-	  while (sources.find(sampled_source) != sources.end())
+	  //while (sources.find(sampled_source) != sources.end())
+	  while (sampled_source == word_source)
 	    sampled_source = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
 	  while (sampled_source == word_source)
@@ -2196,7 +2211,8 @@ struct ITG
 	word_type sampled_target = word_target;
 	
 	if (word_source == vocab_type::EPSILON) {
-	  while (targets.find(sampled_target) != targets.end())
+	  //while (targets.find(sampled_target) != targets.end())
+	  while (sampled_target == word_target)
 	    sampled_target = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
 	  while (sampled_target == word_target)
@@ -2243,6 +2259,22 @@ struct ITG
       }
     }
   }
+
+  size_type span_index(const span_pair_type& span, const model_type& theta)
+  {
+    // if span.size() is: (differentiate by the lengths of two)
+    //  1 --  4 will be 0
+    //  5 --  8 will be 1
+    //  9 -- 12 will be 2
+    // 13 -- 16 will be 3
+    // 17 -- 20 will be 4
+    // 21 -- 24 will be 5
+    // 25 -- 28 will be 6
+    // 29 -- 32 will be 7
+    // 33 -- 36 will be 8
+    
+    return utils::bithack::min((span.size() - 1) / 4, theta.span_);
+  }
   
   // binary rules
   void forward(const sentence_type& source,
@@ -2269,6 +2301,8 @@ struct ITG
     const span_pair_type& span2 = state2->span_;
     
     //std::cerr << "span: " << span << " left: " << span1 << " right: " << span2 << std::endl;
+
+    const size_type offset_span = span_index(span, theta) * hidden_size;
     
     state_type& state = allocate();
     
@@ -2279,9 +2313,9 @@ struct ITG
     state.left_  = state1;
     state.right_ = state2;
     
-    state.layer_ = (br
-		    + Wr.block(0, offset_left,  hidden_size, hidden_size) * state1->layer_
-		    + Wr.block(0, offset_right, hidden_size, hidden_size) * state2->layer_).array().unaryExpr(hinge());
+    state.layer_ = (br.block(offset_span, 0, hidden_size, 1)
+		    + Wr.block(offset_span, offset_left,  hidden_size, hidden_size) * state1->layer_
+		    + Wr.block(offset_span, offset_right, hidden_size, hidden_size) * state2->layer_).array().unaryExpr(hinge());
     state.delta_.setZero();
     
     state.score_ = state1->score_ + state2->score_ + (theta.Wc_ * state.layer_ + theta.bc_)(0, 0);
@@ -2414,6 +2448,7 @@ struct ITG
 	  backwards_[state.right_->span_.size()].insert(state.right_);
 	  
 	  const bool straight = state.straight();
+	  const size_type offset_span = span_index(state.span_, theta) * hidden_size;
 	  
 	  const tensor_type& Wr = (straight ? theta.Ws_ : theta.Wi_);
 	  
@@ -2427,9 +2462,9 @@ struct ITG
 	  state_left.loss_  += state.loss_;
 	  state_right.loss_ += state.loss_;
 	  
-	  dWr.block(0, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
-	  dWr.block(0, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
-	  dbr += state.delta_;
+	  dWr.block(offset_span, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
+	  dWr.block(offset_span, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
+	  dbr.block(offset_span, 0, hidden_size, 1) += state.delta_;
 	  
 	  tensor_type& delta_left  = state_left.delta_;
 	  tensor_type& delta_right = state_right.delta_;
@@ -2440,9 +2475,9 @@ struct ITG
 	    delta_right = tensor_type::Zero(hidden_size, 1);
 	  
 	  delta_left.array()  += (state_left.layer_.array().unaryExpr(dhinge())
-				  * (Wr.block(0, offset_left,  hidden_size, hidden_size).transpose() * state.delta_).array());
+				  * (Wr.block(offset_span, offset_left,  hidden_size, hidden_size).transpose() * state.delta_).array());
 	  delta_right.array() += (state_right.layer_.array().unaryExpr(dhinge())
-				  * (Wr.block(0, offset_right, hidden_size, hidden_size).transpose() * state.delta_).array());
+				  * (Wr.block(offset_span, offset_right, hidden_size, hidden_size).transpose() * state.delta_).array());
 	}
       }
     }
@@ -2510,10 +2545,12 @@ struct LearnAdaGrad
   
   LearnAdaGrad(const size_type& embedding,
 	       const size_type& hidden,
+	       const size_type& span,
 	       const double& lambda,
 	       const double& eta0)
     : embedding_(embedding),
       hidden_(hidden),
+      span_(span),
       lambda_(lambda),
       eta0_(eta0)
   {
@@ -2531,11 +2568,11 @@ struct LearnAdaGrad
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    Ws_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bs_ = tensor_type::Zero(hidden_, 1);
+    Ws_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bs_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
 
-    Wi_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
-    bi_ = tensor_type::Zero(hidden_, 1);
+    Wi_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    bi_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
     
     Wt_ = tensor_type::Zero(hidden_, embedding_ * 2);
     bt_ = tensor_type::Zero(hidden_, 1);
@@ -2667,6 +2704,7 @@ struct LearnAdaGrad
   
   size_type embedding_;
   size_type hidden_;
+  size_type span_;
   
   double lambda_;
   double eta0_;
