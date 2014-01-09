@@ -2284,7 +2284,7 @@ struct ITG
 	  
 	  dWr.block(offset_span, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
 	  dWr.block(offset_span, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
-	  dbr.block(offset_span, 0, hidden_size, 1) += state.delta_;
+	  dbr.block(offset_span, 0, hidden_size, 1)                      += state.delta_;
 	  
 	  tensor_type& delta_left  = state_left.delta_;
 	  tensor_type& delta_right = state_right.delta_;
@@ -2295,9 +2295,11 @@ struct ITG
 	    delta_right = tensor_type::Zero(hidden_size, 1);
 	  
 	  delta_left.array()  += (state_left.layer_.array().unaryExpr(dhinge())
-				  * (Wr.block(offset_span, offset_left,  hidden_size, hidden_size).transpose() * state.delta_).array());
+				  * (Wr.block(offset_span, offset_left,  hidden_size, hidden_size).transpose()
+				     * state.delta_).array());
 	  delta_right.array() += (state_right.layer_.array().unaryExpr(dhinge())
-				  * (Wr.block(offset_span, offset_right, hidden_size, hidden_size).transpose() * state.delta_).array());
+				  * (Wr.block(offset_span, offset_right, hidden_size, hidden_size).transpose()
+				     * state.delta_).array());
 	}
       }
     }
