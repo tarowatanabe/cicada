@@ -2396,10 +2396,8 @@ struct ITG
 	  const_cast<state_type&>(*(*citer)).loss_ -= error_factor;
 	  const_cast<state_type&>(*(*miter)).loss_ += error_factor;
 	  
-	  if (! (*citer)->delta_.rows())
-	    const_cast<state_type&>(*(*citer)).delta_ = tensor_type::Zero(hidden_size, 1);
-	  if (! (*miter)->delta_.rows())
-	    const_cast<state_type&>(*(*miter)).delta_ = tensor_type::Zero(hidden_size, 1);
+	  const_cast<state_type&>(*(*citer)).delta_ = tensor_type::Zero(hidden_size, 1);
+	  const_cast<state_type&>(*(*miter)).delta_ = tensor_type::Zero(hidden_size, 1);
 	  
 	  loss += error;
 	}

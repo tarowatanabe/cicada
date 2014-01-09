@@ -1964,6 +1964,8 @@ struct ITG
       state.reconstruction_.block(i * embedding_size, 0, embedding_size, 1)
 	= (state.output_.block(i * embedding_size, 0, embedding_size, 1).normalized()
 	   - state.input_.block(i * embedding_size, 0, embedding_size, 1));
+
+    state.delta_.setZero();
     
     state.loss_   = 0.5 * state.reconstruction_.squaredNorm();
     state.weight_ = 0;
@@ -2029,6 +2031,8 @@ struct ITG
     state.reconstruction_.block(offset_right, 0, hidden_size, 1) = (state.output_.block(offset_right, 0, hidden_size, 1).normalized()
 								    - state2->layer_);
     
+    state.delta_.setZero();
+
     state.loss_   = 0.5 * state.reconstruction_.squaredNorm() + state1->loss_ + state2->loss_;
     state.weight_ = 0;
     
@@ -2219,12 +2223,12 @@ struct ITG
 	  if (! delta_right.rows())
 	    delta_right = tensor_type::Zero(hidden_size, 1);
 
-	  delta_left.array()  = (state_left.layer_.array().unaryExpr(dhtanh())
-				 * (Wr1.block(offset_span1, offset_left, hidden_size, hidden_size).transpose() * state.delta_
-				    - state.reconstruction_.block(offset_left, 0, hidden_size, 1) * state.weight_).array());
-	  delta_right.array() = (state_right.layer_.array().unaryExpr(dhtanh())
-				 * (Wr1.block(offset_span1, offset_right, hidden_size, hidden_size).transpose() * state.delta_
-				    - state.reconstruction_.block(offset_right, 0, hidden_size, 1) * state.weight_).array());
+	  delta_left.array()  += (state_left.layer_.array().unaryExpr(dhtanh())
+				  * (Wr1.block(offset_span1, offset_left, hidden_size, hidden_size).transpose() * state.delta_
+				     - state.reconstruction_.block(offset_left, 0, hidden_size, 1) * state.weight_).array());
+	  delta_right.array() += (state_right.layer_.array().unaryExpr(dhtanh())
+				  * (Wr1.block(offset_span1, offset_right, hidden_size, hidden_size).transpose() * state.delta_
+				     - state.reconstruction_.block(offset_right, 0, hidden_size, 1) * state.weight_).array());
 	}
       }
     }

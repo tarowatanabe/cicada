@@ -2232,9 +2232,7 @@ struct ITG
       backwards_[length_max].insert(*citer);
       
       const_cast<state_type&>(*(*citer)).weight_ = std::exp(double((*citer)->score_) - logsum);
-      
-      if (! (*citer)->delta_.rows())
-	const_cast<state_type&>(*(*citer)).delta_ = tensor_type::Zero(hidden_size, 1);
+      const_cast<state_type&>(*(*citer)).delta_  = tensor_type::Zero(hidden_size, 1);
     }
     
     double loss = 0;
