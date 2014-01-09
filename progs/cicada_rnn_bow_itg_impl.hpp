@@ -1808,6 +1808,11 @@ struct ITG
     return (output.col(word.id()).block(0, 0, hidden_size, 1).transpose() * layer * scale
 	    + output.col(word.id()).block(hidden_size, 0, 1, 1))(0, 0);
   }
+
+  double clip_score(const double& value)
+  {
+    return std::max(- 6.0, std::min(6.0, value));
+  }
   
   template <typename Hidden>
   double score_span(const sentence_type& source,
@@ -2010,7 +2015,7 @@ struct ITG
     for (difference_type i = source_first - window_size; i != source_first; ++ i) {
       const word_type& word = i < 0 ? vocab_type::BOS : source[i];
 
-      const double score     = score_span(word, theta.output_source_, theta.scale_, theta.hidden_, layer);
+      const double score     = clip_score(score_span(word, theta.output_source_, theta.scale_, theta.hidden_, layer));
       const double exp_score = std::exp(score);
       const double sigmoid   = exp_score / (1.0 + exp_score);
       const double label     = 1.0;
@@ -2031,7 +2036,7 @@ struct ITG
 	while (sampled == word)
 	  sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	
-	const double score     = score_span(sampled, theta.output_source_, theta.scale_, theta.hidden_, layer);
+	const double score     = clip_score(score_span(sampled, theta.output_source_, theta.scale_, theta.hidden_, layer));
 	const double exp_score = std::exp(score);
 	const double sigmoid   = exp_score / (1.0 + exp_score);
 	const double label     = 0.0;
@@ -2052,7 +2057,7 @@ struct ITG
     for (difference_type i = source_last; i != source_last + window_size; ++ i) {
       const word_type& word = i >= source_size ? vocab_type::EOS : source[i];
       
-      const double score     = score_span(word, theta.output_source_, theta.scale_, theta.hidden_, layer);
+      const double score     = clip_score(score_span(word, theta.output_source_, theta.scale_, theta.hidden_, layer));
       const double exp_score = std::exp(score);
       const double sigmoid   = exp_score / (1.0 + exp_score);
       const double label     = 1.0;
@@ -2073,7 +2078,7 @@ struct ITG
 	while (sampled == word)
 	  sampled = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	
-	const double score     = score_span(sampled, theta.output_source_, theta.scale_, theta.hidden_, layer);
+	const double score     = clip_score(score_span(sampled, theta.output_source_, theta.scale_, theta.hidden_, layer));
 	const double exp_score = std::exp(score);
 	const double sigmoid   = exp_score / (1.0 + exp_score);
 	const double label     = 0.0;
@@ -2094,7 +2099,7 @@ struct ITG
     for (difference_type i = target_first - window_size; i != target_first; ++ i) {
       const word_type& word = i < 0 ? vocab_type::BOS : target[i];
       
-      const double score     = score_span(word, theta.output_target_, theta.scale_, theta.hidden_, layer);
+      const double score     = clip_score(score_span(word, theta.output_target_, theta.scale_, theta.hidden_, layer));
       const double exp_score = std::exp(score);
       const double sigmoid   = exp_score / (1.0 + exp_score);
       const double label     = 1.0;
@@ -2115,7 +2120,7 @@ struct ITG
 	while (sampled == word)
 	  sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	
-	const double score     = score_span(sampled, theta.output_target_, theta.scale_, theta.hidden_, layer);
+	const double score     = clip_score(score_span(sampled, theta.output_target_, theta.scale_, theta.hidden_, layer));
 	const double exp_score = std::exp(score);
 	const double sigmoid   = exp_score / (1.0 + exp_score);
 	const double label     = 0.0;
@@ -2136,7 +2141,7 @@ struct ITG
     for (difference_type i = target_last; i != target_last + window_size; ++ i) {
       const word_type& word = i >= target_size ? vocab_type::EOS : target[i];
       
-      const double score     = score_span(word, theta.output_target_, theta.scale_, theta.hidden_, layer);
+      const double score     = clip_score(score_span(word, theta.output_target_, theta.scale_, theta.hidden_, layer));
       const double exp_score = std::exp(score);
       const double sigmoid   = exp_score / (1.0 + exp_score);
       const double label     = 1.0;
@@ -2157,7 +2162,7 @@ struct ITG
 	while (sampled == word)
 	  sampled = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	
-	const double score     = score_span(sampled, theta.output_target_, theta.scale_, theta.hidden_, layer);
+	const double score     = clip_score(score_span(sampled, theta.output_target_, theta.scale_, theta.hidden_, layer));
 	const double exp_score = std::exp(score);
 	const double sigmoid   = exp_score / (1.0 + exp_score);
 	const double label     = 0.0;

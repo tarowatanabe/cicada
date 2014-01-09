@@ -707,6 +707,8 @@ struct TaskAccumulate
 	      
 	      if (parsed) {
 		const double error = itg_.backward(source, target, theta_, *grad, generator_);
+
+		//std::cerr << "error: " << error << std::endl;
 		
 		itg_.derivation(source, target, bitext_derivation.derivation_);
 		

@@ -1403,28 +1403,30 @@ struct ITG
     typedef State state_type;
     
     State() : span_(),
-	      left_(),
-	      right_(),
-	      loss_(std::numeric_limits<double>::infinity()) {}
+	      left_(0),
+	      right_(0),
+	      loss_(std::numeric_limits<double>::infinity()),
+	      weight_(0) {}
     State(const span_pair_type& span)
       : span_(span),
-	left_(),
-	right_(),
-	loss_(std::numeric_limits<double>::infinity()) {}
-    State(const span_pair_type& span, const span_pair_type left, const span_pair_type& right)
+	left_(0),
+	right_(0),
+	loss_(std::numeric_limits<double>::infinity()),
+	weight_(0) {}
+    State(const span_pair_type& span, const state_type* left, const state_type* right)
       : span_(span),
 	left_(left),
 	right_(right),
-	loss_(std::numeric_limits<double>::infinity()) {}
-    
-    bool aligned()  const { return ! span_.source_.empty() && ! span_.target_.empty(); }
-    bool terminal() const { return left_.empty() && right_.empty(); }
-    bool straight() const { return ! terminal() && left_.target_.last_  == right_.target_.first_; }
-    bool inverted() const { return ! terminal() && left_.target_.first_ == right_.target_.last_; }
+	loss_(std::numeric_limits<double>::infinity()),
+	weight_(0) {}
+
+    bool terminal() const { return left_ == 0 && right_ == 0; }
+    bool straight() const { return ! terminal() && left_->span_.target_.last_  == right_->span_.target_.first_; }
+    bool inverted() const { return ! terminal() && left_->span_.target_.first_ == right_->span_.target_.last_; }
     
     span_pair_type span_;
-    span_pair_type left_;
-    span_pair_type right_;
+    const state_type* left_;
+    const state_type* right_;
 
     // source word and target word... (for sampling...)
     word_type source_;
@@ -1432,6 +1434,7 @@ struct ITG
     
     // other state related data
     double loss_;
+    double weight_;
 
     tensor_type input_;
     tensor_type layer_;
@@ -1443,44 +1446,41 @@ struct ITG
 
   typedef State state_type;
 
-  typedef utils::vector2<state_type, std::allocator<state_type> > terminal_set_type;
-  typedef utils::bichart<state_type, std::allocator<state_type> > chart_type;
-
-  typedef std::pair<double, span_pair_type> loss_span_pair_type;
-  typedef std::vector<loss_span_pair_type, std::allocator<loss_span_pair_type> > heap_type;  
+  typedef utils::chunk_vector<state_type, 4 * 1024 * 1024 / sizeof(state_type), std::allocator<state_type> > state_pool_type;
+  
+  typedef std::vector<const state_type*, std::allocator<const state_type*> > state_set_type;
+  
+  typedef utils::bichart<state_set_type, std::allocator<state_set_type> > chart_type;
+  
+  typedef std::pair<double, const state_type*> loss_state_type;
+  typedef std::vector<loss_state_type, std::allocator<loss_state_type> > heap_type;  
   
   struct heap_compare
   {
     // sort by greater item so that we can pop from less items
-    bool operator()(const loss_span_pair_type& x, const loss_span_pair_type& y) const
+    bool operator()(const loss_state_type& x, const loss_state_type& y) const
     {
       return x.first > y.first;
     }
   };
   
-  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
-  typedef std::vector<span_pair_set_type, std::allocator<span_pair_set_type> > agenda_type;
+  typedef std::vector<state_set_type, std::allocator<state_set_type> > agenda_type;
 
   typedef std::vector<hyperedge_type, std::allocator<hyperedge_type> > derivation_type;
-  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
+  typedef std::vector<const state_type*, std::allocator<const state_type*> > stack_type;
+  
+  typedef std::pair<const state_type*, const state_type*> state_pair_type;
+  
+  typedef utils::compact_set<state_pair_type,
+			     utils::unassigned<state_pair_type>, utils::unassigned<state_pair_type>,
+			     utils::hashmurmur3<size_t>, std::equal_to<state_pair_type>,
+			     std::allocator<state_pair_type> > state_pair_unique_type;
 
-  typedef std::pair<span_pair_type, span_pair_type> tail_set_type;
-  
-  struct tail_set_unassigned
-  {
-    tail_set_type operator()() const
-    {
-      return tail_set_type(span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
-					  span_type::index_type(-1), span_type::index_type(-1)),
-			   span_pair_type(span_type::index_type(-1), span_type::index_type(-1),
-					  span_type::index_type(-1), span_type::index_type(-1)));
-    }
-  };
-  
-  typedef utils::compact_set<tail_set_type,
-			     tail_set_unassigned, tail_set_unassigned,
-			     utils::hashmurmur3<size_t>, std::equal_to<tail_set_type>,
-			     std::allocator<tail_set_type> > tail_set_unique_type;
+  typedef utils::compact_set<const state_type*,
+			     utils::unassigned<const state_type*>, utils::unassigned<const state_type*>,
+			     utils::hashmurmur3<size_t>, std::equal_to<const state_type*>,
+			     std::allocator<const state_type*> > state_unique_type;
+  typedef std::vector<state_unique_type, std::allocator<state_unique_type> > state_unique_set_type;
 
   struct RestCost
   {
@@ -1496,7 +1496,6 @@ struct ITG
   
   typedef RestCost rest_cost_type;
   typedef std::vector<rest_cost_type, std::allocator<rest_cost_type> > rest_cost_set_type;
-  
   
   ITG(const dictionary_type& dict_source_target,
       const dictionary_type& dict_target_source,
@@ -1514,19 +1513,16 @@ struct ITG
   agenda_type agenda_;
   heap_type   heap_;
 
-  terminal_set_type terminals_;
-
   rest_cost_set_type costs_source_;
   rest_cost_set_type costs_target_;
   
-  tail_set_unique_type uniques_;
+  state_pair_unique_type uniques_;
   stack_type stack_;
-
-  buffer_type buffer_layer_;
-  buffer_type buffer_layer_norm_;
-
-  buffer_type buffer_output_;
-  buffer_type buffer_reconstruction_;
+  
+  state_unique_set_type backwards_;
+  
+  state_pool_type   states_;
+  const state_type* linked_;
 
   buffer_type buffer_delta_;
 
@@ -1592,12 +1588,16 @@ struct ITG
     agenda_.clear();
     heap_.clear();
 
-    terminals_.clear();
     costs_source_.clear();
     costs_target_.clear();
     
     uniques_.clear();
     stack_.clear();
+
+    backwards_.clear();
+    
+    states_.clear();
+    linked_ = 0;
   }
 
   size_type span_index(const span_pair_type& span, const model_type& theta)
@@ -1637,17 +1637,11 @@ struct ITG
     agenda_.reserve(source_size + target_size + 1);
     agenda_.resize(source_size + target_size + 1);
     
-    terminals_.reserve(source_size + 1, target_size + 1);
-    terminals_.resize(source_size + 1, target_size + 1);
-    
     costs_source_.reserve(source_size + 1);
     costs_target_.reserve(target_size + 1);
 
     costs_source_.resize(source_size + 1);
     costs_target_.resize(target_size + 1);
-
-    // initialize terminals...
-    forward_terminals(source, target, theta);
     
     // initialize chart...
     for (size_type src = 0; src <= source_size; ++ src)
@@ -1666,6 +1660,10 @@ struct ITG
 	    forward(source, target, span_pair_type(span_type(src, src + 1), span_type(trg, trg + 1)), theta);
 	}
 
+    // estimate rest-costs
+    forward_backward(costs_source_);
+    forward_backward(costs_target_);
+
 #if 0
     std::cerr << "biparsing source: " << source << std::endl
 	      << "biparsing target: " << target << std::endl;
@@ -1680,21 +1678,20 @@ struct ITG
 	
 	//std::cerr << "length: " << length << std::endl;
 
-	span_pair_set_type& spans = agenda_[length];
+	state_set_type& states = agenda_[length];
 	
 	heap_.clear();
-	heap_.reserve(spans.size());
+	heap_.reserve(states.size());
 
-	span_pair_set_type::const_iterator siter_end = spans.end();
-	for (span_pair_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter) {
-	  const double loss = (chart_(siter->source_.first_, siter->source_.last_,
-				      siter->target_.first_, siter->target_.last_).loss_
-			       + std::max(costs_source_[siter->source_.first_].alpha_
-					  + costs_source_[siter->source_.last_].beta_,
-					  costs_target_[siter->target_.first_].alpha_
-					  + costs_target_[siter->target_.last_].beta_));
+	state_set_type::const_iterator siter_end = states.end();
+	for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+	  const double loss = ((*siter)->loss_
+			       + std::max(costs_source_[(*siter)->span_.source_.first_].alpha_
+					  + costs_source_[(*siter)->span_.source_.last_].beta_,
+					  costs_target_[(*siter)->span_.target_.first_].alpha_
+					  + costs_target_[(*siter)->span_.target_.last_].beta_));
 	  
-	  heap_.push_back(loss_span_pair_type(loss, *siter));
+	  heap_.push_back(loss_state_type(loss, *siter));
 	  std::push_heap(heap_.begin(), heap_.end(), heap_compare());
 	}
 	
@@ -1702,22 +1699,34 @@ struct ITG
 	heap_type::iterator hiter       = heap_.end();
 	heap_type::iterator hiter_end   = heap_.end();
 	
-	if (length > 2 && std::distance(hiter_begin, hiter_end) > beam_) {
-	  //std::make_heap(hiter_begin, hiter_end, heap_compare());
-	  
+	if (length > 1 && std::distance(hiter_begin, hiter_end) > beam_) {
 	  for (/**/; hiter_begin != hiter && std::distance(hiter, hiter_end) != beam_; -- hiter)
 	    std::pop_heap(hiter_begin, hiter, heap_compare());
+	  
+	  for (heap_type::iterator iter = hiter_begin ; iter != hiter; ++ iter)
+	    if (! iter->second->terminal())
+	      deallocate(iter->second);
 	} else
 	  hiter = hiter_begin;
 	
 	// clear uniques
 	uniques_.clear();
 	
+	// first, enumerate and put into chart...
+	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
+	  const state_type* state = iter->second;
+	  const span_pair_type& span = state->span_;
+	  
+	  if (! state->terminal())
+	    chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(state);
+	}
+	
 	// then, enumerate new hypotheses
 	for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter) {
 	  //std::cerr << "length: " << length << " loss: " << iter->first << std::endl;
 	  
-	  const span_pair_type& span = iter->second;
+	  const state_type* state = iter->second;
+	  const span_pair_type& span = state->span_;
 	  
 	  // we borrow the notation...
 	  const difference_type l = length;
@@ -1741,14 +1750,12 @@ struct ITG
 	      // span1: SsUu
 	      // span2: stuv
 	      
-	      if (chart_(S, s, U, u).loss_ == infty) continue;
+	      const state_set_type& states = chart_(S, s, U, u);
 	      
-	      const span_pair_type  span1(S, s, U, u);
-	      const span_pair_type& span2(span);
-	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
-	      
-	      forward(source, target, span_pair_type(S, t, U, v), span1, span2, theta, true);
+	      state_set_type::const_iterator siter_end = states.end();
+	      for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
+		if (uniques_.insert(std::make_pair(*siter, state)).second)
+		  forward(source, target, span_pair_type(S, t, U, v), *siter, state, theta, true);
 	    }
 
 	    // inversion
@@ -1756,15 +1763,13 @@ struct ITG
 	      // parent span: StuU
 	      // span1: SsvU
 	      // span2: stuv
-
-	      if (chart_(S, s, v, U).loss_ == infty) continue;
 	      
-	      const span_pair_type  span1(S, s, v, U);
-	      const span_pair_type& span2(span);
+	      const state_set_type& states = chart_(S, s, v, U);
 	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
-	      
-	      forward(source, target, span_pair_type(S, t, u, U), span1, span2, theta, false);
+	      state_set_type::const_iterator siter_end = states.end();
+	      for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
+		if (uniques_.insert(std::make_pair(*siter, state)).second)
+		  forward(source, target, span_pair_type(S, t, u, U), *siter, state, theta, false);
 	    }
 	  }
 	  
@@ -1777,14 +1782,12 @@ struct ITG
 	      // span1: stuv
 	      // span2: tSUu
 	      
-	      if (chart_(t, S, U, u).loss_ == infty) continue;
+	      const state_set_type& states = chart_(t, S, U, u);
 	      
-	      const span_pair_type& span1(span);
-	      const span_pair_type  span2(t, S, U, u);
-	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
-	      
-	      forward(source, target, span_pair_type(s, S, U, v), span1, span2, theta, false);
+	      state_set_type::const_iterator siter_end = states.end();
+	      for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
+		if (uniques_.insert(std::make_pair(*siter, state)).second)
+		  forward(source, target, span_pair_type(s, S, U, v), state, *siter, theta, false);
 	    }
 	    
 	    // straight
@@ -1792,21 +1795,51 @@ struct ITG
 	      // parent span: sSuU
 	      // span1: stuv
 	      // span2: tSvU
-		
-	      if (chart_(t, S, v, U).loss_ == infty) continue;
-
-	      const span_pair_type& span1(span);
-	      const span_pair_type  span2(t, S, v, U);
 	      
-	      if (! uniques_.insert(std::make_pair(span1, span2)).second) continue;
+	      const state_set_type& states = chart_(t, S, v, U);
 	      
-	      forward(source, target, span_pair_type(s, S, u, U), span1, span2, theta, true);
+	      state_set_type::const_iterator siter_end = states.end();
+	      for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter)
+		if (uniques_.insert(std::make_pair(*siter, state)).second)
+		  forward(source, target, span_pair_type(s, S, u, U), state, *siter, theta, true);
 	    }
 	  }
 	}
       }
     
-    return chart_(0, source_size, 0, target_size).loss_;
+    // final enumeration...
+    state_set_type& states = agenda_[length_max];
+    
+    if (states.empty())
+      return infty;
+    
+    heap_.clear();
+    heap_.reserve(states.size());
+    
+    state_set_type::const_iterator siter_end = states.end();
+    for (state_set_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+      heap_.push_back(loss_state_type((*siter)->loss_, *siter));
+      std::push_heap(heap_.begin(), heap_.end(), heap_compare());
+    }
+    
+    heap_type::iterator hiter_begin = heap_.begin();
+    heap_type::iterator hiter       = heap_.end();
+    heap_type::iterator hiter_end   = heap_.end();
+    
+    // perform sorting...
+    for (/**/; hiter_begin != hiter && std::distance(hiter, hiter_end) != beam_; -- hiter)
+      std::pop_heap(hiter_begin, hiter, heap_compare());
+    
+    for (heap_type::iterator iter = hiter_begin ; iter != hiter; ++ iter)
+      if (! iter->second->terminal())
+	deallocate(iter->second);
+    
+    // allocate new states...
+    chart_(0, source_size, 0, target_size).clear();
+    for (heap_type::iterator iter = hiter ; iter != hiter_end; ++ iter)
+      chart_(0, source_size, 0, target_size).push_back(iter->second);
+    
+    return chart_(0, source_size, 0, target_size).back()->loss_;
   }
   
   template <typename Embedding>
@@ -1861,66 +1894,6 @@ struct ITG
       }
     }
   }
-  
-  void forward_terminals(const sentence_type& source,
-			 const sentence_type& target,
-			 const model_type& theta)
-  {
-    typedef Eigen::Map<tensor_type> matrix_type;
-
-#if 0
-    std::cerr << "terminals source: " << source << std::endl
-	      << "terminals target: " << target << std::endl;
-#endif
-    
-    const size_type embedding_size = theta.embedding_;
-    const size_type hidden_size    = theta.hidden_;
-    const size_type window_size    = theta.window_;
-
-    const size_type offset_source = 0;
-    const size_type offset_target = embedding_size;
-    
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-
-    const size_type leaf_size = embedding_size * (window_size * 2 + 1) * 2;
-    
-    for (size_type src = 0; src <= source_size; ++ src)
-      for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-	state_type& state = terminals_(src, trg);
-
-	state.input_.resize(leaf_size, 1);
-	
-	copy_embedding(source, target, src, trg, theta, state.input_);
-	
-	//const word_type& word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	//const word_type& word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
-
-	state.layer_ = theta.Wt1_ * state.input_ + theta.bt1_;
-	
-	state.layer_norm_ = state.layer_.normalized();
-
-	state.output_ = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
-
-	state.reconstruction_.resize(leaf_size, 1);
-
-	for (size_type i = 0; i != (window_size * 2 + 1) * 2; ++ i)
-	  state.reconstruction_.block(i * embedding_size, 0, embedding_size, 1)
-	    = (state.output_.block(i * embedding_size, 0, embedding_size, 1).normalized()
-	       - state.input_.block(i * embedding_size, 0, embedding_size, 1));
-	
-	state.loss_ = 0.5 * state.reconstruction_.squaredNorm();
-	
-	if (src)
-	  costs_source_[src - 1].cost_ = std::min(costs_source_[src - 1].cost_, state.loss_);
-	if (trg)
-	  costs_target_[trg - 1].cost_ = std::min(costs_target_[trg - 1].cost_, state.loss_);
-      }
-
-    // estimate rest-costs
-    forward_backward(costs_source_);
-    forward_backward(costs_target_);
-  }
 
   void forward_backward(rest_cost_set_type& costs)
   {
@@ -1949,22 +1922,67 @@ struct ITG
 	       const span_pair_type& span,
 	       const model_type& theta)
   {
+    const size_type embedding_size = theta.embedding_;
+    const size_type hidden_size    = theta.hidden_;
+    const size_type window_size    = theta.window_;
+    
+    const size_type leaf_size = embedding_size * (window_size * 2 + 1) * 2;
 
-    state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+    const size_type offset_source = 0;
+    const size_type offset_target = embedding_size;
     
-    state = terminals_(span.source_.empty() ? 0 : span.source_.first_ + 1, span.target_.empty() ? 0 : span.target_.first_ + 1);
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
     
-    state.span_ = span;
+    state_type& state = allocate();
+
+    state.span_  = span;
+    state.left_  = 0;
+    state.right_ = 0;
+
+    state.source_ = (span.source_.empty() ? vocab_type::EPSILON : source[span.source_.first_]);
+    state.target_ = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
     
-    agenda_[span.size()].push_back(span);
+    state.input_.resize(leaf_size, 1);
+    
+    copy_embedding(source,
+		   target,
+		   span.source_.empty() ? size_type(0) : span.source_.last_,
+		   span.target_.empty() ? size_type(0) : span.target_.last_,
+		   theta,
+		   state.input_);
+    
+    state.layer_ = theta.Wt1_ * state.input_ + theta.bt1_;
+    
+    state.layer_norm_ = state.layer_.normalized();
+    
+    state.output_ = (theta.Wt2_ * state.layer_norm_ + theta.bt2_).array().unaryExpr(htanh());
+    
+    state.reconstruction_.resize(leaf_size, 1);
+    
+    for (size_type i = 0; i != (window_size * 2 + 1) * 2; ++ i)
+      state.reconstruction_.block(i * embedding_size, 0, embedding_size, 1)
+	= (state.output_.block(i * embedding_size, 0, embedding_size, 1).normalized()
+	   - state.input_.block(i * embedding_size, 0, embedding_size, 1));
+    
+    state.loss_   = 0.5 * state.reconstruction_.squaredNorm();
+    state.weight_ = 0;
+    
+    if (! span.source_.empty())
+      costs_source_[span.source_.first_].cost_ = std::min(costs_source_[span.source_.first_].cost_, state.loss_);
+    if (! span.target_.empty())
+      costs_target_[span.target_.first_].cost_ = std::min(costs_target_[span.target_.first_].cost_, state.loss_);
+    
+    chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
+    agenda_[span.size()].push_back(&state);
   }
   
   // binary rules
   void forward(const sentence_type& source,
 	       const sentence_type& target,
 	       const span_pair_type& span,
-	       const span_pair_type& span1,
-	       const span_pair_type& span2,
+	       const state_type* state1,
+	       const state_type* state2,
 	       const model_type& theta,
 	       const bool straight)
   {
@@ -1979,58 +1997,42 @@ struct ITG
     const size_type offset_span1 = span_index(span, theta) * hidden_size;
     const size_type offset_span2 = span_index(span, theta) * hidden_size * 2;
     
+    const span_pair_type& span1 = state1->span_;
+    const span_pair_type& span2 = state2->span_;
+    
     //std::cerr << "span: " << span << " left: " << span1 << " right: " << span2 << std::endl;
     
-    /**/  state_type& state  = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
-    const state_type& state1 = chart_(span1.source_.first_, span1.source_.last_, span1.target_.first_, span1.target_.last_);
-    const state_type& state2 = chart_(span2.source_.first_, span2.source_.last_, span2.target_.first_, span2.target_.last_);
+    state_type& state = allocate();
     
     const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
     const tensor_type& br1 = (straight ? theta.bs1_ : theta.bi1_);
     const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
     const tensor_type& br2 = (straight ? theta.bs2_ : theta.bi2_);
     
-    buffer_layer_.resize(hidden_size);
-    buffer_layer_norm_.resize(hidden_size);
-    buffer_output_.resize(hidden_size * 2);
-    buffer_reconstruction_.resize(hidden_size * 2);
+    state.span_  = span;
+    state.left_  = state1;
+    state.right_ = state2;
     
-    matrix_type layer(&(*buffer_layer_.begin()), hidden_size, 1);
-    matrix_type layer_norm(&(*buffer_layer_norm_.begin()), hidden_size, 1);
-    matrix_type output(&(*buffer_output_.begin()), hidden_size * 2, 1);
-    matrix_type reconstruction(&(*buffer_reconstruction_.begin()), hidden_size * 2, 1);
+    state.layer_ = (br1.block(offset_span1, 0, hidden_size, 1)
+		    + Wr1.block(offset_span1, offset_left,  hidden_size, hidden_size) * state1->layer_
+		    + Wr1.block(offset_span1, offset_right, hidden_size, hidden_size) * state2->layer_).array().unaryExpr(htanh());
     
-    layer = (br1.block(offset_span1, 0, hidden_size, 1)
-	     + Wr1.block(offset_span1, offset_left,  hidden_size, hidden_size) * state1.layer_
-	     + Wr1.block(offset_span1, offset_right, hidden_size, hidden_size) * state2.layer_).array().unaryExpr(htanh());
+    state.layer_norm_ = state.layer_.normalized();
     
-    layer_norm = layer.normalized();
+    state.output_ = (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size) * state.layer_norm_
+		     + br2.block(offset_span2, 0, hidden_size * 2, 1)).array().unaryExpr(htanh());
     
-    output = (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size) * layer_norm
-	      + br2.block(offset_span2, 0, hidden_size * 2, 1)).array().unaryExpr(htanh());
+    state.reconstruction_.resize(hidden_size * 2, 1);
     
-    reconstruction.block(offset_left, 0, hidden_size, 1)  = (output.block(offset_left, 0, hidden_size, 1).normalized()
-							     - state1.layer_);
-    reconstruction.block(offset_right, 0, hidden_size, 1) = (output.block(offset_right, 0, hidden_size, 1).normalized()
-							     - state2.layer_);
+    state.reconstruction_.block(offset_left,  0, hidden_size, 1)  = (state.output_.block(offset_left, 0, hidden_size, 1).normalized()
+								     - state1->layer_);
+    state.reconstruction_.block(offset_right, 0, hidden_size, 1) = (state.output_.block(offset_right, 0, hidden_size, 1).normalized()
+								    - state2->layer_);
     
-    const double loss = 0.5 * reconstruction.squaredNorm() + state1.loss_ + state2.loss_;
+    state.loss_   = 0.5 * state.reconstruction_.squaredNorm() + state1->loss_ + state2->loss_;
+    state.weight_ = 0;
     
-    if (loss < state.loss_) {
-      if (state.loss_ == std::numeric_limits<double>::infinity())
-	agenda_[span.size()].push_back(span);
-
-      state.span_  = span;
-      state.left_  = span1;
-      state.right_ = span2;
-      
-      state.loss_ = loss;
-      
-      state.layer_          = layer;
-      state.layer_norm_     = layer_norm;
-      state.output_         = output;
-      state.reconstruction_ = reconstruction;
-    }
+    agenda_[span.size()].push_back(&state);
   }
   
   template <typename Gen>
@@ -2062,139 +2064,168 @@ struct ITG
     const size_type offset_left  = 0;
     const size_type offset_right = hidden_size;
 
+    const size_type length_max = source_size + target_size;
+    
+    backwards_.clear();
+    backwards_.reserve(length_max + 1);
+    backwards_.resize(length_max + 1);
+    
+    const state_set_type& states = chart_(0, source_size, 0, target_size);
+    
+    state_set_type::const_iterator citer_begin = states.begin();
+    state_set_type::const_iterator citer_end   = states.end();
+
+    for (state_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+      backwards_[length_max].insert(*citer);
+      
+      // weight is used to rescale "reconstruction"
+      const_cast<state_type&>(*(*citer)).weight_ = 1.0 / states.size();
+      
+      // delta is propagated from root
+      const_cast<state_type&>(*(*citer)).delta_  = tensor_type::Zero(hidden_size, 1);
+    }
+    
     ++ gradient.count_;
-
-    state_type& root = chart_(0, source_size, 0, target_size);
     
-    root.delta_ = tensor_type::Zero(hidden_size, 1);
-    
-    stack_.clear();
-    stack_.push_back(span_pair_type(0, source_size, 0, target_size));
-
     buffer_delta_.resize(utils::bithack::max(hidden_size * 2, leaf_size));
     
-    while (! stack_.empty()) {
-      const span_pair_type span = stack_.back();
-      stack_.pop_back();
+    for (size_type length = length_max; length != 0; -- length) {
+      //std::cerr << "backward: " << length << std::endl;
       
-      state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
+      const state_unique_type& states = backwards_[length];
       
-      if (state.terminal()) {
-	//const word_type& word_source = (span.source_.empty() ? vocab_type::EPSILON : source[span.source_.first_]);
-	//const word_type& word_target = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
+      state_unique_type::const_iterator siter_end = states.end();
+      for (state_unique_type::const_iterator siter = states.begin(); siter != siter_end; ++ siter) {
+	state_type& state = const_cast<state_type&>(*(*siter));
 
-	// increment delta from reconstruction
-	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), leaf_size, 1);
+	//std::cerr << "loss: " << state.loss_ << std::endl;
 	
-	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
+	const span_pair_type& span = state.span_;
 	
-	gradient.Wt2_ += delta_reconstruction * state.layer_norm_.transpose();
-	gradient.bt2_ += delta_reconstruction;
-	
-	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
-				 * (theta.Wt2_.transpose() * delta_reconstruction).array());
-	
-	gradient.Wt1_ += state.delta_ * state.input_.transpose();
-	gradient.bt1_ += state.delta_;
+	if (state.terminal()) {
+	  //const word_type& word_source = (span.source_.empty() ? vocab_type::EPSILON : source[span.source_.first_]);
+	  //const word_type& word_target = (span.target_.empty() ? vocab_type::EPSILON : target[span.target_.first_]);
 
-	if (span.source_.empty()) {
-	  tensor_type& dsource = gradient.source(vocab_type::EPSILON);
+	  // increment delta from reconstruction
+	  matrix_type delta_reconstruction(&(*buffer_delta_.begin()), leaf_size, 1);
+	
+	  delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array() * state.weight_;
 	  
-	  for (size_type i = 0; i != window_size * 2 + 1; ++ i)
-	    dsource
-	      += (theta.Wt1_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose()
-		  * state.delta_
-		  - state.reconstruction_.block(offset_source + i * embedding_size, 0, embedding_size, 1));
-	} else {
-	  const difference_type src = span.source_.last_;
+	  gradient.Wt2_ += delta_reconstruction * state.layer_norm_.transpose();
+	  gradient.bt2_ += delta_reconstruction;
+	
+	  state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
+				   * (theta.Wt2_.transpose() * delta_reconstruction).array());
+	
+	  gradient.Wt1_ += state.delta_ * state.input_.transpose();
+	  gradient.bt1_ += state.delta_;
+
+	  if (span.source_.empty()) {
+	    tensor_type& dsource = gradient.source(vocab_type::EPSILON);
 	  
-	  for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
-	    const difference_type shift = i - static_cast<difference_type>(window_size);
-	    const word_type& word = (src + shift <= 0
-				     ? vocab_type::BOS
-				     : (src + shift > source_size
-					? vocab_type::EOS
-					: source[src + shift - 1]));
+	    for (size_type i = 0; i != window_size * 2 + 1; ++ i)
+	      dsource
+		+= (theta.Wt1_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose()
+		    * state.delta_
+		    - state.reconstruction_.block(offset_source + i * embedding_size, 0, embedding_size, 1) * state.weight_);
+	  } else {
+	    const difference_type src = span.source_.last_;
+	  
+	    for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	      const difference_type shift = i - static_cast<difference_type>(window_size);
+	      const word_type& word = (src + shift <= 0
+				       ? vocab_type::BOS
+				       : (src + shift > source_size
+					  ? vocab_type::EOS
+					  : source[src + shift - 1]));
 	    
-	    gradient.source(word.id()) +=
-	      (theta.Wt1_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose()
-	       * state.delta_
-	       - state.reconstruction_.block(offset_source + i * embedding_size, 0, embedding_size, 1));
+	      gradient.source(word.id()) +=
+		(theta.Wt1_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose()
+		 * state.delta_
+		 - state.reconstruction_.block(offset_source + i * embedding_size, 0, embedding_size, 1) * state.weight_);
+	    }
 	  }
-	}
 	
-	if (span.target_.empty()) {
-	  tensor_type& dtarget = gradient.target(vocab_type::EPSILON);
+	  if (span.target_.empty()) {
+	    tensor_type& dtarget = gradient.target(vocab_type::EPSILON);
 	  
-	  for (size_type i = 0; i != window_size * 2 + 1; ++ i)
-	    dtarget
-	      += (theta.Wt1_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose()
-		  * state.delta_
-		  - state.reconstruction_.block(offset_target + i * embedding_size, 0, embedding_size, 1));
-	} else {
-	  const difference_type trg = span.target_.last_;
+	    for (size_type i = 0; i != window_size * 2 + 1; ++ i)
+	      dtarget
+		+= (theta.Wt1_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose()
+		    * state.delta_
+		    - state.reconstruction_.block(offset_target + i * embedding_size, 0, embedding_size, 1) * state.weight_);
+	  } else {
+	    const difference_type trg = span.target_.last_;
 	  
-	  for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
-	    const difference_type shift = i - static_cast<difference_type>(window_size);
-	    const word_type& word = (trg + shift <= 0
-				     ? vocab_type::BOS
-				     : (trg + shift > target_size
-					? vocab_type::EOS
-					: target[trg + shift - 1]));
+	    for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	      const difference_type shift = i - static_cast<difference_type>(window_size);
+	      const word_type& word = (trg + shift <= 0
+				       ? vocab_type::BOS
+				       : (trg + shift > target_size
+					  ? vocab_type::EOS
+					  : target[trg + shift - 1]));
 	    
-	    gradient.target(word.id()) +=
-	      (theta.Wt1_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose()
-	       * state.delta_
-	       - state.reconstruction_.block(offset_target + i * embedding_size, 0, embedding_size, 1));
+	      gradient.target(word.id()) +=
+		(theta.Wt1_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose()
+		 * state.delta_
+		 - state.reconstruction_.block(offset_target + i * embedding_size, 0, embedding_size, 1) * state.weight_);
+	    }
 	  }
+	} else {
+	  backwards_[state.left_->span_.size()].insert(state.left_);
+	  backwards_[state.right_->span_.size()].insert(state.right_);
+	
+	  const bool straight = state.straight();
+
+	  const size_type offset_span1 = span_index(span, theta) * hidden_size;
+	  const size_type offset_span2 = span_index(span, theta) * hidden_size * 2;
+
+	  const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
+	  const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
+	
+	  tensor_type& dWr1 = (straight ? gradient.Ws1_ : gradient.Wi1_);
+	  tensor_type& dbr1 = (straight ? gradient.bs1_ : gradient.bi1_);
+	  tensor_type& dWr2 = (straight ? gradient.Ws2_ : gradient.Wi2_);
+	  tensor_type& dbr2 = (straight ? gradient.bs2_ : gradient.bi2_);
+
+	  state_type& state_left  = const_cast<state_type&>(*state.left_);
+	  state_type& state_right = const_cast<state_type&>(*state.right_);
+	  
+	  // propagate weight for errors... this is used to scale "reconstruction" in each state
+	  state_left.weight_  += state.weight_;
+	  state_right.weight_ += state.weight_;
+
+	  // increment delta from reconstruction
+	  matrix_type delta_reconstruction(&(*buffer_delta_.begin()), hidden_size * 2, 1);
+	  
+	  delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array() * state.weight_;
+	  
+	  dWr2.block(offset_span2, 0, hidden_size * 2, hidden_size) += delta_reconstruction * state.layer_norm_.transpose();
+	  dbr2.block(offset_span2, 0, hidden_size * 2, 1)           += delta_reconstruction;
+	
+	  state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
+				   * (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size).transpose()
+				      * delta_reconstruction).array());
+	  
+	  dWr1.block(offset_span1, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
+	  dWr1.block(offset_span1, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
+	  dbr1.block(offset_span1, 0, hidden_size, 1)                      += state.delta_;
+	
+	  tensor_type& delta_left  = state_left.delta_;
+	  tensor_type& delta_right = state_right.delta_;
+	
+	  if (! delta_left.rows())
+	    delta_left = tensor_type::Zero(hidden_size, 1);
+	  if (! delta_right.rows())
+	    delta_right = tensor_type::Zero(hidden_size, 1);
+
+	  delta_left.array()  = (state_left.layer_.array().unaryExpr(dhtanh())
+				 * (Wr1.block(offset_span1, offset_left, hidden_size, hidden_size).transpose() * state.delta_
+				    - state.reconstruction_.block(offset_left, 0, hidden_size, 1) * state.weight_).array());
+	  delta_right.array() = (state_right.layer_.array().unaryExpr(dhtanh())
+				 * (Wr1.block(offset_span1, offset_right, hidden_size, hidden_size).transpose() * state.delta_
+				    - state.reconstruction_.block(offset_right, 0, hidden_size, 1) * state.weight_).array());
 	}
-      } else {
-	stack_.push_back(state.left_);
-	stack_.push_back(state.right_);
-	
-	const bool straight = state.straight();
-
-	const size_type offset_span1 = span_index(span, theta) * hidden_size;
-	const size_type offset_span2 = span_index(span, theta) * hidden_size * 2;
-
-	const tensor_type& Wr1 = (straight ? theta.Ws1_ : theta.Wi1_);
-	const tensor_type& Wr2 = (straight ? theta.Ws2_ : theta.Wi2_);
-	
-	tensor_type& dWr1 = (straight ? gradient.Ws1_ : gradient.Wi1_);
-	tensor_type& dbr1 = (straight ? gradient.bs1_ : gradient.bi1_);
-	tensor_type& dWr2 = (straight ? gradient.Ws2_ : gradient.Wi2_);
-	tensor_type& dbr2 = (straight ? gradient.bs2_ : gradient.bi2_);
-
-	// increment delta from reconstruction
-	matrix_type delta_reconstruction(&(*buffer_delta_.begin()), hidden_size * 2, 1);
-	
-	delta_reconstruction = state.output_.array().unaryExpr(dhtanh()) * state.reconstruction_.array();
-	
-	dWr2.block(offset_span2, 0, hidden_size * 2, hidden_size) += delta_reconstruction * state.layer_norm_.transpose();
-	dbr2.block(offset_span2, 0, hidden_size * 2, 1)           += delta_reconstruction;
-	
-	state.delta_.array() += (state.layer_.array().unaryExpr(dhtanh())
-				 * (Wr2.block(offset_span2, 0, hidden_size * 2, hidden_size).transpose()
-				    * delta_reconstruction).array());
-	
-	state_type& state_left  = chart_(state.left_.source_.first_, state.left_.source_.last_,
-					 state.left_.target_.first_, state.left_.target_.last_);
-	state_type& state_right = chart_(state.right_.source_.first_, state.right_.source_.last_,
-					 state.right_.target_.first_, state.right_.target_.last_);
-	
-	dWr1.block(offset_span1, offset_left,  hidden_size, hidden_size) += state.delta_ * state_left.layer_.transpose();
-	dWr1.block(offset_span1, offset_right, hidden_size, hidden_size) += state.delta_ * state_right.layer_.transpose();
-	dbr1.block(offset_span1, 0, hidden_size, 1)                      += state.delta_;
-	
-	tensor_type& delta_left  = state_left.delta_;
-	tensor_type& delta_right = state_right.delta_;
-	
-	delta_left  = (state_left.layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(offset_span1, offset_left, hidden_size, hidden_size).transpose() * state.delta_
-			  - state.reconstruction_.block(offset_left, 0, hidden_size, 1)).array());
-	delta_right = (state_right.layer_.array().unaryExpr(dhtanh())
-		       * (Wr1.block(offset_span1, offset_right, hidden_size, hidden_size).transpose() * state.delta_
-			  - state.reconstruction_.block(offset_right, 0, hidden_size, 1)).array());
       }
     }
   }
@@ -2206,26 +2237,41 @@ struct ITG
     d.clear();
     
     stack_.clear();
-    stack_.push_back(span_pair_type(0, source.size(), 0, target.size()));
+    stack_.push_back(chart_(0, source.size(), 0, target.size()).back());
     
     while (! stack_.empty()) {
-      const span_pair_type span = stack_.back();
+      const state_type* state = stack_.back();
       stack_.pop_back();
-
-      const state_type& state = chart_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_);
       
-      if (state.terminal())
-	d.push_back(hyperedge_type(span));
+      if (state->terminal())
+	d.push_back(hyperedge_type(state->span_));
       else {
-	d.push_back(hyperedge_type(span, state.left_, state.right_));
+	d.push_back(hyperedge_type(state->span_, state->left_->span_, state->right_->span_));
 	
 	// we will push in right-to-left order...!
-	stack_.push_back(state.right_);
-	stack_.push_back(state.left_);
+	stack_.push_back(state->right_);
+	stack_.push_back(state->left_);
       }
     }
   }
 
+  void deallocate(const state_type* state)
+  {
+    const_cast<state_type*>(state)->left_ = linked_;
+    linked_ = state;
+  }
+
+  state_type& allocate()
+  {
+    if (linked_) {
+      const state_type* state = linked_;
+      linked_ = state->left_;
+      return const_cast<state_type&>(*state);
+    }
+
+    states_.push_back(state_type());
+    return states_.back();
+  }
 };
 
 struct LearnAdaGrad
