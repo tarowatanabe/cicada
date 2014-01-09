@@ -319,16 +319,23 @@ namespace std
 
 struct OutputDerivation : OutputMapReduce
 {
+  typedef cicada::Alignment alignment_type;
   typedef std::vector<std::string, std::allocator<std::string> > stack_type;
 	  
   OutputDerivation(const bitext_set_type& bitexts,
-		   const path_type& path,
+		   const path_type& path_derivation,
+		   const path_type& path_source_target,
+		   const path_type& path_target_source,
 		   queue_type& queue)
-    : bitexts_(bitexts), path_(path), queue_(queue) {}
+    : bitexts_(bitexts),
+      path_derivation_(path_derivation),
+      path_source_target_(path_source_target),
+      path_target_source_(path_target_source),
+      queue_(queue) {}
   
   void operator()()
   {
-    if (path_.empty()) {
+    if (path_derivation_.empty() && path_source_target_.empty() && path_target_source_.empty()) {
       bitext_derivation_type bitext;
       
       for (;;) {
@@ -336,12 +343,21 @@ struct OutputDerivation : OutputMapReduce
 	
 	if (bitext.id_ == size_type(-1)) break;
       }
+      
     } else {
       bitext_reduced_type bitexts;
       bitext_derivation_type bitext;
       size_type id = 0;
       
-      utils::compress_ostream os(path_, 1024 * 1024);
+      std::auto_ptr<std::ostream> os_derivation(! path_derivation_.empty()
+						? new utils::compress_ostream(path_derivation_, 1024 * 1024)
+						: 0);
+      std::auto_ptr<std::ostream> os_source_target(! path_source_target_.empty()
+						   ? new utils::compress_ostream(path_source_target_, 1024 * 1024)
+						   : 0);
+      std::auto_ptr<std::ostream> os_target_source(! path_target_source_.empty()
+						   ? new utils::compress_ostream(path_target_source_, 1024 * 1024)
+						   : 0);
       
       for (;;) {
 	queue_.pop_swap(bitext);
@@ -349,26 +365,38 @@ struct OutputDerivation : OutputMapReduce
 	if (bitext.id_ == size_type(-1)) break;
 	
 	if (bitext.id_ == id) {
-	  write(os, bitext);
+	  if (os_derivation.get())
+	    write(*os_derivation, bitext);
+	  if (os_source_target.get() || os_target_source.get())
+	    write_alignment(os_source_target.get(), os_target_source.get(), bitext);
+	  
 	  ++ id;
 	} else
 	  bitexts.insert(bitext);
 	
 	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	  write(os, *bitexts.begin());
+	  if (os_derivation.get())
+	    write(*os_derivation, *bitexts.begin());
+	  if (os_source_target.get() || os_target_source.get())
+	    write_alignment(os_source_target.get(), os_target_source.get(), *bitexts.begin());
+	  
 	  bitexts.erase(bitexts.begin());
 	  ++ id;
 	}
       }
       
       while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	write(os, *bitexts.begin());
+	if (os_derivation.get())
+	  write(*os_derivation, *bitexts.begin());
+	if (os_source_target.get() || os_target_source.get())
+	  write_alignment(os_source_target.get(), os_target_source.get(), *bitexts.begin());
+	
 	bitexts.erase(bitexts.begin());
 	++ id;
       }
       
       if (! bitexts.empty())
-	throw std::runtime_error("error while writing derivation output?");
+	throw std::runtime_error("error while writing derivation output?");      
     }
   }
   
@@ -410,82 +438,11 @@ struct OutputDerivation : OutputMapReduce
     
     os << '\n';
   }
-  
-  const bitext_set_type& bitexts_;
-  path_type              path_;
-  queue_type&            queue_;
-  
-  stack_type stack_;
-};
 
-struct OutputAlignment : OutputMapReduce
-{
-  typedef cicada::Alignment alignment_type;
-
-  OutputAlignment(const bitext_set_type& bitexts,
-		  const path_type& path_source_target,
-		  const path_type& path_target_source,
-		  queue_type& queue)
-    : bitexts_(bitexts),
-      path_source_target_(path_source_target),
-      path_target_source_(path_target_source),
-      queue_(queue) {}
-  
-  void operator()()
-  {
-    if (path_source_target_.empty() && path_target_source_.empty()) {
-      bitext_derivation_type bitext;
-      
-      for (;;) {
-	queue_.pop_swap(bitext);
-	
-	if (bitext.id_ == size_type(-1)) break;
-      }
-    } else {
-      bitext_reduced_type bitexts;
-      bitext_derivation_type bitext;
-      size_type id = 0;
-      
-      std::auto_ptr<std::ostream> os_source_target(! path_source_target_.empty()
-						   ? new utils::compress_ostream(path_source_target_, 1024 * 1024)
-						   : 0);
-      std::auto_ptr<std::ostream> os_target_source(! path_target_source_.empty()
-						   ? new utils::compress_ostream(path_target_source_, 1024 * 1024)
-						   : 0);
-      
-      for (;;) {
-	queue_.pop_swap(bitext);
-	
-	if (bitext.id_ == size_type(-1)) break;
-	
-	if (bitext.id_ == id) {
-	  write(os_source_target.get(), os_target_source.get(), bitext);
-	  ++ id;
-	} else
-	  bitexts.insert(bitext);
-	
-	while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	  write(os_source_target.get(), os_target_source.get(), *bitexts.begin());
-	  bitexts.erase(bitexts.begin());
-	  ++ id;
-	}
-      }
-      
-      while (! bitexts.empty() && bitexts.begin()->id_ == id) {
-	write(os_source_target.get(), os_target_source.get(), *bitexts.begin());
-	bitexts.erase(bitexts.begin());
-	++ id;
-      }
-      
-      if (! bitexts.empty())
-	throw std::runtime_error("error while writing derivation output?");
-    }
-  }
-
-  void write(std::ostream* os_source_target, std::ostream* os_target_source, const value_type& bitext)
+  void write_alignment(std::ostream* os_source_target, std::ostream* os_target_source, const value_type& bitext)
   {
     alignment_.clear();
-
+    
     derivation_type::const_iterator diter_end = bitext.derivation_.end();
     for (derivation_type::const_iterator diter = bitext.derivation_.begin(); diter != diter_end; ++ diter)
       if (diter->terminal() && diter->aligned())
@@ -504,7 +461,7 @@ struct OutputAlignment : OutputMapReduce
       alignment_.inverse();
       
       std::sort(alignment_.begin(), alignment_.end());
-
+      
       if (moses_mode)
 	*os_target_source << alignment_ << '\n';
       else
@@ -566,12 +523,16 @@ struct OutputAlignment : OutputMapReduce
       os << '\n';
     }
   }
-
+  
   const bitext_set_type& bitexts_;
+  
+  path_type              path_derivation_;
   path_type              path_source_target_;
   path_type              path_target_source_;
+  
   queue_type&            queue_;
   
+  stack_type stack_;
   alignment_type alignment_;
 };
 
@@ -614,15 +575,13 @@ struct TaskAccumulate
 		 const size_type batch_size,
 		 queue_mapper_type& mapper,
 		 queue_merger_set_type& mergers,
-		 queue_derivation_type& queue_derivation,
-		 queue_derivation_type& queue_alignment)
+		 queue_derivation_type& reducer)
     : learner_(learner),
       bitexts_(bitexts),
       theta_(theta),
       mapper_(mapper),
       mergers_(mergers),
-      queue_derivation_(queue_derivation),
-      queue_alignment_(queue_alignment),
+      reducer_(reducer),
       itg_(dict_source_target, dict_target_source, beam),
       parsed_(0),
       shard_(0),
@@ -722,8 +681,7 @@ struct TaskAccumulate
 			  << "target: " << target << std::endl;
 	    }
 	    
-	    queue_derivation_.push(bitext_derivation);
-	    queue_alignment_.push(bitext_derivation);
+	    reducer_.push(bitext_derivation);
 	  }
 	  
 	  learner_(theta_, *grad);
@@ -773,8 +731,7 @@ struct TaskAccumulate
 
   queue_mapper_type&     mapper_;
   queue_merger_set_type& mergers_;  
-  queue_derivation_type& queue_derivation_;
-  queue_derivation_type& queue_alignment_;
+  queue_derivation_type& reducer_;
   
   itg_type itg_;
 
@@ -843,7 +800,6 @@ void learn_online(const Learner& learner,
 
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputDerivation output_derivation_type;
-  typedef OutputAlignment  output_alignment_type;
 
   typedef typename task_type::queue_mapper_type     queue_mapper_type;
   typedef typename task_type::queue_merger_set_type queue_merger_set_type;
@@ -870,8 +826,7 @@ void learn_online(const Learner& learner,
   queue_mapper_type     mapper(threads);
   queue_merger_set_type mergers(threads);
 
-  typename output_map_reduce_type::queue_type queue_derivation;
-  typename output_map_reduce_type::queue_type queue_alignment;
+  typename output_map_reduce_type::queue_type reducer;
   
   task_set_type tasks(threads, task_type(learner,
 					 bitexts,
@@ -882,8 +837,7 @@ void learn_online(const Learner& learner,
 					 batch_size,
 					 mapper,
 					 mergers,
-					 queue_derivation,
-					 queue_alignment));
+					 reducer));
 
   // assign shard id
   for (size_type shard = 0; shard != tasks.size(); ++ shard)
@@ -923,19 +877,17 @@ void learn_online(const Learner& learner,
     
     const std::string iter_tag = '.' + utils::lexical_cast<std::string>(t + 1);
 
-    boost::thread output_derivation(output_derivation_type(bitexts,
-							   ! derivation_file.empty() && dump_mode
-							   ? add_suffix(derivation_file, iter_tag)
-							   : path_type(),
-							   queue_derivation));
-    boost::thread output_alignment(output_alignment_type(bitexts,
-							 ! alignment_source_target_file.empty() && dump_mode
-							 ? add_suffix(alignment_source_target_file, iter_tag)
-							 : path_type(),
-							 ! alignment_target_source_file.empty() && dump_mode
-							 ? add_suffix(alignment_target_source_file, iter_tag)
-							 : path_type(),
-							 queue_alignment));
+    boost::thread output(output_derivation_type(bitexts,
+						! derivation_file.empty() && dump_mode
+						? add_suffix(derivation_file, iter_tag)
+						: path_type(),
+						! alignment_source_target_file.empty() && dump_mode
+						? add_suffix(alignment_source_target_file, iter_tag)
+						: path_type(),
+						! alignment_target_source_file.empty() && dump_mode
+						? add_suffix(alignment_target_source_file, iter_tag)
+						: path_type(),
+						reducer));
 
     utils::resource start;
     
@@ -958,8 +910,7 @@ void learn_online(const Learner& learner,
     
     workers.join_all();
     
-    queue_derivation.push(typename output_map_reduce_type::value_type());
-    queue_alignment.push(typename output_map_reduce_type::value_type());
+    reducer.push(typename output_map_reduce_type::value_type());
     
     utils::resource end;
     
@@ -996,8 +947,7 @@ void learn_online(const Learner& learner,
     for (size_type i = 1; i != tasks.size(); ++ i)
       tasks[i].theta_ = tasks.front().theta_;
     
-    output_derivation.join();
-    output_alignment.join();
+    output.join();
   }
   
   // copy model!
@@ -1033,13 +983,11 @@ struct TaskDerivation
 		 const model_type& theta,
 		 const int& beam,
 		 queue_type& queue,
-		 queue_derivation_type& queue_derivation,
-		 queue_derivation_type& queue_alignment)
+		 queue_derivation_type& reducer)
     : bitexts_(bitexts),
       theta_(theta),
       queue_(queue),
-      queue_derivation_(queue_derivation),
-      queue_alignment_(queue_alignment),
+      reducer_(reducer),
       itg_(dict_source_target, dict_target_source, beam) {}
 
   
@@ -1078,8 +1026,7 @@ struct TaskDerivation
 		    << "target: " << target << std::endl;
       }
       
-      queue_derivation_.push(bitext_derivation);
-      queue_alignment_.push(bitext_derivation);
+      reducer_.push(bitext_derivation);
     }
   }
 
@@ -1087,8 +1034,7 @@ struct TaskDerivation
   const model_type& theta_;
   
   queue_type&            queue_;
-  queue_derivation_type& queue_derivation_;
-  queue_derivation_type& queue_alignment_;
+  queue_derivation_type& reducer_;
   
   itg_type itg_;
 };
@@ -1105,11 +1051,9 @@ void derivation(const bitext_set_type& bitexts,
   
   typedef OutputMapReduce  output_map_reduce_type;
   typedef OutputDerivation output_derivation_type;
-  typedef OutputAlignment  output_alignment_type;
 
   task_type::queue_type   mapper(8 * threads);
-  output_map_reduce_type::queue_type queue_derivation;
-  output_map_reduce_type::queue_type queue_alignment;
+  output_map_reduce_type::queue_type reducer;
   
   task_set_type tasks(threads, task_type(bitexts,
 					 dict_source_target,
@@ -1117,27 +1061,23 @@ void derivation(const bitext_set_type& bitexts,
 					 theta,
 					 beam,
 					 mapper,
-					 queue_derivation,
-					 queue_alignment));
+					 reducer));
 
   boost::thread_group workers;
   for (size_type i = 0; i != tasks.size(); ++ i)
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
-  boost::thread_group workers_dump;
-  workers_dump.add_thread(new boost::thread(output_derivation_type(bitexts,
-								   ! derivation_file.empty()
-								   ? derivation_file
-								   : path_type(),
-								   queue_derivation)));
-  workers_dump.add_thread(new boost::thread(output_alignment_type(bitexts,
-								  ! alignment_source_target_file.empty()
-								  ? alignment_source_target_file
-								  : path_type(),
-								  ! alignment_target_source_file.empty()
-								  ? alignment_target_source_file
-								  : path_type(),
-								  queue_alignment)));
+  boost::thread output(output_derivation_type(bitexts,
+					      ! derivation_file.empty()
+					      ? derivation_file
+					      : path_type(),
+					      ! alignment_source_target_file.empty()
+					      ? alignment_source_target_file
+					      : path_type(),
+					      ! alignment_target_source_file.empty()
+					      ? alignment_target_source_file
+					      : path_type(),
+					      reducer));
 
   if (debug)
     std::cerr << "max derivation" << std::endl;
@@ -1167,10 +1107,9 @@ void derivation(const bitext_set_type& bitexts,
     std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 	      << "user time:   " << end.user_time() - start.user_time() << std::endl;
 
-  queue_derivation.push(output_map_reduce_type::value_type());
-  queue_alignment.push(output_map_reduce_type::value_type());
+  reducer.push(output_map_reduce_type::value_type());
   
-  workers_dump.join_all();
+  output.join();
 }
 
 void read_data(const path_type& source_file,
