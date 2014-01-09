@@ -2371,16 +2371,22 @@ struct ITG
     
     state_set_type::const_iterator miter_begin = states_mistake.begin();
     state_set_type::const_iterator miter_end   = states_mistake.end();
-    
-    size_type num_mistake = 0;
+        
+    size_type num_loss   = 0;
+    size_type num_errors = 0;
     for (state_set_type::const_iterator miter = miter_begin; miter != miter_end; ++ miter)
-      num_mistake += ((*miter)->error_ > 0);
-
-    if (num_mistake == 0)
+      if ((*miter)->error_ > 0) {
+	for (state_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) 
+	  num_loss += double((*miter)->error_) - ((*citer)->score_ - (*miter)->score_) > 0.0;
+	
+	++ num_errors;
+      }
+    
+    if (num_loss == 0)
       return 0.0;
     
-    const double error_factor = 1.0 / (num_mistake * (citer_end - citer_begin));
-
+    const double error_factor = 1.0 / (num_errors * (citer_end - citer_begin));
+    
     double loss = 0.0;
     
     for (state_set_type::const_iterator miter = miter_begin; miter != miter_end; ++ miter)
@@ -2396,12 +2402,14 @@ struct ITG
 	  const_cast<state_type&>(*(*citer)).loss_ -= error_factor;
 	  const_cast<state_type&>(*(*miter)).loss_ += error_factor;
 	  
-	  const_cast<state_type&>(*(*citer)).delta_ = tensor_type::Zero(hidden_size, 1);
-	  const_cast<state_type&>(*(*miter)).delta_ = tensor_type::Zero(hidden_size, 1);
+	  if (! (*citer)->delta_.rows()) 
+	    const_cast<state_type&>(*(*citer)).delta_ = tensor_type::Zero(hidden_size, 1);
+	  if (! (*miter)->delta_.rows())
+	    const_cast<state_type&>(*(*miter)).delta_ = tensor_type::Zero(hidden_size, 1);
 	  
 	  loss += error;
 	}
-
+    
     //std::cerr << "loss: " << loss << std::endl;
     
     ++ gradient.count_;

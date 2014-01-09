@@ -2250,13 +2250,19 @@ struct HMM
     
     double loss = 0.0;
 
-    size_type num_mistake = 0;
+    size_type num_loss   = 0;
+    size_type num_errors = 0;
     for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
-      num_mistake += (miter->error() > 0);
+      if (miter->error() > 0) {
+	for (heap_type::iterator citer = viter; citer != viter_end; ++ citer)
+	  num_loss += double(miter->error()) - (citer->score() - miter->score()) > 0.0;
+	
+	++ num_errors;
+      }
     
-    if (num_mistake) {
-      const double error_factor = 1.0 / (num_mistake * (viter_end - viter));
-
+    if (num_loss) {
+      const double error_factor = 1.0 / (num_errors * (viter_end - viter));
+      
       for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
 	if (miter->error() > 0)
 	  for (heap_type::iterator citer = viter; citer != viter_end; ++ citer) {
@@ -2334,8 +2340,11 @@ struct HMM
     const size_type offset_target = embedding_window_size;
     const size_type offset_matrix = embedding_window_size * 2;
 
+    // do not accumulate!
+    if (states_[target_size + 1].empty()) return 0.0;
+    
     double loss = 0.0;
-
+        
     ++ gradient.count_;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
