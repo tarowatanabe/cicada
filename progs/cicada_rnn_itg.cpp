@@ -85,6 +85,7 @@ int window = 1;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
+bool optimize_adadelta = false;
 
 int iteration = 10;
 int baby_steps = 1;
@@ -147,10 +148,10 @@ int main(int argc, char** argv)
     if (int(giza_mode) + moses_mode == 0)
       moses_mode = true;
 
-    if (int(optimize_sgd) + optimize_adagrad > 1)
-      throw std::runtime_error("either one of optimize-{sgd,adagrad}");
+    if (int(optimize_sgd) + optimize_adagrad + optimize_adadelta > 1)
+      throw std::runtime_error("either one of optimize-{sgd,adagrad,adadelta}");
     
-    if (int(optimize_sgd) + optimize_adagrad == 0)
+    if (int(optimize_sgd) + optimize_adagrad + optimize_adadelta == 0)
       optimize_sgd = true;
     
     threads = utils::bithack::max(threads, 1);
@@ -199,6 +200,12 @@ int main(int argc, char** argv)
     if (iteration > 0) {
       if (optimize_adagrad)
 	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, span, lambda, eta0),
+		     bitexts,
+		     dict_source_target,
+		     dict_target_source,
+		     theta);
+      else if (optimize_adadelta)
+	learn_online(LearnAdaDelta(dimension_embedding, dimension_hidden, span, lambda, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
@@ -1299,8 +1306,9 @@ void options(int argc, char** argv)
     ("span",                po::value<int>(&span)->default_value(span),                               "span context size")
     ("window",              po::value<int>(&window)->default_value(window),                           "context window size")
     
-    ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")
-    ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
+    ("optimize-sgd",      po::bool_switch(&optimize_sgd),      "SGD optimizer")
+    ("optimize-adagrad",  po::bool_switch(&optimize_adagrad),  "AdaGrad optimizer")
+    ("optimize-adadelta", po::bool_switch(&optimize_adadelta), "AdaDelta optimizer")
     
     ("iteration",         po::value<int>(&iteration)->default_value(iteration),   "max # of iterations")
     ("baby-steps",        po::value<int>(&baby_steps)->default_value(baby_steps), "# of baby steps")
