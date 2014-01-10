@@ -129,11 +129,6 @@ struct Gradient
     if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    //if (! Wt_.rows())
-    //  Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
-    //if (! bt_.rows())
-    //  bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
-    
     if (! Wa_.rows())
       Wa_ = tensor_type::Zero(x.Wa_.rows(), x.Wa_.cols());
     if (! ba_.rows())
@@ -149,9 +144,6 @@ struct Gradient
 
     Wc_ -= x.Wc_;
     bc_ -= x.bc_;
-    
-    //Wt_ -= x.Wt_;
-    //bt_ -= x.bt_;
     
     Wa_ -= x.Wa_;
     ba_ -= x.ba_;
@@ -193,11 +185,6 @@ struct Gradient
     if (! bc_.rows())
       bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
 
-    //if (! Wt_.rows())
-    //  Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
-    //if (! bt_.rows())
-    //  bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
-
     if (! Wa_.rows())
       Wa_ = tensor_type::Zero(x.Wa_.rows(), x.Wa_.cols());
     if (! ba_.rows())
@@ -214,9 +201,6 @@ struct Gradient
     Wc_ += x.Wc_;
     bc_ += x.bc_;
 
-    //Wt_ += x.Wt_;
-    //bt_ += x.bt_;
-    
     Wa_ += x.Wa_;
     ba_ += x.ba_;
 
@@ -238,9 +222,6 @@ struct Gradient
 
     Wc_.setZero();
     bc_.setZero();
-    
-    //Wt_.setZero();
-    //bt_.setZero();
     
     Wa_.setZero();
     ba_.setZero();
@@ -296,9 +277,6 @@ struct Gradient
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    //Wt_ = tensor_type::Zero(hidden_, state_size);
-    //bt_ = tensor_type::Zero(hidden_, 1);
-
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
     
@@ -381,9 +359,6 @@ private:
     write(os, Wc_);
     write(os, bc_);
     
-    //write(os, Wt_);
-    //write(os, bt_);
-
     write(os, Wa_);
     write(os, ba_);
 
@@ -409,9 +384,6 @@ private:
     read(is, Wc_);
     read(is, bc_);
     
-    //read(is, Wt_);
-    //read(is, bt_);
-
     read(is, Wa_);
     read(is, ba_);
 
@@ -502,9 +474,6 @@ public:
 
   tensor_type Wc_;
   tensor_type bc_;
-  
-  //tensor_type Wt_;
-  //tensor_type bt_;
   
   tensor_type Wa_;
   tensor_type ba_;
@@ -610,9 +579,6 @@ struct Model
     Wc_.setZero();
     bc_.setZero();
     
-    //Wt_.setZero();
-    //bt_.setZero();
-    
     Wa_.setZero();
     ba_.setZero();
 
@@ -697,9 +663,6 @@ struct Model
     Wc_ = tensor_type::Zero(1, hidden_).array().unaryExpr(randomize<Gen>(gen, range_c));
     bc_ = tensor_type::Ones(1, 1);
     
-    //Wt_ = tensor_type::Zero(hidden_, state_size).array().unaryExpr(randomize<Gen>(gen, range_t));
-    //bt_ = tensor_type::Zero(hidden_, 1);
-    
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size).array().unaryExpr(randomize<Gen>(gen, range_a));
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
 
@@ -745,9 +708,6 @@ struct Model
     Wc_ += x.Wc_;
     bc_ += x.bc_;
     
-    //Wt_ += x.Wt_;
-    //bt_ += x.bt_;
-
     Wa_ += x.Wa_;
     ba_ += x.ba_;
 
@@ -767,9 +727,6 @@ struct Model
     Wc_ *= x;
     bc_ *= x;
     
-    //Wt_ *= x;
-    //bt_ *= x;
-
     Wa_ *= x;
     ba_ *= x;
 
@@ -939,9 +896,6 @@ struct Model
       read(rep.path("Wc.bin"), Wc_);
       read(rep.path("bc.bin"), bc_);
 
-      //read(rep.path("Wt.bin"), Wt_);
-      //read(rep.path("bt.bin"), bt_);
-
       read(rep.path("Wa.bin"), Wa_);
       read(rep.path("ba.bin"), ba_);
 
@@ -1008,9 +962,6 @@ struct Model
 
     write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
     write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
-    
-    //write(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
-    //write(rep.path("bt.txt.gz"), rep.path("bt.bin"), bt_);
     
     write(rep.path("Wa.txt.gz"), rep.path("Wa.bin"), Wa_);
     write(rep.path("ba.txt.gz"), rep.path("ba.bin"), ba_);
@@ -1133,9 +1084,6 @@ private:
     write(os, Wc_);
     write(os, bc_);
     
-    //write(os, Wt_);
-    //write(os, bt_);
-
     write(os, Wa_);
     write(os, ba_);
     
@@ -1160,9 +1108,6 @@ private:
 
     read(is, Wc_);
     read(is, bc_);
-
-    //read(is, Wt_);
-    //read(is, bt_);
 
     read(is, Wa_);
     read(is, ba_);
@@ -1262,9 +1207,6 @@ public:
 
   tensor_type Wc_;
   tensor_type bc_;
-  
-  //tensor_type Wt_;
-  //tensor_type bt_;
   
   tensor_type Wa_;
   tensor_type ba_;
@@ -2646,9 +2588,6 @@ struct LearnAdaGrad
     Wc_ = tensor_type::Zero(1, hidden_);
     bc_ = tensor_type::Zero(1, 1);
     
-    //Wt_ = tensor_type::Zero(hidden_, state_size);
-    //bt_ = tensor_type::Zero(hidden_, 1);
-
     Wa_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), state_size);
     ba_ = tensor_type::Zero(hidden_ * (alignment * 2 + 1), 1);
     
@@ -2687,9 +2626,6 @@ struct LearnAdaGrad
 
     update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
-    
-    //update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
-    //update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
     
     update(theta.Wa_, const_cast<tensor_type&>(Wa_), gradient.Wa_, scale, lambda_ != 0.0);
     update(theta.ba_, const_cast<tensor_type&>(ba_), gradient.ba_, scale, false);
@@ -2818,9 +2754,6 @@ struct LearnAdaGrad
   tensor_type Wc_;
   tensor_type bc_;
   
-  //tensor_type Wt_;
-  //tensor_type bt_;
-  
   tensor_type Wa_;
   tensor_type ba_;
 
@@ -2898,9 +2831,6 @@ struct LearnSGD
 
     update(theta.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
     update(theta.bc_, gradient.bc_, scale, false);
-    
-    //update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
-    //update(theta.bt_, gradient.bt_, scale, false);
     
     update(theta.Wa_, gradient.Wa_, scale, lambda_ != 0.0);
     update(theta.ba_, gradient.ba_, scale, false);
