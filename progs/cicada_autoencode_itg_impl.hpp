@@ -2501,6 +2501,256 @@ struct LearnAdaGrad
   tensor_type bt2_;
 };
 
+struct LearnAdaDelta
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef Model     model_type;
+  typedef Gradient  gradient_type;
+
+  typedef cicada::Symbol   word_type;
+  typedef cicada::Vocab    vocab_type;
+  
+  typedef model_type::tensor_type tensor_type;
+  
+  LearnAdaDelta(const size_type& embedding,
+		const size_type& hidden,
+		const size_type& span,
+		const size_type& window,
+		const double& lambda,
+		const double& eta0)
+    : embedding_(embedding),
+      hidden_(hidden),
+      span_(span),
+      window_(window),
+      lambda_(lambda),
+      eta0_(eta0)
+  {
+    if (lambda_ < 0.0)
+      throw std::runtime_error("invalid regularization");
+    
+    if (eta0_ <= 0.0)
+      throw std::runtime_error("invalid learning rate");
+
+    const size_type vocabulary_size = word_type::allocated();
+    const size_type leaf_size = embedding * (window * 2 + 1) * 2;
+    
+    gsource_ = tensor_type::Zero(embedding_, vocabulary_size);
+    gtarget_ = tensor_type::Zero(embedding_, vocabulary_size);
+    xsource_ = tensor_type::Zero(embedding_, vocabulary_size);
+    xtarget_ = tensor_type::Zero(embedding_, vocabulary_size);
+    
+    gWc_ = tensor_type::Zero(embedding, hidden_);
+    gbc_ = tensor_type::Zero(embedding, 1);
+    xWc_ = tensor_type::Zero(embedding, hidden_);
+    xbc_ = tensor_type::Zero(embedding, 1);
+    
+    gWs1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    gbs1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    xWs1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    xbs1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    
+    gWs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), hidden_);
+    gbs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
+    xWs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), hidden_);
+    xbs2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
+    
+    gWi1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    gbi1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    xWi1_ = tensor_type::Zero(hidden_ * (span_ + 1), hidden_ + hidden_);
+    xbi1_ = tensor_type::Zero(hidden_ * (span_ + 1), 1);
+    
+    gWi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1),  hidden_);
+    gbi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
+    xWi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1),  hidden_);
+    xbi2_ = tensor_type::Zero((hidden_ + hidden_) * (span_ + 1), 1);
+    
+    gWt1_ = tensor_type::Zero(hidden_, leaf_size);
+    gbt1_ = tensor_type::Zero(hidden_, 1);
+    xWt1_ = tensor_type::Zero(hidden_, leaf_size);
+    xbt1_ = tensor_type::Zero(hidden_, 1);
+    
+    gWt2_ = tensor_type::Zero(leaf_size, hidden_);
+    gbt2_ = tensor_type::Zero(leaf_size, 1);
+    xWt2_ = tensor_type::Zero(leaf_size, hidden_);
+    xbt2_ = tensor_type::Zero(leaf_size, 1);
+  }
+
+  
+  void operator()(model_type& theta,
+		  const gradient_type& gradient) const
+  {
+    typedef gradient_type::embedding_type gradient_embedding_type;
+    
+    const double scale = 1.0 / gradient.count_;
+
+    gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
+    for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
+      update(siter->first,
+	     theta.source_,
+	     const_cast<tensor_type&>(gsource_),
+	     const_cast<tensor_type&>(xsource_),
+	     siter->second,
+	     scale);
+    
+    gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
+    for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
+      update(titer->first,
+	     theta.target_,
+	     const_cast<tensor_type&>(gtarget_),
+	     const_cast<tensor_type&>(xtarget_),
+	     titer->second,
+	     scale);
+
+    update(theta.Wc_, const_cast<tensor_type&>(gWc_), const_cast<tensor_type&>(xWc_), gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, const_cast<tensor_type&>(gbc_), const_cast<tensor_type&>(xbc_), gradient.bc_, scale, false);
+    
+    update(theta.Ws1_, const_cast<tensor_type&>(gWs1_), const_cast<tensor_type&>(xWs1_), gradient.Ws1_, scale, lambda_ != 0.0);
+    update(theta.bs1_, const_cast<tensor_type&>(gbs1_), const_cast<tensor_type&>(xbs1_), gradient.bs1_, scale, false);
+    update(theta.Ws2_, const_cast<tensor_type&>(gWs2_), const_cast<tensor_type&>(xWs2_), gradient.Ws2_, scale, lambda_ != 0.0);
+    update(theta.bs2_, const_cast<tensor_type&>(gbs2_), const_cast<tensor_type&>(xbs2_), gradient.bs2_, scale, false);
+
+    update(theta.Wi1_, const_cast<tensor_type&>(gWi1_), const_cast<tensor_type&>(xWi1_), gradient.Wi1_, scale, lambda_ != 0.0);
+    update(theta.bi1_, const_cast<tensor_type&>(gbi1_), const_cast<tensor_type&>(xbi1_), gradient.bi1_, scale, false);
+    update(theta.Wi2_, const_cast<tensor_type&>(gWi2_), const_cast<tensor_type&>(xWi2_), gradient.Wi2_, scale, lambda_ != 0.0);
+    update(theta.bi2_, const_cast<tensor_type&>(gbi2_), const_cast<tensor_type&>(xbi2_), gradient.bi2_, scale, false);
+    
+    update(theta.Wt1_, const_cast<tensor_type&>(gWt1_), const_cast<tensor_type&>(xWt1_), gradient.Wt1_, scale, lambda_ != 0.0);
+    update(theta.bt1_, const_cast<tensor_type&>(gbt1_), const_cast<tensor_type&>(xbt1_), gradient.bt1_, scale, false);
+    update(theta.Wt2_, const_cast<tensor_type&>(gWt2_), const_cast<tensor_type&>(xWt2_), gradient.Wt2_, scale, lambda_ != 0.0);
+    update(theta.bt2_, const_cast<tensor_type&>(gbt2_), const_cast<tensor_type&>(xbt2_), gradient.bt2_, scale, false);
+  }
+
+  template <typename Theta, typename GradVar, typename XVar, typename Grad>
+  struct update_visitor_regularize
+  {
+    update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
+			      Eigen::MatrixBase<GradVar>& G,
+			      Eigen::MatrixBase<XVar>& X,
+			      const Eigen::MatrixBase<Grad>& g,
+			      const double& scale,
+			      const double& lambda,
+			      const double& eta0)
+      : theta_(theta), G_(G), X_(X), g_(g), scale_(scale), lambda_(lambda), eta0_(eta0) {}
+    
+    void init(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      operator()(value, i, j);
+    }
+    
+    void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      if (g_(i, j) == 0) return;
+
+      G_(i, j) = G_(i, j) * 0.99 + g_(i, j) * g_(i, j) * scale_ * scale_;
+      
+      const double rate = std::sqrt(eta0_ + X_(i, j)) / std::sqrt(eta0_ + G_(i, j));
+      const double f = theta_(i, j) - rate * scale_ * g_(i, j);
+      const double x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      
+      X_(i, j) = X_(i, j) * 0.99 + (x - theta_(i, j)) * (x - theta_(i, j));
+      
+      theta_(i, j) = x;
+    }
+    
+    Eigen::MatrixBase<Theta>&      theta_;
+    Eigen::MatrixBase<GradVar>&    G_;
+    Eigen::MatrixBase<XVar>&       X_;
+    const Eigen::MatrixBase<Grad>& g_;
+    
+    const double scale_;
+    const double lambda_;
+    const double eta0_;
+  };
+
+  
+  template <typename Theta, typename GradVar, typename XVar, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      Eigen::MatrixBase<XVar>& X,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize=true) const
+  {
+    update_visitor_regularize<Theta, GradVar, XVar, Grad> visitor(theta, G, X, g, scale, regularize ? lambda_ : 0.0, eta0_);
+    
+    theta.visit(visitor);
+  }
+
+  template <typename Theta, typename GradVar, typename XVar, typename Grad>
+  void update(const word_type& word,
+	      Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      Eigen::MatrixBase<XVar>& X,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale) const
+  {
+    for (int row = 0; row != g.rows(); ++ row) 
+      if (g(row, 0) != 0) {
+	G(row, word.id()) = G(row, word.id()) * 0.99 + g(row, 0) * g(row, 0) * scale * scale;
+	
+	const double rate = std::sqrt(eta0_ + X(row, word.id())) / std::sqrt(eta0_ + G(row, word.id()));
+	const double f = theta(row, word.id()) - rate * scale * g(row, 0);
+	const double x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+	
+	X(row, word.id()) = X(row, word.id()) * 0.99 + (x - theta(row, word.id())) * (x - theta(row, word.id()));
+	
+	theta(row, word.id()) = x;
+      }
+  }
+  
+  size_type embedding_;
+  size_type hidden_;
+  size_type span_;
+  size_type window_;
+  
+  double lambda_;
+  double eta0_;
+  
+  // embedding
+  tensor_type gsource_;
+  tensor_type gtarget_;
+  tensor_type xsource_;
+  tensor_type xtarget_;
+
+  // classification
+  tensor_type gWc_;
+  tensor_type gbc_;
+  tensor_type xWc_;
+  tensor_type xbc_;
+
+  // straight
+  tensor_type gWs1_;
+  tensor_type gbs1_;
+  tensor_type gWs2_;
+  tensor_type gbs2_;
+  tensor_type xWs1_;
+  tensor_type xbs1_;
+  tensor_type xWs2_;
+  tensor_type xbs2_;
+
+  // inversion
+  tensor_type gWi1_;
+  tensor_type gbi1_;  
+  tensor_type gWi2_;
+  tensor_type gbi2_;  
+  tensor_type xWi1_;
+  tensor_type xbi1_;  
+  tensor_type xWi2_;
+  tensor_type xbi2_;  
+  
+  // terminal
+  tensor_type gWt1_;
+  tensor_type gbt1_;
+  tensor_type gWt2_;
+  tensor_type gbt2_;
+  tensor_type xWt1_;
+  tensor_type xbt1_;
+  tensor_type xWt2_;
+  tensor_type xbt2_;
+};
+
 struct LearnSGD
 {
   typedef size_t    size_type;
