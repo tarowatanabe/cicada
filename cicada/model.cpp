@@ -9,6 +9,7 @@
 #include "model.hpp"
 
 #include "utils/simple_vector.hpp"
+#include "utils/bithack.hpp"
 
 namespace cicada
 {
@@ -46,10 +47,10 @@ namespace cicada
     {
       if (state_size != 0) {
 	// sizeof(char*) aligned size..
-	const size_type pointer_size = sizeof(pointer);
-	const size_type pointer_mask = ~(pointer_size - 1);
+	const size_type alignment_size = utils::bithack::max(sizeof(pointer), size_type(16));
+	const size_type alignment_mask = ~(alignment_size - 1);
 	
-	state_alloc_size = (state_size + pointer_size - 1) & pointer_mask;
+	state_alloc_size = (state_size + alignment_size - 1) & alignment_mask;
 	state_chunk_size = state_alloc_size * chunk_size;
       }
     }
@@ -331,8 +332,8 @@ namespace cicada
     offsets.resize(models.size());
     states_size = 0;
 
-    const size_t pointer_size = sizeof(void*);
-    const size_t pointer_mask = ~(pointer_size - 1);
+    const size_t alignment_size = utils::bithack::max(sizeof(void*), size_type(16));
+    const size_t alignment_mask = ~(alignment_size - 1);
     
     for (size_t i = 0; i != models.size(); ++ i) {
       offsets[i] = states_size;
@@ -341,7 +342,7 @@ namespace cicada
       
       // multiple of pointer size...
       if (models[i]->state_size())
-	states_size += (models[i]->state_size() + pointer_size - 1) & pointer_mask;
+	states_size += (models[i]->state_size() + alignment_size - 1) & alignment_mask;
       
       if (feature_names.find(models[i]->feature_name()) != feature_names.end())
 	throw std::runtime_error("you have already registered feature: " + static_cast<const std::string&>(models[i]->feature_name()));
