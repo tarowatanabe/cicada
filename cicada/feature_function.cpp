@@ -40,6 +40,7 @@
 #include "feature/span.hpp"
 #include "feature/sparse_lexicon.hpp"
 #include "feature/sparse_ngram.hpp"
+#include "feature/tree_rnn.hpp"
 #include "feature/variational.hpp"
 #include "feature/vocabulary.hpp"
 
@@ -243,6 +244,14 @@ sparse-ngram: sparse ngram feature\n\
 \tname=feature-name-prefix (default: sparse-ngram)\n\
 \tcluster=[word class file] word-class for ngram\n\
 \tstemmer=[stemmer spec] stemming for ngram\n\
+tree-rnn: tree-rnn feature\n\
+\tfile=<model file>\n\
+\tembedding-file=<embedding file>\n\
+\tdimension-hidden=<dimension for hidden states>\n\
+\tdimension-embedding=<dimension for word embedding>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: tree-rnn)\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
@@ -378,6 +387,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::SparseLexicon(parameter));
     else if (param_name == "sparse-ngram")
       return feature_function_ptr_type(new feature::SparseNGram(parameter));
+    else if (param_name == "tree-rnn")
+      return feature_function_ptr_type(new feature::TreeRNN(parameter));
     else
       throw std::runtime_error("unknown feature: " + parameter);
     

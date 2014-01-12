@@ -62,6 +62,25 @@ namespace cicada
     
     typedef Embedding embedding_type;
     
+    struct shtanh
+    {
+      template <typename Tp>
+      Tp operator()(const Tp& x) const
+      {
+	return int(std::min(std::max(x, Tp(- 1)), Tp(1)) * 128) / Tp(128);
+      }
+    };
+    
+    struct dshtanh
+    {
+      template <typename Tp>
+      Tp operator()(const Tp& x) const
+      {
+	return Tp(- 1) < x && x < Tp(1);
+      }
+    };
+    
+    
   public:
     TreeRNN(const path_type& path)
     { open(path); }
@@ -73,10 +92,11 @@ namespace cicada
     void open(const path_type& path);
     void open(const size_type& hidden, const size_type& embedding, const path_type& path);
 
+  private:
     template <typename Gen>
-    struct randomize
+    struct __randomize
     {
-      randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
+      __randomize(Gen& gen, const double range=0.01) : gen_(gen), range_(range) {}
       
       template <typename Tp>
       Tp operator()(const Tp& x) const
@@ -88,6 +108,7 @@ namespace cicada
       double range_;
     };
     
+  public:
     template <typename Gen>
     void random(Gen& gen)
     {
@@ -96,25 +117,29 @@ namespace cicada
       const double range_t = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
       const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + hidden_));
       
-      Wp_.array().unaryExpr(randomize<Gen>(gen, range_p));
-      Wu_.array().unaryExpr(randomize<Gen>(gen, range_u));
-      Wt_.array().unaryExpr(randomize<Gen>(gen, range_t));
-      Wn_.array().unaryExpr(randomize<Gen>(gen, range_n));
+      Wp_.array().unaryExpr(__randomize<Gen>(gen, range_p));
+      Wu_.array().unaryExpr(__randomize<Gen>(gen, range_u));
+      Wt_.array().unaryExpr(__randomize<Gen>(gen, range_t));
+      Wn_.array().unaryExpr(__randomize<Gen>(gen, range_n));
     }
     
   public:
     size_type hidden_;
     size_type embedding_;
     
+    // pre-terminal
     tensor_type Wp_;
     tensor_type Bp_;
     
+    // unary
     tensor_type Wu_;
     tensor_type Bu_;
     
+    // binary rule for terminal
     tensor_type Wt_;
     tensor_type Bt_;
     
+    // binary rule for non-terminal
     tensor_type Wn_;
     tensor_type Bn_;
     
