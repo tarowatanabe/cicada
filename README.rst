@@ -28,7 +28,7 @@ Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pron
 Quick Start
 -----------
 
-The stable version is: `0.3.0 <http://www2.nict.go.jp/univ-com/multi_trans/cicada/cicada-0.3.0.tar.gz>`_.
+The stable version is: `0.3.1 <http://www2.nict.go.jp/univ-com/multi_trans/cicada/cicada-0.3.1.tar.gz>`_.
 The latest code is also available from `github.com <http://github.com/tarowatanabe/cicada>`_.
 
 Compile
@@ -251,6 +251,7 @@ Feature functions (see `doc/features.rst` for details):
 - The ngram language model feature supports both of
   `expgram <http://www2.nict.go.jp/univ-com/multi_trans/expgram>`_ [39]_ and
   `kenlm <http://kheafield.com/code/kenlm/>`_ [40]_.
+- Feed-forward neural network language model [41]_.
 - Sparse features, including rule-identity, source/target ngrams, and
   word pairs.
 
@@ -510,3 +511,9 @@ References
 	 Machine Translation, pages 187-197, Edinburgh, Scotland,
 	 July 2011. Association for Computational Linguistics.
 
+.. [41] Ashish Vaswani, Yinggong Zhao, Victoria Fossum, and David
+	Chiang. Decoding with large-scale neural language models
+	improves translation. In Proceedings of the 2013 Conference on
+	Empirical Methods in Natural Language Processing, pages
+	1387-1392, Seattle, Washington, USA, October 2013. Association
+	for Computational Linguistics.

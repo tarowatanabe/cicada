@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.61])
 
-AC_INIT([cicada], [0.3.0], [taro.watanabe@nict.go.jp])
+AC_INIT([cicada], [0.3.1], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config])
@@ -20,7 +20,7 @@ AM_INIT_AUTOMAKE([])
 CICADA_LTVERSION=0:3:0
 AC_SUBST(CICADA_LTVERSION)
 
-CICADA_VERSION=0.3.0
+CICADA_VERSION=0.3.1
 AC_SUBST(CICADA_VERSION)
 
 AC_CONFIG_HEADERS(utils/config.h)

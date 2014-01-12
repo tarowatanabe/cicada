@@ -1,3 +1,10 @@
+2014-1-12
+---------
+- Bug fix for max-scope constraint computation for GHKM/Tree
+  extractions
+- Added feed-forward neural network language model and its recurrent
+  version. Training is performed by noise contrastive estimate (NCE).
+
 2013-10-26
 ----------
  - Bugfix for MPI libraries linking (thanks to the problem reported by
