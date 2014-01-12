@@ -173,13 +173,13 @@ namespace cicada
 	      matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 	      
 	      const word_type word = extract(*first);
-	      
+
 	      if (is_initial)
 		buffer_next = (rnn.Wp_ * rnn.input_->operator()(word) + rnn.Bp_).array().unaryExpr(rnn_type::shtanh());
 	      else
 		buffer_next = (rnn.Bt_
-			       + rnn.Wt_.block(offset1, 0, rnn.hidden_, rnn.hidden_) * buffer_curr
-			       + rnn.Wt_.block(offset2, 0, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
+			       + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
+			       + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
 			       ).array().unaryExpr(rnn_type::shtanh());
 	      
 	      std::swap(pointer_curr, pointer_next);
@@ -188,7 +188,7 @@ namespace cicada
 	} else {
 	  if (states.size() == 1 && std::distance(first, last) == 1) {
 	    // special handling of unary rules
-	    
+
 	    matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[0])), rnn.hidden_, 1);
 	    matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 	    
@@ -208,7 +208,7 @@ namespace cicada
 								    non_terminal_pos,
 								    __non_terminal_index - 1);
 		++ non_terminal_pos;
-		
+
 		matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[antecedent_index])),
 					rnn.hidden_, 1);
 		
@@ -216,8 +216,8 @@ namespace cicada
 		  buffer_next = buffer_prev;
 		else 
 		  buffer_next = (rnn.Bn_
-				 + rnn.Wn_.block(offset1, 0, rnn.hidden_, rnn.hidden_) * buffer_curr
-				 + rnn.Wn_.block(offset2, 0, rnn.hidden_, rnn.hidden_) * buffer_prev
+				 + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
+				 + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
 				 ).array().unaryExpr(rnn_type::shtanh());
 		
 		std::swap(pointer_curr, pointer_next);
@@ -227,13 +227,13 @@ namespace cicada
 		matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 		
 		const word_type word = extract(*first);
-		
+
 		if (is_initial)
 		  buffer_next = (rnn.Wp_ * rnn.input_->operator()(word) + rnn.Bp_).array().unaryExpr(rnn_type::shtanh());
 		else
 		  buffer_next = (rnn.Bt_
-				 + rnn.Wt_.block(offset1, 0, rnn.hidden_, rnn.hidden_) * buffer_curr
-				 + rnn.Wt_.block(offset2, 0, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
+				 + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
+				 + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
 				 ).array().unaryExpr(rnn_type::shtanh());
 		
 		std::swap(pointer_curr, pointer_next);
@@ -256,7 +256,8 @@ namespace cicada
 	
 	matrix_type buffer(reinterpret_cast<parameter_type*>(state), rnn.hidden_, 1);
 	for (size_type i = 0; i != rnn.hidden_; ++ i)
-	  features[feature_names[i]] = buffer(i, 0);
+	  if (buffer(i, 0) != parameter_type(0)) 
+	    features[feature_names[i]] = buffer(i, 0);
       }
       
     public:
