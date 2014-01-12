@@ -38,7 +38,7 @@ namespace cicada
     path_ = path;
     
     embedding_size_ = repository_value<size_type>(rep, "size");
-    dimension_      = repository_value<size_type>(rep, "dimension");
+    dimension_      = repository_value<size_type>(rep, "embedding");
     order_          = repository_value<int>(rep, "order");
 
     normalize_ = normalize;

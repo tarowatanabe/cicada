@@ -588,7 +588,7 @@ struct Model
     
     repository_type rep(path, repository_type::write);
     
-    rep["dimension"] = utils::lexical_cast<std::string>(dimension_);
+    rep["embedding"] = utils::lexical_cast<std::string>(dimension_);
     rep["order"]     = utils::lexical_cast<std::string>(order_);
     rep["size"]      = utils::lexical_cast<std::string>(words_.size());
     rep["scale"]     = utils::lexical_cast<std::string>(scale_);
