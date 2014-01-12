@@ -255,9 +255,12 @@ namespace cicada
 	features.reserve(features.size() + rnn.hidden_);
 	
 	matrix_type buffer(reinterpret_cast<parameter_type*>(state), rnn.hidden_, 1);
-	for (size_type i = 0; i != rnn.hidden_; ++ i)
-	  if (buffer(i, 0) != parameter_type(0)) 
+	for (size_type i = 0; i != rnn.hidden_; ++ i) {
+	  if (buffer(i, 0) != parameter_type(0))
 	    features[feature_names[i]] = buffer(i, 0);
+	  else
+	    features.erase(feature_names[i]);
+	}
       }
       
     public:
