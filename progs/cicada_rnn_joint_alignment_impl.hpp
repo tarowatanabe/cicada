@@ -1957,9 +1957,7 @@ struct HMM
 		while (target_sampled == target_next)
 		  target_sampled = dict_.draw(source_next, gen);
 		
-		if (! sampled_.empty() && sampled_.find(target_sampled) != sampled_.end()) continue;
-		
-		sampled_.insert(target_sampled);
+		if (! sampled_.insert(target_sampled).second) continue;
 		
 		state_type state_sampled = state_allocator_.allocate();
 		state_sampled.prev() = state;
@@ -2030,9 +2028,7 @@ struct HMM
 	      while (target_sampled == target_next)
 		target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      if (! sampled_.empty() && sampled_.find(target_sampled) != sampled_.end()) continue;
-		
-	      sampled_.insert(target_sampled);
+	      if (! sampled_.insert(target_sampled).second) continue;
 	      
 	      state_type state_sampled = state_allocator_.allocate();
 	      state_sampled.prev() = state;
