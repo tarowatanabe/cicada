@@ -107,11 +107,67 @@ namespace cicada
       Wt_ = Wt_.array().unaryExpr(__randomize<Gen>(gen, range_t));
       Wn_ = Wn_.array().unaryExpr(__randomize<Gen>(gen, range_n));
     }
+
+    void clear()
+    {
+      Wt_.setZero();
+      Bt_.setZero();
+
+      Wn_.setZero();
+      Bn_.setZero();
+      
+      Bi_.setZero();
+    }
+
+  public:
+    friend
+    std::ostream& operator<<(std::ostream& os, const TreeRNN& rnn);
+    friend
+    std::istream& operator>>(std::istream& is, TreeRNN& rnn);
+
+  public:
+    TreeRNN& operator*=(const double& x)
+    {
+      Wt_ *= x;
+      Bt_ *= x;
+      
+      Wn_ *= x;
+      Bn_ *= x;
+      
+      Bi_ *= x;
+
+      return *this;
+    }
+
+    TreeRNN& operator+=(const TreeRNN& x)
+    {
+      Wt_ += x.Wt_;
+      Bt_ += x.Bt_;
+      
+      Wn_ += x.Wn_;
+      Bn_ += x.Bn_;
+      
+      Bi_ += x.Bi_;
+
+      return *this;
+    }
+
+    TreeRNN& operator-=(const TreeRNN& x)
+    {
+      Wt_ -= x.Wt_;
+      Bt_ -= x.Bt_;
+      
+      Wn_ -= x.Wn_;
+      Bn_ -= x.Bn_;
+      
+      Bi_ -= x.Bi_;
+
+      return *this;
+    }
     
   public:
     size_type hidden_;
     size_type embedding_;
-    
     
     // binary rule for terminal
     tensor_type Wt_;

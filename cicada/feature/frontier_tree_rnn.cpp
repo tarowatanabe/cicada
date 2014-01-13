@@ -438,7 +438,6 @@ namespace cicada
       size_type   embedding = 0;
       bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
-      bool        random = false;
       
       std::string name;
       
@@ -457,8 +456,6 @@ namespace cicada
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-bos-eos")
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "random")
-	  random = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -486,15 +483,17 @@ namespace cicada
       
       if (name.empty())
 	name = "frontier-tree-rnn";
+
+      const bool model_mode = (! path.empty());
       
-      std::auto_ptr<impl_type> rnn_impl(! path.empty()
+      std::auto_ptr<impl_type> rnn_impl(model_mode
 					? new impl_type(path, name)
 					: new impl_type(hidden, embedding, path_source, path_target, name));
       
       rnn_impl->no_bos_eos    = no_bos_eos;
       rnn_impl->skip_sgml_tag = skip_sgml_tag;
-
-      if (random) {
+      
+      if (! model_mode) {
 	boost::mt19937 generator;
 	generator.seed(utils::random_seed());
 	

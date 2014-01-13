@@ -111,7 +111,88 @@ namespace cicada
       Wt_ = Wt_.array().unaryExpr(__randomize<Gen>(gen, range_t));
       Wn_ = Wn_.array().unaryExpr(__randomize<Gen>(gen, range_n));
     }
+
+    void clear()
+    {
+      Wp_.setZero();
+      Bp_.setZero();
+      
+      Ws_.setZero();
+      Bs_.setZero();
+      
+      Wt_.setZero();
+      Bt_.setZero();
+
+      Wn_.setZero();
+      Bn_.setZero();
+      
+      Bi_.setZero();
+    }
+
+  public:
+    friend
+    std::ostream& operator<<(std::ostream& os, const BiTreeRNN& rnn);
+    friend
+    std::istream& operator>>(std::istream& is, BiTreeRNN& rnn);
     
+  public:
+    BiTreeRNN& operator*=(const double& x)
+    {
+      Wp_ *= x;
+      Bp_ *= x;
+      
+      Ws_ *= x;
+      Bs_ *= x;
+      
+      Wt_ *= x;
+      Bt_ *= x;
+      
+      Wn_ *= x;
+      Bn_ *= x;
+      
+      Bi_ *= x;
+
+      return *this;
+    }
+
+    BiTreeRNN& operator+=(const BiTreeRNN& x)
+    {
+      Wp_ += x.Wp_;
+      Bp_ += x.Bp_;
+
+      Ws_ += x.Ws_;
+      Bs_ += x.Bs_;
+      
+      Wt_ += x.Wt_;
+      Bt_ += x.Bt_;
+      
+      Wn_ += x.Wn_;
+      Bn_ += x.Bn_;
+      
+      Bi_ += x.Bi_;
+
+      return *this;
+    }
+
+    BiTreeRNN& operator-=(const BiTreeRNN& x)
+    {
+      Wp_ -= x.Wp_;
+      Bp_ -= x.Bp_;
+
+      Ws_ -= x.Ws_;
+      Bs_ -= x.Bs_;
+      
+      Wt_ -= x.Wt_;
+      Bt_ -= x.Bt_;
+      
+      Wn_ -= x.Wn_;
+      Bn_ -= x.Bn_;
+      
+      Bi_ -= x.Bi_;
+
+      return *this;
+    }
+
   public:
     size_type hidden_;
     size_type embedding_;

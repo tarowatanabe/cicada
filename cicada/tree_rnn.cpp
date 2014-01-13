@@ -150,4 +150,64 @@ namespace cicada
     if (input_->dimension() != embedding_)
       throw std::runtime_error("invalid dimension for word embedding");
   }
+
+  template <typename Tensor>
+  inline
+  void write_matrix(std::ostream& os, const Tensor& matrix)
+  {
+    const typename Tensor::Index rows = matrix.rows();
+    const typename Tensor::Index cols = matrix.cols();
+    
+    os.write((char*) &rows, sizeof(typename Tensor::Index));
+    os.write((char*) &cols, sizeof(typename Tensor::Index));
+    
+    os.write((char*) matrix.data(), sizeof(typename Tensor::Scalar) * rows * cols);
+  }
+
+  template <typename Tensor>
+  inline
+  void read_matrix(std::istream& is, Tensor& matrix)
+  {
+    typename Tensor::Index rows;
+    typename Tensor::Index cols;
+    
+    is.read((char*) &rows, sizeof(typename Tensor::Index));
+    is.read((char*) &cols, sizeof(typename Tensor::Index));
+    
+    matrix.resize(rows, cols);
+    
+    is.read((char*) matrix.data(), sizeof(typename Tensor::Scalar) * rows * cols);
+  }
+  
+  std::ostream& operator<<(std::ostream& os, const TreeRNN& rnn)
+  {
+    os.write((char*) &rnn.hidden_,    sizeof(rnn.hidden_));
+    os.write((char*) &rnn.embedding_, sizeof(rnn.embedding_));
+    
+    write_matrix(os, rnn.Wt_);
+    write_matrix(os, rnn.Bt_);
+    
+    write_matrix(os, rnn.Wn_);
+    write_matrix(os, rnn.Bn_);
+
+    write_matrix(os, rnn.Bi_);
+    
+    return os;
+  }
+  
+  std::istream& operator>>(std::istream& is, TreeRNN& rnn)
+  {
+    is.read((char*) &rnn.hidden_,    sizeof(rnn.hidden_));
+    is.read((char*) &rnn.embedding_, sizeof(rnn.embedding_));
+    
+    read_matrix(is, rnn.Wt_);
+    read_matrix(is, rnn.Bt_);
+
+    read_matrix(is, rnn.Wn_);
+    read_matrix(is, rnn.Bn_);
+
+    read_matrix(is, rnn.Bi_);
+    
+    return is;
+  }
 };
