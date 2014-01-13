@@ -318,18 +318,14 @@ namespace cicada
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
     
-    write_matrix(rep.path("Wp.txt.gz"), rep.path("Wp.bin"), Wp_);
-    write_matrix(rep.path("Bp.txt.gz"), rep.path("Bp.bin"), Bp_);
-
-    write_matrix(rep.path("Wu.txt.gz"), rep.path("Wu.bin"), Wu_);
-    write_matrix(rep.path("Bu.txt.gz"), rep.path("Bu.bin"), Bu_);
-
     write_matrix(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
     write_matrix(rep.path("Bt.txt.gz"), rep.path("Bt.bin"), Bt_);
 
     write_matrix(rep.path("Wn.txt.gz"), rep.path("Wn.bin"), Wn_);
     write_matrix(rep.path("Bn.txt.gz"), rep.path("Bn.bin"), Bn_);
-    
+
+    write_matrix(rep.path("Bi.txt.gz"), rep.path("Bi.bin"), Bi_);
+
     if (input_)
       input_->write(rep.path("input"));
   }
@@ -351,29 +347,21 @@ namespace cicada
     if (embedding_ == 0)
       throw std::runtime_error("invalid dimension");
 
-    Wp_ = tensor_type::Zero(hidden_, embedding_);
-    Bp_ = tensor_type::Zero(hidden_, 1);
-
-    Wu_ = tensor_type::Zero(hidden_, hidden_);
-    Bu_ = tensor_type::Zero(hidden_, 1);
-    
     Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     Bt_ = tensor_type::Zero(hidden_, 1);
     
     Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
     Bn_ = tensor_type::Zero(hidden_, 1);
-    
-    read_matrix(rep.path("Wp.bin"), Wp_);
-    read_matrix(rep.path("Bp.bin"), Bp_);
-    
-    read_matrix(rep.path("Wu.bin"), Wu_);
-    read_matrix(rep.path("Bu.bin"), Bu_);
-    
+
+    Bi_ = tensor_type::Zero(hidden_, 1);
+
     read_matrix(rep.path("Wt.bin"), Wt_);
     read_matrix(rep.path("Bt.bin"), Bt_);
     
     read_matrix(rep.path("Wn.bin"), Wn_);
     read_matrix(rep.path("Bn.bin"), Bn_);
+    
+    read_matrix(rep.path("Bi.bin"), Bi_);
     
     input_ = EmbeddingMapped::create(rep.path("input"), embedding_);
   }
@@ -391,17 +379,13 @@ namespace cicada
     if (embedding_ == 0)
       throw std::runtime_error("invalid dimension");
     
-    Wp_ = tensor_type::Zero(hidden_, embedding_);
-    Bp_ = tensor_type::Zero(hidden_, 1);
-
-    Wu_ = tensor_type::Zero(hidden_, hidden_);
-    Bu_ = tensor_type::Zero(hidden_, 1);
-    
     Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     Bt_ = tensor_type::Zero(hidden_, 1);
     
     Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
     Bn_ = tensor_type::Zero(hidden_, 1);
+
+    Bi_ = tensor_type::Zero(hidden_, 1);
 
     input_ = (boost::filesystem::is_directory(path)
 	      ? EmbeddingMapped::create(path, embedding_)

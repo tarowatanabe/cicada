@@ -16,6 +16,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
 #include "utils/small_vector.hpp"
+#include "utils/random_seed.hpp"
 
 namespace cicada
 {
@@ -96,6 +97,12 @@ namespace cicada
 	for (size_type i = 0; i != rnn.hidden_; ++ i)
 	  feature_names.push_back(name + ':' + utils::lexical_cast<std::string>(i));
       }
+
+      void initialize()
+      {
+	// pre-apply f(x) for Bi
+	init = rnn.Bi_.array().unaryExpr(rnn_type::shtanh());
+      }
       
       struct extract_word
       {
@@ -165,86 +172,64 @@ namespace cicada
 	parameter_type* pointer_curr = const_cast<parameter_type*>(&(*buffer_tmp.begin()));
 	parameter_type* pointer_next = reinterpret_cast<parameter_type*>(state);
 	
-	if (states.empty()) {
-	  bool is_initial = true;
-	  for (/**/; first != last; ++ first)
-	    if (! skipper(*first)) {
-	      matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
-	      matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
-	      
-	      const word_type word = extract(*first);
-
-	      if (is_initial)
-		buffer_next = (rnn.Wp_ * rnn.input_->operator()(word) + rnn.Bp_).array().unaryExpr(rnn_type::shtanh());
-	      else
-		buffer_next = (rnn.Bt_
-			       + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
-			       + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
-			       ).array().unaryExpr(rnn_type::shtanh());
-	      
-	      std::swap(pointer_curr, pointer_next);
-	      is_initial = false;
-	    }
-	} else {
-	  if (states.size() == 1 && std::distance(first, last) == 1) {
-	    // special handling of unary rules
-
-	    matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[0])), rnn.hidden_, 1);
+	bool is_initial = true;
+	int non_terminal_pos = 0;
+	for (/**/; first != last; ++ first) {
+	  if (first->is_non_terminal()) {
+	    matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
 	    matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 	    
-	    buffer_next = (rnn.Bu_ + rnn.Wu_ * buffer_prev).array().unaryExpr(rnn_type::shtanh());
+	    const int __non_terminal_index = first->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0,
+								non_terminal_pos,
+								__non_terminal_index - 1);
+	    ++ non_terminal_pos;
+	    
+	    matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[antecedent_index])),
+				    rnn.hidden_, 1);
+	    
+	    if (is_initial)
+	      buffer_next = (rnn.Bn_
+			     + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * init
+			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
+			     ).array().unaryExpr(rnn_type::shtanh());
+	    else 
+	      buffer_next = (rnn.Bn_
+			     + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
+			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
+			     ).array().unaryExpr(rnn_type::shtanh());
 	    
 	    std::swap(pointer_curr, pointer_next);
-	  } else {
-	    bool is_initial = true;
-	    int non_terminal_pos = 0;
-	    for (/**/; first != last; ++ first) {
-	      if (first->is_non_terminal()) {
-		matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
-		matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
-
-		const int __non_terminal_index = first->non_terminal_index();
-		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0,
-								    non_terminal_pos,
-								    __non_terminal_index - 1);
-		++ non_terminal_pos;
-
-		matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[antecedent_index])),
-					rnn.hidden_, 1);
-		
-		if (is_initial)
-		  buffer_next = buffer_prev;
-		else 
-		  buffer_next = (rnn.Bn_
-				 + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
-				 + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
-				 ).array().unaryExpr(rnn_type::shtanh());
-		
-		std::swap(pointer_curr, pointer_next);
-		is_initial = false;
-	      } else if (! skipper(*first)) {
-		matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
-		matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
-		
-		const word_type word = extract(*first);
-
-		if (is_initial)
-		  buffer_next = (rnn.Wp_ * rnn.input_->operator()(word) + rnn.Bp_).array().unaryExpr(rnn_type::shtanh());
-		else
-		  buffer_next = (rnn.Bt_
-				 + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
-				 + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
-				 ).array().unaryExpr(rnn_type::shtanh());
-		
-		std::swap(pointer_curr, pointer_next);
-		is_initial = false;
-	      }
-	    }
+	    is_initial = false;
+	  } else if (! skipper(*first)) {
+	    matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
+	    matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
+	    
+	    const word_type word = extract(*first);
+	    
+	    if (is_initial)
+	      buffer_next = (rnn.Bt_
+			     + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_)    * init
+			     + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
+			     ).array().unaryExpr(rnn_type::shtanh());
+	    else
+	      buffer_next = (rnn.Bt_
+			     + rnn.Wt_.block(0, offset1, rnn.hidden_, rnn.hidden_)    * buffer_curr
+			     + rnn.Wt_.block(0, offset2, rnn.hidden_, rnn.embedding_) * rnn.input_->operator()(word)
+			     ).array().unaryExpr(rnn_type::shtanh());
+	    
+	    std::swap(pointer_curr, pointer_next);
+	    is_initial = false;
 	  }
 	}
 	
 	// copy into state buffer when necessary..
-	if (pointer_curr != reinterpret_cast<parameter_type*>(state)) {
+	if (is_initial) {
+	  // nothing is propagated... this may not happen, but we will simply copy "init"
+	  matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
+	  
+	  buffer_next = init;
+	} else if (pointer_curr != reinterpret_cast<parameter_type*>(state)) {
 	  matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
 	  matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 	  
@@ -253,7 +238,7 @@ namespace cicada
 	
 	// add features...
 	features.reserve(features.size() + rnn.hidden_);
-	
+
 	matrix_type buffer(reinterpret_cast<parameter_type*>(state), rnn.hidden_, 1);
 	for (size_type i = 0; i != rnn.hidden_; ++ i) {
 	  if (buffer(i, 0) != parameter_type(0))
@@ -264,9 +249,10 @@ namespace cicada
       }
       
     public:
-      rnn_type rnn;
+      rnn_type    rnn;
+      tensor_type init;
 
-      buffer_type buffer_tmp;
+      buffer_type   buffer_tmp;
       word_set_type words_tmp;
       
       bool no_bos_eos;
@@ -293,6 +279,7 @@ namespace cicada
       size_type   embedding = 0;
       bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
+      bool        random = false;
       
       std::string name;
       
@@ -309,6 +296,8 @@ namespace cicada
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-bos-eos")
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "random")
+	  random = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -341,6 +330,13 @@ namespace cicada
       
       rnn_impl->no_bos_eos    = no_bos_eos;
       rnn_impl->skip_sgml_tag = skip_sgml_tag;
+
+      if (random) {
+	boost::mt19937 generator;
+	generator.seed(utils::random_seed());
+	
+	rnn_impl->rnn.random(generator);
+      }
       
       base_type::__state_size = sizeof(tree_rnn_type::parameter_type) * rnn_impl->rnn.hidden_;
       base_type::__feature_name = name;
@@ -372,6 +368,10 @@ namespace cicada
       return *this;
     }
     
+    void TreeRNN::initialize()
+    {
+      pimpl->initialize();
+    }
     
     void TreeRNN::apply(state_ptr_type& state,
 			const state_ptr_set_type& states,
