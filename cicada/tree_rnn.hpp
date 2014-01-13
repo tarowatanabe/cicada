@@ -126,7 +126,8 @@ namespace cicada
     std::istream& operator>>(std::istream& is, TreeRNN& rnn);
 
   public:
-    TreeRNN& operator*=(const double& x)
+    template <typename Tp>
+    TreeRNN& operator*=(const Tp& x)
     {
       Wt_ *= x;
       Bt_ *= x;
