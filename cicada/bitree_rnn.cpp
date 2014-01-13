@@ -72,6 +72,12 @@ namespace cicada
 
     rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
+
+    write_matrix(rep.path("Wp.txt.gz"), rep.path("Wp.bin"), Wp_);
+    write_matrix(rep.path("Bp.txt.gz"), rep.path("Bp.bin"), Bp_);
+
+    write_matrix(rep.path("Ws.txt.gz"), rep.path("Ws.bin"), Ws_);
+    write_matrix(rep.path("Bs.txt.gz"), rep.path("Bs.bin"), Bs_);
     
     write_matrix(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
     write_matrix(rep.path("Bt.txt.gz"), rep.path("Bt.bin"), Bt_);
@@ -104,13 +110,25 @@ namespace cicada
     if (embedding_ == 0)
       throw std::runtime_error("invalid dimension");
 
-    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_ + embedding_);
+    Wp_ = tensor_type::Zero(hidden_, hidden_ + embedding_ + embedding_);
+    Bp_ = tensor_type::Zero(hidden_, 1);
+
+    Ws_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
+    Bs_ = tensor_type::Zero(hidden_, 1);
+    
+    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     Bt_ = tensor_type::Zero(hidden_, 1);
     
     Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
     Bn_ = tensor_type::Zero(hidden_, 1);
 
     Bi_ = tensor_type::Zero(hidden_, 1);
+
+    read_matrix(rep.path("Wp.bin"), Wp_);
+    read_matrix(rep.path("Bp.bin"), Bp_);
+
+    read_matrix(rep.path("Ws.bin"), Ws_);
+    read_matrix(rep.path("Bs.bin"), Bs_);
 
     read_matrix(rep.path("Wt.bin"), Wt_);
     read_matrix(rep.path("Bt.bin"), Bt_);
@@ -147,7 +165,13 @@ namespace cicada
     if (embedding_ == 0)
       throw std::runtime_error("invalid dimension");
     
-    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_ + embedding_);
+    Wp_ = tensor_type::Zero(hidden_, hidden_ + embedding_ + embedding_);
+    Bp_ = tensor_type::Zero(hidden_, 1);
+
+    Ws_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
+    Bs_ = tensor_type::Zero(hidden_, 1);
+
+    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
     Bt_ = tensor_type::Zero(hidden_, 1);
     
     Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);

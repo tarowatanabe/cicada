@@ -101,9 +101,13 @@ namespace cicada
     template <typename Gen>
     void random(Gen& gen)
     {
-      const double range_t = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_ + embedding_));
+      const double range_p = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_ + embedding_));
+      const double range_s = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
+      const double range_t = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
       const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + hidden_));
       
+      Wp_ = Wp_.array().unaryExpr(__randomize<Gen>(gen, range_p));
+      Ws_ = Ws_.array().unaryExpr(__randomize<Gen>(gen, range_s));
       Wt_ = Wt_.array().unaryExpr(__randomize<Gen>(gen, range_t));
       Wn_ = Wn_.array().unaryExpr(__randomize<Gen>(gen, range_n));
     }
@@ -112,7 +116,15 @@ namespace cicada
     size_type hidden_;
     size_type embedding_;
     
-    // binary rule for terminal
+    // binary rule for terminal-pairs
+    tensor_type Wp_;
+    tensor_type Bp_;
+
+    // binary rule for source (w/o target)
+    tensor_type Ws_;
+    tensor_type Bs_;
+
+    // binary rule for target (w/o source)
     tensor_type Wt_;
     tensor_type Bt_;
     
