@@ -264,7 +264,6 @@ namespace cicada
 	  
 	  if (! phrase_source.empty() || ! phrase_target.empty()) {
 	    
-	    
 	    if (phrase_source.empty()) {
 	      // only target...
 	      phrase_type::const_iterator titer_begin = phrase_target.begin();
@@ -406,7 +405,7 @@ namespace cicada
 
       buffer_type   buffer_tmp;
       word_set_type words_tmp;
-      phrase_type phrase_tmp;
+      phrase_type   phrase_tmp;
 
       cache_phrase_set_type cache_source;
       cache_phrase_set_type cache_target;
