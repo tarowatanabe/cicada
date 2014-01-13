@@ -53,7 +53,7 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
-      typedef std::vector<feature_type, std::allocator<feature_type> > name_set_type;
+      typedef cicada::feature::FrontierTreeRNN::feature_name_set_type feature_name_set_type;
 
       typedef rnn_type::parameter_type parameter_type;
       typedef rnn_type::matrix_type    matrix_type;
@@ -95,15 +95,21 @@ namespace cicada
       
     public:
       FrontierTreeRNNImpl(const path_type& path, const std::string& name)
-	: rnn(path), no_bos_eos(false), skip_sgml_tag(false),
+	: rnn(path),
+	  no_bos_eos(false), skip_sgml_tag(false),
 	  attr_frontier_source("frontier-source"),
 	  attr_frontier_target("frontier-target")
       {
 	initialize(name);
       }
       
-      FrontierTreeRNNImpl(const size_type& hidden, const size_type& embedding, const path_type& path, const std::string& name)
-	: rnn(hidden, embedding, path), no_bos_eos(false), skip_sgml_tag(false),
+      FrontierTreeRNNImpl(const size_type& hidden,
+			  const size_type& embedding,
+			  const path_type& path_source,
+			  const path_type& path_target,
+			  const std::string& name)
+	: rnn(hidden, embedding, path_source, path_target),
+	  no_bos_eos(false), skip_sgml_tag(false),
 	  attr_frontier_source("frontier-source"),
 	  attr_frontier_target("frontier-target")
       {
@@ -409,7 +415,7 @@ namespace cicada
       bool skip_sgml_tag;
       
       // names...
-      name_set_type feature_names;
+      feature_name_set_type feature_names;
 
       attribute_type attr_frontier_source;
       attribute_type attr_frontier_target;
@@ -423,11 +429,12 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (utils::ipiece(param.name()) != "tree-rnn")
-	throw std::runtime_error("is this really tree-rnn feature function? " + parameter);
+      if (utils::ipiece(param.name()) != "frontier-tree-rnn")
+	throw std::runtime_error("is this really frontier tree-rnn feature function? " + parameter);
       
       path_type   path;
-      path_type   path_embedding;
+      path_type   path_source;
+      path_type   path_target;
       size_type   hidden = 0;
       size_type   embedding = 0;
       bool        skip_sgml_tag = false;
@@ -439,8 +446,10 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
-	else if (utils::ipiece(piter->first) == "embedding-file")
-	  path_embedding = piter->second;
+	else if (utils::ipiece(piter->first) == "embedding-source-file")
+	  path_source = piter->second;
+	else if (utils::ipiece(piter->first) == "embedding-target-file")
+	  path_target = piter->second;
 	else if (utils::ipiece(piter->first) == "dimension-hidden")
 	  hidden = utils::lexical_cast<size_type>(piter->second);
 	else if (utils::ipiece(piter->first) == "dimension-embedding")
@@ -457,29 +466,31 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for ngram: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (! path.empty() && ! path_embedding.empty())
-	throw std::runtime_error("either one of model file or embedding file");
+      if (! path.empty() && ! path_source.empty() && ! path_target.empty())
+	throw std::runtime_error("either one of model file or source/target embedding file");
       
       if (! path.empty()) {
 	if (! boost::filesystem::exists(path))
 	  throw std::runtime_error("no model file? " + path.string());
 	
-      } else if (! path_embedding.empty()) {
-	if (! boost::filesystem::exists(path_embedding))
-	  throw std::runtime_error("no embedding file? " + path_embedding.string());
+      } else if (! path_source.empty() && ! path_target.empty()) {
+	if (! boost::filesystem::exists(path_source))
+	  throw std::runtime_error("no source embedding file? " + path_source.string());
+	if (! boost::filesystem::exists(path_target))
+	  throw std::runtime_error("no target embedding file? " + path_target.string());
 	
 	if (hidden == 0 || embedding == 0)
 	  throw std::runtime_error("invalid dimension");
 	
       } else
-	throw std::runtime_error("no model file nor embedding file?");
+	throw std::runtime_error("no model file nor source/target embedding file?");
       
       if (name.empty())
-	name = "tree-rnn";
+	name = "frontier-tree-rnn";
       
       std::auto_ptr<impl_type> rnn_impl(! path.empty()
 					? new impl_type(path, name)
-					: new impl_type(hidden, embedding, path_embedding, name));
+					: new impl_type(hidden, embedding, path_source, path_target, name));
       
       rnn_impl->no_bos_eos    = no_bos_eos;
       rnn_impl->skip_sgml_tag = skip_sgml_tag;
@@ -510,6 +521,11 @@ namespace cicada
     FrontierTreeRNN::tree_rnn_type& FrontierTreeRNN::model() const
     {
       return const_cast<tree_rnn_type&>(pimpl->rnn);
+    }
+
+    const FrontierTreeRNN::feature_name_set_type& FrontierTreeRNN::features() const
+    {
+      return pimpl->feature_names;
     }
     
     FrontierTreeRNN& FrontierTreeRNN::operator=(const FrontierTreeRNN& x)

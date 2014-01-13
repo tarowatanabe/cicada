@@ -38,6 +38,7 @@ namespace cicada
 
     public:
       typedef cicada::TreeRNN tree_rnn_type;
+      typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
       
     public:
       // parameter = key:[key=value (delimited by ',')]*
@@ -90,6 +91,7 @@ namespace cicada
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new TreeRNN(*this)); }
       
       tree_rnn_type& model() const;
+      const feature_name_set_type& features() const;
       
     private:
       impl_type* pimpl;

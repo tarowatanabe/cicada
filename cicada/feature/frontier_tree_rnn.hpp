@@ -33,11 +33,12 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
     private:
-      typedef FeatureFunction base_type;
-      typedef TreeRNNImpl     impl_type;
+      typedef FeatureFunction     base_type;
+      typedef FrontierTreeRNNImpl impl_type;
       
     public:
       typedef cicada::BiTreeRNN tree_rnn_type;
+      typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
       
     public:
       // parameter = key:[key=value (delimited by ',')]*
@@ -90,6 +91,7 @@ namespace cicada
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new FrontierTreeRNN(*this)); }
       
       tree_rnn_type& model() const;
+      const feature_name_set_type& features() const;
       
     private:
       impl_type* pimpl;

@@ -147,6 +147,7 @@ feature/frontier_bigram.hpp \
 feature/frontier_lexicon.hpp \
 feature/frontier_pair.hpp \
 feature/frontier_shape.hpp \
+feature/frontier_tree_rnn.hpp \
 feature/global_lexicon.hpp \
 feature/insertion.hpp \
 feature/kenlm.hpp \
@@ -187,6 +188,7 @@ feature/frontier_bigram.cpp \
 feature/frontier_lexicon.cpp \
 feature/frontier_pair.cpp \
 feature/frontier_shape.cpp \
+feature/frontier_tree_rnn.cpp \
 feature/global_lexicon.cpp \
 feature/insertion.cpp \
 feature/kenlm.cpp \

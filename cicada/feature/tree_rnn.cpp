@@ -45,7 +45,7 @@ namespace cicada
       
       typedef feature_set_type::feature_type feature_type;
       
-      typedef std::vector<feature_type, std::allocator<feature_type> > name_set_type;
+      typedef cicada::feature::TreeRNN::feature_name_set_type feature_name_set_type;
 
       typedef rnn_type::parameter_type parameter_type;
       typedef rnn_type::matrix_type    matrix_type;
@@ -259,7 +259,7 @@ namespace cicada
       bool skip_sgml_tag;
       
       // names...
-      name_set_type feature_names;
+      feature_name_set_type feature_names;
     };
     
     TreeRNN::TreeRNN(const std::string& parameter)
@@ -357,6 +357,11 @@ namespace cicada
     TreeRNN::tree_rnn_type& TreeRNN::model() const
     {
       return const_cast<tree_rnn_type&>(pimpl->rnn);
+    }
+
+    const TreeRNN::feature_name_set_type& TreeRNN::features() const
+    {
+      return pimpl->feature_names;
     }
     
     TreeRNN& TreeRNN::operator=(const TreeRNN& x)
