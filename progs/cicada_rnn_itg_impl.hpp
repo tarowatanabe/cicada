@@ -2385,7 +2385,8 @@ struct ITG
     if (num_loss == 0)
       return 0.0;
     
-    const double error_factor = 1.0 / (num_errors * (citer_end - citer_begin));
+    //const double error_factor = 1.0 / (num_errors * (citer_end - citer_begin));
+    const double error_factor = 1.0 / num_loss;
     
     double loss = 0.0;
     

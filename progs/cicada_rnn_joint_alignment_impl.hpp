@@ -2199,7 +2199,8 @@ struct HMM
       }
     
     if (num_loss) {
-      const double error_factor = 1.0 / (num_errors * (viter_end - viter));
+      //const double error_factor = 1.0 / (num_errors * (viter_end - viter));
+      const double error_factor = 1.0 / num_loss;
       
       for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
 	if (miter->error() > 0)
