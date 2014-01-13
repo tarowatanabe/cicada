@@ -589,7 +589,8 @@ unite.hpp \
 verify.hpp \
 viterbi.hpp \
 vocab.hpp \
-weight_vector.hpp
+weight_vector.hpp \
+word_embedding.hpp 
 
 libcicada_la_SOURCES = \
 alignment.cpp \
@@ -639,7 +640,8 @@ tree_rnn.cpp \
 tree_rule.cpp \
 tree_rule_compact.cpp \
 tree_transducer.cpp \
-vocab.cpp
+vocab.cpp \
+word_embedding.cpp
 
 libcicada_la_LDFLAGS = \
 	$(PTHREAD_FLAGS) \

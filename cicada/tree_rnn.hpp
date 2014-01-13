@@ -21,7 +21,7 @@
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
-#include <cicada/ngram_cache.hpp>
+#include <cicada/word_embedding.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/mathop.hpp>
@@ -46,21 +46,8 @@ namespace cicada
     
     typedef Eigen::Matrix<parameter_type, Eigen::Dynamic, Eigen::Dynamic>    tensor_type;
     typedef Eigen::Map<tensor_type>                                          matrix_type;
-    
-    class Embedding
-    {
-    public:
-      virtual
-      ~Embedding() {}
-    public:
-      virtual
-      void write(const path_type& path) const = 0;
-      
-      virtual
-      matrix_type operator()(const word_type& word) const = 0;
-    };
-    
-    typedef Embedding embedding_type;
+
+    typedef WordEmbedding embedding_type;
     
     struct shtanh
     {
@@ -135,7 +122,7 @@ namespace cicada
     // bias for initial state
     tensor_type Bi_;
     
-    boost::shared_ptr<embedding_type> input_;
+    const embedding_type* input_;
   };
 };
 
