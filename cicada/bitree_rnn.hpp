@@ -3,8 +3,8 @@
 //  Copyright(C) 2014 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__TREE_RNN__HPP__
-#define __CICADA__TREE_RNN__HPP__ 1
+#ifndef __CICADA__BI_TREE_RNN__HPP__
+#define __CICADA__BI_TREE_RNN__HPP__ 1
 
 // binary tree RNN model
 // this is simply a place-holder for actual feature in feature directory...
@@ -30,7 +30,7 @@
 
 namespace cicada
 {
-  class TreeRNN
+  class BiTreeRNN
   {
   public:
     typedef Symbol                  word_type;
@@ -69,17 +69,17 @@ namespace cicada
     
     
   public:
-    TreeRNN()
-      : hidden_(0), embedding_(0), input_(0) {}
-    TreeRNN(const path_type& path)
+    BiTreeRNN()
+      : hidden_(0), embedding_(0), source_(0), target_(0) {}
+    BiTreeRNN(const path_type& path)
     { open(path); }
-    TreeRNN(const size_type& hidden, const size_type& embedding, const path_type& path)
-    { open(hidden, embedding, path); }
+    BiTreeRNN(const size_type& hidden, const size_type& embedding, const path_type& path_source, const path_type& path_target)
+    { open(hidden, embedding, path_source, path_target); }
     
     void write(const path_type& path) const;
     
     void open(const path_type& path);
-    void open(const size_type& hidden, const size_type& embedding, const path_type& path);
+    void open(const size_type& hidden, const size_type& embedding, const path_type& path_source, const path_type& path_target);
 
   private:
     template <typename Gen>
@@ -101,7 +101,7 @@ namespace cicada
     template <typename Gen>
     void random(Gen& gen)
     {
-      const double range_t = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_));
+      const double range_t = std::sqrt(6.0 / (hidden_ + hidden_ + embedding_ + embedding_));
       const double range_n = std::sqrt(6.0 / (hidden_ + hidden_ + hidden_));
       
       Wt_ = Wt_.array().unaryExpr(__randomize<Gen>(gen, range_t));
@@ -111,7 +111,6 @@ namespace cicada
   public:
     size_type hidden_;
     size_type embedding_;
-    
     
     // binary rule for terminal
     tensor_type Wt_;
@@ -124,7 +123,8 @@ namespace cicada
     // bias for initial state
     tensor_type Bi_;
     
-    const embedding_type* input_;
+    const embedding_type* source_;
+    const embedding_type* target_;
   };
 };
 

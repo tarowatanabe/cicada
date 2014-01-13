@@ -450,6 +450,7 @@ binarize_dependency.hpp \
 binarize_left.hpp \
 binarize_right.hpp \
 bitext.hpp \
+bitree_rnn.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
 compose.hpp \
@@ -596,6 +597,7 @@ libcicada_la_SOURCES = \
 alignment.cpp \
 attribute.cpp \
 attribute_vector.cpp \
+bitree_rnn.cpp \
 cluster.cpp \
 dependency.cpp \
 feature.cpp \
