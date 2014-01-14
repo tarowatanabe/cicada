@@ -206,8 +206,8 @@ namespace cicada
     template <typename Iterator>
     logprob_type logprob_dispatch(Iterator first, Iterator last, id_type) const
     {
-      const size_type hash = hasher_type::operator()(first, last, 0);
-      const size_type pos = hash & (cache_type::cache_size - 1);
+      const size_type hash      = hasher_type::operator()(first, last, 0);
+      const size_type pos       = (hash >> 4) & (cache_type::cache_size - 1);
       const size_type pos_cache = hash & (locks_.size() - 1);
       
       spinlock_type::lock_type lock(const_cast<spinlock_type&>(locks_[pos_cache]).mutex_);
