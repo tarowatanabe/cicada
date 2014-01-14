@@ -54,7 +54,8 @@ namespace cicada
       template <typename Tp>
       Tp operator()(const Tp& x) const
       {
-	return int(std::min(std::max(x, Tp(- 1)), Tp(1)) * 128) / Tp(128);
+	// we perform rounding twice for stabler quantization
+	return int(Tp(int(std::min(std::max(x, Tp(- 1)), Tp(1)) * 100) * Tp(0.01)) * 100) * Tp(0.01);
       }
     };
     

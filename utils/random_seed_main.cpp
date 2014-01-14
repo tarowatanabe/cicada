@@ -15,12 +15,12 @@ int main(int argc, char** argv)
   
   for (size_t i = 0; i != 1024; ++ i) {
     const double rand = gen(generator);
-    const double rounded1 = int(rand * 128) / double(128);
-    const double rounded2 = int(rounded1 * 128) / double(128);
-
-    const int value = int(rand * 128);
+    const double rounded1 = int(rand * 100) * double(0.01);
+    const double rounded2 = int(rounded1 * 100) * double(0.01);
+    const double rounded3 = int(rounded2 * 100) * double(0.01);
+    const double rounded4 = int(rounded3 * 100) * double(0.01);
     
-    if (rounded1 != rounded2)
-      std::cerr << "differ: " << rand << " 1st = " << rounded1 << " 2nd = " << rounded2 << std::endl;
+    if (rounded2 != rounded3)
+      std::cerr << "differ: " << rand << " 2nd = " << rounded2 << " 3rd = " << rounded3 << std::endl;
   }
 }
