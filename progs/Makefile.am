@@ -398,7 +398,7 @@ cicada_learn_tree_rnn_mpi_SOURCES  = \
 	cicada_learn_tree_rnn_mpi.cpp \
 	cicada_learn_tree_rnn_impl.hpp 
 cicada_learn_tree_rnn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_learn_tree_rnn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS) $(LIBCG_DESCENT)
+cicada_learn_tree_rnn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 
 cicada_learn_online_mpi_SOURCES  = \
