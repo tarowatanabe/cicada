@@ -73,6 +73,8 @@ namespace cicada
       : hidden_(0), embedding_(0), source_(0), target_(0) {}
     BiTreeRNN(const path_type& path)
     { open(path); }
+    BiTreeRNN(const size_type& hidden, const size_type& embedding)
+    { initialize(hidden, embedding); }
     BiTreeRNN(const size_type& hidden, const size_type& embedding, const path_type& path_source, const path_type& path_target)
     { open(hidden, embedding, path_source, path_target); }
     
@@ -80,6 +82,8 @@ namespace cicada
     
     void open(const path_type& path);
     void open(const size_type& hidden, const size_type& embedding, const path_type& path_source, const path_type& path_target);
+
+    void initialize(const size_type& hidden, const size_type& embedding);
 
   private:
     template <typename Gen>
@@ -127,6 +131,29 @@ namespace cicada
       Bn_.setZero();
       
       Bi_.setZero();
+    }
+
+    void swap(BiTreeRNN& x)
+    {
+      std::swap(hidden_,    x.hidden_);
+      std::swap(embedding_, x.embedding_);
+
+      Wp_.swap(x.Wp_);
+      Bp_.swap(x.Bp_);
+
+      Ws_.swap(x.Ws_);
+      Bs_.swap(x.Bs_);
+      
+      Wt_.swap(x.Wt_);
+      Bt_.swap(x.Bt_);
+
+      Wn_.swap(x.Wn_);
+      Bn_.swap(x.Bn_);
+
+      Bi_.swap(x.Bi_);
+
+      std::swap(source_, x.source_);
+      std::swap(target_, x.target_);
     }
 
   public:
@@ -220,6 +247,16 @@ namespace cicada
     const embedding_type* source_;
     const embedding_type* target_;
   };
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::BiTreeRNN& x, cicada::BiTreeRNN& y)
+  {
+    x.swap(y);
+  }
+  
 };
 
 #endif

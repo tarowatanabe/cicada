@@ -73,6 +73,8 @@ namespace cicada
       : hidden_(0), embedding_(0), input_(0) {}
     TreeRNN(const path_type& path)
     { open(path); }
+    TreeRNN(const size_type& hidden, const size_type& embedding)
+    { initialize(hidden, embedding); }
     TreeRNN(const size_type& hidden, const size_type& embedding, const path_type& path)
     { open(hidden, embedding, path); }
     
@@ -80,6 +82,8 @@ namespace cicada
     
     void open(const path_type& path);
     void open(const size_type& hidden, const size_type& embedding, const path_type& path);
+
+    void initialize(const size_type& hidden, const size_type& embedding);
 
   private:
     template <typename Gen>
@@ -117,6 +121,22 @@ namespace cicada
       Bn_.setZero();
       
       Bi_.setZero();
+    }
+
+    void swap(TreeRNN& x)
+    {
+      std::swap(hidden_,    x.hidden_);
+      std::swap(embedding_, x.embedding_);
+
+      Wt_.swap(x.Wt_);
+      Bt_.swap(x.Bt_);
+
+      Wn_.swap(x.Wn_);
+      Bn_.swap(x.Bn_);
+
+      Bi_.swap(x.Bi_);
+
+      std::swap(input_, x.input_);
     }
 
   public:
@@ -183,6 +203,16 @@ namespace cicada
     
     const embedding_type* input_;
   };
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::TreeRNN& x, cicada::TreeRNN& y)
+  {
+    x.swap(y);
+  }
+  
 };
 
 #endif

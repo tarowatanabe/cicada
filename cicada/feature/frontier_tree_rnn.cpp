@@ -526,6 +526,16 @@ namespace cicada
       return pimpl->feature_names;
     }
     
+    bool FrontierTreeRNN::no_bos_eos() const
+    {
+      return pimpl->no_bos_eos;
+    }
+
+    bool FrontierTreeRNN::skip_sgml_tag() const
+    {
+      return pimpl->skip_sgml_tag;
+    }
+
     FrontierTreeRNN& FrontierTreeRNN::operator=(const FrontierTreeRNN& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);

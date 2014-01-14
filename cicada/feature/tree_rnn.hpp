@@ -92,6 +92,8 @@ namespace cicada
       
       tree_rnn_type& model() const;
       const feature_name_set_type& features() const;
+      bool no_bos_eos() const;
+      bool skip_sgml_tag() const;
       
     private:
       impl_type* pimpl;

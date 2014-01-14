@@ -187,6 +187,35 @@ namespace cicada
     if (target_->dimension() != embedding_)
       throw std::runtime_error("invalid dimension for target word embedding");
   }
+  
+  void BiTreeRNN::initialize(const size_type& hidden,
+			     const size_type& embedding)
+  {
+    hidden_    = hidden;
+    embedding_ = embedding;
+
+    if (hidden_ == 0)
+      throw std::runtime_error("invalid dimension");
+    if (embedding_ == 0)
+      throw std::runtime_error("invalid dimension");
+    
+    Wp_ = tensor_type::Zero(hidden_, hidden_ + embedding_ + embedding_);
+    Bp_ = tensor_type::Zero(hidden_, 1);
+
+    Ws_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
+    Bs_ = tensor_type::Zero(hidden_, 1);
+
+    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
+    Bt_ = tensor_type::Zero(hidden_, 1);
+    
+    Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
+    Bn_ = tensor_type::Zero(hidden_, 1);
+
+    Bi_ = tensor_type::Zero(hidden_, 1);
+
+    source_ = 0;
+    target_ = 0;
+  }
 
   template <typename Tensor>
   inline

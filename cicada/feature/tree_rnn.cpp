@@ -362,6 +362,16 @@ namespace cicada
     {
       return pimpl->feature_names;
     }
+
+    bool TreeRNN::no_bos_eos() const
+    {
+      return pimpl->no_bos_eos;
+    }
+
+    bool TreeRNN::skip_sgml_tag() const
+    {
+      return pimpl->skip_sgml_tag;
+    }
     
     TreeRNN& TreeRNN::operator=(const TreeRNN& x)
     {

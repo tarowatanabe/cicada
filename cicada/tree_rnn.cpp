@@ -151,6 +151,27 @@ namespace cicada
       throw std::runtime_error("invalid dimension for word embedding");
   }
 
+  void TreeRNN::initialize(const size_type& hidden, const size_type& embedding)
+  {
+    hidden_    = hidden;
+    embedding_ = embedding;
+    
+    if (hidden_ == 0)
+      throw std::runtime_error("invalid dimension");
+    if (embedding_ == 0)
+      throw std::runtime_error("invalid dimension");
+    
+    Wt_ = tensor_type::Zero(hidden_, hidden_ + embedding_);
+    Bt_ = tensor_type::Zero(hidden_, 1);
+    
+    Wn_ = tensor_type::Zero(hidden_, hidden_ + hidden_);
+    Bn_ = tensor_type::Zero(hidden_, 1);
+    
+    Bi_ = tensor_type::Zero(hidden_, 1);
+    
+    input_ = 0;
+  }
+
   template <typename Tensor>
   inline
   void write_matrix(std::ostream& os, const Tensor& matrix)
