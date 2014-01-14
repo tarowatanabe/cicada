@@ -272,8 +272,10 @@ struct TaskAccumulate
 	  
 	  for (size_type j = 0; j != gradients_.size(); ++ j)
 	    if (gradients_[j].shared() == shard_size) {
-	      grad = &gradients_[j];
-	      break;
+	      if (! grad)
+		grad = &gradients_[j];
+	      else
+		gradients_[j].clear();
 	    }
 	  
 	  if (! grad) {
