@@ -226,12 +226,12 @@ namespace cicada
 	// copy into state buffer when necessary..
 	if (is_initial) {
 	  // nothing is propagated... this may not happen, but we will simply copy "init"
-	  matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
+	  matrix_type buffer_next(reinterpret_cast<parameter_type*>(state), rnn.hidden_, 1);
 	  
 	  buffer_next = init;
 	} else if (pointer_curr != reinterpret_cast<parameter_type*>(state)) {
 	  matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
-	  matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
+	  matrix_type buffer_next(reinterpret_cast<parameter_type*>(state), rnn.hidden_, 1);
 	  
 	  buffer_next = buffer_curr;
 	}
