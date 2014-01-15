@@ -208,7 +208,7 @@ struct TaskAccumulate
   typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_merger_type;
   typedef std::vector<queue_merger_type, std::allocator<queue_merger_type> > queue_merger_set_type;
   
-  typedef utils::chunk_vector<gradient_type, 4096 / sizeof(gradient_type), std::allocator<gradient_type> > gradient_set_type;
+  typedef utils::chunk_vector<gradient_type, 1024 / sizeof(gradient_type), std::allocator<gradient_type> > gradient_set_type;
   
   TaskAccumulate(const Learner& learner,
 		 const data_type& data,
@@ -307,7 +307,7 @@ struct TaskAccumulate
 	break;
       }
     
-    if (! grad && gradients_.size() < 1024) {
+    if (! grad && gradients_.size() < 128) {
       gradients_.push_back(gradient_type(theta_.dimension_embedding_, theta_.dimension_hidden_, theta_.order_));
       grad = &gradients_.back();
     }
