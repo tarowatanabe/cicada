@@ -185,18 +185,18 @@ namespace cicada
 								__non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
-	    matrix_type buffer_prev(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[antecedent_index])),
+	    matrix_type buffer_ante(const_cast<parameter_type*>(reinterpret_cast<const parameter_type*>(states[antecedent_index])),
 				    rnn.hidden_, 1);
 	    
 	    if (is_initial)
 	      buffer_next = (rnn.Bn_
 			     + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * init
-			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
+			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_ante
 			     ).array().unaryExpr(rnn_type::shtanh());
 	    else 
 	      buffer_next = (rnn.Bn_
 			     + rnn.Wn_.block(0, offset1, rnn.hidden_, rnn.hidden_) * buffer_curr
-			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_prev
+			     + rnn.Wn_.block(0, offset2, rnn.hidden_, rnn.hidden_) * buffer_ante
 			     ).array().unaryExpr(rnn_type::shtanh());
 	    
 	    std::swap(pointer_curr, pointer_next);
