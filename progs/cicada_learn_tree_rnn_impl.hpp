@@ -712,7 +712,7 @@ struct KBestSentence
 	  boost::get<0>(yield).insert(boost::get<0>(yield).end(),
 				      boost::get<0>(*(first + pos)).begin(),
 				      boost::get<0>(*(first + pos)).end());
-	} else if (*titer != vocab_type::EPSILON)
+	} else if (*titer != vocab_type::EPSILON && *titer != vocab_type::BOS && *titer != vocab_type::EPS)
 	  boost::get<0>(yield).push_back(*titer);
       
       // collect edge id and features...
