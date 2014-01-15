@@ -1200,6 +1200,8 @@ struct LearnAdaGrad : public Learn
   void operator()(model_type& theta, const gradient_type& gradient) const
   {
     typedef gradient_type::embedding_type embedding_type;
+
+    if (! gradient.count_) return;
     
     embedding_type::const_iterator iiter_end = gradient.embedding_input_.end();
     for (embedding_type::const_iterator iiter = gradient.embedding_input_.begin(); iiter != iiter_end; ++ iiter)
@@ -1363,6 +1365,8 @@ struct LearnSGD : public Learn
   void operator()(model_type& theta, const gradient_type& gradient) const
   {
     typedef gradient_type::embedding_type embedding_type;
+
+    if (! gradient.count_) return;
 
     //++ const_cast<size_type&>(epoch_);
     

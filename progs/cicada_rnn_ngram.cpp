@@ -18,7 +18,6 @@
 #include <cmath>
 #include <climits>
 
-#include <deque>
 #include <memory>
 
 #include "cicada_rnn_ngram_impl.hpp"
@@ -30,6 +29,7 @@
 #include "utils/random_seed.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
+#include "utils/chunk_vector.hpp"
 
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/random.hpp>
@@ -205,7 +205,7 @@ struct TaskAccumulate
   typedef utils::lockfree_list_queue<gradient_type*, std::allocator<gradient_type*> > queue_merger_type;
   typedef std::vector<queue_merger_type, std::allocator<queue_merger_type> > queue_merger_set_type;
   
-  typedef std::deque<gradient_type, std::allocator<gradient_type> > gradient_set_type;
+  typedef utils::chunk_vector<gradient_type, 4096 / sizeof(gradient_type), std::allocator<gradient_type> > gradient_set_type;
   
   TaskAccumulate(const Learner& learner,
 		 const data_type& data,
@@ -246,7 +246,7 @@ struct TaskAccumulate
       bool found = false;
       
       if (merge_finished != shard_size)
-	while (mergers_[shard_].pop(grad, true)) {
+	for (size_type i = 0; i != shard_size && mergers_[shard_].pop(grad, true); ++ i) {
 	  if (! grad)
 	    ++ merge_finished;
 	  else {
