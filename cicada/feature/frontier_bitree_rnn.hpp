@@ -3,8 +3,8 @@
 //  Copyright(C) 2014 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__FEATURE__FRONTIER_TREE_RNN__HPP__
-#define __CICADA__FEATURE__FRONTIER_TREE_RNN__HPP__ 1
+#ifndef __CICADA__FEATURE__FRONTIER_BI_TREE_RNN__HPP__
+#define __CICADA__FEATURE__FRONTIER_BI_TREE_RNN__HPP__ 1
 
 #include <string>
 
@@ -18,9 +18,9 @@ namespace cicada
   namespace feature
   {
     
-    class FrontierTreeRNNImpl;
+    class FrontierBiTreeRNNImpl;
 
-    class FrontierTreeRNN : public FeatureFunction
+    class FrontierBiTreeRNN : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -33,8 +33,8 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
     private:
-      typedef FeatureFunction     base_type;
-      typedef FrontierTreeRNNImpl impl_type;
+      typedef FeatureFunction       base_type;
+      typedef FrontierBiTreeRNNImpl impl_type;
       
     public:
       typedef cicada::BiTreeRNN tree_rnn_type;
@@ -49,14 +49,14 @@ namespace cicada
       // name: name of this feature function. default to ngram
       // order: ngram's order
       
-      FrontierTreeRNN(const std::string& parameter);
-      FrontierTreeRNN(const FrontierTreeRNN&);
-      ~FrontierTreeRNN();
+      FrontierBiTreeRNN(const std::string& parameter);
+      FrontierBiTreeRNN(const FrontierBiTreeRNN&);
+      ~FrontierBiTreeRNN();
       
-      FrontierTreeRNN& operator=(const FrontierTreeRNN&);
+      FrontierBiTreeRNN& operator=(const FrontierBiTreeRNN&);
 
     private:
-      FrontierTreeRNN() {}
+      FrontierBiTreeRNN() {}
       
     public:
       virtual void apply(state_ptr_type& state,
@@ -88,7 +88,7 @@ namespace cicada
 
       virtual void initialize();
       
-      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new FrontierTreeRNN(*this)); }
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new FrontierBiTreeRNN(*this)); }
       
       tree_rnn_type& model() const;
       const feature_name_set_type& features() const;

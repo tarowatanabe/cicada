@@ -30,7 +30,7 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/tokenizer.hpp"
 #include "cicada/matcher.hpp"
-#include "cicada/feature/tree_rnn.hpp"
+#include "cicada/feature/frontier_bitree_rnn.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -93,7 +93,7 @@ bool matcher_list = false;
 // learning options...
 path_type refset_file;
 path_type output_weights_file; // weights output
-path_type output_model_file;  // model output
+path_type output_model_file;   // model output
 path_type weights_file;
 
 // scorers
@@ -121,7 +121,7 @@ bool dump_weights_mode   = false; // dump current weights... for debugging purpo
 
 int debug = 0;
 
-#include "cicada_learn_tree_rnn_impl.hpp"
+#include "cicada_learn_bitree_rnn_impl.hpp"
 
 // forward declarations...
 
@@ -309,15 +309,15 @@ int main(int argc, char ** argv)
     }
         
     // check if we have correct feature!
-    const cicada::feature::TreeRNN* tree_rnn_feature = 0;
+    const cicada::feature::FrontierBiTreeRNN* tree_rnn_feature = 0;
     
     model_type::const_iterator miter_end = model.end();
     for (model_type::const_iterator miter = model.begin(); miter != miter_end; ++ miter)
-      if (dynamic_cast<cicada::feature::TreeRNN*>(miter->get())) {
+      if (dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get())) {
 	if (tree_rnn_feature)
 	  throw std::runtime_error("We do not allow multiple tree-rnn features!");
 	
-	tree_rnn_feature = dynamic_cast<cicada::feature::TreeRNN*>(miter->get());
+	tree_rnn_feature = dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get());
       }
     
     if (! tree_rnn_feature)
@@ -702,7 +702,7 @@ struct Task
   
   typedef std::vector<size_t, std::allocator<size_t> > segment_set_type;
 
-  typedef cicada::feature::TreeRNN::feature_name_set_type feature_name_set_type;
+  typedef cicada::feature::FrontierBiTreeRNN::feature_name_set_type feature_name_set_type;
 
   typedef tree_rnn_type::tensor_type tensor_type;
 
@@ -803,12 +803,12 @@ struct Task
 	segments_.push_back(seg);
     
     // check for the feature
-    const cicada::feature::TreeRNN* tree_rnn_feature = 0;
+    const cicada::feature::FrontierBiTreeRNN* tree_rnn_feature = 0;
     
     model_type::const_iterator miter_end = model.end();
     for (model_type::const_iterator miter = model.begin(); miter != miter_end; ++ miter)
-      if (dynamic_cast<cicada::feature::TreeRNN*>(miter->get())) {
-	tree_rnn_feature = dynamic_cast<cicada::feature::TreeRNN*>(miter->get());
+      if (dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get())) {
+	tree_rnn_feature = dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get());
 	break;
       }
     

@@ -18,10 +18,10 @@
 #include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
 #include "feature/frontier_bigram.hpp"
+#include "feature/frontier_bitree_rnn.hpp"
 #include "feature/frontier_lexicon.hpp"
 #include "feature/frontier_pair.hpp"
 #include "feature/frontier_shape.hpp"
-#include "feature/frontier_tree_rnn.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/insertion.hpp"
 #include "feature/kenlm.hpp"
@@ -108,6 +108,15 @@ frontier-bigram: sparse frontier source side bigram\n\
 \ttarget=[true|false] target side bigram (you can specify both)\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-bigram)\n\
+frontier-bitree-rnn: frontier-bitree-rnn feature\n\
+\tfile=<model file>\n\
+\tembedding-source-file=<source embedding file>\n\
+\tembedding-target-file=<target embedding file>\n\
+\tdimension-hidden=<dimension for hidden states>\n\
+\tdimension-embedding=<dimension for word embedding>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-bitree-rnn)\n\
 frontier-lexicon: sparse lexicon feature from frontiers\n\
 \tcluster-source=[word class file] word-class for source side\n\
 \tcluster-target=[word class file] word-class for target side\n\
@@ -121,15 +130,6 @@ frontier-pair: sparse frontier pair features\n\
 frontier-shape: sparse frontier shape features\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-shape)\n\
-frontier-tree-rnn: frontier-tree-rnn feature\n\
-\tfile=<model file>\n\
-\tembedding-source-file=<source embedding file>\n\
-\tembedding-target-file=<target embedding file>\n\
-\tdimension-hidden=<dimension for hidden states>\n\
-\tdimension-embedding=<dimension for word embedding>\n\
-\tno-bos-eos=[true|false] do not add bos/eos\n\
-\tskip-sgml-tag=[true|false] skip sgml tags\n\
-\tname=feature-name-prefix (default: frontier-tree-rnn)\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
 insertion: insertion feature\n\
@@ -344,14 +344,14 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Depeval(parameter));
     else if (param_name == "frontier-bigram")
       return feature_function_ptr_type(new feature::FrontierBigram(parameter));
+    else if (param_name == "frontier-bitree-rnn")
+      return feature_function_ptr_type(new feature::FrontierBiTreeRNN(parameter));
     else if (param_name == "frontier-lexicon")
       return feature_function_ptr_type(new feature::FrontierLexicon(parameter));
     else if (param_name == "frontier-pair")
       return feature_function_ptr_type(new feature::FrontierPair(parameter));
     else if (param_name == "frontier-shape")
       return feature_function_ptr_type(new feature::FrontierShape(parameter));
-    else if (param_name == "frontier-tree-rnn")
-      return feature_function_ptr_type(new feature::FrontierTreeRNN(parameter));
     else if (param_name == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
     else if (param_name == "insertion")

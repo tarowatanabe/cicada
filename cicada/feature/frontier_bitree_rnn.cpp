@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <memory>
 
-#include "cicada/feature/frontier_tree_rnn.hpp"
+#include "cicada/feature/frontier_bitree_rnn.hpp"
 #include "cicada/bitree_rnn.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
@@ -26,7 +26,7 @@ namespace cicada
 {
   namespace feature
   {
-    class FrontierTreeRNNImpl : public utils::hashmurmur3<size_t>
+    class FrontierBiTreeRNNImpl : public utils::hashmurmur3<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -53,7 +53,7 @@ namespace cicada
       typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
       
-      typedef cicada::feature::FrontierTreeRNN::feature_name_set_type feature_name_set_type;
+      typedef cicada::feature::FrontierBiTreeRNN::feature_name_set_type feature_name_set_type;
 
       typedef rnn_type::parameter_type parameter_type;
       typedef rnn_type::matrix_type    matrix_type;
@@ -94,7 +94,7 @@ namespace cicada
       };
       
     public:
-      FrontierTreeRNNImpl(const path_type& path, const std::string& name)
+      FrontierBiTreeRNNImpl(const path_type& path, const std::string& name)
 	: rnn(path),
 	  no_bos_eos(false), skip_sgml_tag(false),
 	  attr_frontier_source("frontier-source"),
@@ -103,11 +103,11 @@ namespace cicada
 	initialize(name);
       }
       
-      FrontierTreeRNNImpl(const size_type& hidden,
-			  const size_type& embedding,
-			  const path_type& path_source,
-			  const path_type& path_target,
-			  const std::string& name)
+      FrontierBiTreeRNNImpl(const size_type& hidden,
+			    const size_type& embedding,
+			    const path_type& path_source,
+			    const path_type& path_target,
+			    const std::string& name)
 	: rnn(hidden, embedding, path_source, path_target),
 	  no_bos_eos(false), skip_sgml_tag(false),
 	  attr_frontier_source("frontier-source"),
@@ -116,7 +116,7 @@ namespace cicada
 	initialize(name);
       }
       
-      FrontierTreeRNNImpl(const FrontierTreeRNNImpl& x)
+      FrontierBiTreeRNNImpl(const FrontierBiTreeRNNImpl& x)
 	: rnn(x.rnn),
 	  no_bos_eos(x.no_bos_eos),
 	  skip_sgml_tag(x.skip_sgml_tag),
@@ -126,7 +126,7 @@ namespace cicada
       {
       }
 
-      FrontierTreeRNNImpl& operator=(const FrontierTreeRNNImpl& x)
+      FrontierBiTreeRNNImpl& operator=(const FrontierBiTreeRNNImpl& x)
       {
 	rnn = x.rnn;
 	
@@ -180,24 +180,10 @@ namespace cicada
 		     feature_set_type& features,
 		     const bool final) const
       {
-	if (final && ! no_bos_eos) {
-	  word_set_type& words = const_cast<word_set_type&>(words_tmp);
-	  
-	  words.clear();
-	  words.push_back(vocab_type::BOS);
-	  words.insert(words.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
-	  words.push_back(vocab_type::EOS);
-	  
-	  if (skip_sgml_tag)
-	    rnn_score(state, states, edge, words.begin(), words.end(),  features, extract_word(), skipper_sgml());
-	  else
-	    rnn_score(state, states, edge, words.begin(), words.end(), features, extract_word(), skipper_epsilon());
-	} else {
-	  if (skip_sgml_tag)
-	    rnn_score(state, states, edge, edge.rule->rhs.begin(), edge.rule->rhs.end(), features, extract_word(), skipper_sgml());
-	  else
-	    rnn_score(state, states, edge, edge.rule->rhs.begin(), edge.rule->rhs.end(), features, extract_word(), skipper_epsilon());
-	}
+	if (skip_sgml_tag)
+	  rnn_score(state, states, edge, edge.rule->rhs.begin(), edge.rule->rhs.end(), features, extract_word(), skipper_sgml());
+	else
+	  rnn_score(state, states, edge, edge.rule->rhs.begin(), edge.rule->rhs.end(), features, extract_word(), skipper_epsilon());
       }
 
       
@@ -255,15 +241,19 @@ namespace cicada
 	attribute_set_type::const_iterator siter = edge.attributes.find(attr_frontier_source);
 	attribute_set_type::const_iterator titer = edge.attributes.find(attr_frontier_target);
 	
-	if (siter != edge.attributes.end() && titer != edge.attributes.end()) {
-	  const std::string& frontier_source = boost::apply_visitor(__attribute_string(), siter->second);
-	  const std::string& frontier_target = boost::apply_visitor(__attribute_string(), titer->second);
+	if (siter != edge.attributes.end() || titer != edge.attributes.end()) {
+	  const std::string& frontier_source = (siter != edge.attributes.end()
+						? boost::apply_visitor(__attribute_string(), siter->second)
+						: frontier_tmp);
+	  const std::string& frontier_target = (titer != edge.attributes.end()
+						? boost::apply_visitor(__attribute_string(), titer->second)
+						: frontier_tmp);
 	  
 	  const phrase_type& phrase_source = cache_phrase(frontier_source, cache_source, skipper);
 	  const phrase_type& phrase_target = cache_phrase(frontier_target, cache_target, skipper);
 	  
 	  if (! phrase_source.empty() || ! phrase_target.empty()) {
-	    
+
 	    if (phrase_source.empty()) {
 	      // only target...
 	      phrase_type::const_iterator titer_begin = phrase_target.begin();
@@ -316,8 +306,8 @@ namespace cicada
 	      phrase_type::const_iterator titer_begin = phrase_target.begin();
 	      phrase_type::const_iterator titer_end   = phrase_target.end();
 	      
-	      for (phrase_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-		for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	      for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+		for (phrase_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 		  matrix_type buffer_curr(pointer_curr, rnn.hidden_, 1);
 		  matrix_type buffer_next(pointer_next, rnn.hidden_, 1);
 		  
@@ -405,6 +395,7 @@ namespace cicada
 
       buffer_type   buffer_tmp;
       word_set_type words_tmp;
+      std::string   frontier_tmp;
       phrase_type   phrase_tmp;
 
       cache_phrase_set_type cache_source;
@@ -420,7 +411,7 @@ namespace cicada
       attribute_type attr_frontier_target;
     };
     
-    FrontierTreeRNN::FrontierTreeRNN(const std::string& parameter)
+    FrontierBiTreeRNN::FrontierBiTreeRNN(const std::string& parameter)
       : pimpl(0)
     {
       typedef boost::filesystem::path path_type;
@@ -428,7 +419,7 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (utils::ipiece(param.name()) != "frontier-tree-rnn")
+      if (utils::ipiece(param.name()) != "frontier-bitree-rnn")
 	throw std::runtime_error("is this really frontier tree-rnn feature function? " + parameter);
       
       path_type   path;
@@ -482,7 +473,7 @@ namespace cicada
 	throw std::runtime_error("no model file nor source/target embedding file?");
       
       if (name.empty())
-	name = "frontier-tree-rnn";
+	name = "frontier-bitree-rnn";
 
       const bool model_mode = (! path.empty());
       
@@ -506,37 +497,37 @@ namespace cicada
       pimpl = rnn_impl.release();
     }
     
-    FrontierTreeRNN::~FrontierTreeRNN()
+    FrontierBiTreeRNN::~FrontierBiTreeRNN()
     {
       std::auto_ptr<impl_type> tmp(pimpl);
     }
     
-    FrontierTreeRNN::FrontierTreeRNN(const FrontierTreeRNN& x)
+    FrontierBiTreeRNN::FrontierBiTreeRNN(const FrontierBiTreeRNN& x)
       : base_type(static_cast<const base_type&>(x)),
 	pimpl(new impl_type(*x.pimpl))
     {}
 
-    FrontierTreeRNN::tree_rnn_type& FrontierTreeRNN::model() const
+    FrontierBiTreeRNN::tree_rnn_type& FrontierBiTreeRNN::model() const
     {
       return const_cast<tree_rnn_type&>(pimpl->rnn);
     }
 
-    const FrontierTreeRNN::feature_name_set_type& FrontierTreeRNN::features() const
+    const FrontierBiTreeRNN::feature_name_set_type& FrontierBiTreeRNN::features() const
     {
       return pimpl->feature_names;
     }
     
-    bool FrontierTreeRNN::no_bos_eos() const
+    bool FrontierBiTreeRNN::no_bos_eos() const
     {
       return pimpl->no_bos_eos;
     }
 
-    bool FrontierTreeRNN::skip_sgml_tag() const
+    bool FrontierBiTreeRNN::skip_sgml_tag() const
     {
       return pimpl->skip_sgml_tag;
     }
 
-    FrontierTreeRNN& FrontierTreeRNN::operator=(const FrontierTreeRNN& x)
+    FrontierBiTreeRNN& FrontierBiTreeRNN::operator=(const FrontierBiTreeRNN& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       
@@ -545,47 +536,47 @@ namespace cicada
       return *this;
     }
     
-    void FrontierTreeRNN::initialize()
+    void FrontierBiTreeRNN::initialize()
     {
       pimpl->initialize();
     }
     
-    void FrontierTreeRNN::apply(state_ptr_type& state,
-				const state_ptr_set_type& states,
-				const edge_type& edge,
-				feature_set_type& features,
-				const bool final) const
+    void FrontierBiTreeRNN::apply(state_ptr_type& state,
+				  const state_ptr_set_type& states,
+				  const edge_type& edge,
+				  feature_set_type& features,
+				  const bool final) const
     {
       pimpl->rnn_score(state, states, edge, features, final);
     }
 
-    void FrontierTreeRNN::apply_coarse(state_ptr_type& state,
-				       const state_ptr_set_type& states,
-				       const edge_type& edge,
-				       feature_set_type& features,
-				       const bool final) const
-    { }
-    
-    void FrontierTreeRNN::apply_predict(state_ptr_type& state,
-					const state_ptr_set_type& states,
-					const edge_type& edge,
-					feature_set_type& features,
-					const bool final) const
-    { }
-    
-    void FrontierTreeRNN::apply_scan(state_ptr_type& state,
-				     const state_ptr_set_type& states,
-				     const edge_type& edge,
-				     const int dot,
-				     feature_set_type& features,
-				     const bool final) const
-    { }
-    
-    void FrontierTreeRNN::apply_complete(state_ptr_type& state,
+    void FrontierBiTreeRNN::apply_coarse(state_ptr_type& state,
 					 const state_ptr_set_type& states,
 					 const edge_type& edge,
 					 feature_set_type& features,
 					 const bool final) const
+    { }
+    
+    void FrontierBiTreeRNN::apply_predict(state_ptr_type& state,
+					  const state_ptr_set_type& states,
+					  const edge_type& edge,
+					  feature_set_type& features,
+					  const bool final) const
+    { }
+    
+    void FrontierBiTreeRNN::apply_scan(state_ptr_type& state,
+				       const state_ptr_set_type& states,
+				       const edge_type& edge,
+				       const int dot,
+				       feature_set_type& features,
+				       const bool final) const
+    { }
+    
+    void FrontierBiTreeRNN::apply_complete(state_ptr_type& state,
+					   const state_ptr_set_type& states,
+					   const edge_type& edge,
+					   feature_set_type& features,
+					   const bool final) const
     {
       apply(state, states, edge, features, final);
     }
