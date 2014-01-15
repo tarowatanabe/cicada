@@ -1212,21 +1212,12 @@ void cicada_learn(const Learner& learner,
     }
     
     if (mix_average_mode) {
-      // +1 to avid zero...
-      const size_t updated = task.num_update_ + 1;
-      
-      weights *= updated;
-      theta   *= updated;
-      
       reduce_weights(weights, theta);
       
       bcast_weights(weights, theta);
       
-      size_t updated_total = 0;
-      MPI::COMM_WORLD.Allreduce(&updated, &updated_total, 1, utils::mpi_traits<size_t>::data_type(), MPI::SUM);
-      
-      weights *= 1.0 / updated_total;
-      theta   *= 1.0 / updated_total;
+      weights *= 1.0 / mpi_size;
+      theta   *= 1.0 / mpi_size;
     } else if (mix_select_mode) {
       typedef std::vector<double, std::allocator<double> > buffer_type;
       
