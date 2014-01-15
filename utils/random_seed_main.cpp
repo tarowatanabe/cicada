@@ -14,13 +14,17 @@ int main(int argc, char** argv)
   boost::random::uniform_real_distribution<double> gen(-1, 1);
   
   for (size_t i = 0; i != 1024; ++ i) {
-    const double rand = gen(generator);
-    const double rounded1 = int(rand * 100) * double(0.01);
-    const double rounded2 = int(rounded1 * 100) * double(0.01);
-    const double rounded3 = int(rounded2 * 100) * double(0.01);
-    const double rounded4 = int(rounded3 * 100) * double(0.01);
-    
+    const float rand = gen(generator);
+    const float rounded1 = int(rand * 128) / float(128);
+    const float rounded2 = int(rounded1 * 128) / float(128);
+    const float rounded3 = int(rounded2 * 128) / float(128);
+    const float rounded4 = int(rounded3 * 128) / float(128);
+
+    if (rounded1 != rounded2)
+      std::cerr << "differ: " << rand << " 1st = " << rounded1 << " 2nd = " << rounded2 << std::endl;
     if (rounded2 != rounded3)
       std::cerr << "differ: " << rand << " 2nd = " << rounded2 << " 3rd = " << rounded3 << std::endl;
+    if (rounded4 != rounded4)
+      std::cerr << "differ: " << rand << " 3rd = " << rounded3 << " 4th = " << rounded4 << std::endl;
   }
 }

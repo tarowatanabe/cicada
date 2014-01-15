@@ -54,8 +54,7 @@ namespace cicada
       template <typename Tp>
       Tp operator()(const Tp& x) const
       {
-	// we perform rounding twice for stabler quantization
-	return int(Tp(int(std::min(std::max(x, Tp(- 1)), Tp(1)) * 100) * Tp(0.01)) * 100) * Tp(0.01);
+	return int(x * 128) / Tp(128);
       }
     };
     
@@ -67,7 +66,6 @@ namespace cicada
 	return Tp(- 1) < x && x < Tp(1);
       }
     };
-    
     
   public:
     TreeRNN()
