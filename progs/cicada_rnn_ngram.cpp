@@ -246,7 +246,7 @@ struct TaskAccumulate
       bool found = false;
       
       if (merge_finished != shard_size)
-	for (size_type i = 0; i != shard_size && mergers_[shard_].pop(grad, true); ++ i) {
+	while (mergers_[shard_].pop(grad, true)) {
 	  if (! grad)
 	    ++ merge_finished;
 	  else {
@@ -257,7 +257,7 @@ struct TaskAccumulate
 	  found = true;
 	}
       
-      if (! learn_finished && mapper_.pop(batch, true)) {
+      if (! learn_finished && ((grad = allocate()) != 0) && mapper_.pop(batch, true)) {
 	
 	found = true;
 	
@@ -268,21 +268,6 @@ struct TaskAccumulate
 	  
 	  learn_finished = true;
 	} else {
-	  gradient_type* grad = 0;
-	  
-	  for (size_type j = 0; j != gradients_.size(); ++ j)
-	    if (gradients_[j].shared() >= shard_size || gradients_[j].shared() == 0) {
-	      if (! grad)
-		grad = &gradients_[j];
-	      else
-		gradients_[j].clear();
-	    }
-	  
-	  if (! grad) {
-	    gradients_.push_back(gradient_type(theta_.dimension_, theta_.order_));
-	    grad = &gradients_.back();
-	  }
-	  
 	  grad->clear();
 	  
 	  // use of batch from batch * batch_size and (batch + 1) * batch_size
@@ -307,6 +292,24 @@ struct TaskAccumulate
     
     // rescale current model
     theta_.rescale();
+  }
+
+  gradient_type* allocate()
+  {
+    gradient_type* grad = 0;
+    
+    for (size_type j = 0; j != gradients_.size(); ++ j)
+      if (gradients_[j].shared() >= mergers_.size() || gradients_[j].shared() == 0) {
+	grad = &gradients_[j];
+	break;
+      }
+    
+    if (! grad && gradients_.size() < 1024) {
+      gradients_.push_back(gradient_type(theta_.dimension_, theta_.order_));
+      grad = &gradients_.back();
+    }
+    
+    return grad;
   }
   
   inline
