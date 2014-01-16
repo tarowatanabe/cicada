@@ -1934,9 +1934,40 @@ struct PosteriorReducer : public PosteriorMapReduce
 	throw std::runtime_error("error while writeing posterior output?");
     }
   }
+
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
   
   void write(std::ostream& os, const posterior_type& posterior)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    const matrix_type& matrix = posterior.matrix;
+
+    karma::real_generator<double, real_precision> real;
+    iterator_type iter(os);
+
+    if (! matrix.empty()) {
+      karma::generate(iter, karma::lit('('));
+      for (size_type i = 0; i != matrix.size1(); ++ i) {
+	if (i)
+	  karma::generate(iter, karma::lit(", "));
+	karma::generate(iter, '(' << (real % ", ") << ')',
+			boost::make_iterator_range(matrix.begin(i), matrix.end(i)));
+      }
+      karma::generate(iter, karma::lit(')'));
+    }
+    karma::generate(iter, karma::lit('\n'));
+
+#if 0
     const matrix_type& matrix = posterior.matrix;
     
     if (matrix.empty())
@@ -1957,6 +1988,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       }
       os << ')' << '\n';
     }
+#endif
   }
 };
 
