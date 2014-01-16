@@ -217,6 +217,9 @@ void process(std::istream& is,
 {
   Scorer scorer;
 
+  if (debug)
+    std::cerr << scorer;
+
   phrase_pair_type phrase_pair;
   PhrasePairParser parser;
   std::string line;
