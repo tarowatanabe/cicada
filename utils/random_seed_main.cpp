@@ -16,11 +16,11 @@ int main(int argc, char** argv)
   
   for (size_t i = 0; i != 1024; ++ i) {
     const float rand = gen(generator);
-    const float rounded1 = lroundf(rand * 128) / float(128);
-    const float rounded2 = lroundf(rounded1 * 128) / float(128);
-    const float rounded3 = lroundf(rounded2 * 128) / float(128);
-    const float rounded4 = lroundf(rounded3 * 128) / float(128);
-
+    const float rounded1 = roundf(rand * 128) / float(128);
+    const float rounded2 = roundf(rounded1 * 128) / float(128);
+    const float rounded3 = roundf(rounded2 * 128) / float(128);
+    const float rounded4 = roundf(rounded3 * 128) / float(128);
+    
     if (rounded1 != rounded2)
       std::cerr << "differ: " << rand << " 1st = " << rounded1 << " 2nd = " << rounded2 << std::endl;
     if (rounded2 != rounded3)
