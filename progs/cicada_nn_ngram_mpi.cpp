@@ -566,7 +566,8 @@ void learn_online(const Learner& learner,
     
     if (debug && mpi_rank == 0)
       std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl
-		<< "perplexity: " << std::exp(- static_cast<double>(log_likelihood)) << std::endl;
+		<< "entropy: "    << std::exp(- static_cast<double>(log_likelihood)) << std::endl
+		<< "perplexity: " << (- static_cast<double>(log_likelihood) / std::log(2.0)) << std::endl;
     
     if (debug && mpi_rank == 0)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl

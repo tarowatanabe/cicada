@@ -457,14 +457,16 @@ void learn_online(const Learner& learner,
     
     if (debug)
       std::cerr << "log-likelihood: " << static_cast<double>(log_likelihood) << std::endl
-		<< "perplexity: " << std::exp(- static_cast<double>(log_likelihood)) << std::endl;
+		<< "entropy: "    << std::exp(- static_cast<double>(log_likelihood)) << std::endl
+		<< "perplexity: " << (- static_cast<double>(log_likelihood) / std::log(2.0)) << std::endl;
     
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
-    
+
     // shuffle ngrams!
-    std::random_shuffle(batches.begin(), batches.end());
+    boost::random_number_generator<boost::mt19937> gen(tasks.front().generator_);
+    std::random_shuffle(batches.begin(), batches.end(), gen);
     
     if (mix_average) {
       for (size_type i = 1; i != tasks.size(); ++ i)

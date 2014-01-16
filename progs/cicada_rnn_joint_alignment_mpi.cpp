@@ -1277,13 +1277,15 @@ void learn_online_root(const Learner& learner,
     
     // shuffle bitexts!
     {
+      boost::random_number_generator<boost::mt19937> gen(task.generator_);
+      
       typename id_set_type::iterator biter     = ids.begin();
       typename id_set_type::iterator biter_end = ids.end();
       
       while (biter < biter_end) {
 	typename id_set_type::iterator iter_end = std::min(biter + 4096, biter_end);
 	
-	std::random_shuffle(biter, iter_end);
+	std::random_shuffle(biter, iter_end, gen);
 	biter = iter_end;
       }
     }

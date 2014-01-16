@@ -1870,7 +1870,8 @@ void learn_online(const Learner& learner,
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
     
     // shuffle bitexts!
-    std::random_shuffle(batches.begin(), batches.end());
+    boost::random_number_generator<boost::mt19937> gen(tasks.front().generator_);
+    std::random_shuffle(batches.begin(), batches.end(), gen);
   }
   
   theta = tasks.front().theta_;

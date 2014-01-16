@@ -855,9 +855,11 @@ void learn_online(const Learner& learner,
     
     if (debug)
       std::cerr << "log-likelihood P(target | source): " << static_cast<double>(log_likelihood_source_target) << std::endl
-		<< "perplexity     P(target | source): " << std::exp(- static_cast<double>(log_likelihood_source_target)) << std::endl
+		<< "entropy        P(target | source): " << std::exp(- static_cast<double>(log_likelihood_source_target)) << std::endl
+		<< "perplexity     P(target | source): " << (- static_cast<double>(log_likelihood_source_target) / std::log(2.0)) << std::endl
 		<< "log-likelihood P(source | target): " << static_cast<double>(log_likelihood_target_source) << std::endl
-		<< "perplexity     P(source | target): " << std::exp(- static_cast<double>(log_likelihood_target_source)) << std::endl;
+		<< "entropy        P(source | target): " << std::exp(- static_cast<double>(log_likelihood_target_source)) << std::endl
+		<< "perplexity     P(source | target): " << (- static_cast<double>(log_likelihood_target_source) / std::log(2.0)) << std::endl;
 
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
@@ -865,13 +867,15 @@ void learn_online(const Learner& learner,
     
     // shuffle bitexts!
     {
+      boost::random_number_generator<boost::mt19937> gen(tasks.front().generator_);
+      
       typename batch_set_type::iterator biter     = batches.begin();
       typename batch_set_type::iterator biter_end = batches.end();
       
       while (biter < biter_end) {
 	typename batch_set_type::iterator iter_end = std::min(biter + utils::bithack::max(4096 / batch_size, 1), biter_end);
 	
-	std::random_shuffle(biter, iter_end);
+	std::random_shuffle(biter, iter_end, gen);
 	biter = iter_end;
       }
     }
