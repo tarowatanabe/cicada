@@ -54,7 +54,20 @@ namespace cicada
       template <typename Tp>
       Tp operator()(const Tp& x) const
       {
-	return int(x * 128) / Tp(128);
+	return __lround(x * 128) / Tp(128);
+      }
+      
+      template <typename Tp>
+      inline
+      long int __lround(const Tp& x) const
+      {
+	return lround(x);
+      }
+      
+      inline
+      long int __lround(const float& x) const
+      {
+	return lroundf(x);
       }
     };
     
