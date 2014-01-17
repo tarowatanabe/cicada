@@ -58,6 +58,8 @@ opt_parser = OptionParser(
                 help="PBS for launching processes after this process id", metavar="ID"),
     make_option("--pbs-before", default="", action="store", type="string",
                 help="PBS for launching processes before this process id", metavar="ID"),
+    make_option("--pbs-non-block", action="store_true",
+                help="lanch job in a non-blocking fashion"),
 
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
@@ -177,9 +179,10 @@ class QSUB:
         fh.read()
         
 class PBS:
-    def __init__(self, queue=""):
+    def __init__(self, queue="", non_block=None):
         self.workers = []
         self.queue = queue
+        self.non_block = non_block
 
     def wait(self):
         for worker in self.workers:
@@ -193,7 +196,9 @@ class PBS:
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -e localhost:/dev/null\n")
         pipe.write("#PBS -o localhost:/dev/null\n")
-        pipe.write("#PBS -W block=true\n")
+
+        if not self.non_block:
+            pipe.write("#PBS -W block=true\n")
         
         if after:
             pipe.write("#PBS -W depend=after:%s\n" %(after))
