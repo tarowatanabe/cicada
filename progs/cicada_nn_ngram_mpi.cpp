@@ -442,7 +442,7 @@ void learn_online(const Learner& learner,
   ostream_ptr_set_type ostreams(mpi_size);
   istream_ptr_set_type istreams(mpi_size);
   
-  queue_type mapper(2); // one for gradient, another for terminatin
+  queue_type mapper; // one for gradient, another for terminatin
   queue_type reducer;
   
   task_type task(learner,
