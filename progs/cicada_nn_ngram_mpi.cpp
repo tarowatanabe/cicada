@@ -305,7 +305,7 @@ struct TaskAccumulate
 	  found = true;
 	}
       
-      if (! learn_finished) {
+      if (! learn_finished && mapper_.empty()) {
 	found = true;
 	
 	gradient_.clear();
@@ -442,7 +442,7 @@ void learn_online(const Learner& learner,
   ostream_ptr_set_type ostreams(mpi_size);
   istream_ptr_set_type istreams(mpi_size);
   
-  queue_type mapper;
+  queue_type mapper(2); // one for gradient, another for terminatin
   queue_type reducer;
   
   task_type task(learner,
@@ -478,6 +478,7 @@ void learn_online(const Learner& learner,
       bool found = false;
       
       // reduce samples...
+      bool reduced = false;
       for (int rank = 0; rank != mpi_size; ++ rank)
 	if (rank != mpi_rank && istreams[rank] && istreams[rank]->test()) {
 	  if (istreams[rank]->read(buffer))
@@ -487,6 +488,7 @@ void learn_online(const Learner& learner,
 	  
 	  buffer.clear();
 	  found = true;
+	  reduced = true;
 	}
 
       // check termination...
@@ -497,7 +499,7 @@ void learn_online(const Learner& learner,
       
       // bcast...
       // first, get the encoded buffer from mapper
-      if (mapper.pop_swap(buffer, true)) {
+      if (! reduced && mapper.pop_swap(buffer, true)) {
 	buffer_ptr_type buffer_ptr;
 	
 	if (! buffer.empty()) {
