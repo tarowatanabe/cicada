@@ -472,13 +472,13 @@ void learn_online(const Learner& learner,
     boost::thread worker(boost::ref(task));
     
     bool finished = false;
+    bool full = false;
     
     int non_found_iter = 0;
     for (;;) {
       bool found = false;
       
       // reduce samples...
-      bool reduced = false;
       for (int rank = 0; rank != mpi_size; ++ rank)
 	if (rank != mpi_rank && istreams[rank] && istreams[rank]->test()) {
 	  if (istreams[rank]->read(buffer))
@@ -488,7 +488,6 @@ void learn_online(const Learner& learner,
 	  
 	  buffer.clear();
 	  found = true;
-	  reduced = true;
 	}
 
       // check termination...
@@ -499,7 +498,7 @@ void learn_online(const Learner& learner,
       
       // bcast...
       // first, get the encoded buffer from mapper
-      if (! reduced && mapper.pop_swap(buffer, true)) {
+      if (! full && mapper.pop_swap(buffer, true)) {
 	buffer_ptr_type buffer_ptr;
 	
 	if (! buffer.empty()) {
@@ -516,6 +515,8 @@ void learn_online(const Learner& learner,
       }
       
       // second, bcast...
+      full = false;
+      
       for (int rank = 0; rank != mpi_size; ++ rank)
 	if (rank != mpi_rank && ostreams[rank] && ostreams[rank]->test() && ! buffers[rank].empty()) {
 	  if (! buffers[rank].front()) {
@@ -532,6 +533,7 @@ void learn_online(const Learner& learner,
 	  }
 	  
 	  found = true;
+	  full |= (buffers[rank].size() > 128);
 	}
       
       // termination condition
