@@ -480,16 +480,17 @@ void learn_online(const Learner& learner,
       
       // reduce samples...
       for (int rank = 0; rank != mpi_size; ++ rank)
-	if (rank != mpi_rank && istreams[rank] && istreams[rank]->test()) {
-	  if (istreams[rank]->read(buffer))
-	    reducer.push_swap(buffer);
-	  else
-	    istreams[rank].reset();
-	  
-	  buffer.clear();
-	  found = true;
-	}
-
+	if (rank != mpi_rank)
+	  while (istreams[rank] && istreams[rank]->test()) {
+	    if (istreams[rank]->read(buffer))
+	      reducer.push_swap(buffer);
+	    else
+	      istreams[rank].reset();
+	    
+	    buffer.clear();
+	    found = true;
+	  }
+      
       // check termination...
       if (! finished && std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size) {
 	reducer.push(buffer_type());
@@ -518,21 +519,24 @@ void learn_online(const Learner& learner,
       full = false;
       
       for (int rank = 0; rank != mpi_size; ++ rank)
-	if (rank != mpi_rank && ostreams[rank] && ostreams[rank]->test() && ! buffers[rank].empty()) {
-	  if (! buffers[rank].front()) {
-	    // termination!
-	    if (! ostreams[rank]->terminated())
-	      ostreams[rank]->terminate();
-	    else {
-	      ostreams[rank].reset();
+	if (rank != mpi_rank) {
+	  while (ostreams[rank] && ostreams[rank]->test() && ! buffers[rank].empty()) {
+	    if (! buffers[rank].front()) {
+	      // termination!
+	      if (! ostreams[rank]->terminated())
+		ostreams[rank]->terminate();
+	      else {
+		ostreams[rank].reset();
+		buffers[rank].erase(buffers[rank].begin());
+	      }
+	    } else {
+	      ostreams[rank]->write(*(buffers[rank].front()));
 	      buffers[rank].erase(buffers[rank].begin());
 	    }
-	  } else {
-	    ostreams[rank]->write(*(buffers[rank].front()));
-	    buffers[rank].erase(buffers[rank].begin());
+	    
+	    found = true;
 	  }
 	  
-	  found = true;
 	  full |= (buffers[rank].size() > 128);
 	}
       
