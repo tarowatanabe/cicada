@@ -238,8 +238,13 @@ class PBS:
         
         pipe.write(prefix + command + suffix + '\n')
 
-        self.workers.append(QSUB(pipe.getvalue()))
-        self.workers[-1].start()
+        if self.non_block:
+            qsub = QSUB(pipe.getvalue())
+            qsub.start()
+            qsub.join()
+        else:
+            self.workers.append(QSUB(pipe.getvalue()))
+            self.workers[-1].start()
 
         sys.stderr.write(command+'\n')
         
