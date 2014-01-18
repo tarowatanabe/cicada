@@ -533,7 +533,7 @@ void learn_online(const Learner& learner,
 	    found = true;
 	  }
 	  
-	  full |= (buffers[rank].size() > 128);
+	  full |= (buffers[rank].size() > 1024);
 	}
       
       // termination condition
