@@ -1038,6 +1038,14 @@ struct Oracle
   
   typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > oracle_set_type;
   typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
+
+  struct greater_sentence_length
+  {
+    bool operator()(const candidate_type* x, const candidate_type* y) const
+    {
+      return x->hypothesis_.sentence.size() > y->hypothesis_.sentence.size();
+    }
+  };
   
   template <typename Generator>
   std::pair<score_ptr_type, score_ptr_type>
@@ -1141,6 +1149,9 @@ struct Oracle
 	  } else if (objective_sample == objective_next)
 	    oracles_next[id].push_back(&(*hiter));
 	}
+
+	// heuristic: sort so that longer translations are selected!
+	std::sort(oracles_next[id].begin(), oracles_next[id].end(), greater_sentence_length());
       }
       
       if (objective_next > objective_best) {
