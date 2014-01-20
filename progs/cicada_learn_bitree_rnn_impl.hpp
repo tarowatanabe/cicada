@@ -1116,7 +1116,9 @@ struct Oracle
     // 
     // 10 iteration will be fine
     //
-    for (int i = 0; i < 10; ++ i) {
+    const int max_iter = 10;
+    const int min_iter = 4;
+    for (int i = 0; i != max_iter; ++ i) {
       
       for (id_set_type::const_iterator iiter = ids.begin(); iiter != ids.end(); ++ iiter) {
 	const size_t id = *iiter;
@@ -1160,7 +1162,7 @@ struct Oracle
 	oracles_best   = oracles_next;
       }
       
-      if (objective_next <= objective_curr) break;
+      if (i >= min_iter && objective_next <= objective_curr) break;
       
       score_curr     = score_next->clone();
       objective_curr = objective_next;
