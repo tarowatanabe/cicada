@@ -1140,14 +1140,8 @@ struct Oracle
 	    
 	    objective_next = objective_sample;
 	    score_next     = score_sample;
-	  } else if (objective_sample == objective_next) {
-	    if (hiter->hypothesis_.sentence.size() > oracles_next[id].front()->hypothesis_.sentence.size()) {
-	      oracles_next[id].insert(oracles_next[id].begin(), &(*hiter));
-	      
-	      score_next = score_sample;
-	    } else
-	      oracles_next[id].push_back(&(*hiter));
-	  }
+	  } else if (objective_sample == objective_next)
+	    oracles_next[id].push_back(&(*hiter));
 	}
       }
       
