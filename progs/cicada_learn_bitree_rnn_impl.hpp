@@ -1111,10 +1111,16 @@ struct Oracle
 	*score_segment -= *kbests[id].front().hypothesis_.score;
 	
 	candidate_set_type oracles_new;
+	score_ptr_type     score_oracle_seg;
 	
 	candidate_set_type::iterator hiter_end = oracles[id].end();
 	for (candidate_set_type::iterator hiter = oracles[id].begin(); hiter != hiter_end; ++ hiter) {
-	  if (sentences_[id].find(hiter->hypothesis_.sentence) != sentences_[id].end()) continue;
+	  if (sentences_[id].find(hiter->hypothesis_.sentence) != sentences_[id].end()) {
+	    if (! score_oracle_seg)
+	      score_oracle_seg  = scorers[id]->score(sentence_type(hiter->hypothesis_.sentence.begin(),
+								   hiter->hypothesis_.sentence.end()));
+	    continue;
+	  }
 	  
 	  oracles_new.push_back(candidate_type());
 	  oracles_new.back().swap(*hiter);
@@ -1133,10 +1139,17 @@ struct Oracle
 	
 	oracles[id].swap(oracles_new);
 	
-	if (! score_oracle)
-	  score_oracle = oracles[id].front().hypothesis_.score->clone();
-	else
-	  *score_oracle += *(oracles[id].front().hypothesis_.score);
+	if (! oracles[id].empty()) {
+	  if (! score_oracle)
+	    score_oracle = oracles[id].front().hypothesis_.score->clone();
+	  else
+	    *score_oracle += *(oracles[id].front().hypothesis_.score);
+	} else {
+	  if (! score_oracle)
+	    score_oracle = score_oracle_seg;
+	  else
+	    *score_oracle += *(score_oracle_seg);
+	}
       }
 
     if (! score_oracle)
