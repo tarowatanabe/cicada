@@ -57,6 +57,7 @@ typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
 path_type input_file;
+path_type oracle_file;
 
 bool input_id_mode = false;
 bool input_bitext_mode = false;
@@ -134,6 +135,7 @@ void cicada_learn(const Learner& learner,
 		  operation_set_type& operations,
 		  const model_type& model,
 		  const event_set_type& events,
+		  const event_set_type& oracles,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights,
 		  tree_rnn_type& theta);
@@ -287,6 +289,14 @@ int main(int argc, char ** argv)
     // read input data
     event_set_type events;
     read_events(input_file, events, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+
+    event_set_type oracles;
+    if (! oracle_file.empty()) {
+      if (oracle_file != "-" && !boost::filesystem::exists(oracle_file))
+	throw std::runtime_error("no oracle input? " + oracle_file.string());
+      
+      read_events(oracle_file, oracles, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+    }
     
     // read reference data
     scorer_document_type scorers(scorer_name);
@@ -294,6 +304,10 @@ int main(int argc, char ** argv)
     
     if (scorers.size() != events.size())
       throw std::runtime_error("training sample size and reference translation size does not match");
+
+    if (! oracles.empty())
+      if (scorers.size() != oracles.size())
+	throw std::runtime_error("oracle size and reference translation size does not match");
     
     // weights and rnn parameters
     weight_set_type weights;
@@ -327,9 +341,9 @@ int main(int argc, char ** argv)
     
     // perform learning...
     if (optimize_adagrad)
-      cicada_learn(LearnAdaGrad(theta, lambda, eta0), operations, model, events, scorers, weights, theta);
+      cicada_learn(LearnAdaGrad(theta, lambda, eta0), operations, model, events, oracles, scorers, weights, theta);
     else 
-      cicada_learn(LearnSGD(theta, lambda, eta0), operations, model, events, scorers, weights, theta);
+      cicada_learn(LearnSGD(theta, lambda, eta0), operations, model, events, oracles, scorers, weights, theta);
     
     // output model...
     if (mpi_rank == 0) {
@@ -780,6 +794,7 @@ struct Task
        operation_set_type& operations,
        const model_type& model,
        const event_set_type& events,
+       const event_set_type& oracles,
        const scorer_document_type& scorers,
        weight_set_type& weights,
        tree_rnn_type& theta)
@@ -790,17 +805,27 @@ struct Task
       operations_(operations),
       model_(model),
       events_(events),
+      oracles_(oracles),
       scorers_(scorers),
       weights_(weights),
       theta_(theta)
   {
     generator_.seed(utils::random_seed());
     
+    // check oracles...
+    if (! oracles.empty())
+      if (events.size() != oracles.size())
+	throw std::runtime_error("invalid oracle size");
+    
     // intialize segments_ 
     segments_.clear();
     for (size_t seg = 0; seg != events.size(); ++ seg)
-      if (! events[seg].empty())
+      if (! events[seg].empty()) {
 	segments_.push_back(seg);
+	
+	if (! oracles.empty() && oracles[seg].empty())
+	  throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(seg));
+      }
     
     // check for the feature
     const cicada::feature::TreeRNN* tree_rnn_feature = 0;
@@ -834,6 +859,7 @@ struct Task
   operation_set_type&           operations_;
   const model_type&             model_;
   const event_set_type&         events_;
+  const event_set_type&         oracles_;
   const scorer_document_type&   scorers_;
   weight_set_type&              weights_;
   tree_rnn_type&                theta_;
@@ -944,15 +970,28 @@ struct Task
 	  segments_batch.push_back(id);
 	  kbests_batch.push_back(kbests);
 	  scorers_batch.push_back(scorers_[id]);
+
+	  if (! oracles_.empty()) {
+	    kbest_generator_(operations_, oracles_[id], weights_, kbests);
+	    
+	    if (kbests.empty())
+	      throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
+	    
+	    oracles_batch.push_back(kbests);
+	  }
 	}
 	
 	// if we have segments!
 	if (! segments_batch.empty()) {
 	  // oracle computation
-	  std::pair<score_ptr_type, score_ptr_type> scores = oracle_generator_(kbests_batch,
-									       scorers_batch,
-									       oracles_batch,
-									       generator_);
+	  std::pair<score_ptr_type, score_ptr_type> scores = (oracles_batch.empty()
+							      ? oracle_generator_(kbests_batch,
+										  scorers_batch,
+										  oracles_batch,
+										  generator_)
+							      : oracle_generator_(kbests_batch,
+										  scorers_batch,
+										  oracles_batch));
 	  
 	  if (! score_1best_)
 	    score_1best_ = scores.first;
@@ -1054,6 +1093,7 @@ void cicada_learn(const Learner& learner,
 		  operation_set_type& operations,
 		  const model_type& model,
 		  const event_set_type& events,
+		  const event_set_type& oracles,
 		  const scorer_document_type& scorers,
 		  weight_set_type& weights,
 		  tree_rnn_type& theta)
@@ -1094,6 +1134,7 @@ void cicada_learn(const Learner& learner,
 		 operations,
 		 model,
 		 events,
+		 oracles,
 		 scorers,
 		 weights,
 		 theta);
@@ -1485,7 +1526,8 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("input",   po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("oracle",  po::value<path_type>(&oracle_file)->default_value(oracle_file), "oracle file")
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")

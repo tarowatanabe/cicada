@@ -864,6 +864,84 @@ struct Oracle
   typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > oracle_set_type;
   typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
   
+  std::pair<score_ptr_type, score_ptr_type>
+  operator()(const candidate_map_type& kbests,
+	     const scorer_document_type& scorers,
+	     candidate_map_type& oracles)
+  {
+    score_ptr_type score_1best;
+    score_ptr_type score_oracle;
+    
+    // initialization...
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	candidate_set_type::const_iterator hiter_end = kbests[id].end();
+	for (candidate_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	  hypothesis_type& hyp = const_cast<hypothesis_type&>(hiter->hypothesis_);
+	  
+	  if (! hyp.score)
+	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	}
+	
+	if (! score_1best)
+	  score_1best = kbests[id].front().hypothesis_.score->clone();
+	else
+	  *score_1best += *(kbests[id].front().hypothesis_.score);
+      }
+    
+    if (! score_1best)
+      throw std::runtime_error("no evaluation score?");
+    
+    // assign loss
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	score_ptr_type score_segment = score_1best->clone();
+	*score_segment -= *kbests[id].front().hypothesis_.score;
+	
+	candidate_set_type::const_iterator hiter_end = kbests[id].end();
+	for (candidate_set_type::const_iterator hiter = kbests[id].begin(); hiter != hiter_end; ++ hiter) {
+	  hypothesis_type& hyp = const_cast<hypothesis_type&>(hiter->hypothesis_);
+	  
+	  *score_segment += *hyp.score;
+	  
+	  hyp.loss = score_segment->loss();
+	  
+	  *score_segment -= *hyp.score;
+	}
+      }
+    
+    const size_t kbests_size = utils::bithack::min(oracles.size(), kbests.size());
+    for (size_t id = 0; id != kbests_size; ++ id) 
+      if (! oracles[id].empty() && ! kbests[id].empty()) {
+	score_ptr_type score_segment = score_1best->clone();
+	*score_segment -= *kbests[id].front().hypothesis_.score;
+	
+	candidate_set_type::const_iterator hiter_end = oracles[id].end();
+	for (candidate_set_type::const_iterator hiter = oracles[id].begin(); hiter != hiter_end; ++ hiter) {
+	  hypothesis_type& hyp = const_cast<hypothesis_type&>(hiter->hypothesis_);
+	  
+	  if (! hyp.score)
+	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+	  
+	  *score_segment += *hyp.score;
+	  
+	  hyp.loss = score_segment->loss();
+	  
+	  *score_segment -= *hyp.score;
+	}
+	
+	if (! score_oracle)
+	  score_oracle = oracles[id].front().hypothesis_.score->clone();
+	else
+	  *score_oracle += *(oracles[id].front().hypothesis_.score);
+      }
+
+    if (! score_oracle)
+      throw std::runtime_error("no oracle evaluation score?");
+    
+    return std::make_pair(score_1best, score_oracle);
+  }
+  
   template <typename Generator>
   std::pair<score_ptr_type, score_ptr_type>
   operator()(const candidate_map_type& kbests,
