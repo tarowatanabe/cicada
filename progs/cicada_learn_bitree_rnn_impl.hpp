@@ -254,8 +254,7 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     size_type num_loss = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss)
-	  num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
+	num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -272,17 +271,16 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     double loss = 0.0;
     
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
-	  const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
-	  
-	  if (error == 0.0) continue;
-	  
-	  loss_oracles_[o] -= error_factor;
-	  loss_kbests_[k]  += error_factor;
-	  
-	  loss += error;
-	}
+      for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
+	const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	
+	if (error == 0.0) continue;
+	
+	loss_oracles_[o] -= error_factor;
+	loss_kbests_[k]  += error_factor;
+	
+	loss += error;
+      }
     
     ++ gradient.count_;
     
@@ -1031,7 +1029,6 @@ struct KBestSentence
   }
 };
 
-
 struct Oracle
 {
   typedef LearnBase::candidate_type     candidate_type;
@@ -1041,6 +1038,21 @@ struct Oracle
   typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > oracle_set_type;
   typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
   
+  struct hash_sentence : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
+  typedef std::vector<sentence_unique_type, std::allocator<sentence_unique_type> > sentence_unique_set_type;
+
+  sentence_unique_set_type sentences_;
+
   std::pair<score_ptr_type, score_ptr_type>
   operator()(const candidate_map_type& kbests,
 	     const scorer_document_type& scorers,
@@ -1048,6 +1060,9 @@ struct Oracle
   {
     score_ptr_type score_1best;
     score_ptr_type score_oracle;
+
+    sentences_.clear();
+    sentences_.resize(kbests.size());
     
     // initialization...
     for (size_t id = 0; id != kbests.size(); ++ id) 
@@ -1058,6 +1073,8 @@ struct Oracle
 	  
 	  if (! hyp.score)
 	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
+
+	  sentences_[id].insert(hyp.sentence);
 	}
 	
 	if (! score_1best)
@@ -1093,9 +1110,15 @@ struct Oracle
 	score_ptr_type score_segment = score_1best->clone();
 	*score_segment -= *kbests[id].front().hypothesis_.score;
 	
+	candidate_set_type oracles_new;
+	
 	candidate_set_type::const_iterator hiter_end = oracles[id].end();
 	for (candidate_set_type::const_iterator hiter = oracles[id].begin(); hiter != hiter_end; ++ hiter) {
-	  hypothesis_type& hyp = const_cast<hypothesis_type&>(hiter->hypothesis_);
+	  if (sentences_[id].find(hiter->hypothesis_.sentence) != sentences_[id].end()) continue;
+	  
+	  oracles_new.push_back(*hiter);
+	  
+	  hypothesis_type& hyp = oracles_new.back().hypothesis_;
 	  
 	  if (! hyp.score)
 	    hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
@@ -1106,6 +1129,8 @@ struct Oracle
 	  
 	  *score_segment -= *hyp.score;
 	}
+	
+	oracles[id].swap(oracles_new);
 	
 	if (! score_oracle)
 	  score_oracle = oracles[id].front().hypothesis_.score->clone();
