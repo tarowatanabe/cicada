@@ -254,7 +254,8 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     size_type num_loss = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss)
+	  num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -271,17 +272,18 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     double loss = 0.0;
     
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
-	
-	if (error == 0.0) continue;
-	
-	loss_oracles_[o] -= error_factor;
-	loss_kbests_[k]  += error_factor;
-	
-	loss += error;
-      }
-
+      for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	  const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  
+	  if (error == 0.0) continue;
+	  
+	  loss_oracles_[o] -= error_factor;
+	  loss_kbests_[k]  += error_factor;
+	  
+	  loss += error;
+	}
+    
     ++ gradient.count_;
     
     for (size_type k = 0; k != loss_kbests_.size(); ++ k)
