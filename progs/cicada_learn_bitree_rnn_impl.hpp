@@ -1112,11 +1112,12 @@ struct Oracle
 	
 	candidate_set_type oracles_new;
 	
-	candidate_set_type::const_iterator hiter_end = oracles[id].end();
-	for (candidate_set_type::const_iterator hiter = oracles[id].begin(); hiter != hiter_end; ++ hiter) {
+	candidate_set_type::iterator hiter_end = oracles[id].end();
+	for (candidate_set_type::iterator hiter = oracles[id].begin(); hiter != hiter_end; ++ hiter) {
 	  if (sentences_[id].find(hiter->hypothesis_.sentence) != sentences_[id].end()) continue;
 	  
-	  oracles_new.push_back(*hiter);
+	  oracles_new.push_back(candidate_type());
+	  oracles_new.back().swap(*hiter);
 	  
 	  hypothesis_type& hyp = oracles_new.back().hypothesis_;
 	  
