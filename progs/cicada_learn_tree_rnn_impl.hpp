@@ -239,12 +239,9 @@ struct LearnBase
     size_type num_loss = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  if (sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end())
-	    ++ num_loss;
-	  else
-	    num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
-	}
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	  num_loss += ((1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0
+		       || sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end());
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -263,9 +260,9 @@ struct LearnBase
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
 	  
-	  const double error = (sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end()
-				? 1.0
-				: std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0));
+	  double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  if (error == 0.0 && sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end())
+	    error = 1;
 	  
 	  if (error == 0.0) continue;
 	  

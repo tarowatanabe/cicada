@@ -192,14 +192,14 @@ struct LearnBase : public utils::hashmurmur3<size_t>
   margin_set_type margin_kbests_;
   margin_set_type margin_oracles_;
   
-  loss_set_type loss_;
   loss_set_type loss_kbests_;
   loss_set_type loss_oracles_;
   
   node_map_type        node_map_;
   state_set_type       states_;
   word_set_type        words_;
-  sentence_unique_type sentences_;
+  sentence_unique_type sentence_kbests_;
+  sentence_unique_type sentence_oracles_;
   
   cache_phrase_set_type cache_source_;
   cache_phrase_set_type cache_target_;
@@ -247,31 +247,33 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     margin_kbests_.clear();
     margin_oracles_.clear();
     
-    for (size_type k = 0; k != kbests.size(); ++ k)
+    sentence_kbests_.clear();
+    sentence_oracles_.clear();
+    
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+      
       margin_kbests_.push_back(cicada::dot_product(weights,
                                                    kbests[k].hypothesis_.features.begin(),
                                                    kbests[k].hypothesis_.features.end(),
 						   0.0));
+    }
     
-    for (size_type o = 0; o != oracles.size(); ++ o)
+    for (size_type o = 0; o != oracles.size(); ++ o) {
+      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+      
       margin_oracles_.push_back(cicada::dot_product(weights,
 						    oracles[o].hypothesis_.features.begin(),
 						    oracles[o].hypothesis_.features.end(),
 						    0.0));
-    
-    // pre-compute a set of oracle translations
-    sentences_.clear();
-    for (size_type o = 0; o != oracles.size(); ++ o)
-      sentences_.insert(oracles[o].hypothesis_.sentence);
+    }
     
     size_type num_loss = 0;
-    loss_.clear();
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  loss_.push_back(std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0));
-	  num_loss +=  loss_.back() > 0.0;
-	}
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	  num_loss += ((1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0
+		       || sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end());
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -286,11 +288,13 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     loss_oracles_.resize(margin_oracles_.size());
     
     double loss = 0.0;
-    size_type loss_pos = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  const double error = loss_[loss_pos ++];
+
+	  double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  if (error == 0.0 && sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end())
+	    error = 1;
 	  
 	  if (error == 0.0) continue;
 	  
