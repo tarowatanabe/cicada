@@ -305,10 +305,12 @@ struct hash_sentence : public utils::hashmurmur3<size_t>
     ++ gradient.count_;
     
     for (size_type k = 0; k != loss_kbests_.size(); ++ k)
-      accumulate(loss_kbests_[k], kbests[k], weights, W, theta, gradient);
+      if (loss_kbests_[k] != 0)
+	accumulate(loss_kbests_[k], kbests[k], weights, W, theta, gradient);
     
     for (size_type o = 0; o != loss_oracles_.size(); ++ o)
-      accumulate(loss_oracles_[o], oracles[o], weights, W, theta, gradient);
+      if (loss_oracles_[o] != 0)
+	accumulate(loss_oracles_[o], oracles[o], weights, W, theta, gradient);
     
     return loss * error_factor;
   }
