@@ -154,15 +154,45 @@ struct LearnBase
   
   typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
+  struct node_margin_type
+  {
+    double max;
+    double min;
+    
+    node_margin_type()
+      : max(- std::numeric_limits<double>::infinity()),
+	min(std::numeric_limits<double>::infinity()) {}
+
+    bool empty() const
+    {
+      return (max == - std::numeric_limits<double>::infinity() && min == std::numeric_limits<double>::infinity());
+    }
+    
+    void assign(const double x)
+    {
+      this->max = std::max(this->max, x);
+      this->min = std::min(this->min, x);
+    }
+  };
+  typedef std::vector<node_margin_type, std::allocator<node_margin_type> > node_margin_set_type;
+  typedef std::vector<node_margin_set_type, std::allocator<node_margin_set_type> > node_margin_map_type;
+  
+  typedef std::vector<size_type, std::allocator<size_type> > node_count_type;
+  typedef std::vector<double, std::allocator<double> > score_set_type;
+
   LearnBase() {}
   
   bool no_bos_eos_;
   bool skip_sgml_tag_;
   feature_name_set_type names_;
   
-  margin_set_type margin_kbests_;
-  margin_set_type margin_oracles_;
+  node_margin_map_type margin_kbests_;
+  node_margin_map_type margin_oracles_;
   
+  node_count_type node_counts_;
+  score_set_type  node_scores_;
+  
+  loss_set_type loss_;
   loss_set_type loss_kbests_;
   loss_set_type loss_oracles_;
   
@@ -198,6 +228,79 @@ struct LearnBase
       W(0, i) = weights[names_[i]];
   }
 
+  void compute_margin(const weight_set_type& weights,
+		      const candidate_type& candidate,
+		      node_margin_set_type& margins)
+  {
+    margins.clear();
+    margins.resize(candidate.graph_.nodes.size());
+    
+    node_counts_.clear();
+    node_counts_.resize(candidate.graph_.nodes.size(), 0);
+
+    node_scores_.clear();
+    node_scores_.resize(candidate.graph_.nodes.size(), 0);
+    
+    for (size_type n = 0; n != candidate.graph_.nodes.size(); ++ n) {
+      const hypergraph_type::node_type& node = candidate.graph_.nodes[n];
+      
+      if (node.edges.size() != 1)
+	throw std::runtime_error("invalid node");
+      
+      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = candidate.graph_.edges[*eiter];
+	
+	double score = cicada::dot_product(weights, edge.features);
+	size_type num_child_nodes = 0;
+	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+	  num_child_nodes += node_counts_[*titer] + 1;
+	  score += node_scores_[*titer];
+	}
+	
+	node_scores_[node.id] = score;
+	margins[num_child_nodes].assign(score);
+      }
+    }
+  }
+  
+  void compute_margin(const weight_set_type& weights,
+		      const candidate_set_type& candidates,
+		      node_margin_map_type& margins)
+  {
+    margins.clear();
+    margins.resize(candidates.size());
+    
+    for (size_type c = 0; c != candidates.size(); ++ c)
+      compute_margin(weights, candidates[c], margins[c]);
+  }
+
+  double compute_loss(const node_margin_set_type& kbests,
+		      const node_margin_set_type& oracles)
+  {
+    const size_type num_max = utils::bithack::max(kbests.size(), oracles.size());
+
+    double prev_kbest  = 0;
+    double prev_oracle = 0;
+    
+    for (size_type n = 0; n != num_max; ++ n) 
+      if ((n < kbests.size() && ! kbests[n].empty()) || (n < oracles.size() && ! oracles[n].empty())) {
+	const double score_kbest  = (kbests.size() >= n  || kbests[n].empty()  ? prev_kbest  : kbests[n].max);
+	const double score_oracle = (oracles.size() >= n || oracles[n].empty() ? prev_oracle : oracles[n].min);
+	
+	const double loss = 1.0 - (score_oracle - score_kbest);
+	
+	if (loss > 0.0)
+	  return loss;
+	
+	prev_kbest  = score_kbest;
+	prev_oracle = score_oracle;
+      }
+    
+    return 0.0;
+  }
+
   double accumulate(const size_type id,
 		    const candidate_set_type& kbests,
 		    const candidate_set_type& oracles,
@@ -207,37 +310,22 @@ struct LearnBase
 		    gradient_type& gradient)
   {
     // first, compuate pairs...
-    margin_kbests_.clear();
-    margin_oracles_.clear();
-
-    sentences_.clear();
+    compute_margin(weights, kbests,  margin_kbests_);
+    compute_margin(weights, oracles, margin_oracles_);
     
-    candidate_set_type::const_iterator kiter_begin = kbests.begin();
-    candidate_set_type::const_iterator kiter_end   = kbests.end();
-
-    candidate_set_type::const_iterator oiter_begin = oracles.begin();
-    candidate_set_type::const_iterator oiter_end   = oracles.end();
-
-    for (candidate_set_type::const_iterator kiter = kiter_begin; kiter != kiter_end; ++ kiter)
-      margin_kbests_.push_back(cicada::dot_product(weights,
-						   kiter->hypothesis_.features.begin(),
-						   kiter->hypothesis_.features.end(),
-						   0.0));
-
-    for (candidate_set_type::const_iterator oiter = oiter_begin; oiter != oiter_end; ++ oiter) {
-      sentences_.insert(oiter->hypothesis_.sentence);
-      
-      margin_oracles_.push_back(cicada::dot_product(weights,
-						    oiter->hypothesis_.features.begin(),
-						    oiter->hypothesis_.features.end(),
-						    0.0));
-    }
+    // pre-compute a set of oracle translations
+    sentences_.clear();
+    for (size_type o = 0; o != oracles.size(); ++ o)
+      sentences_.insert(oracles[o].hypothesis_.sentence);
     
     size_type num_loss = 0;
+    loss_.clear();
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	  num_loss += (double(oracles[o].hypothesis_.sentence.size()) - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
+	  loss_.push_back(compute_loss(margin_kbests_[k], margin_oracles_[o]));
+	  num_loss +=  loss_.back() > 0.0;
+	}
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -252,11 +340,11 @@ struct LearnBase
     loss_oracles_.resize(margin_oracles_.size());
     
     double loss = 0.0;
-    
+    size_type loss_pos = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  const double error = std::max(double(oracles[o].hypothesis_.sentence.size()) - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  const double error = loss_[loss_pos ++];
 	  
 	  if (error == 0.0) continue;
 	  
