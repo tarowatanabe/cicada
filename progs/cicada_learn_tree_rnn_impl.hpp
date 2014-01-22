@@ -115,6 +115,7 @@ struct LearnBase
   typedef cicada::feature::TreeRNN::feature_name_set_type feature_name_set_type;
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
+  typedef std::vector<double, std::allocator<double> > margin_set_type;
   
   typedef std::vector<size_type, std::allocator<size_type> >  node_map_type;
 
@@ -153,52 +154,23 @@ struct LearnBase
   
   typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
-  struct margin_type
-  {
-    double max;
-    double min;
-    
-    margin_type()
-      : max(- std::numeric_limits<double>::infinity()),
-	min(std::numeric_limits<double>::infinity()) {}
-
-    bool empty() const
-    {
-      return (max == - std::numeric_limits<double>::infinity() && min == std::numeric_limits<double>::infinity());
-    }
-    
-    void assign(const double x)
-    {
-      this->max = std::max(this->max, x);
-      this->min = std::min(this->min, x);
-    }
-  };
-  typedef std::vector<margin_type, std::allocator<margin_type> > margin_set_type;
-  typedef std::vector<margin_set_type, std::allocator<margin_set_type> > margin_map_type;
-  
-  typedef std::vector<size_type, std::allocator<size_type> > node_count_type;
-  typedef std::vector<double, std::allocator<double> > score_set_type;
-
   LearnBase() {}
   
   bool no_bos_eos_;
   bool skip_sgml_tag_;
   feature_name_set_type names_;
   
-  margin_map_type margin_kbests_;
-  margin_map_type margin_oracles_;
+  margin_set_type margin_kbests_;
+  margin_set_type margin_oracles_;
   
-  node_count_type node_counts_;
-  score_set_type  node_scores_;
-  
-  loss_set_type loss_;
   loss_set_type loss_kbests_;
   loss_set_type loss_oracles_;
   
   node_map_type        node_map_;
   state_set_type       states_;
   word_set_type        words_;
-  sentence_unique_type sentences_;
+  sentence_unique_type sentence_kbests_;
+  sentence_unique_type sentence_oracles_;
   
   void initialize(const feature_name_set_type& names,
 		  const bool no_bos_eos,
@@ -226,81 +198,7 @@ struct LearnBase
     for (size_type i = 0; i != theta.hidden_; ++ i)
       W(0, i) = weights[names_[i]];
   }
-
-  void compute_margin(const weight_set_type& weights,
-		      const candidate_type& candidate,
-		      margin_set_type& margins)
-  {
-    margins.clear();
-    margins.resize(candidate.graph_.nodes.size());
-    
-    node_counts_.clear();
-    node_counts_.resize(candidate.graph_.nodes.size(), 0);
-
-    node_scores_.clear();
-    node_scores_.resize(candidate.graph_.nodes.size(), 0);
-    
-    for (size_type n = 0; n != candidate.graph_.nodes.size(); ++ n) {
-      const hypergraph_type::node_type& node = candidate.graph_.nodes[n];
-      
-      if (node.edges.size() != 1)
-	throw std::runtime_error("invalid node");
-      
-      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = candidate.graph_.edges[*eiter];
-	
-	double score = cicada::dot_product(weights, edge.features);
-	size_type num_child_nodes = edge.tails.size();
-	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-	  score += node_scores_[*titer];
-	  num_child_nodes += node_counts_[*titer];
-	}
-	
-	node_scores_[node.id] = score;
-	node_counts_[node.id] = num_child_nodes;
-	margins[num_child_nodes].assign(score);
-      }
-    }
-  }
   
-  void compute_margin(const weight_set_type& weights,
-		      const candidate_set_type& candidates,
-		      margin_map_type& margins)
-  {
-    margins.clear();
-    margins.resize(candidates.size());
-    
-    for (size_type c = 0; c != candidates.size(); ++ c)
-      compute_margin(weights, candidates[c], margins[c]);
-  }
-
-  double compute_loss(const margin_set_type& kbests,
-		      const margin_set_type& oracles)
-  {
-    const size_type num_max = utils::bithack::max(kbests.size(), oracles.size());
-
-    double prev_kbest  = 0;
-    double prev_oracle = 0;
-    
-    for (size_type n = 0; n != num_max; ++ n) 
-      if ((n < kbests.size() && ! kbests[n].empty()) || (n < oracles.size() && ! oracles[n].empty())) {
-	const double score_kbest  = (kbests.size() >= n  || kbests[n].empty()  ? prev_kbest  : kbests[n].min);
-	const double score_oracle = (oracles.size() >= n || oracles[n].empty() ? prev_oracle : oracles[n].max);
-	
-	const double loss = 1.0 - (score_oracle - score_kbest);
-	
-	if (loss > 0.0)
-	  return loss;
-	
-	prev_kbest  = score_kbest;
-	prev_oracle = score_oracle;
-      }
-    
-    return 0.0;
-  }
-
   double accumulate(const size_type id,
 		    const candidate_set_type& kbests,
 		    const candidate_set_type& oracles,
@@ -309,22 +207,43 @@ struct LearnBase
 		    const tree_rnn_type& theta,
 		    gradient_type& gradient)
   {
-    // first, compuate pairs...
-    compute_margin(weights, kbests,  margin_kbests_);
-    compute_margin(weights, oracles, margin_oracles_);
+    // we will devise a slightly complicated feature function:
+    // the reason for the starnbe behavior may come from the ngram language model estimates
+    // thus, even if our oracle is hight enough, but not covered by kbests, we will try optimize toward the oracles.
     
-    // pre-compute a set of oracle translations
-    sentences_.clear();
-    for (size_type o = 0; o != oracles.size(); ++ o)
-      sentences_.insert(oracles[o].hypothesis_.sentence);
+    // first, compuate pairs...
+    margin_kbests_.clear();
+    margin_oracles_.clear();
+    
+    sentence_kbests_.clear();
+    sentence_oracles_.clear();
+    
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+      
+      margin_kbests_.push_back(cicada::dot_product(weights,
+                                                   kbests[k].hypothesis_.features.begin(),
+                                                   kbests[k].hypothesis_.features.end(),
+						   0.0));
+    }
+    
+    for (size_type o = 0; o != oracles.size(); ++ o) {
+      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+      
+      margin_oracles_.push_back(cicada::dot_product(weights,
+						    oracles[o].hypothesis_.features.begin(),
+						    oracles[o].hypothesis_.features.end(),
+						    0.0));
+    }
     
     size_type num_loss = 0;
-    loss_.clear();
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  loss_.push_back(compute_loss(margin_kbests_[k], margin_oracles_[o]));
-	  num_loss +=  loss_.back() > 0.0;
+	  if (sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end())
+	    ++ num_loss;
+	  else
+	    num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
 	}
     
     // if no errors suffered, we will simply return...
@@ -340,11 +259,13 @@ struct LearnBase
     loss_oracles_.resize(margin_oracles_.size());
     
     double loss = 0.0;
-    size_type loss_pos = 0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentences_.find(kbests[k].hypothesis_.sentence) == sentences_.end())
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  const double error = loss_[loss_pos ++];
+	  
+	  const double error = (sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end()
+				? 1.0
+				: std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0));
 	  
 	  if (error == 0.0) continue;
 	  
