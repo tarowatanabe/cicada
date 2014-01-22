@@ -260,6 +260,7 @@ struct LearnBase
 	}
 	
 	node_scores_[node.id] = score;
+	node_counts_[node.id] = num_child_nodes;
 	margins[num_child_nodes].assign(score);
       }
     }
@@ -286,8 +287,8 @@ struct LearnBase
     
     for (size_type n = 0; n != num_max; ++ n) 
       if ((n < kbests.size() && ! kbests[n].empty()) || (n < oracles.size() && ! oracles[n].empty())) {
-	const double score_kbest  = (kbests.size() >= n  || kbests[n].empty()  ? prev_kbest  : kbests[n].max);
-	const double score_oracle = (oracles.size() >= n || oracles[n].empty() ? prev_oracle : oracles[n].min);
+	const double score_kbest  = (kbests.size() >= n  || kbests[n].empty()  ? prev_kbest  : kbests[n].min);
+	const double score_oracle = (oracles.size() >= n || oracles[n].empty() ? prev_oracle : oracles[n].max);
 	
 	const double loss = 1.0 - (score_oracle - score_kbest);
 	
