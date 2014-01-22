@@ -115,7 +115,6 @@ struct LearnBase
   typedef cicada::feature::TreeRNN::feature_name_set_type feature_name_set_type;
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
-  typedef std::vector<double, std::allocator<double> > margin_set_type;
   
   typedef std::vector<size_type, std::allocator<size_type> >  node_map_type;
 
@@ -154,12 +153,12 @@ struct LearnBase
   
   typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
 
-  struct node_margin_type
+  struct margin_type
   {
     double max;
     double min;
     
-    node_margin_type()
+    margin_type()
       : max(- std::numeric_limits<double>::infinity()),
 	min(std::numeric_limits<double>::infinity()) {}
 
@@ -174,8 +173,8 @@ struct LearnBase
       this->min = std::min(this->min, x);
     }
   };
-  typedef std::vector<node_margin_type, std::allocator<node_margin_type> > node_margin_set_type;
-  typedef std::vector<node_margin_set_type, std::allocator<node_margin_set_type> > node_margin_map_type;
+  typedef std::vector<margin_type, std::allocator<margin_type> > margin_set_type;
+  typedef std::vector<margin_set_type, std::allocator<margin_set_type> > margin_map_type;
   
   typedef std::vector<size_type, std::allocator<size_type> > node_count_type;
   typedef std::vector<double, std::allocator<double> > score_set_type;
@@ -186,8 +185,8 @@ struct LearnBase
   bool skip_sgml_tag_;
   feature_name_set_type names_;
   
-  node_margin_map_type margin_kbests_;
-  node_margin_map_type margin_oracles_;
+  margin_map_type margin_kbests_;
+  margin_map_type margin_oracles_;
   
   node_count_type node_counts_;
   score_set_type  node_scores_;
@@ -230,7 +229,7 @@ struct LearnBase
 
   void compute_margin(const weight_set_type& weights,
 		      const candidate_type& candidate,
-		      node_margin_set_type& margins)
+		      margin_set_type& margins)
   {
     margins.clear();
     margins.resize(candidate.graph_.nodes.size());
@@ -252,11 +251,11 @@ struct LearnBase
 	const hypergraph_type::edge_type& edge = candidate.graph_.edges[*eiter];
 	
 	double score = cicada::dot_product(weights, edge.features);
-	size_type num_child_nodes = 0;
+	size_type num_child_nodes = edge.tails.size();
 	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-	  num_child_nodes += node_counts_[*titer] + 1;
 	  score += node_scores_[*titer];
+	  num_child_nodes += node_counts_[*titer];
 	}
 	
 	node_scores_[node.id] = score;
@@ -268,7 +267,7 @@ struct LearnBase
   
   void compute_margin(const weight_set_type& weights,
 		      const candidate_set_type& candidates,
-		      node_margin_map_type& margins)
+		      margin_map_type& margins)
   {
     margins.clear();
     margins.resize(candidates.size());
@@ -277,8 +276,8 @@ struct LearnBase
       compute_margin(weights, candidates[c], margins[c]);
   }
 
-  double compute_loss(const node_margin_set_type& kbests,
-		      const node_margin_set_type& oracles)
+  double compute_loss(const margin_set_type& kbests,
+		      const margin_set_type& oracles)
   {
     const size_type num_max = utils::bithack::max(kbests.size(), oracles.size());
 
