@@ -39,6 +39,7 @@
 #include "utils/hashmurmur3.hpp"
 #include "utils/getline.hpp"
 #include "utils/compact_map.hpp"
+#include "utils/indexed_set.hpp"
 
 #include <boost/tokenizer.hpp>
 
@@ -466,16 +467,82 @@ struct ViolationAll : public ViolationBase
   typedef std::vector<size_type, std::allocator<size_type> >         node_set_type;
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
+  typedef hypergraph_type::rule_type     rule_type;
+  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
   typedef hypergraph_type::feature_set_type   feature_set_type;
   typedef hypergraph_type::attribute_set_type attribute_set_type;
 
   typedef feature_set_type::feature_type     feature_type;
   typedef attribute_set_type::attribute_type attribute_type;
+  
+  struct Tree
+  {
+    typedef uint32_t id_type;
+    
+    struct edge_type
+    {
+      typedef utils::small_vector<id_type, std::allocator<id_type> > node_set_type;
+      
+      edge_type() : rule_(), tails_() {}
+      edge_type(const rule_ptr_type& rule)
+	: rule_(rule), tails_() {}
+      edge_type(const rule_ptr_type& rule, const node_set_type& tails)
+	: rule_(rule), tails_(tails) {}
+      
+      rule_ptr_type rule_;
+      node_set_type tails_;
+      
+      friend
+      bool operator==(const edge_type& x, const edge_type& y) 
+      {
+	return ((x.rule_ == y.rule_ || (x.rule_ && y.rule_ && *x.rule_ == *y.rule_))
+		&& x.tails_ == y.tails_);
+      }
+      
+      friend
+      bool operator!=(const edge_type& x, const edge_type& y) 
+      {
+	return ! (x == y);
+      }
+      
+      friend
+      size_t  hash_value(edge_type const& x)
+      {
+	return utils::hashmurmur3<size_t>()(x.tails_.begin(), x.tails_.end(),
+					    x.rule_ ? hash_value(*x.rule_) : size_t(0));
+      }
+    };
+    
+    typedef utils::indexed_set<edge_type, boost::hash<edge_type>, std::equal_to<edge_type>, std::allocator<edge_type> > edge_set_type;
+    
+    void clear()
+    {
+      edges_.clear();
+    }
+
+    id_type operator()(const rule_ptr_type& rule, const edge_type::node_set_type& tails)
+    {
+      return operator()(edge_type(rule, tails));
+    }
+    
+    id_type operator()(const edge_type& edge)
+    {
+      edge_set_type::iterator iter = edges_.insert(edge).first;
+      
+      return iter - edges_.begin();
+    }
+    
+    edge_set_type edges_;
+  };
+
+  typedef Tree tree_type;
+
+  typedef std::vector<tree_type::id_type, std::allocator<tree_type::id_type> > tree_set_type;
+  typedef std::vector<tree_set_type, std::allocator<tree_set_type> >           tree_map_type;
 
   struct Inside
   {
-    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
-    
     struct attribute_int : public boost::static_visitor<attribute_set_type::int_type>
     {
       // we will not throw, but simply return zero. (TODO: return negative?)
@@ -489,14 +556,21 @@ struct ViolationAll : public ViolationBase
     void operator()(const weight_set_type& weights,
 		    const hypergraph_type& graph,
 		    weight_node_type& weights_node,
-		    node_set_type& node_map)
+		    node_set_type& node_map,
+		    tree_type& tree,
+		    tree_set_type& tree_nodes)
     {
       weights_node.clear();
-      node_map.clear();
-      
       weights_node.resize(graph.nodes.size());
       
+      node_map.clear();
+      
+      tree_nodes.clear();
+      tree_nodes.resize(graph.nodes.size(), tree_type::id_type(-1));
+      
       cicada::operation::weight_function<weight_type > function(weights);
+
+      tree_type::edge_type::node_set_type tree_tails;
       
       hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
@@ -516,9 +590,17 @@ struct ViolationAll : public ViolationBase
 	  const edge_type& edge = graph.edges[*eiter];
 	  
 	  weight = function(edge);
+	  tree_tails.resize(edge.tails.size());
+	  
+	  size_type tail = 0;
 	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ tail) {
 	    weight *= weights_node[*niter];
+	    tree_tails[tail] = tree_nodes[*niter];
+	  }
+
+	  // assign tree-node id
+	  tree_nodes[node.id] = tree(edge.rule, tree_tails);
 	  
 	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_bin_);
 	  if (piter == edge.attributes.end()) continue;
@@ -538,7 +620,6 @@ struct ViolationAll : public ViolationBase
       }
     }
     
-    // name of the bin
     const attribute_type attr_bin_;
   };
 
@@ -552,8 +633,12 @@ struct ViolationAll : public ViolationBase
   
   node_map_type node_map_kbests_;
   node_map_type node_map_oracles_;
+
+  tree_map_type tree_kbests_;
+  tree_map_type tree_oracles_;
   
   Inside inside_;
+  Tree   tree_;
 
   double operator()(const candidate_set_type& kbests,
 		    const candidate_set_type& oracles,
@@ -587,25 +672,33 @@ struct ViolationAll : public ViolationBase
     
     node_map_kbests_.clear();
     node_map_oracles_.clear();
-
+    
     weights_kbests_.resize(kbests.size());
     weights_oracles_.resize(oracles.size());
     
     node_map_kbests_.resize(kbests.size());
     node_map_oracles_.resize(oracles.size());
-    
+
     loss_kbests.resize(kbests.size());
     loss_oracles.resize(oracles.size());
+    
+    tree_.clear();
+    
+    tree_kbests_.clear();
+    tree_oracles_.clear();
+
+    tree_kbests_.resize(kbests.size());
+    tree_oracles_.resize(oracles.size());
 
     for (size_type k = 0; k != kbests.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end()) {
-	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k]);
+	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k], tree_, tree_kbests_[k]);
 	
 	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
       }
 
     for (size_type o = 0; o != oracles.size(); ++ o) {
-      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o]);
+      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o], tree_, tree_oracles_[o]);
       
       loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
     }
@@ -621,6 +714,11 @@ struct ViolationAll : public ViolationBase
 	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
 	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
 	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
+	      
+	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+
+	      if (tree_kbest == tree_oracle) continue;
 	      
 	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
 	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
