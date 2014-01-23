@@ -126,8 +126,8 @@ struct LearnBase : public utils::hashmurmur3<size_t>
   typedef cicada::feature::FrontierBiTreeRNN::feature_name_set_type feature_name_set_type;
   
   typedef std::vector<double, std::allocator<double> > loss_set_type;
-  typedef std::vector<double, std::allocator<double> > margin_set_type;
-  
+  typedef std::vector<loss_set_type, std::allocator<loss_set_type> > loss_map_type;
+
   typedef std::vector<size_type, std::allocator<size_type> >  node_map_type;
 
   typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
@@ -168,19 +168,6 @@ struct LearnBase : public utils::hashmurmur3<size_t>
   };
   typedef utils::array_power2<cache_phrase_type, 1024 * 4, std::allocator<cache_phrase_type> > cache_phrase_set_type;
 
-  struct hash_sentence : public utils::hashmurmur3<size_t>
-  {
-    typedef utils::hashmurmur3<size_t> hasher_type;
-    
-    size_t operator()(const hypothesis_type::sentence_type& x) const
-    {
-      return hasher_type()(x.begin(), x.end(), 0);
-    }
-  };
-  
-  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
-  
-
   LearnBase() 
     : attr_frontier_source_("frontier-source"),
       attr_frontier_target_("frontier-target") {}
@@ -189,17 +176,13 @@ struct LearnBase : public utils::hashmurmur3<size_t>
   bool skip_sgml_tag_;
   feature_name_set_type names_;
   
-  margin_set_type margin_kbests_;
-  margin_set_type margin_oracles_;
-  
-  loss_set_type loss_kbests_;
-  loss_set_type loss_oracles_;
+  loss_map_type loss_kbests_;
+  loss_map_type loss_oracles_;
   
   node_map_type        node_map_;
+  node_map_type        state_map_;
   state_set_type       states_;
   word_set_type        words_;
-  sentence_unique_type sentence_kbests_;
-  sentence_unique_type sentence_oracles_;
   
   cache_phrase_set_type cache_source_;
   cache_phrase_set_type cache_target_;
@@ -235,86 +218,31 @@ struct LearnBase : public utils::hashmurmur3<size_t>
       W(0, i) = weights[names_[i]];
   }
   
+  template <typename Violation>
   double accumulate(const size_type id,
 		    const candidate_set_type& kbests,
 		    const candidate_set_type& oracles,
 		    const weight_set_type& weights,
 		    const tensor_type& W,
 		    const tree_rnn_type& theta,
+		    Violation& violation,
 		    gradient_type& gradient)
   {
-    // first, compuate pairs...
-    margin_kbests_.clear();
-    margin_oracles_.clear();
-    
-    sentence_kbests_.clear();
-    sentence_oracles_.clear();
-    
-    for (size_type k = 0; k != kbests.size(); ++ k) {
-      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
-      
-      margin_kbests_.push_back(cicada::dot_product(weights,
-                                                   kbests[k].hypothesis_.features.begin(),
-                                                   kbests[k].hypothesis_.features.end(),
-						   0.0));
-    }
-    
-    for (size_type o = 0; o != oracles.size(); ++ o) {
-      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
-      
-      margin_oracles_.push_back(cicada::dot_product(weights,
-						    oracles[o].hypothesis_.features.begin(),
-						    oracles[o].hypothesis_.features.end(),
-						    0.0));
-    }
-    
-    size_type num_loss = 0;
-    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	  num_loss += ((1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0
-		       || sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end());
-    
-    // if no errors suffered, we will simply return...
-    if (! num_loss)
-      return 0.0;
+    const double loss = violation(kbests, oracles, weights, loss_kbests_, loss_oracles_);
 
-    const double error_factor = 1.0 / num_loss;
-    
-    loss_kbests_.clear();
-    loss_oracles_.clear();
-    
-    loss_kbests_.resize(margin_kbests_.size());
-    loss_oracles_.resize(margin_oracles_.size());
-    
-    double loss = 0.0;
-    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-
-	  double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
-	  if (error == 0.0 && sentence_kbests_.find(oracles[o].hypothesis_.sentence) == sentence_kbests_.end())
-	    error = 1;
-	  
-	  if (error == 0.0) continue;
-	  
-	  loss_oracles_[o] -= error_factor;
-	  loss_kbests_[k]  += error_factor;
-	  
-	  loss += error;
-	}
+    if (loss_kbests_.empty() || loss_oracles_.empty()) return loss;
     
     ++ gradient.count_;
     
     for (size_type k = 0; k != loss_kbests_.size(); ++ k)
-      if (loss_kbests_[k] != 0)
+      if (! loss_kbests_[k].empty())
 	accumulate(loss_kbests_[k], kbests[k], weights, W, theta, gradient);
     
     for (size_type o = 0; o != loss_oracles_.size(); ++ o)
-      if (loss_oracles_[o] != 0)
+      if (! loss_oracles_[o].empty())
 	accumulate(loss_oracles_[o], oracles[o], weights, W, theta, gradient);
     
-    return loss * error_factor;
+    return loss;
   }
 
   struct skipper_epsilon
@@ -333,7 +261,7 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     }
   };
   
-  void accumulate(const double& loss,
+  void accumulate(const loss_set_type& loss,
 		  const candidate_type& cand,
 		  const weight_set_type& weights,
 		  const tensor_type& W,
@@ -351,8 +279,11 @@ struct LearnBase : public utils::hashmurmur3<size_t>
 	       const tree_rnn_type& theta)
   {
     node_map_.clear();
+    state_map_.clear();
     states_.clear();
-
+    
+    node_map_.resize(cand.graph_.nodes.size(), size_type(-1));
+    
     const tensor_type init = theta.Bi_.array().unaryExpr(tree_rnn_type::shtanh());
     
     hypergraph_type::node_set_type::const_iterator niter_end = cand.graph_.nodes.end();
@@ -555,13 +486,14 @@ struct LearnBase : public utils::hashmurmur3<size_t>
       state.features_[names_[i]] = state.layer_(i, 0);
     
     // set up node-map
-    if (edge.head >= node_map_.size())
-      node_map_.resize(edge.head + 1, size_type(-1));
-    
     node_map_[edge.head] = states_.size() - 1;
+    
+    // set up state-map
+    state_map_.resize(states_.size());
+    state_map_.back() = edge.head;
   }
   
-  void backward(const double& loss,
+  void backward(const loss_set_type& loss,
 		const candidate_type& cand,
 		const weight_set_type& weights,
 		const tensor_type& W,
@@ -573,17 +505,18 @@ struct LearnBase : public utils::hashmurmur3<size_t>
     const size_type offset_source = theta.hidden_;
     const size_type offset_target = theta.hidden_ + theta.embedding_;
     
+    size_type state_pos = states_.size() - 1;
     state_set_type::reverse_iterator siter_end = states_.rend();
-    for (state_set_type::reverse_iterator siter = states_.rbegin(); siter != siter_end; ++ siter) {
+    for (state_set_type::reverse_iterator siter = states_.rbegin(); siter != siter_end; ++ siter, -- state_pos) {
       state_type& state = *siter;
       
       if (state.final()) {
 	feature_set_type::const_iterator fiter_end = state.features_.end();
 	for (feature_set_type::const_iterator fiter = state.features_.begin(); fiter != fiter_end; ++ fiter)
-	  gradient.weights_[fiter->first] += loss * fiter->second;
+	  gradient.weights_[fiter->first] += loss[state_map_[state_pos]] * fiter->second;
 	
 	state.delta_.array() += (state.layer_.array().unaryExpr(tree_rnn_type::dshtanh())
-				 * W.transpose().array() * loss);
+				 * W.transpose().array() * loss[state_map_[state_pos]]);
       }
       
       if (state.initial()) // initial
@@ -654,6 +587,310 @@ struct LearnBase : public utils::hashmurmur3<size_t>
   }
 };
 
+struct ViolationBase
+{
+  typedef LearnBase::size_type       size_type;
+  typedef LearnBase::difference_type difference_type;
+  
+  typedef LearnBase::candidate_type     candidate_type;
+  typedef LearnBase::candidate_set_type candidate_set_type;
+  typedef LearnBase::candidate_map_type candidate_map_type;
+
+  typedef LearnBase::loss_set_type loss_set_type;
+  typedef LearnBase::loss_map_type loss_map_type;
+  
+  typedef cicada::HyperGraph hypergraph_type;
+
+  struct hash_sentence : public utils::hashmurmur3<size_t>
+  {
+    typedef utils::hashmurmur3<size_t> hasher_type;
+    
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+  
+  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
+
+  sentence_unique_type sentence_kbests_;
+  sentence_unique_type sentence_oracles_;
+};
+
+struct ViolationAll : public ViolationBase
+{
+  typedef cicada::semiring::Tropical<double> weight_type;
+  
+  typedef std::vector<weight_type, std::allocator<weight_type> >           weight_node_type;
+  typedef std::vector<weight_node_type, std::allocator<weight_node_type> > weight_map_type;
+  
+  typedef std::vector<size_type, std::allocator<size_type> >         node_set_type;
+  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+
+  typedef hypergraph_type::feature_set_type   feature_set_type;
+  typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+  typedef feature_set_type::feature_type     feature_type;
+  typedef attribute_set_type::attribute_type attribute_type;
+
+  struct Inside
+  {
+    typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_map_type;
+    
+    struct attribute_int : public boost::static_visitor<attribute_set_type::int_type>
+    {
+      // we will not throw, but simply return zero. (TODO: return negative?)
+      attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+      attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
+      attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
+    };
+    
+    Inside(const std::string& attr_bin) : attr_bin_(attr_bin) {}
+    
+    void operator()(const weight_set_type& weights,
+		    const hypergraph_type& graph,
+		    weight_node_type& weights_node,
+		    node_set_type& node_map)
+    {
+      weights_node.clear();
+      node_map.clear();
+      
+      weights_node.resize(graph.nodes.size());
+      
+      cicada::operation::weight_function<weight_type > function(weights);
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+	typedef hypergraph_type::node_type node_type;
+	
+	const node_type& node = *niter;
+	
+	weight_type& weight = weights_node[node.id];
+	
+	if (node.edges.size() != 1)
+	  throw std::runtime_error("invlaid single tree derivation");
+	
+	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  typedef hypergraph_type::edge_type edge_type;
+	  
+	  const edge_type& edge = graph.edges[*eiter];
+	  
+	  weight = function(edge);
+	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	    weight *= weights_node[*niter];
+	  
+	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_bin_);
+	  if (piter == edge.attributes.end()) continue;
+	  
+	  const int bin_pos = boost::apply_visitor(attribute_int(), piter->second);
+	  
+	  if (bin_pos < 0) continue;
+	  
+	  if (bin_pos >= node_map.size())
+	    node_map.resize(bin_pos + 1, size_type(-1));
+	  
+	  if (node_map[bin_pos] != size_type(-1))
+	    throw std::runtime_error("duplicated node map?");
+	  
+	  node_map[bin_pos] = node.id;
+	}
+      }
+    }
+    
+    // name of the bin
+    const attribute_type attr_bin_;
+  };
+
+  ViolationAll()
+    : inside_("head-node") {}
+  ViolationAll(const std::string& attr_bin)
+    : inside_(attr_bin) {}
+
+  weight_map_type weights_kbests_;
+  weight_map_type weights_oracles_;
+  
+  node_map_type node_map_kbests_;
+  node_map_type node_map_oracles_;
+  
+  Inside inside_;
+
+  double operator()(const candidate_set_type& kbests,
+		    const candidate_set_type& oracles,
+		    const weight_set_type& weights,
+		    loss_map_type& loss_kbests,
+		    loss_map_type& loss_oracles)
+  {
+    loss_kbests.clear();
+    loss_oracles.clear();
+
+    sentence_kbests_.clear();
+    sentence_oracles_.clear();
+    
+    for (size_type k = 0; k != kbests.size(); ++ k)
+      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+    
+    for (size_type o = 0; o != oracles.size(); ++ o)
+      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+    
+    size_type num_kbests = 0;
+    for (size_type k = 0; k != kbests.size(); ++ k)
+      num_kbests += (sentence_oracles_.find(kbests[k].hypothesis_.sentence)
+		     == sentence_oracles_.end());
+    
+    if (! num_kbests) return 0.0;
+    
+    const double error_factor = 1.0 / (num_kbests * oracles.size());
+    
+    weights_kbests_.clear();
+    weights_oracles_.clear();
+    
+    node_map_kbests_.clear();
+    node_map_oracles_.clear();
+
+    weights_kbests_.resize(kbests.size());
+    weights_oracles_.resize(oracles.size());
+    
+    node_map_kbests_.resize(kbests.size());
+    node_map_oracles_.resize(oracles.size());
+    
+    loss_kbests.resize(kbests.size());
+    loss_oracles.resize(oracles.size());
+
+    for (size_type k = 0; k != kbests.size(); ++ k)
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end()) {
+	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k]);
+	
+	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
+      }
+
+    for (size_type o = 0; o != oracles.size(); ++ o) {
+      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o]);
+      
+      loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
+    }
+
+    double loss = 0.0;
+        
+    for (size_type k = 0; k != kbests.size(); ++ k)
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
+	for (size_type o = 0; o != oracles.size(); ++ o) {
+	  const size_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+
+	  for (size_type bin = 0; bin != bin_max; ++ bin) 
+	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
+	      
+	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+	      
+	      const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+	      
+	      if (error <= 0.0) continue;
+	
+	      loss_oracles[o][node_pos_oracle] -= error_factor;
+	      loss_kbests[k][node_pos_kbest]   += error_factor;
+	      
+	      loss += error;
+	    }
+	}
+
+    return loss * error_factor;
+  }
+};
+
+struct ViolationDerivation : public ViolationBase
+{
+  typedef std::vector<double, std::allocator<double> > margin_set_type;
+
+  margin_set_type margin_kbests_;
+  margin_set_type margin_oracles_;
+
+  loss_set_type loss_kbests_;
+  loss_set_type loss_oracles_;
+  
+  double operator()(const candidate_set_type& kbests,
+		    const candidate_set_type& oracles,
+		    const weight_set_type& weights,
+		    loss_map_type& loss_kbests,
+		    loss_map_type& loss_oracles)
+  {
+    loss_kbests.clear();
+    loss_oracles.clear();
+
+    // first, compuate pairs...
+    margin_kbests_.clear();
+    margin_oracles_.clear();
+    
+    sentence_kbests_.clear();
+    sentence_oracles_.clear();
+    
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+      
+      margin_kbests_.push_back(cicada::dot_product(weights,
+                                                   kbests[k].hypothesis_.features.begin(),
+                                                   kbests[k].hypothesis_.features.end(),
+						   0.0));
+    }
+    
+    for (size_type o = 0; o != oracles.size(); ++ o) {
+      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+      
+      margin_oracles_.push_back(cicada::dot_product(weights,
+						    oracles[o].hypothesis_.features.begin(),
+						    oracles[o].hypothesis_.features.end(),
+						    0.0));
+    }
+    
+    size_type num_loss = 0;
+    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	  num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
+    
+    // if no errors suffered, we will simply return...
+    if (! num_loss)
+      return 0.0;
+    
+    const double error_factor = 1.0 / num_loss;
+    
+    loss_kbests_.clear();
+    loss_oracles_.clear();
+    
+    loss_kbests_.resize(margin_kbests_.size());
+    loss_oracles_.resize(margin_oracles_.size());
+    
+    double loss = 0.0;
+    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
+      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
+	  const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  
+	  if (error == 0.0) continue;
+	  
+	  loss_oracles_[o] -= error_factor;
+	  loss_kbests_[k]  += error_factor;
+	  
+	  loss += error;
+	}
+    
+    loss_kbests.resize(margin_kbests_.size());
+    loss_oracles.resize(margin_oracles_.size());
+    
+    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
+      if (loss_kbests_[k] != 0.0)
+	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), loss_kbests_[k]);
+    
+    for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+      if (loss_oracles_[o] != 0)
+	loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), loss_oracles_[o]);
+    
+    return loss * error_factor;
+  }
+};
 
 struct LearnAdaGrad : public LearnBase
 {

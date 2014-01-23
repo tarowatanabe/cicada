@@ -113,6 +113,10 @@ bool optimize_sgd = false;
 double lambda = 0.0;
 double eta0 = 0.1;
 
+std::string violation_bin = "prune-bin";
+bool violation_derivation = false;
+bool violation_all        = false;
+
 // additional misc parameters...
 int merge_history = 0;
 bool mix_none_mode = false;
@@ -221,6 +225,12 @@ int main(int argc, char ** argv)
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
     
+    if (int(violation_derivation) + violation_all > 1)
+      throw std::runtime_error("either derivation/all violations");
+    
+    if (int(violation_derivation) + violation_all == 0)
+      violation_derivation = true;
+
     if (lambda < 0)
       throw std::runtime_error("regularization constant must be positive");
 
@@ -901,6 +911,10 @@ struct Task
     scorer_document_type scorers_batch(scorers_);
 
     history_set_type history;
+
+    // violation...
+    ViolationDerivation violation_margin;
+    ViolationAll        violation_margin_all(violation_bin);
     
     score_1best_.reset();
     score_oracle_.reset();
@@ -1014,25 +1028,53 @@ struct Task
 	  // encode into learner...
 	  double objective = 0.0;
 	  
-	  if (! history.empty())
-	    for (size_t j = 0; j != history.size(); ++ j)
-	      for (size_t i = 0; i != history[j].segments.size(); ++ i)
-		objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
-								       history[j].kbests[i],
-								       history[j].oracles[i],
-								       weights_,
-								       W,
-								       theta_,
-								       gradient);
+	  if (! history.empty()) {
+	    if (violation_all) {
+	      for (size_t j = 0; j != history.size(); ++ j)
+		for (size_t i = 0; i != history[j].segments.size(); ++ i)
+		  objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
+									 history[j].kbests[i],
+									 history[j].oracles[i],
+									 weights_,
+									 W,
+									 theta_,
+									 violation_margin_all,
+									 gradient);
+	    } else {
+	      for (size_t j = 0; j != history.size(); ++ j)
+		for (size_t i = 0; i != history[j].segments.size(); ++ i)
+		  objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
+									 history[j].kbests[i],
+									 history[j].oracles[i],
+									 weights_,
+									 W,
+									 theta_,
+									 violation_margin,
+									 gradient);
+	    }
+	  }
 	  
-	  for (size_t i = 0; i != kbests_batch.size(); ++ i)
-	    objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
-								   kbests_batch[i],
-								   oracles_batch[i],
-								   weights_,
-								   W,
-								   theta_,
-								   gradient);
+	  if (violation_all) {
+	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	      objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
+								     kbests_batch[i],
+								     oracles_batch[i],
+								     weights_,
+								     W,
+								     theta_,
+								     violation_margin_all,
+								     gradient);
+	  } else {
+	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	      objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
+								     kbests_batch[i],
+								     oracles_batch[i],
+								     weights_,
+								     W,
+								     theta_,
+								     violation_margin,
+								     gradient);
+	  }
 	  
 	  // perform parameter updates...
 	  const_cast<Learner&>(learner_).learn(weights_, W, theta_, gradient);
@@ -1584,6 +1626,10 @@ void options(int argc, char** argv)
     
     ("lambda",           po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",             po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
+    
+    ("violation-bin",        po::value<std::string>(&violation_bin)->default_value(violation_bin), "violation bin")
+    ("violation-derivation", po::bool_switch(&violation_derivation), "full derivation based violation")
+    ("violation-all",        po::bool_switch(&violation_all),        "violations from all the nodes")
     
     ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
