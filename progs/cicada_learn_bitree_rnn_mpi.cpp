@@ -115,7 +115,8 @@ double eta0 = 0.1;
 
 std::string violation_bin = "prune-bin";
 bool violation_derivation = false;
-bool violation_all        = false;
+bool violation_root       = false;
+bool violation_frontier   = false;
 
 // additional misc parameters...
 int merge_history = 0;
@@ -225,10 +226,10 @@ int main(int argc, char ** argv)
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
     
-    if (int(violation_derivation) + violation_all > 1)
+    if (int(violation_derivation) + violation_root + violation_frontier > 1)
       throw std::runtime_error("either derivation/all violations");
     
-    if (int(violation_derivation) + violation_all == 0)
+    if (int(violation_derivation) + violation_root + violation_frontier == 0)
       violation_derivation = true;
 
     if (lambda < 0)
@@ -914,7 +915,8 @@ struct Task
 
     // violation...
     ViolationDerivation violation_margin;
-    ViolationAll        violation_margin_all(violation_bin);
+    ViolationRoot       violation_margin_root(violation_bin);
+    ViolationFrontier   violation_margin_frontier(violation_bin);
     
     score_1best_.reset();
     score_oracle_.reset();
@@ -1029,7 +1031,7 @@ struct Task
 	  double objective = 0.0;
 	  
 	  if (! history.empty()) {
-	    if (violation_all) {
+	    if (violation_root) {
 	      for (size_t j = 0; j != history.size(); ++ j)
 		for (size_t i = 0; i != history[j].segments.size(); ++ i)
 		  objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
@@ -1038,7 +1040,18 @@ struct Task
 									 weights_,
 									 W,
 									 theta_,
-									 violation_margin_all,
+									 violation_margin_root,
+									 gradient);
+	    } else if (violation_frontier) {
+	      for (size_t j = 0; j != history.size(); ++ j)
+		for (size_t i = 0; i != history[j].segments.size(); ++ i)
+		  objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
+									 history[j].kbests[i],
+									 history[j].oracles[i],
+									 weights_,
+									 W,
+									 theta_,
+									 violation_margin_frontier,
 									 gradient);
 	    } else {
 	      for (size_t j = 0; j != history.size(); ++ j)
@@ -1054,7 +1067,7 @@ struct Task
 	    }
 	  }
 	  
-	  if (violation_all) {
+	  if (violation_root) {
 	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
 	      objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
 								     kbests_batch[i],
@@ -1062,7 +1075,17 @@ struct Task
 								     weights_,
 								     W,
 								     theta_,
-								     violation_margin_all,
+								     violation_margin_root,
+								     gradient);
+	  } else if (violation_frontier) {
+	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
+	      objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
+								     kbests_batch[i],
+								     oracles_batch[i],
+								     weights_,
+								     W,
+								     theta_,
+								     violation_margin_frontier,
 								     gradient);
 	  } else {
 	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
@@ -1629,7 +1652,8 @@ void options(int argc, char** argv)
     
     ("violation-bin",        po::value<std::string>(&violation_bin)->default_value(violation_bin), "violation bin")
     ("violation-derivation", po::bool_switch(&violation_derivation), "full derivation based violation")
-    ("violation-all",        po::bool_switch(&violation_all),        "violations from all the nodes")
+    ("violation-root",       po::bool_switch(&violation_root),       "violations from the root node")
+    ("violation-frontier",   po::bool_switch(&violation_frontier),   "violations from the frontier nodes")
     
     ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
