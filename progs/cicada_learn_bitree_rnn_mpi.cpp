@@ -120,6 +120,7 @@ bool violation_frontier   = false;
 bool violation_max        = false;
 
 // additional misc parameters...
+bool merge_oracle_mode = false;
 int merge_history = 0;
 bool mix_none_mode = false;
 bool mix_average_mode = false;
@@ -986,7 +987,8 @@ struct Task
 	  if (kbests.empty()) continue;
 	  
 	  segments_batch.push_back(id);
-	  kbests_batch.push_back(kbests);
+	  kbests_batch.push_back(candidate_set_type());
+	  kbests_batch.back().swap(kbests);
 	  scorers_batch.push_back(scorers_[id]);
 	  
 	  if (! oracles_.empty()) {
@@ -995,7 +997,12 @@ struct Task
 	    if (kbests.empty())
 	      throw std::runtime_error("no kbests for oracle? " + utils::lexical_cast<std::string>(id));
 	    
-	    oracles_batch.push_back(kbests);
+	    if (merge_oracle_mode)
+	      kbests_batch.back().insert(kbests_batch.back().end(), kbests.begin(), kbests.end());
+	    else {
+	      oracles_batch.push_back(candidate_set_type());
+	      oracles_batch.back().swap(kbests);
+	    }
 	  }
 	}
 	
@@ -1679,6 +1686,7 @@ void options(int argc, char** argv)
     ("violation-frontier",   po::bool_switch(&violation_frontier),   "violations from the frontier nodes")
     ("violation-max",        po::bool_switch(&violation_max),        "maximum violations among nodes")
     
+    ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
     ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")
     ("mix-average",         po::bool_switch(&mix_average_mode),     "mixing weights by averaging")
