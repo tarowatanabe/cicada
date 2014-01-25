@@ -928,6 +928,23 @@ struct ViolationRoot : public ViolationBase
 	      
 	      if (error <= 0.0) continue;
 
+	      {
+		// invalidate parent nodes
+		size_type pos = node_pos_oracle;
+		
+		while (pos != size_type(-1)) {
+		  coverage_oracles_[pos] = true;
+		  pos = parent_oracles_[o][pos];
+		}
+		
+		pos = node_pos_kbest;
+		
+		while (pos != size_type(-1)) {
+		  coverage_kbests_[pos] = true;
+		  pos = parent_kbests_[k][pos];
+		}
+	      }
+
 	      stack_.clear();
 	      stack_.push_back(node_pos_oracle);
 	      

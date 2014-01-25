@@ -1055,7 +1055,7 @@ struct Task
 									 theta_,
 									 violation_margin_frontier,
 									 gradient);
-	      } else if (violation_max) {
+	    } else if (violation_max) {
 	      for (size_t j = 0; j != history.size(); ++ j)
 		for (size_t i = 0; i != history[j].segments.size(); ++ i)
 		  objective += const_cast<Learner&>(learner_).accumulate(history[j].segments[i],
@@ -1100,7 +1100,7 @@ struct Task
 								     theta_,
 								     violation_margin_frontier,
 								     gradient);
-	    } else if (violation_max) {
+	  } else if (violation_max) {
 	    for (size_t i = 0; i != kbests_batch.size(); ++ i)
 	      objective += const_cast<Learner&>(learner_).accumulate(segments_batch[i],
 								     kbests_batch[i],
