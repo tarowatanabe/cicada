@@ -737,91 +737,92 @@ struct ViolationRoot : public ViolationBase
         
     for (size_type k = 0; k != kbests.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o) {
-	  
-	  coverage_kbests_.clear();
-	  coverage_oracles_.clear();
-	  
-	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
-	  
-	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
-	  
-	  // top-down to identify where we find errors
-	  for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
-	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
-
-	      if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
-	      
-	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
-	      
-	      if (tree_kbest == tree_oracle) continue;
-	      
-	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
-	      
-	      const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
-	      
-	      if (error <= 0.0) continue;
-
-	      {
-		// invalidate parent nodes
-		size_type pos = node_pos_oracle;
+	for (size_type o = 0; o != oracles.size(); ++ o)
+	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	    
+	    coverage_kbests_.clear();
+	    coverage_oracles_.clear();
+	    
+	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+	    
+	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+	    
+	    // top-down to identify where we find errors
+	    for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
+	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+		const size_type node_pos_oracle = node_map_oracles_[o][bin];
 		
-		while (pos != size_type(-1)) {
+		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
+		
+		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+		
+		if (tree_kbest == tree_oracle) continue;
+		
+		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+		
+		const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+		
+		if (error <= 0.0) continue;
+		
+		{
+		  // invalidate parent nodes
+		  size_type pos = node_pos_oracle;
+		  
+		  while (pos != size_type(-1)) {
+		    coverage_oracles_[pos] = true;
+		    pos = parent_oracles_[o][pos];
+		  }
+		  
+		  pos = node_pos_kbest;
+		  
+		  while (pos != size_type(-1)) {
+		    coverage_kbests_[pos] = true;
+		    pos = parent_kbests_[k][pos];
+		  }
+		}
+		
+		stack_.clear();
+		stack_.push_back(node_pos_oracle);
+		
+		while (! stack_.empty()) {
+		  const size_type pos = stack_.back();
+		  stack_.pop_back();
+		  
+		  loss_oracles[o][pos] -= error_factor;
 		  coverage_oracles_[pos] = true;
-		  pos = parent_oracles_[o][pos];
+		  
+		  const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+		  
+		  stack_.insert(stack_.end(),
+				oracles[o].graph_.edges[edge_id].tails.begin(),
+				oracles[o].graph_.edges[edge_id].tails.end());
 		}
 		
-		pos = node_pos_kbest;
+		stack_.clear();
+		stack_.push_back(node_pos_kbest);
 		
-		while (pos != size_type(-1)) {
+		while (! stack_.empty()) {
+		  const size_type pos = stack_.back();
+		  stack_.pop_back();
+		  
+		  loss_kbests[k][pos] += error_factor;
 		  coverage_kbests_[pos] = true;
-		  pos = parent_kbests_[k][pos];
+		  
+		  const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+		  
+		  stack_.insert(stack_.end(),
+				kbests[k].graph_.edges[edge_id].tails.begin(),
+				kbests[k].graph_.edges[edge_id].tails.end());
 		}
+		
+		loss += error;
 	      }
-
-	      stack_.clear();
-	      stack_.push_back(node_pos_oracle);
-	      
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
-		
-		loss_oracles[o][pos] -= error_factor;
-		coverage_oracles_[pos] = true;
-		
-		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-		
-		stack_.insert(stack_.end(),
-			      oracles[o].graph_.edges[edge_id].tails.begin(),
-			      oracles[o].graph_.edges[edge_id].tails.end());
-	      }
-
-	      stack_.clear();
-	      stack_.push_back(node_pos_kbest);
-	      
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
-		
-		loss_kbests[k][pos] += error_factor;
-		coverage_kbests_[pos] = true;
-		
-		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
-		
-		stack_.insert(stack_.end(),
-			      kbests[k].graph_.edges[edge_id].tails.begin(),
-			      kbests[k].graph_.edges[edge_id].tails.end());
-	      }
-	      
-	      loss += error;
-	    }
-	}
-
+	  }
+    
     return loss * error_factor;
   }
 };
@@ -1106,90 +1107,91 @@ struct ViolationFrontier : public ViolationBase
         
     for (size_type k = 0; k != kbests.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o) {
+	for (size_type o = 0; o != oracles.size(); ++ o)
+	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	    
+	    coverage_kbests_.clear();
+	    coverage_oracles_.clear();
 	  
-	  coverage_kbests_.clear();
-	  coverage_oracles_.clear();
+	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
 	  
-	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
-	  
-	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
 
-	  // bottom-up to identify where we find errors
-	  for (difference_type bin = 0; bin != bin_max; ++ bin)
-	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
+	    // bottom-up to identify where we find errors
+	    for (difference_type bin = 0; bin != bin_max; ++ bin)
+	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+		const size_type node_pos_oracle = node_map_oracles_[o][bin];
 
-	      if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
+		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
 	      
-	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
 	      
-	      if (tree_kbest == tree_oracle) continue;
+		if (tree_kbest == tree_oracle) continue;
 	      
-	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
 	      
-	      const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+		const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
 	      
-	      if (error <= 0.0) continue;
+		if (error <= 0.0) continue;
 
-	      {
-		// invalidate parent nodes
-		size_type pos = node_pos_oracle;
+		{
+		  // invalidate parent nodes
+		  size_type pos = node_pos_oracle;
 		
-		while (pos != size_type(-1)) {
+		  while (pos != size_type(-1)) {
+		    coverage_oracles_[pos] = true;
+		    pos = parent_oracles_[o][pos];
+		  }
+		
+		  pos = node_pos_kbest;
+		
+		  while (pos != size_type(-1)) {
+		    coverage_kbests_[pos] = true;
+		    pos = parent_kbests_[k][pos];
+		  }
+		}
+	      
+		stack_.clear();
+		stack_.push_back(node_pos_oracle);
+	      
+		while (! stack_.empty()) {
+		  const size_type pos = stack_.back();
+		  stack_.pop_back();
+		
+		  loss_oracles[o][pos] -= error_factor;
 		  coverage_oracles_[pos] = true;
-		  pos = parent_oracles_[o][pos];
+		
+		  const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+		
+		  stack_.insert(stack_.end(),
+				oracles[o].graph_.edges[edge_id].tails.begin(),
+				oracles[o].graph_.edges[edge_id].tails.end());
 		}
-		
-		pos = node_pos_kbest;
-		
-		while (pos != size_type(-1)) {
-		  coverage_kbests_[pos] = true;
-		  pos = parent_kbests_[k][pos];
-		}
-	      }
-	      
-	      stack_.clear();
-	      stack_.push_back(node_pos_oracle);
-	      
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
-		
-		loss_oracles[o][pos] -= error_factor;
-		coverage_oracles_[pos] = true;
-		
-		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-		
-		stack_.insert(stack_.end(),
-			      oracles[o].graph_.edges[edge_id].tails.begin(),
-			      oracles[o].graph_.edges[edge_id].tails.end());
-	      }
 
-	      stack_.clear();
-	      stack_.push_back(node_pos_kbest);
+		stack_.clear();
+		stack_.push_back(node_pos_kbest);
 	      
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
+		while (! stack_.empty()) {
+		  const size_type pos = stack_.back();
+		  stack_.pop_back();
 		
-		loss_kbests[k][pos] += error_factor;
-		coverage_kbests_[pos] = true;
+		  loss_kbests[k][pos] += error_factor;
+		  coverage_kbests_[pos] = true;
 		
-		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+		  const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
 		
-		stack_.insert(stack_.end(),
-			      kbests[k].graph_.edges[edge_id].tails.begin(),
-			      kbests[k].graph_.edges[edge_id].tails.end());
+		  stack_.insert(stack_.end(),
+				kbests[k].graph_.edges[edge_id].tails.begin(),
+				kbests[k].graph_.edges[edge_id].tails.end());
+		}
+	      
+		loss += error;
 	      }
-	      
-	      loss += error;
-	    }
-	}
+	  }
 
     return loss * error_factor;
   }
@@ -1477,118 +1479,119 @@ struct ViolationMax : public ViolationBase
         
     for (size_type k = 0; k != kbests.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o) {
-	  
-	  coverage_kbests_.clear();
-	  coverage_oracles_.clear();
-	  
-	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
-
-	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
-	  
-	  // first, compute margins
-	  margins_.clear();
-	  margins_.resize(bin_max, 0.0);
-	  
-	  for (difference_type bin = 0; bin != bin_max; ++ bin)
-	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
-	      
-	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
-	      
-	      if (tree_kbest == tree_oracle) continue;
-	      
-	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
-	      
-	      margins_[bin] = std::max(1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest)), 0.0);
-	    }
-	  
-	  // second, iterate and find max-violation
-	  for (;;) {
-	    // top-down to identify where we find errors
-	    double error = 0.0;
-	    size_type bin_pos = size_type(-1);
-	    for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
+	for (size_type o = 0; o != oracles.size(); ++ o)
+	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	    
+	    coverage_kbests_.clear();
+	    coverage_oracles_.clear();
+	    
+	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+	    
+	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+	    
+	    // first, compute margins
+	    margins_.clear();
+	    margins_.resize(bin_max, 0.0);
+	    
+	    for (difference_type bin = 0; bin != bin_max; ++ bin)
 	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
 		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
 		const size_type node_pos_oracle = node_map_oracles_[o][bin];
-		
-		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
 		
 		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
 		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
 		
 		if (tree_kbest == tree_oracle) continue;
 		
-		if (margins_[bin] > error) {
-		  error   = margins_[bin];
-		  bin_pos = bin;
+		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+		
+		margins_[bin] = std::max(1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest)), 0.0);
+	      }
+	    
+	    // second, iterate and find max-violation
+	    for (;;) {
+	      // top-down to identify where we find errors
+	      double error = 0.0;
+	      size_type bin_pos = size_type(-1);
+	      for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
+		if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+		  const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+		  const size_type node_pos_oracle = node_map_oracles_[o][bin];
+		
+		  if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
+		
+		  const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+		  const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+		
+		  if (tree_kbest == tree_oracle) continue;
+		
+		  if (margins_[bin] > error) {
+		    error   = margins_[bin];
+		    bin_pos = bin;
+		  }
+		}
+	    
+	      if (bin_pos == size_type(-1)) break;
+	    
+	      const size_type node_pos_kbest  = node_map_kbests_[k][bin_pos];
+	      const size_type node_pos_oracle = node_map_oracles_[o][bin_pos];
+	    
+	      {
+		// invalidate parent nodes
+		size_type pos = node_pos_oracle;
+	      
+		while (pos != size_type(-1)) {
+		  coverage_oracles_[pos] = true;
+		  pos = parent_oracles_[o][pos];
+		}
+	      
+		pos = node_pos_kbest;
+	      
+		while (pos != size_type(-1)) {
+		  coverage_kbests_[pos] = true;
+		  pos = parent_kbests_[k][pos];
 		}
 	      }
 	    
-	    if (bin_pos == size_type(-1)) break;
+	      stack_.clear();
+	      stack_.push_back(node_pos_oracle);
 	    
-	    const size_type node_pos_kbest  = node_map_kbests_[k][bin_pos];
-	    const size_type node_pos_oracle = node_map_oracles_[o][bin_pos];
-	    
-	    {
-	      // invalidate parent nodes
-	      size_type pos = node_pos_oracle;
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
 	      
-	      while (pos != size_type(-1)) {
+		loss_oracles[o][pos] -= error_factor;
 		coverage_oracles_[pos] = true;
-		pos = parent_oracles_[o][pos];
+	      
+		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+	      
+		stack_.insert(stack_.end(),
+			      oracles[o].graph_.edges[edge_id].tails.begin(),
+			      oracles[o].graph_.edges[edge_id].tails.end());
 	      }
+	    
+	      stack_.clear();
+	      stack_.push_back(node_pos_kbest);
+	    
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
 	      
-	      pos = node_pos_kbest;
-	      
-	      while (pos != size_type(-1)) {
+		loss_kbests[k][pos] += error_factor;
 		coverage_kbests_[pos] = true;
-		pos = parent_kbests_[k][pos];
+	      
+		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+	      
+		stack_.insert(stack_.end(),
+			      kbests[k].graph_.edges[edge_id].tails.begin(),
+			      kbests[k].graph_.edges[edge_id].tails.end());
 	      }
+	    
+	      loss += error;
 	    }
-	    
-	    stack_.clear();
-	    stack_.push_back(node_pos_oracle);
-	    
-	    while (! stack_.empty()) {
-	      const size_type pos = stack_.back();
-	      stack_.pop_back();
-	      
-	      loss_oracles[o][pos] -= error_factor;
-	      coverage_oracles_[pos] = true;
-	      
-	      const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-	      
-	      stack_.insert(stack_.end(),
-			    oracles[o].graph_.edges[edge_id].tails.begin(),
-			    oracles[o].graph_.edges[edge_id].tails.end());
-	    }
-	    
-	    stack_.clear();
-	    stack_.push_back(node_pos_kbest);
-	    
-	    while (! stack_.empty()) {
-	      const size_type pos = stack_.back();
-	      stack_.pop_back();
-	      
-	      loss_kbests[k][pos] += error_factor;
-	      coverage_kbests_[pos] = true;
-	      
-	      const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
-	      
-	      stack_.insert(stack_.end(),
-			    kbests[k].graph_.edges[edge_id].tails.begin(),
-			    kbests[k].graph_.edges[edge_id].tails.end());
-	    }
-	    
-	    loss += error;
 	  }
-	}
 
     return loss * error_factor;
   }
@@ -1642,7 +1645,8 @@ struct ViolationDerivation : public ViolationBase
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
 	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	  num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
+	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss)
+	    num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
     
     // if no errors suffered, we will simply return...
     if (! num_loss)
@@ -1659,16 +1663,17 @@ struct ViolationDerivation : public ViolationBase
     double loss = 0.0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
       if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o) {
-	  const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
-	  
-	  if (error == 0.0) continue;
-	  
-	  loss_oracles_[o] -= error_factor;
-	  loss_kbests_[k]  += error_factor;
-	  
-	  loss += error;
-	}
+	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	    const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	    
+	    if (error == 0.0) continue;
+	    
+	    loss_oracles_[o] -= error_factor;
+	    loss_kbests_[k]  += error_factor;
+	    
+	    loss += error;
+	  }
     
     loss_kbests.resize(margin_kbests_.size());
     loss_oracles.resize(margin_oracles_.size());
