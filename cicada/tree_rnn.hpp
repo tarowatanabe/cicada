@@ -55,7 +55,7 @@ namespace cicada
       template <typename Tp>
       Tp operator()(const Tp& x) const
       {
-	return __round(x * 128) / Tp(128);
+	return __round(std::min(std::max(x, Tp(-1)), Tp(1)) * 128) / Tp(128);
       }
       
       template <typename Tp>
