@@ -441,23 +441,20 @@ struct ViolationBase
   
   typedef cicada::HyperGraph hypergraph_type;
 
-  struct hash_sentence : public utils::hashmurmur3<size_t>
+  size_type count_violations(const candidate_set_type& kbests,
+			     const candidate_set_type& oracles)
   {
-    typedef utils::hashmurmur3<size_t> hasher_type;
+    size_type num = 0;
     
-    size_t operator()(const hypothesis_type::sentence_type& x) const
-    {
-      return hasher_type()(x.begin(), x.end(), 0);
-    }
-  };
-  
-  typedef utils::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> >::type sentence_unique_type;
-
-  sentence_unique_type sentence_kbests_;
-  sentence_unique_type sentence_oracles_;
+    for (size_type k = 0; k != kbests.size(); ++ k)
+      for (size_type o = 0; o != oracles.size(); ++ o)
+	num += (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss);
+    
+    return num;
+  }
 };
 
-struct ViolationRoot : public ViolationBase
+struct ViolationTree : public ViolationBase
 {
   typedef cicada::semiring::Tropical<double> weight_type;
   
@@ -479,9 +476,6 @@ struct ViolationRoot : public ViolationBase
   typedef feature_set_type::feature_type     feature_type;
   typedef attribute_set_type::attribute_type attribute_type;
 
-  typedef std::vector<size_type, std::allocator<size_type> > stack_type;
-  typedef std::vector<bool, std::allocator<bool> > coverage_type;
-  
   struct Tree
   {
     typedef uint32_t id_type;
@@ -637,27 +631,88 @@ struct ViolationRoot : public ViolationBase
     
     const attribute_type attr_bin_;
   };
+
+  ViolationTree()
+    : inside_("head-node") {}
+  ViolationTree(const std::string& attr_bin)
+    : inside_(attr_bin) {}
+
+  weight_map_type weights_kbests_;
+  weight_map_type weights_oracles_;
+  
+  node_map_type node_map_kbests_;
+  node_map_type node_map_oracles_;
+
+  parent_map_type parent_kbests_;
+  parent_map_type parent_oracles_;
+  
+  tree_map_type tree_kbests_;
+  tree_map_type tree_oracles_;
+  
+  Inside inside_;
+  Tree   tree_;
+
+  double initialize(const candidate_set_type& kbests,
+		    const candidate_set_type& oracles,
+		    const weight_set_type& weights,
+		    loss_map_type& loss_kbests,
+		    loss_map_type& loss_oracles)
+  {
+    weights_kbests_.clear();
+    weights_oracles_.clear();
+    
+    node_map_kbests_.clear();
+    node_map_oracles_.clear();
+    
+    parent_kbests_.clear();
+    parent_oracles_.clear();
+    
+    weights_kbests_.resize(kbests.size());
+    weights_oracles_.resize(oracles.size());
+    
+    node_map_kbests_.resize(kbests.size());
+    node_map_oracles_.resize(oracles.size());
+    
+    parent_kbests_.resize(kbests.size());
+    parent_oracles_.resize(oracles.size());
+    
+    loss_kbests.resize(kbests.size());
+    loss_oracles.resize(oracles.size());
+    
+    tree_.clear();
+    
+    tree_kbests_.clear();
+    tree_oracles_.clear();
+    
+    tree_kbests_.resize(kbests.size());
+    tree_oracles_.resize(oracles.size());
+    
+    for (size_type k = 0; k != kbests.size(); ++ k) {
+      inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k], parent_kbests_[k],
+	      tree_, tree_kbests_[k]);
+      
+      loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
+    }
+    
+    for (size_type o = 0; o != oracles.size(); ++ o) {
+      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o], parent_oracles_[o],
+	      tree_, tree_oracles_[o]);
+      
+      loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
+    }
+  }
+};
+
+struct ViolationRoot : public ViolationTree
+{
+  typedef std::vector<size_type, std::allocator<size_type> > stack_type;
+  typedef std::vector<bool, std::allocator<bool> > coverage_type;
 
   ViolationRoot()
-    : inside_("head-node") {}
+    : ViolationTree() {}
   ViolationRoot(const std::string& attr_bin)
-    : inside_(attr_bin) {}
-
-  weight_map_type weights_kbests_;
-  weight_map_type weights_oracles_;
+    : ViolationTree(attr_bin) {}
   
-  node_map_type node_map_kbests_;
-  node_map_type node_map_oracles_;
-
-  parent_map_type parent_kbests_;
-  parent_map_type parent_oracles_;
-  
-  tree_map_type tree_kbests_;
-  tree_map_type tree_oracles_;
-  
-  Inside inside_;
-  Tree   tree_;
-
   stack_type stack_;
   coverage_type coverage_kbests_;
   coverage_type coverage_oracles_;
@@ -670,363 +725,124 @@ struct ViolationRoot : public ViolationBase
   {
     loss_kbests.clear();
     loss_oracles.clear();
-
-    sentence_kbests_.clear();
-    sentence_oracles_.clear();
     
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+    const size_type num_violation = count_violations(kbests, oracles);
     
-    for (size_type o = 0; o != oracles.size(); ++ o)
-      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+    if (! num_violation) return 0.0;
     
-    size_type num_kbests = 0;
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      num_kbests += (sentence_oracles_.find(kbests[k].hypothesis_.sentence)
-		     == sentence_oracles_.end());
+    initialize(kbests, oracles, weights, loss_kbests, loss_oracles);
     
-    if (! num_kbests) return 0.0;
+    const double error_factor = 1.0 / num_violation;
     
-    const double error_factor = 1.0 / (num_kbests * oracles.size());
-    
-    weights_kbests_.clear();
-    weights_oracles_.clear();
-    
-    node_map_kbests_.clear();
-    node_map_oracles_.clear();
-
-    parent_kbests_.clear();
-    parent_oracles_.clear();
-    
-    weights_kbests_.resize(kbests.size());
-    weights_oracles_.resize(oracles.size());
-    
-    node_map_kbests_.resize(kbests.size());
-    node_map_oracles_.resize(oracles.size());
-    
-    parent_kbests_.resize(kbests.size());
-    parent_oracles_.resize(oracles.size());
-    
-    loss_kbests.resize(kbests.size());
-    loss_oracles.resize(oracles.size());
-    
-    tree_.clear();
-    
-    tree_kbests_.clear();
-    tree_oracles_.clear();
-
-    tree_kbests_.resize(kbests.size());
-    tree_oracles_.resize(oracles.size());
-
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end()) {
-	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k], parent_kbests_[k],
-		tree_, tree_kbests_[k]);
-	
-	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
-      }
-
-    for (size_type o = 0; o != oracles.size(); ++ o) {
-      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o], parent_oracles_[o],
-	      tree_, tree_oracles_[o]);
-      
-      loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
-    }
-
     double loss = 0.0;
-        
+    
     for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o)
-	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
-	    
-	    coverage_kbests_.clear();
-	    coverage_oracles_.clear();
-	    
-	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
-	    
-	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
-	    
-	    // top-down to identify where we find errors
-	    for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
-	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-		const size_type node_pos_oracle = node_map_oracles_[o][bin];
+      for (size_type o = 0; o != oracles.size(); ++ o)
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	  
+	  coverage_kbests_.clear();
+	  coverage_oracles_.clear();
+	  
+	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+
+	  double    error_total = 0;
+	  size_type violation_total = 0;
+	  
+	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+	  
+	  // top-down to identify where we find errors
+	  for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
+	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
+	      
+	      if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
 		
-		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
+	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
 		
-		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+	      if (tree_kbest == tree_oracle) continue;
 		
-		if (tree_kbest == tree_oracle) continue;
+	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
 		
-		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+	      const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
 		
-		const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+	      if (error <= 0.0) continue;
 		
-		if (error <= 0.0) continue;
-		
-		{
-		  // invalidate parent nodes
-		  size_type pos = node_pos_oracle;
+	      {
+		// invalidate parent nodes
+		size_type pos = node_pos_oracle;
 		  
-		  while (pos != size_type(-1)) {
-		    coverage_oracles_[pos] = true;
-		    pos = parent_oracles_[o][pos];
-		  }
-		  
-		  pos = node_pos_kbest;
-		  
-		  while (pos != size_type(-1)) {
-		    coverage_kbests_[pos] = true;
-		    pos = parent_kbests_[k][pos];
-		  }
-		}
-		
-		stack_.clear();
-		stack_.push_back(node_pos_oracle);
-		
-		while (! stack_.empty()) {
-		  const size_type pos = stack_.back();
-		  stack_.pop_back();
-		  
-		  loss_oracles[o][pos] -= error_factor;
+		while (pos != size_type(-1)) {
 		  coverage_oracles_[pos] = true;
-		  
-		  const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-		  
-		  stack_.insert(stack_.end(),
-				oracles[o].graph_.edges[edge_id].tails.begin(),
-				oracles[o].graph_.edges[edge_id].tails.end());
+		  pos = parent_oracles_[o][pos];
 		}
-		
-		stack_.clear();
-		stack_.push_back(node_pos_kbest);
-		
-		while (! stack_.empty()) {
-		  const size_type pos = stack_.back();
-		  stack_.pop_back();
 		  
-		  loss_kbests[k][pos] += error_factor;
+		pos = node_pos_kbest;
+		  
+		while (pos != size_type(-1)) {
 		  coverage_kbests_[pos] = true;
-		  
-		  const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
-		  
-		  stack_.insert(stack_.end(),
-				kbests[k].graph_.edges[edge_id].tails.begin(),
-				kbests[k].graph_.edges[edge_id].tails.end());
+		  pos = parent_kbests_[k][pos];
 		}
-		
-		loss += error;
 	      }
-	  }
+		
+	      stack_.clear();
+	      stack_.push_back(node_pos_oracle);
+		
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
+		  
+		loss_oracles[o][pos] -= error_factor;
+		coverage_oracles_[pos] = true;
+		  
+		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+		  
+		stack_.insert(stack_.end(),
+			      oracles[o].graph_.edges[edge_id].tails.begin(),
+			      oracles[o].graph_.edges[edge_id].tails.end());
+	      }
+	      
+	      stack_.clear();
+	      stack_.push_back(node_pos_kbest);
+		
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
+		  
+		loss_kbests[k][pos] += error_factor;
+		coverage_kbests_[pos] = true;
+		
+		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+		
+		stack_.insert(stack_.end(),
+			      kbests[k].graph_.edges[edge_id].tails.begin(),
+			      kbests[k].graph_.edges[edge_id].tails.end());
+	      }
+	      
+	      error_total += error;
+	      ++ violation_total;
+	    }
+	  
+	  loss += error_total / violation_total;
+	}
     
     return loss * error_factor;
   }
 };
 
-struct ViolationFrontier : public ViolationBase
+struct ViolationFrontier : public ViolationTree
 {
-  typedef cicada::semiring::Tropical<double> weight_type;
-  
-  typedef std::vector<weight_type, std::allocator<weight_type> >           weight_node_type;
-  typedef std::vector<weight_node_type, std::allocator<weight_node_type> > weight_map_type;
-  
-  typedef std::vector<size_type, std::allocator<size_type> >         node_set_type;
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-  
-  typedef std::vector<size_type, std::allocator<size_type> >             parent_set_type;
-  typedef std::vector<parent_set_type, std::allocator<parent_set_type> > parent_map_type;
-
-  typedef hypergraph_type::rule_type     rule_type;
-  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
-
-  typedef hypergraph_type::feature_set_type   feature_set_type;
-  typedef hypergraph_type::attribute_set_type attribute_set_type;
-
-  typedef feature_set_type::feature_type     feature_type;
-  typedef attribute_set_type::attribute_type attribute_type;
 
   typedef std::vector<size_type, std::allocator<size_type> > stack_type;
   typedef std::vector<bool, std::allocator<bool> > coverage_type;
-  
-  struct Tree
-  {
-    typedef uint32_t id_type;
-    
-    struct edge_type
-    {
-      typedef utils::small_vector<id_type, std::allocator<id_type> > node_set_type;
-      
-      edge_type() : rule_(), tails_() {}
-      edge_type(const rule_ptr_type& rule)
-	: rule_(rule), tails_() {}
-      edge_type(const rule_ptr_type& rule, const node_set_type& tails)
-	: rule_(rule), tails_(tails) {}
-      
-      rule_ptr_type rule_;
-      node_set_type tails_;
-      
-      friend
-      bool operator==(const edge_type& x, const edge_type& y) 
-      {
-	return ((x.rule_ == y.rule_ || (x.rule_ && y.rule_ && *x.rule_ == *y.rule_))
-		&& x.tails_ == y.tails_);
-      }
-      
-      friend
-      bool operator!=(const edge_type& x, const edge_type& y) 
-      {
-	return ! (x == y);
-      }
-      
-      friend
-      size_t  hash_value(edge_type const& x)
-      {
-	return utils::hashmurmur3<size_t>()(x.tails_.begin(), x.tails_.end(),
-					    x.rule_ ? hash_value(*x.rule_) : size_t(0));
-      }
-    };
-    
-    typedef utils::indexed_set<edge_type, boost::hash<edge_type>, std::equal_to<edge_type>, std::allocator<edge_type> > edge_set_type;
-    
-    void clear()
-    {
-      edges_.clear();
-    }
-
-    id_type operator()(const rule_ptr_type& rule, const edge_type::node_set_type& tails)
-    {
-      return operator()(edge_type(rule, tails));
-    }
-    
-    id_type operator()(const edge_type& edge)
-    {
-      edge_set_type::iterator iter = edges_.insert(edge).first;
-      
-      return iter - edges_.begin();
-    }
-    
-    edge_set_type edges_;
-  };
-
-  typedef Tree tree_type;
-
-  typedef std::vector<tree_type::id_type, std::allocator<tree_type::id_type> > tree_set_type;
-  typedef std::vector<tree_set_type, std::allocator<tree_set_type> >           tree_map_type;
-
-  struct Inside
-  {
-    struct attribute_int : public boost::static_visitor<attribute_set_type::int_type>
-    {
-      // we will not throw, but simply return zero. (TODO: return negative?)
-      attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
-      attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
-      attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
-    };
-    
-    Inside(const std::string& attr_bin) : attr_bin_(attr_bin) {}
-    
-    void operator()(const weight_set_type& weights,
-		    const hypergraph_type& graph,
-		    weight_node_type& weights_node,
-		    node_set_type& node_map,
-		    parent_set_type& parents,
-		    tree_type& tree,
-		    tree_set_type& tree_nodes)
-    {
-      weights_node.clear();
-      weights_node.resize(graph.nodes.size());
-      
-      node_map.clear();
-      
-      parents.clear();
-      parents.resize(graph.nodes.size(), size_type(-1));
-      
-      tree_nodes.clear();
-      tree_nodes.resize(graph.nodes.size(), tree_type::id_type(-1));
-      
-      cicada::operation::weight_function<weight_type > function(weights);
-
-      tree_type::edge_type::node_set_type tree_tails;
-      
-      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
-	typedef hypergraph_type::node_type node_type;
-	
-	const node_type& node = *niter;
-	
-	weight_type& weight = weights_node[node.id];
-	
-	if (node.edges.size() != 1)
-	  throw std::runtime_error("invlaid single tree derivation");
-	
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  typedef hypergraph_type::edge_type edge_type;
-	  
-	  const edge_type& edge = graph.edges[*eiter];
-	  
-	  weight = function(edge);
-	  tree_tails.resize(edge.tails.size());
-	  
-	  size_type tail = 0;
-	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ tail) {
-	    weight *= weights_node[*niter];
-	    tree_tails[tail] = tree_nodes[*niter];
-	    
-	    if (parents[*niter] != size_type(-1))
-	      throw std::runtime_error("already assgined a parent?");
-
-	    parents[*niter] = node.id;
-	  }
-
-	  // assign tree-node id
-	  tree_nodes[node.id] = tree(edge.rule, tree_tails);
-	  
-	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_bin_);
-	  if (piter == edge.attributes.end()) continue;
-	  
-	  const int bin_pos = boost::apply_visitor(attribute_int(), piter->second);
-	  
-	  if (bin_pos < 0) continue;
-	  
-	  if (bin_pos >= node_map.size())
-	    node_map.resize(bin_pos + 1, size_type(-1));
-	  
-	  if (node_map[bin_pos] != size_type(-1))
-	    throw std::runtime_error("duplicated node map?");
-	  
-	  node_map[bin_pos] = node.id;
-	}
-      }
-    }
-    
-    const attribute_type attr_bin_;
-  };
 
   ViolationFrontier()
-    : inside_("head-node") {}
+    : ViolationTree() {}
   ViolationFrontier(const std::string& attr_bin)
-    : inside_(attr_bin) {}
-
-  weight_map_type weights_kbests_;
-  weight_map_type weights_oracles_;
-  
-  node_map_type node_map_kbests_;
-  node_map_type node_map_oracles_;
-
-  parent_map_type parent_kbests_;
-  parent_map_type parent_oracles_;
-  
-  tree_map_type tree_kbests_;
-  tree_map_type tree_oracles_;
-  
-  Inside inside_;
-  Tree   tree_;
+    : ViolationTree(attr_bin) {}
 
   stack_type stack_;
   coverage_type coverage_kbests_;
@@ -1040,365 +856,125 @@ struct ViolationFrontier : public ViolationBase
   {
     loss_kbests.clear();
     loss_oracles.clear();
-
-    sentence_kbests_.clear();
-    sentence_oracles_.clear();
     
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+    const size_type num_violation = count_violations(kbests, oracles);
     
-    for (size_type o = 0; o != oracles.size(); ++ o)
-      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+    if (! num_violation) return 0.0;
     
-    size_type num_kbests = 0;
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      num_kbests += (sentence_oracles_.find(kbests[k].hypothesis_.sentence)
-		     == sentence_oracles_.end());
+    initialize(kbests, oracles, weights, loss_kbests, loss_oracles);
     
-    if (! num_kbests) return 0.0;
-    
-    const double error_factor = 1.0 / (num_kbests * oracles.size());
-    
-    weights_kbests_.clear();
-    weights_oracles_.clear();
-    
-    node_map_kbests_.clear();
-    node_map_oracles_.clear();
-
-    parent_kbests_.clear();
-    parent_oracles_.clear();
-    
-    weights_kbests_.resize(kbests.size());
-    weights_oracles_.resize(oracles.size());
-    
-    node_map_kbests_.resize(kbests.size());
-    node_map_oracles_.resize(oracles.size());
-    
-    parent_kbests_.resize(kbests.size());
-    parent_oracles_.resize(oracles.size());
-    
-    loss_kbests.resize(kbests.size());
-    loss_oracles.resize(oracles.size());
-    
-    tree_.clear();
-    
-    tree_kbests_.clear();
-    tree_oracles_.clear();
-
-    tree_kbests_.resize(kbests.size());
-    tree_oracles_.resize(oracles.size());
-
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end()) {
-	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k], parent_kbests_[k],
-		tree_, tree_kbests_[k]);
-	
-	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
-      }
-
-    for (size_type o = 0; o != oracles.size(); ++ o) {
-      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o], parent_oracles_[o],
-	      tree_, tree_oracles_[o]);
-      
-      loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
-    }
+    const double error_factor = 1.0 / num_violation;
 
     double loss = 0.0;
-        
+    
     for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o)
-	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
-	    
-	    coverage_kbests_.clear();
-	    coverage_oracles_.clear();
+      for (size_type o = 0; o != oracles.size(); ++ o)
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
 	  
-	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+	  coverage_kbests_.clear();
+	  coverage_oracles_.clear();
 	  
-	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
-
-	    // bottom-up to identify where we find errors
-	    for (difference_type bin = 0; bin != bin_max; ++ bin)
-	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-		const size_type node_pos_oracle = node_map_oracles_[o][bin];
-
-		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
+	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+	  
+	  double    error_total = 0;
+	  size_type violation_total = 0;
+	  
+	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
+	  
+	  // bottom-up to identify where we find errors
+	  for (difference_type bin = 0; bin != bin_max; ++ bin)
+	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
 	      
-		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+	      if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
 	      
-		if (tree_kbest == tree_oracle) continue;
+	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
 	      
-		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+	      if (tree_kbest == tree_oracle) continue;
 	      
-		const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
 	      
-		if (error <= 0.0) continue;
-
-		{
-		  // invalidate parent nodes
-		  size_type pos = node_pos_oracle;
+	      const double error = 1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest));
+	      
+	      if (error <= 0.0) continue;
+	      
+	      {
+		// invalidate parent nodes
+		size_type pos = node_pos_oracle;
 		
-		  while (pos != size_type(-1)) {
-		    coverage_oracles_[pos] = true;
-		    pos = parent_oracles_[o][pos];
-		  }
-		
-		  pos = node_pos_kbest;
-		
-		  while (pos != size_type(-1)) {
-		    coverage_kbests_[pos] = true;
-		    pos = parent_kbests_[k][pos];
-		  }
-		}
-	      
-		stack_.clear();
-		stack_.push_back(node_pos_oracle);
-	      
-		while (! stack_.empty()) {
-		  const size_type pos = stack_.back();
-		  stack_.pop_back();
-		
-		  loss_oracles[o][pos] -= error_factor;
+		while (pos != size_type(-1)) {
 		  coverage_oracles_[pos] = true;
-		
-		  const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-		
-		  stack_.insert(stack_.end(),
-				oracles[o].graph_.edges[edge_id].tails.begin(),
-				oracles[o].graph_.edges[edge_id].tails.end());
+		  pos = parent_oracles_[o][pos];
 		}
-
-		stack_.clear();
-		stack_.push_back(node_pos_kbest);
-	      
-		while (! stack_.empty()) {
-		  const size_type pos = stack_.back();
-		  stack_.pop_back();
 		
-		  loss_kbests[k][pos] += error_factor;
+		pos = node_pos_kbest;
+		
+		while (pos != size_type(-1)) {
 		  coverage_kbests_[pos] = true;
-		
-		  const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
-		
-		  stack_.insert(stack_.end(),
-				kbests[k].graph_.edges[edge_id].tails.begin(),
-				kbests[k].graph_.edges[edge_id].tails.end());
+		  pos = parent_kbests_[k][pos];
 		}
-	      
-		loss += error;
 	      }
-	  }
-
+	      
+	      stack_.clear();
+	      stack_.push_back(node_pos_oracle);
+	      
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
+		
+		loss_oracles[o][pos] -= error_factor;
+		coverage_oracles_[pos] = true;
+		
+		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+		
+		stack_.insert(stack_.end(),
+			      oracles[o].graph_.edges[edge_id].tails.begin(),
+			      oracles[o].graph_.edges[edge_id].tails.end());
+	      }
+	      
+	      stack_.clear();
+	      stack_.push_back(node_pos_kbest);
+	      
+	      while (! stack_.empty()) {
+		const size_type pos = stack_.back();
+		stack_.pop_back();
+		
+		loss_kbests[k][pos] += error_factor;
+		coverage_kbests_[pos] = true;
+		
+		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+		
+		stack_.insert(stack_.end(),
+			      kbests[k].graph_.edges[edge_id].tails.begin(),
+			      kbests[k].graph_.edges[edge_id].tails.end());
+	      }
+	      
+	      error_total += error;
+	      ++ violation_total;
+	    }
+	  
+	  loss += error_total / violation_total;
+	}
+    
     return loss * error_factor;
   }
 };
 
-struct ViolationMax : public ViolationBase
+struct ViolationMax : public ViolationTree
 {
-  typedef cicada::semiring::Tropical<double> weight_type;
-  
-  typedef std::vector<weight_type, std::allocator<weight_type> >           weight_node_type;
-  typedef std::vector<weight_node_type, std::allocator<weight_node_type> > weight_map_type;
-  
-  typedef std::vector<size_type, std::allocator<size_type> >         node_set_type;
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-  
-  typedef std::vector<size_type, std::allocator<size_type> >             parent_set_type;
-  typedef std::vector<parent_set_type, std::allocator<parent_set_type> > parent_map_type;
-
-  typedef hypergraph_type::rule_type     rule_type;
-  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
-
-  typedef hypergraph_type::feature_set_type   feature_set_type;
-  typedef hypergraph_type::attribute_set_type attribute_set_type;
-
-  typedef feature_set_type::feature_type     feature_type;
-  typedef attribute_set_type::attribute_type attribute_type;
-
   typedef std::vector<size_type, std::allocator<size_type> > stack_type;
   typedef std::vector<bool, std::allocator<bool> > coverage_type;
   typedef std::vector<double, std::allocator<double > > margin_set_type;
-  
-  struct Tree
-  {
-    typedef uint32_t id_type;
-    
-    struct edge_type
-    {
-      typedef utils::small_vector<id_type, std::allocator<id_type> > node_set_type;
-      
-      edge_type() : rule_(), tails_() {}
-      edge_type(const rule_ptr_type& rule)
-	: rule_(rule), tails_() {}
-      edge_type(const rule_ptr_type& rule, const node_set_type& tails)
-	: rule_(rule), tails_(tails) {}
-      
-      rule_ptr_type rule_;
-      node_set_type tails_;
-      
-      friend
-      bool operator==(const edge_type& x, const edge_type& y) 
-      {
-	return ((x.rule_ == y.rule_ || (x.rule_ && y.rule_ && *x.rule_ == *y.rule_))
-		&& x.tails_ == y.tails_);
-      }
-      
-      friend
-      bool operator!=(const edge_type& x, const edge_type& y) 
-      {
-	return ! (x == y);
-      }
-      
-      friend
-      size_t  hash_value(edge_type const& x)
-      {
-	return utils::hashmurmur3<size_t>()(x.tails_.begin(), x.tails_.end(),
-					    x.rule_ ? hash_value(*x.rule_) : size_t(0));
-      }
-    };
-    
-    typedef utils::indexed_set<edge_type, boost::hash<edge_type>, std::equal_to<edge_type>, std::allocator<edge_type> > edge_set_type;
-    
-    void clear()
-    {
-      edges_.clear();
-    }
-
-    id_type operator()(const rule_ptr_type& rule, const edge_type::node_set_type& tails)
-    {
-      return operator()(edge_type(rule, tails));
-    }
-    
-    id_type operator()(const edge_type& edge)
-    {
-      edge_set_type::iterator iter = edges_.insert(edge).first;
-      
-      return iter - edges_.begin();
-    }
-    
-    edge_set_type edges_;
-  };
-
-  typedef Tree tree_type;
-
-  typedef std::vector<tree_type::id_type, std::allocator<tree_type::id_type> > tree_set_type;
-  typedef std::vector<tree_set_type, std::allocator<tree_set_type> >           tree_map_type;
-
-  struct Inside
-  {
-    struct attribute_int : public boost::static_visitor<attribute_set_type::int_type>
-    {
-      // we will not throw, but simply return zero. (TODO: return negative?)
-      attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
-      attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
-      attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
-    };
-    
-    Inside(const std::string& attr_bin) : attr_bin_(attr_bin) {}
-    
-    void operator()(const weight_set_type& weights,
-		    const hypergraph_type& graph,
-		    weight_node_type& weights_node,
-		    node_set_type& node_map,
-		    parent_set_type& parents,
-		    tree_type& tree,
-		    tree_set_type& tree_nodes)
-    {
-      weights_node.clear();
-      weights_node.resize(graph.nodes.size());
-      
-      node_map.clear();
-      
-      parents.clear();
-      parents.resize(graph.nodes.size(), size_type(-1));
-      
-      tree_nodes.clear();
-      tree_nodes.resize(graph.nodes.size(), tree_type::id_type(-1));
-      
-      cicada::operation::weight_function<weight_type > function(weights);
-
-      tree_type::edge_type::node_set_type tree_tails;
-      
-      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
-	typedef hypergraph_type::node_type node_type;
-	
-	const node_type& node = *niter;
-	
-	weight_type& weight = weights_node[node.id];
-	
-	if (node.edges.size() != 1)
-	  throw std::runtime_error("invlaid single tree derivation");
-	
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  typedef hypergraph_type::edge_type edge_type;
-	  
-	  const edge_type& edge = graph.edges[*eiter];
-	  
-	  weight = function(edge);
-	  tree_tails.resize(edge.tails.size());
-	  
-	  size_type tail = 0;
-	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ tail) {
-	    weight *= weights_node[*niter];
-	    tree_tails[tail] = tree_nodes[*niter];
-	    
-	    if (parents[*niter] != size_type(-1))
-	      throw std::runtime_error("already assgined a parent?");
-
-	    parents[*niter] = node.id;
-	  }
-
-	  // assign tree-node id
-	  tree_nodes[node.id] = tree(edge.rule, tree_tails);
-	  
-	  attribute_set_type::const_iterator piter = edge.attributes.find(attr_bin_);
-	  if (piter == edge.attributes.end()) continue;
-	  
-	  const int bin_pos = boost::apply_visitor(attribute_int(), piter->second);
-	  
-	  if (bin_pos < 0) continue;
-	  
-	  if (bin_pos >= node_map.size())
-	    node_map.resize(bin_pos + 1, size_type(-1));
-	  
-	  if (node_map[bin_pos] != size_type(-1))
-	    throw std::runtime_error("duplicated node map?");
-	  
-	  node_map[bin_pos] = node.id;
-	}
-      }
-    }
-    
-    const attribute_type attr_bin_;
-  };
 
   ViolationMax()
-    : inside_("head-node") {}
+    : ViolationTree() {}
   ViolationMax(const std::string& attr_bin)
-    : inside_(attr_bin) {}
-
-  weight_map_type weights_kbests_;
-  weight_map_type weights_oracles_;
+    : ViolationTree(attr_bin) {}
   
-  node_map_type node_map_kbests_;
-  node_map_type node_map_oracles_;
-
-  parent_map_type parent_kbests_;
-  parent_map_type parent_oracles_;
-  
-  tree_map_type tree_kbests_;
-  tree_map_type tree_oracles_;
-  
-  Inside inside_;
-  Tree   tree_;
-
   stack_type stack_;
   coverage_type coverage_kbests_;
   coverage_type coverage_oracles_;
@@ -1412,186 +988,136 @@ struct ViolationMax : public ViolationBase
   {
     loss_kbests.clear();
     loss_oracles.clear();
-
-    sentence_kbests_.clear();
-    sentence_oracles_.clear();
     
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
+    const size_type num_violation = count_violations(kbests, oracles);
     
-    for (size_type o = 0; o != oracles.size(); ++ o)
-      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
+    if (! num_violation) return 0.0;
     
-    size_type num_kbests = 0;
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      num_kbests += (sentence_oracles_.find(kbests[k].hypothesis_.sentence)
-		     == sentence_oracles_.end());
+    initialize(kbests, oracles, weights, loss_kbests, loss_oracles);
     
-    if (! num_kbests) return 0.0;
+    const double error_factor = 1.0 / num_violation;
     
-    const double error_factor = 1.0 / (num_kbests * oracles.size());
-    
-    weights_kbests_.clear();
-    weights_oracles_.clear();
-    
-    node_map_kbests_.clear();
-    node_map_oracles_.clear();
-
-    parent_kbests_.clear();
-    parent_oracles_.clear();
-    
-    weights_kbests_.resize(kbests.size());
-    weights_oracles_.resize(oracles.size());
-    
-    node_map_kbests_.resize(kbests.size());
-    node_map_oracles_.resize(oracles.size());
-    
-    parent_kbests_.resize(kbests.size());
-    parent_oracles_.resize(oracles.size());
-    
-    loss_kbests.resize(kbests.size());
-    loss_oracles.resize(oracles.size());
-    
-    tree_.clear();
-    
-    tree_kbests_.clear();
-    tree_oracles_.clear();
-
-    tree_kbests_.resize(kbests.size());
-    tree_oracles_.resize(oracles.size());
-
-    for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end()) {
-	inside_(weights, kbests[k].graph_, weights_kbests_[k], node_map_kbests_[k], parent_kbests_[k],
-		tree_, tree_kbests_[k]);
-	
-	loss_kbests[k] = loss_set_type(kbests[k].graph_.nodes.size(), 0.0);
-      }
-
-    for (size_type o = 0; o != oracles.size(); ++ o) {
-      inside_(weights, oracles[o].graph_, weights_oracles_[o], node_map_oracles_[o], parent_oracles_[o],
-	      tree_, tree_oracles_[o]);
-      
-      loss_oracles[o] = loss_set_type(oracles[o].graph_.nodes.size(), 0.0);
-    }
-
     double loss = 0.0;
-        
+    
     for (size_type k = 0; k != kbests.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != oracles.size(); ++ o)
-	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+      for (size_type o = 0; o != oracles.size(); ++ o)
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	  coverage_kbests_.clear();
+	  coverage_oracles_.clear();
 	    
-	    coverage_kbests_.clear();
-	    coverage_oracles_.clear();
+	  coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
+	  coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+
+	  double    error_total = 0;
+	  size_type violation_total = 0;
+	  
+	  const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
 	    
-	    coverage_kbests_.resize(kbests[k].graph_.nodes.size(), false);
-	    coverage_oracles_.resize(oracles[o].graph_.nodes.size(), false);
+	  // first, compute margins
+	  margins_.clear();
+	  margins_.resize(bin_max, 0.0);
+	  
+	  for (difference_type bin = 0; bin != bin_max; ++ bin)
+	    if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
+	      const size_type node_pos_kbest  = node_map_kbests_[k][bin];
+	      const size_type node_pos_oracle = node_map_oracles_[o][bin];
+		
+	      const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
+	      const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
+		
+	      if (tree_kbest == tree_oracle) continue;
+		
+	      const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
+	      const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
+		
+	      margins_[bin] = std::max(1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest)), 0.0);
+	    }
 	    
-	    const difference_type bin_max = utils::bithack::min(node_map_kbests_[k].size(), node_map_oracles_[o].size());
-	    
-	    // first, compute margins
-	    margins_.clear();
-	    margins_.resize(bin_max, 0.0);
-	    
-	    for (difference_type bin = 0; bin != bin_max; ++ bin)
+	  // second, iterate and find max-violation
+	  for (;;) {
+	    // top-down to identify where we find errors
+	    double error = 0.0;
+	    size_type bin_pos = size_type(-1);
+	    for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
 	      if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
 		const size_type node_pos_kbest  = node_map_kbests_[k][bin];
 		const size_type node_pos_oracle = node_map_oracles_[o][bin];
+		
+		if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
 		
 		const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
 		const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
 		
 		if (tree_kbest == tree_oracle) continue;
 		
-		const weight_type& weight_kbest  = weights_kbests_[k][node_pos_kbest];
-		const weight_type& weight_oracle = weights_oracles_[o][node_pos_oracle];
-		
-		margins_[bin] = std::max(1.0 - (cicada::semiring::log(weight_oracle) - cicada::semiring::log(weight_kbest)), 0.0);
-	      }
-	    
-	    // second, iterate and find max-violation
-	    for (;;) {
-	      // top-down to identify where we find errors
-	      double error = 0.0;
-	      size_type bin_pos = size_type(-1);
-	      for (difference_type bin = bin_max - 1; bin >= 0; -- bin)
-		if (node_map_kbests_[k][bin] != size_type(-1) && node_map_oracles_[o][bin] != size_type(-1)) {
-		  const size_type node_pos_kbest  = node_map_kbests_[k][bin];
-		  const size_type node_pos_oracle = node_map_oracles_[o][bin];
-		
-		  if (coverage_kbests_[node_pos_kbest] || coverage_oracles_[node_pos_oracle]) continue;
-		
-		  const tree_type::id_type tree_kbest  = tree_kbests_[k][node_pos_kbest];
-		  const tree_type::id_type tree_oracle = tree_oracles_[o][node_pos_oracle];
-		
-		  if (tree_kbest == tree_oracle) continue;
-		
-		  if (margins_[bin] > error) {
-		    error   = margins_[bin];
-		    bin_pos = bin;
-		  }
-		}
-	    
-	      if (bin_pos == size_type(-1)) break;
-	    
-	      const size_type node_pos_kbest  = node_map_kbests_[k][bin_pos];
-	      const size_type node_pos_oracle = node_map_oracles_[o][bin_pos];
-	    
-	      {
-		// invalidate parent nodes
-		size_type pos = node_pos_oracle;
-	      
-		while (pos != size_type(-1)) {
-		  coverage_oracles_[pos] = true;
-		  pos = parent_oracles_[o][pos];
-		}
-	      
-		pos = node_pos_kbest;
-	      
-		while (pos != size_type(-1)) {
-		  coverage_kbests_[pos] = true;
-		  pos = parent_kbests_[k][pos];
+		if (margins_[bin] > error) {
+		  error   = margins_[bin];
+		  bin_pos = bin;
 		}
 	      }
 	    
-	      stack_.clear();
-	      stack_.push_back(node_pos_oracle);
+	    if (bin_pos == size_type(-1)) break;
 	    
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
+	    const size_type node_pos_kbest  = node_map_kbests_[k][bin_pos];
+	    const size_type node_pos_oracle = node_map_oracles_[o][bin_pos];
+	    
+	    {
+	      // invalidate parent nodes
+	      size_type pos = node_pos_oracle;
 	      
-		loss_oracles[o][pos] -= error_factor;
+	      while (pos != size_type(-1)) {
 		coverage_oracles_[pos] = true;
-	      
-		const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
-	      
-		stack_.insert(stack_.end(),
-			      oracles[o].graph_.edges[edge_id].tails.begin(),
-			      oracles[o].graph_.edges[edge_id].tails.end());
+		pos = parent_oracles_[o][pos];
 	      }
-	    
-	      stack_.clear();
-	      stack_.push_back(node_pos_kbest);
-	    
-	      while (! stack_.empty()) {
-		const size_type pos = stack_.back();
-		stack_.pop_back();
 	      
-		loss_kbests[k][pos] += error_factor;
+	      pos = node_pos_kbest;
+	      
+	      while (pos != size_type(-1)) {
 		coverage_kbests_[pos] = true;
-	      
-		const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
-	      
-		stack_.insert(stack_.end(),
-			      kbests[k].graph_.edges[edge_id].tails.begin(),
-			      kbests[k].graph_.edges[edge_id].tails.end());
+		pos = parent_kbests_[k][pos];
 	      }
-	    
-	      loss += error;
 	    }
+	    
+	    stack_.clear();
+	    stack_.push_back(node_pos_oracle);
+	    
+	    while (! stack_.empty()) {
+	      const size_type pos = stack_.back();
+	      stack_.pop_back();
+	      
+	      loss_oracles[o][pos] -= error_factor;
+	      coverage_oracles_[pos] = true;
+	      
+	      const size_type edge_id = oracles[o].graph_.nodes[pos].edges.front();
+	      
+	      stack_.insert(stack_.end(),
+			    oracles[o].graph_.edges[edge_id].tails.begin(),
+			    oracles[o].graph_.edges[edge_id].tails.end());
+	    }
+	    
+	    stack_.clear();
+	    stack_.push_back(node_pos_kbest);
+	    
+	    while (! stack_.empty()) {
+	      const size_type pos = stack_.back();
+	      stack_.pop_back();
+	      
+	      loss_kbests[k][pos] += error_factor;
+	      coverage_kbests_[pos] = true;
+	      
+	      const size_type edge_id = kbests[k].graph_.nodes[pos].edges.front();
+	      
+	      stack_.insert(stack_.end(),
+			    kbests[k].graph_.edges[edge_id].tails.begin(),
+			    kbests[k].graph_.edges[edge_id].tails.end());
+	    }
+	    
+	    error_total += error;
+	    ++ violation_total;
 	  }
+	  
+	  loss += error_total / violation_total;
+	}
 
     return loss * error_factor;
   }
@@ -1616,44 +1142,27 @@ struct ViolationDerivation : public ViolationBase
     loss_kbests.clear();
     loss_oracles.clear();
 
-    // first, compuate pairs...
+    const size_type num_violation = count_violations(kbests, oracles);
+    
+    if (! num_violation) return 0.0;
+
+    const double error_factor = 1.0 / num_violation;
+        
     margin_kbests_.clear();
     margin_oracles_.clear();
     
-    sentence_kbests_.clear();
-    sentence_oracles_.clear();
-    
-    for (size_type k = 0; k != kbests.size(); ++ k) {
-      sentence_kbests_.insert(kbests[k].hypothesis_.sentence);
-      
+    for (size_type k = 0; k != kbests.size(); ++ k)
       margin_kbests_.push_back(cicada::dot_product(weights,
                                                    kbests[k].hypothesis_.features.begin(),
                                                    kbests[k].hypothesis_.features.end(),
 						   0.0));
-    }
     
-    for (size_type o = 0; o != oracles.size(); ++ o) {
-      sentence_oracles_.insert(oracles[o].hypothesis_.sentence);
-      
+    for (size_type o = 0; o != oracles.size(); ++ o)
       margin_oracles_.push_back(cicada::dot_product(weights,
 						    oracles[o].hypothesis_.features.begin(),
 						    oracles[o].hypothesis_.features.end(),
 						    0.0));
-    }
-    
-    size_type num_loss = 0;
-    for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss)
-	    num_loss += (1.0 - (margin_oracles_[o] - margin_kbests_[k])) > 0.0;
-    
-    // if no errors suffered, we will simply return...
-    if (! num_loss)
-      return 0.0;
-    
-    const double error_factor = 1.0 / num_loss;
-    
+
     loss_kbests_.clear();
     loss_oracles_.clear();
     
@@ -1662,18 +1171,17 @@ struct ViolationDerivation : public ViolationBase
     
     double loss = 0.0;
     for (size_type k = 0; k != margin_kbests_.size(); ++ k)
-      if (sentence_oracles_.find(kbests[k].hypothesis_.sentence) == sentence_oracles_.end())
-	for (size_type o = 0; o != margin_oracles_.size(); ++ o)
-	  if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
-	    const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
-	    
-	    if (error == 0.0) continue;
-	    
-	    loss_oracles_[o] -= error_factor;
-	    loss_kbests_[k]  += error_factor;
-	    
-	    loss += error;
-	  }
+      for (size_type o = 0; o != margin_oracles_.size(); ++ o)
+	if (kbests[k].hypothesis_.loss > oracles[o].hypothesis_.loss) {
+	  const double error = std::max(1.0 - (margin_oracles_[o] - margin_kbests_[k]), 0.0);
+	  
+	  if (error == 0.0) continue;
+	  
+	  loss_oracles_[o] -= error_factor;
+	  loss_kbests_[k]  += error_factor;
+	  
+	  loss += error;
+	}
     
     loss_kbests.resize(margin_kbests_.size());
     loss_oracles.resize(margin_oracles_.size());
