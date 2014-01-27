@@ -826,7 +826,8 @@ struct ViolationRoot : public ViolationTree
 	      ++ violation_total;
 	    }
 	  
-	  loss += error_total / violation_total;
+	  if (violation_total)
+	    loss += error_total / violation_total;
 	}
     
     return loss * error_factor;
@@ -957,7 +958,8 @@ struct ViolationFrontier : public ViolationTree
 	      ++ violation_total;
 	    }
 	  
-	  loss += error_total / violation_total;
+	  if (violation_total)
+	    loss += error_total / violation_total;
 	}
     
     return loss * error_factor;
@@ -1116,7 +1118,8 @@ struct ViolationMax : public ViolationTree
 	    ++ violation_total;
 	  }
 	  
-	  loss += error_total / violation_total;
+	  if (violation_total)
+	    loss += error_total / violation_total;
 	}
 
     return loss * error_factor;
