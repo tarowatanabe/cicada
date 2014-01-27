@@ -3,7 +3,7 @@
 //
 
 //
-// mini-batch kbest-based tree-rnn learner
+// mini-batch kbest-based tree learner
 //
 
 //
@@ -30,7 +30,6 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/tokenizer.hpp"
 #include "cicada/matcher.hpp"
-#include "cicada/feature/frontier_bitree_rnn.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -94,7 +93,6 @@ bool matcher_list = false;
 // learning options...
 path_type refset_file;
 path_type output_weights_file; // weights output
-path_type output_model_file;   // model output
 path_type weights_file;
 
 // scorers
@@ -129,7 +127,7 @@ bool dump_weights_mode   = false; // dump current weights... for debugging purpo
 
 int debug = 0;
 
-#include "cicada_learn_bitree_rnn_impl.hpp"
+#include "cicada_learn_tree_impl.hpp"
 
 // forward declarations...
 
@@ -144,17 +142,16 @@ void cicada_learn(const Learner& learner,
 		  const event_set_type& events,
 		  const event_set_type& oracles,
 		  const scorer_document_type& scorers,
-		  weight_set_type& weights,
-		  tree_rnn_type& theta);
+		  weight_set_type& weights);
 void synchronize();
 
-void bcast_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta);
-void bcast_weights(weight_set_type& weights, tree_rnn_type& theta);
-void reduce_weights(weight_set_type& weights, tree_rnn_type& theta);
+void bcast_weights(const int rank, weight_set_type& weights);
+void bcast_weights(weight_set_type& weights);
+void reduce_weights(weight_set_type& weights);
 void reduce_score_pair(score_ptr_type& score_1best, score_ptr_type& score_oracle);
 
-void send_weights(const int rank, const weight_set_type& weights, const tree_rnn_type& theta);
-void recv_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta);
+void send_weights(const int rank, const weight_set_type& weights);
+void recv_weights(const int rank, weight_set_type& weights);
 
 int main(int argc, char ** argv)
 {
@@ -219,21 +216,18 @@ int main(int argc, char ** argv)
     if (output_weights_file.empty())
       throw std::runtime_error("no output?");
 
-    if (output_model_file.empty())
-      throw std::runtime_error("no output?");
-    
     if (int(optimize_sgd) + optimize_adagrad > 1)
       throw std::runtime_error("either one of optimize-{sgd,adagrad}");
     
     if (int(optimize_sgd) + optimize_adagrad == 0)
       optimize_sgd = true;
-    
+
     if (int(violation_derivation) + violation_root + violation_frontier + violation_max > 1)
       throw std::runtime_error("either derivation/all violations");
     
     if (int(violation_derivation) + violation_root + violation_frontier + violation_max == 0)
       violation_derivation = true;
-
+    
     if (lambda < 0)
       throw std::runtime_error("regularization constant must be positive");
 
@@ -322,7 +316,7 @@ int main(int argc, char ** argv)
       if (scorers.size() != oracles.size())
 	throw std::runtime_error("oracle size and reference translation size does not match");
     
-    // weights and rnn parameters
+    // weights
     weight_set_type weights;
     
     if (! weights_file.empty()) {
@@ -333,38 +327,19 @@ int main(int argc, char ** argv)
 	utils::compress_istream is(weights_file, 1024 * 1024);
 	is >> weights;
       }
-    }
-        
-    // check if we have correct feature!
-    const cicada::feature::FrontierBiTreeRNN* tree_rnn_feature = 0;
-    
-    model_type::const_iterator miter_end = model.end();
-    for (model_type::const_iterator miter = model.begin(); miter != miter_end; ++ miter)
-      if (dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get())) {
-	if (tree_rnn_feature)
-	  throw std::runtime_error("We do not allow multiple tree-rnn features!");
-	
-	tree_rnn_feature = dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get());
-      }
-    
-    if (! tree_rnn_feature)
-      throw std::runtime_error("no tree-rnn feature?");
-    
-    tree_rnn_type& theta = tree_rnn_feature->model();
+    }        
     
     // perform learning...
     if (optimize_adagrad)
-      cicada_learn(LearnAdaGrad(theta, lambda, eta0), operations, model, events, oracles, scorers, weights, theta);
+      cicada_learn(LearnAdaGrad(lambda, eta0), operations, model, events, oracles, scorers, weights);
     else 
-      cicada_learn(LearnSGD(theta, lambda, eta0), operations, model, events, oracles, scorers, weights, theta);
+      cicada_learn(LearnSGD(lambda, eta0), operations, model, events, oracles, scorers, weights);
     
     // output model...
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_weights_file, 1024 * 1024);
       os.precision(20);
       os << weights;
-      
-      theta.write(output_model_file);
     }
 
     synchronize();
@@ -676,19 +651,13 @@ struct Dumper
   struct model_file_type
   {
     weight_set_type weights_;
-    tree_rnn_type   theta_;
     path_type       path_weights_;
-    path_type       path_theta_;
 
-    model_file_type() : weights_(), theta_(), path_weights_(), path_theta_() {}
+    model_file_type() : weights_(), path_weights_() {}
     model_file_type(const weight_set_type& weights,
-		    const tree_rnn_type& theta,
-		    const path_type& path_weights,
-		    const path_type& path_theta)
+		    const path_type& path_weights)
       : weights_(weights),
-	theta_(theta),
-	path_weights_(path_weights),
-	path_theta_(path_theta) {}
+	path_weights_(path_weights) {}
   };
   
   typedef utils::lockfree_list_queue<model_file_type, std::allocator<model_file_type> > queue_type;
@@ -703,15 +672,10 @@ struct Dumper
     while (1) {
       queue_.pop(model_file);
       if (model_file.path_weights_.empty()) break;
-
-      if (! model_file.path_weights_.empty()) {
-	utils::compress_ostream os(model_file.path_weights_, 1024 * 1024);
-	os.precision(20);
-	os << model_file.weights_;
-      }
       
-      if (! model_file.path_theta_.empty())
-	model_file.theta_.write(model_file.path_theta_);
+      utils::compress_ostream os(model_file.path_weights_, 1024 * 1024);
+      os.precision(20);
+      os << model_file.weights_;
     }
   }
   
@@ -728,10 +692,6 @@ struct Task
   typedef utils::lockfree_list_queue<update_encoded_type, std::allocator<update_encoded_type> > queue_type;
   
   typedef std::vector<size_t, std::allocator<size_t> > segment_set_type;
-
-  typedef cicada::feature::FrontierBiTreeRNN::feature_name_set_type feature_name_set_type;
-
-  typedef tree_rnn_type::tensor_type tensor_type;
 
   typedef typename Learner::candidate_type     candidate_type;
   typedef typename Learner::candidate_set_type candidate_set_type;
@@ -750,8 +710,6 @@ struct Task
       boost::iostreams::filtering_ostream os;
       os.push(codec::lz4_compressor());
       os.push(boost::iostreams::back_insert_device<buffer_type>(buffer_));
-      
-      os << gradient.theta_;
       
       feature_set_type::const_iterator fiter_end = gradient.weights_.end();
       for (feature_set_type::const_iterator fiter = gradient.weights_.begin(); fiter != fiter_end; ++ fiter) {
@@ -782,8 +740,6 @@ struct Task
       is.push(codec::lz4_decompressor());
       is.push(boost::iostreams::array_source(&(*encoded.begin()), encoded.size()));
       
-      is >> gradient.theta_;
-      
       size_type feature_size = 0;
       feature_set_type::mapped_type value;
       
@@ -809,8 +765,7 @@ struct Task
        const event_set_type& events,
        const event_set_type& oracles,
        const scorer_document_type& scorers,
-       weight_set_type& weights,
-       tree_rnn_type& theta)
+       weight_set_type& weights)
     : rank_(rank),
       queue_merge_(queue_merge),
       queue_bcast_(queue_bcast),
@@ -820,11 +775,10 @@ struct Task
       events_(events),
       oracles_(oracles),
       scorers_(scorers),
-      weights_(weights),
-      theta_(theta)
+      weights_(weights)
   {
     generator_.seed(utils::random_seed());
-
+    
     // check oracles...
     if (! oracles.empty())
       if (events.size() != oracles.size())
@@ -839,27 +793,6 @@ struct Task
 	if (! oracles.empty() && oracles[seg].empty())
 	  throw std::runtime_error("no oracle? " + utils::lexical_cast<std::string>(seg));
       }
-    
-    // check for the feature
-    const cicada::feature::FrontierBiTreeRNN* tree_rnn_feature = 0;
-    
-    model_type::const_iterator miter_end = model.end();
-    for (model_type::const_iterator miter = model.begin(); miter != miter_end; ++ miter)
-      if (dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get())) {
-	tree_rnn_feature = dynamic_cast<cicada::feature::FrontierBiTreeRNN*>(miter->get());
-	break;
-      }
-    
-    if (! tree_rnn_feature)
-      throw std::runtime_error("no tree-rnn feature?");
-    
-    if (&tree_rnn_feature->model() != &theta)
-      throw std::runtime_error("different theta?");
-    
-    names_ = tree_rnn_feature->features();
-
-    no_bos_eos_    = tree_rnn_feature->no_bos_eos();
-    skip_sgml_tag_ = tree_rnn_feature->skip_sgml_tag();
   }
   
   const int rank_;
@@ -875,7 +808,6 @@ struct Task
   const event_set_type&         oracles_;
   const scorer_document_type&   scorers_;
   weight_set_type&              weights_;
-  tree_rnn_type&                theta_;
   
   KBestSentence   kbest_generator_;
   Oracle          oracle_generator_;
@@ -885,10 +817,6 @@ struct Task
   
   boost::mt19937        generator_;
   segment_set_type      segments_;
-  feature_name_set_type names_;
-  
-  bool no_bos_eos_;
-  bool skip_sgml_tag_;
     
   score_ptr_type score_1best_;
   score_ptr_type score_oracle_;
@@ -931,17 +859,10 @@ struct Task
     bool merge_finished = false;
     bool learn_finished = false;
     
-    gradient_type       gradient(theta_.hidden_, theta_.embedding_);
+    gradient_type       gradient;
     update_encoded_type encoded;
-
-    tensor_type W;
     
-    const_cast<Learner&>(learner_).initialize(names_,
-					      no_bos_eos_,
-					      skip_sgml_tag_,
-					      weights_,
-					      W,
-					      theta_);
+    const_cast<Learner&>(learner_).initialize(weights_);
     
     int non_found_iter = 0;
     while (! merge_finished || ! learn_finished) {
@@ -958,7 +879,7 @@ struct Task
 	  
 	  decoder_(encoded, gradient);
 	  
-	  const_cast<Learner&>(learner_).learn(weights_, W, theta_, gradient);
+	  const_cast<Learner&>(learner_).learn(weights_, gradient);
 
 	  ++ num_updated;
 	}
@@ -1047,8 +968,6 @@ struct Task
 									 history[j].kbests[i],
 									 history[j].oracles[i],
 									 weights_,
-									 W,
-									 theta_,
 									 violation_margin_root,
 									 gradient);
 	    } else if (violation_frontier) {
@@ -1058,8 +977,6 @@ struct Task
 									 history[j].kbests[i],
 									 history[j].oracles[i],
 									 weights_,
-									 W,
-									 theta_,
 									 violation_margin_frontier,
 									 gradient);
 	    } else if (violation_max) {
@@ -1069,8 +986,6 @@ struct Task
 									 history[j].kbests[i],
 									 history[j].oracles[i],
 									 weights_,
-									 W,
-									 theta_,
 									 violation_margin_max,
 									 gradient);
 	    } else {
@@ -1080,8 +995,6 @@ struct Task
 									 history[j].kbests[i],
 									 history[j].oracles[i],
 									 weights_,
-									 W,
-									 theta_,
 									 violation_margin,
 									 gradient);
 	    }
@@ -1093,8 +1006,6 @@ struct Task
 								     kbests_batch[i],
 								     oracles_batch[i],
 								     weights_,
-								     W,
-								     theta_,
 								     violation_margin_root,
 								     gradient);
 	  } else if (violation_frontier) {
@@ -1103,8 +1014,6 @@ struct Task
 								     kbests_batch[i],
 								     oracles_batch[i],
 								     weights_,
-								     W,
-								     theta_,
 								     violation_margin_frontier,
 								     gradient);
 	  } else if (violation_max) {
@@ -1113,8 +1022,6 @@ struct Task
 								     kbests_batch[i],
 								     oracles_batch[i],
 								     weights_,
-								     W,
-								     theta_,
 								     violation_margin_max,
 								     gradient);
 	  } else {
@@ -1123,14 +1030,12 @@ struct Task
 								     kbests_batch[i],
 								     oracles_batch[i],
 								     weights_,
-								     W,
-								     theta_,
 								     violation_margin,
 								     gradient);
 	  }
 	  
 	  // perform parameter updates...
-	  const_cast<Learner&>(learner_).learn(weights_, W, theta_, gradient);
+	  const_cast<Learner&>(learner_).learn(weights_, gradient);
 	  
 	  if (debug >= 2)
 	    std::cerr << "rank: " << rank_ << " objective: " << objective << " batch: " << kbests_batch.size() << std::endl;
@@ -1190,8 +1095,7 @@ void cicada_learn(const Learner& learner,
 		  const event_set_type& events,
 		  const event_set_type& oracles,
 		  const scorer_document_type& scorers,
-		  weight_set_type& weights,
-		  tree_rnn_type& theta)
+		  weight_set_type& weights)
 {
   typedef Dumper dumper_type;
   
@@ -1231,8 +1135,7 @@ void cicada_learn(const Learner& learner,
 		 events,
 		 oracles,
 		 scorers,
-		 weights,
-		 theta);
+		 weights);
 
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
@@ -1241,7 +1144,7 @@ void cicada_learn(const Learner& learner,
 				      : 0);
   
   // first, bcast weights...
-  bcast_weights(weights, theta);
+  bcast_weights(weights);
 
   // start training
   for (int iter = 0; iter != iteration; ++ iter) {
@@ -1348,12 +1251,11 @@ void cicada_learn(const Learner& learner,
     }
     
     if (mix_average_mode) {
-      reduce_weights(weights, theta);
+      reduce_weights(weights);
       
-      bcast_weights(weights, theta);
+      bcast_weights(weights);
       
       weights *= 1.0 / mpi_size;
-      theta   *= 1.0 / mpi_size;
     } else if (mix_select_mode) {
       typedef std::vector<double, std::allocator<double> > buffer_type;
       
@@ -1374,14 +1276,12 @@ void cicada_learn(const Learner& learner,
       if (debug >= 2 && mpi_rank == 0)
 	std::cerr << "minimum rank: " << rank_min << " L1: " << buffer_recv[rank_min] << std::endl;
       
-      bcast_weights(rank_min, weights, theta);
+      bcast_weights(rank_min, weights);
     } 
     
     if (dump_weights_mode && mpi_rank == 0)
       queue_dumper.push(model_file_type(weights,
-					theta,
-					add_suffix(output_weights_file, "." + utils::lexical_cast<std::string>(iter + 1)),
-					add_suffix(output_model_file, "." + utils::lexical_cast<std::string>(iter + 1))));
+					add_suffix(output_weights_file, "." + utils::lexical_cast<std::string>(iter + 1))));
   }
   
   // finish dumper...
@@ -1489,7 +1389,7 @@ void reduce_weights(std::istream& is, weight_set_type& weights)
   }  
 }
 
-void recv_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta)
+void recv_weights(const int rank, weight_set_type& weights)
 {
   weights.clear();
   weights.allocate();
@@ -1498,42 +1398,35 @@ void recv_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta
   is.push(codec::lz4_decompressor());
   is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
   
-  is >> theta;
   read_weights(is, weights);
 }
 
-void send_weights(const int rank, const weight_set_type& weights, const tree_rnn_type& theta)
+void send_weights(const int rank, const weight_set_type& weights)
 {
   boost::iostreams::filtering_ostream os;
   os.push(codec::lz4_compressor());
   os.push(utils::mpi_device_sink(rank, weights_tag, 1024 * 1024));
   
-  os << theta;
   write_weights(os, weights);
 }
 
-void reduce_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta)
+void reduce_weights(const int rank, weight_set_type& weights)
 {
-  tree_rnn_type theta_reduced;
-  
   boost::iostreams::filtering_istream is;
   is.push(codec::lz4_decompressor());
   is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
   
-  is >> theta_reduced;
   reduce_weights(is, weights);
-  
-  theta += theta_reduced;
 }
 
 template <typename Iterator>
-void reduce_weights(Iterator first, Iterator last, weight_set_type& weights, tree_rnn_type& theta)
+void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
 {
   for (/**/; first != last; ++ first)
-    reduce_weights(*first, weights, theta);
+    reduce_weights(*first, weights);
 }
 
-void reduce_weights(weight_set_type& weights, tree_rnn_type& theta)
+void reduce_weights(weight_set_type& weights)
 {
   typedef std::vector<int, std::allocator<int> > rank_set_type;
   
@@ -1555,18 +1448,18 @@ void reduce_weights(weight_set_type& weights, tree_rnn_type& theta)
       if (ranks.empty()) continue;
       
       if (ranks.size() == 1)
-	reduce_weights(ranks.front(), weights, theta);
+	reduce_weights(ranks.front(), weights);
       else
-	reduce_weights(ranks.begin(), ranks.end(), weights, theta);
+	reduce_weights(ranks.begin(), ranks.end(), weights);
       
     } else
-      send_weights(mpi_rank % reduce_size, weights, theta);
+      send_weights(mpi_rank % reduce_size, weights);
     
     merge_size = reduce_size;
   }
 }
 
-void bcast_weights(const int rank, weight_set_type& weights, tree_rnn_type& theta)
+void bcast_weights(const int rank, weight_set_type& weights)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1576,7 +1469,6 @@ void bcast_weights(const int rank, weight_set_type& weights, tree_rnn_type& thet
     os.push(codec::lz4_compressor());
     os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
 
-    os << theta;
     write_weights(os, weights);
   } else {
     weights.clear();
@@ -1586,14 +1478,13 @@ void bcast_weights(const int rank, weight_set_type& weights, tree_rnn_type& thet
     is.push(codec::lz4_decompressor());
     is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
     
-    is >> theta;
     read_weights(is, weights);
   }
 }
 
-void bcast_weights(weight_set_type& weights, tree_rnn_type& theta)
+void bcast_weights(weight_set_type& weights)
 {
-  bcast_weights(0, weights, theta);
+  bcast_weights(0, weights);
 }
 
 struct deprecated
@@ -1663,7 +1554,6 @@ void options(int argc, char** argv)
   opts_learn.add_options()
     ("refset",         po::value<path_type>(&refset_file),         "refset")
     ("output-weights", po::value<path_type>(&output_weights_file), "model (or weights) output")
-    ("output-model",   po::value<path_type>(&output_model_file),   "rnn model output")
     ("weights",        po::value<path_type>(&weights_file),        "initial model (or weights)")
     
     ("scorer",           po::value<std::string>(&scorer_name)->default_value(scorer_name), "evaluation scorer")

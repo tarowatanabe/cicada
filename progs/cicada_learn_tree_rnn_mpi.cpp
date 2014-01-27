@@ -702,7 +702,7 @@ struct Dumper
     
     while (1) {
       queue_.pop(model_file);
-      if (model_file.weights_.empty()) break;
+      if (model_file.path_weights_.empty()) break;
 
       if (! model_file.path_weights_.empty()) {
 	utils::compress_ostream os(model_file.path_weights_, 1024 * 1024);
