@@ -106,6 +106,7 @@ bool kbest_unique_mode = true;
 double kbest_diversity = 0.0;
 
 bool optimize_adagrad = false;
+bool optimize_adadec = false;
 bool optimize_sgd = false;
 
 double lambda = 0.0;
@@ -216,10 +217,10 @@ int main(int argc, char ** argv)
     if (output_weights_file.empty())
       throw std::runtime_error("no output?");
 
-    if (int(optimize_sgd) + optimize_adagrad > 1)
-      throw std::runtime_error("either one of optimize-{sgd,adagrad}");
+    if (int(optimize_sgd) + optimize_adagrad + optimize_adadec > 1)
+      throw std::runtime_error("either one of optimize-{sgd,adagrad,adadec}");
     
-    if (int(optimize_sgd) + optimize_adagrad == 0)
+    if (int(optimize_sgd) + optimize_adagrad + optimize_adadec == 0)
       optimize_sgd = true;
 
     if (int(violation_derivation) + violation_root + violation_frontier + violation_max > 1)
@@ -332,6 +333,8 @@ int main(int argc, char ** argv)
     // perform learning...
     if (optimize_adagrad)
       cicada_learn(LearnAdaGrad(lambda, eta0), operations, model, events, oracles, scorers, weights);
+    else if (optimize_adadec)
+      cicada_learn(LearnAdaDec(lambda, eta0), operations, model, events, oracles, scorers, weights);
     else 
       cicada_learn(LearnSGD(lambda, eta0), operations, model, events, oracles, scorers, weights);
     
@@ -1566,6 +1569,7 @@ void options(int argc, char** argv)
     
     ("optimize-sgd",     po::bool_switch(&optimize_sgd),     "SGD optimizer")
     ("optimize-adagrad", po::bool_switch(&optimize_adagrad), "AdaGrad optimizer")
+    ("optimize-adadec",  po::bool_switch(&optimize_adadec),  "AdaDec optimizer")
     
     ("lambda",           po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
     ("eta0",             po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")

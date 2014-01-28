@@ -1499,6 +1499,136 @@ struct LearnAdaGrad : public LearnBase
   tree_rnn_type   G_theta_;
 };
 
+struct LearnAdaDec : public LearnBase
+{
+  LearnAdaDec(const tree_rnn_type& theta,
+	      const double lambda,
+	      const double eta0)
+    : lambda_(lambda),
+      eta0_(eta0),
+      G_weights_(),
+      G_theta_(theta)
+  {
+    G_weights_.clear();
+    G_theta_.clear();
+  }
+  
+  void learn(weight_set_type& weights,
+	     tensor_type& W,
+	     tree_rnn_type& theta,
+	     const gradient_type& gradient)
+  {
+    if (! gradient.count_) return;
+    
+    const double scale = 1.0 / gradient.count_;
+    
+    // update weights
+    feature_set_type::const_iterator giter_end = gradient.weights_.end();
+    for (feature_set_type::const_iterator giter = gradient.weights_.begin(); giter != giter_end; ++ giter) 
+      if (giter->second != 0.0) {
+	double& G = G_weights_[giter->first];
+	double& x = weights[giter->first];
+	
+	G = G * 0.99 + giter->second * giter->second * scale * scale;
+	
+	const double rate = eta0_ / std::sqrt(double(1.0) + G);
+	const double f = x - rate * scale * giter->second;
+	
+	x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      }
+    
+    // update theta
+    update(theta.Wp_, G_theta_.Wp_, gradient.theta_.Wp_, scale, lambda_ != 0.0);
+    update(theta.Bp_, G_theta_.Bp_, gradient.theta_.Bp_, scale, false);
+
+    update(theta.Ws_, G_theta_.Ws_, gradient.theta_.Ws_, scale, lambda_ != 0.0);
+    update(theta.Bs_, G_theta_.Bs_, gradient.theta_.Bs_, scale, false);
+
+    update(theta.Wt_, G_theta_.Wt_, gradient.theta_.Wt_, scale, lambda_ != 0.0);
+    update(theta.Bt_, G_theta_.Bt_, gradient.theta_.Bt_, scale, false);
+    
+    update(theta.Wn_, G_theta_.Wn_, gradient.theta_.Wn_, scale, lambda_ != 0.0);
+    update(theta.Bn_, G_theta_.Bn_, gradient.theta_.Bn_, scale, false);
+    
+    update(theta.Bi_, G_theta_.Bi_, gradient.theta_.Bi_, scale, false);
+    
+    finalize(weights, W, theta);
+  }
+
+  template <typename Theta, typename GradVar, typename Grad>
+  struct update_visitor_regularize
+  {
+    update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
+			      Eigen::MatrixBase<GradVar>& G,
+			      const Eigen::MatrixBase<Grad>& g,
+			      const double& scale,
+			      const double& lambda,
+			      const double& eta0)
+      : theta_(theta), G_(G), g_(g), scale_(scale), lambda_(lambda), eta0_(eta0) {}
+    
+    void init(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      operator()(value, i, j);
+    }
+    
+    void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      if (g_(i, j) == 0) return;
+      
+      G_(i, j) = G_(i, j) * 0.99 + g_(i, j) * g_(i, j) * scale_ * scale_;
+      
+      const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
+      const double f = theta_(i, j) - rate * scale_ * g_(i, j);
+
+      theta_(i, j) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+    }
+    
+    Eigen::MatrixBase<Theta>&      theta_;
+    Eigen::MatrixBase<GradVar>&    G_;
+    const Eigen::MatrixBase<Grad>& g_;
+    
+    const double scale_;
+    const double lambda_;
+    const double eta0_;
+  };
+
+  struct learning_rate
+  {
+    learning_rate(const double& eta0) : eta0_(eta0) {}
+    
+    template <typename Tp>
+    Tp operator()(const Tp& x) const
+    {
+      return (x == 0.0 ? 0.0 : eta0_ / std::sqrt(double(1.0) + x));
+    }
+    
+    const double& eta0_;
+  };
+
+  template <typename Theta, typename GradVar, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<GradVar>& G,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize)
+  {
+    if (regularize) {
+      update_visitor_regularize<Theta, GradVar, Grad> visitor(theta, G, g, scale, lambda_, eta0_);
+      
+      theta.visit(visitor);
+    } else {
+      G = G.array() * 0.99 + g.array().square() * scale * scale;
+      theta.array() -= scale * g.array() * G.array().unaryExpr(learning_rate(eta0_));
+    }
+  }
+  
+  double lambda_;
+  double eta0_;
+  
+  weight_set_type G_weights_;
+  tree_rnn_type   G_theta_;
+};
+
 struct LearnSGD : public LearnBase
 {
   LearnSGD(const tree_rnn_type& theta,

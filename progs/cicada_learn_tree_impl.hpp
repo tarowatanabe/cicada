@@ -990,6 +990,48 @@ struct LearnAdaGrad : public LearnBase
   weight_set_type G_weights_;
 };
 
+struct LearnAdaDec : public LearnBase
+{
+  LearnAdaDec(const double lambda,
+	      const double eta0)
+    : lambda_(lambda),
+      eta0_(eta0),
+      G_weights_()
+  {
+    G_weights_.clear();
+  }
+  
+  void learn(weight_set_type& weights,
+	     const gradient_type& gradient)
+  {
+    if (! gradient.count_) return;
+    
+    const double scale = 1.0 / gradient.count_;
+    
+    // update weights
+    feature_set_type::const_iterator giter_end = gradient.weights_.end();
+    for (feature_set_type::const_iterator giter = gradient.weights_.begin(); giter != giter_end; ++ giter) 
+      if (giter->second != 0.0) {
+	double& G = G_weights_[giter->first];
+	double& x = weights[giter->first];
+	
+	G = G * 0.99 + giter->second * giter->second * scale * scale;
+	
+	const double rate = eta0_ / std::sqrt(double(1.0) + G);
+	const double f = x - rate * scale * giter->second;
+	
+	x = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
+      }
+    
+    finalize(weights);
+  }
+  
+  double lambda_;
+  double eta0_;
+  
+  weight_set_type G_weights_;
+};
+
 struct LearnSGD : public LearnBase
 {
   LearnSGD(const double lambda,
