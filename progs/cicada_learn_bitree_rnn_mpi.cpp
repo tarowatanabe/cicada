@@ -120,6 +120,7 @@ bool violation_frontier   = false;
 bool violation_max        = false;
 
 // additional misc parameters...
+bool fix_weights_mode = false;
 bool merge_oracle_mode = false;
 int merge_history = 0;
 bool mix_none_mode = false;
@@ -939,6 +940,7 @@ struct Task
     const_cast<Learner&>(learner_).initialize(names_,
 					      no_bos_eos_,
 					      skip_sgml_tag_,
+					      fix_weights_mode,
 					      weights_,
 					      W,
 					      theta_);
@@ -1686,6 +1688,7 @@ void options(int argc, char** argv)
     ("violation-frontier",   po::bool_switch(&violation_frontier),   "violations from the frontier nodes")
     ("violation-max",        po::bool_switch(&violation_max),        "maximum violations among nodes")
     
+    ("fix-weights",         po::bool_switch(&fix_weights_mode),     "fix non-rnn weights")
     ("merge-oracle",        po::bool_switch(&merge_oracle_mode),    "merge oracle kbests")
     ("merge-history",       po::value<int>(&merge_history),         "merge history for decoded results")
     ("mix-none",            po::bool_switch(&mix_none_mode),        "no mixing")

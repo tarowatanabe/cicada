@@ -148,6 +148,7 @@ struct LearnBase
   
   bool no_bos_eos_;
   bool skip_sgml_tag_;
+  bool fix_weights_;
   feature_name_set_type names_;
   
   loss_map_type loss_kbests_;
@@ -161,6 +162,7 @@ struct LearnBase
   void initialize(const feature_name_set_type& names,
 		  const bool no_bos_eos,
 		  const bool skip_sgml_tag,
+		  const bool fix_weights,
 		  weight_set_type& weights,
 		  tensor_type& W,
 		  tree_rnn_type& theta)
@@ -168,6 +170,7 @@ struct LearnBase
     names_         = names;
     no_bos_eos_    = no_bos_eos;
     skip_sgml_tag_ = skip_sgml_tag;
+    fix_weights_   = fix_weights;
     
     finalize(weights, W, theta);
   }
@@ -349,11 +352,15 @@ struct LearnBase
     state_type& state = states_.back();
 
     state.final_    = true;
-    state.features_ = edge.features;
-    
-    // TODO: check whether the values are similar!
-    for (size_type i = 0; i != theta.hidden_; ++ i)
-      state.features_[names_[i]] = state.layer_(i, 0);
+
+    if (fix_weights_) {
+      for (size_type i = 0; i != theta.hidden_; ++ i)
+	state.features_[names_[i]] = state.layer_(i, 0);
+    } else {
+      state.features_ = edge.features;
+      for (size_type i = 0; i != theta.hidden_; ++ i)
+	state.features_[names_[i]] = state.layer_(i, 0);
+    }
     
     // set up node-map
     node_map_[edge.head] = states_.size() - 1;
