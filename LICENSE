@@ -385,3 +385,7 @@ Japanese-English Bilingual Corpus of Wikipedia's Kyoto Articles
 http://alaginrc.nict.go.jp/WikiCorpus/index_E.html
 
 The sample data used in this service contains English contents which is translated by the National Institute of Information and Communications Technology (NICT) from Japanese sentences on Wikipedia. Our use of this data is licensed by the Creative Comons Attribution-Share-Alike License 3.0. Please refer to http://creativecommons.org/licenses/by-sa/3.0/ or http://alaginrc.nict.go.jp/WikiCorpus/ for details.
+
+Fast approximate functions <https://code.google.com/p/fastapprox/>
+
+New BSD License
