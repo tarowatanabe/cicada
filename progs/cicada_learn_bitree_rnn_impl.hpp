@@ -1499,6 +1499,136 @@ struct LearnAdaGrad : public LearnBase
   tree_rnn_type   G_theta_;
 };
 
+struct LearnAdaDelta : public LearnBase
+{
+  LearnAdaDelta(const tree_rnn_type& theta,
+	       const double lambda,
+	       const double eta0)
+    : lambda_(lambda),
+      eta0_(eta0),
+      X_weights_(),
+      X_theta_(theta),
+      G_weights_(),
+      G_theta_(theta)
+  {
+    X_weights_.clear();
+    X_theta_.clear();
+    
+    G_weights_.clear();
+    G_theta_.clear();
+  }
+  
+  void learn(weight_set_type& weights,
+	     tensor_type& W,
+	     tree_rnn_type& theta,
+	     const gradient_type& gradient)
+  {
+    if (! gradient.count_) return;
+    
+    const double scale = 1.0 / gradient.count_;
+    
+    // update weights
+    feature_set_type::const_iterator giter_end = gradient.weights_.end();
+    for (feature_set_type::const_iterator giter = gradient.weights_.begin(); giter != giter_end; ++ giter) 
+      if (giter->second != 0.0) {
+	double& X = X_weights_[giter->first];
+	double& G = G_weights_[giter->first];
+	double& x = weights[giter->first];
+	
+	G = G * 0.95 + giter->second * giter->second * scale * scale;
+	
+	const double rate = std::sqrt(eta0_ + X) / std::sqrt(eta0_ + G);
+	const double x1 = x - rate * scale * giter->second;
+	const double x2 = utils::mathop::sgn(x1) * std::max(0.0, std::fabs(x1) - rate * lambda_);
+	
+	X = X * 0.95 + (x2 - x) * (x2 - x);
+	
+	x = x2;
+      }
+    
+    // update theta
+    update(theta.Wp_, X_theta_.Wp_, G_theta_.Wp_, gradient.theta_.Wp_, scale, lambda_ != 0.0);
+    update(theta.Bp_, X_theta_.Bp_, G_theta_.Bp_, gradient.theta_.Bp_, scale, false);
+
+    update(theta.Ws_, X_theta_.Ws_, G_theta_.Ws_, gradient.theta_.Ws_, scale, lambda_ != 0.0);
+    update(theta.Bs_, X_theta_.Bs_, G_theta_.Bs_, gradient.theta_.Bs_, scale, false);
+
+    update(theta.Wt_, X_theta_.Wt_, G_theta_.Wt_, gradient.theta_.Wt_, scale, lambda_ != 0.0);
+    update(theta.Bt_, X_theta_.Bt_, G_theta_.Bt_, gradient.theta_.Bt_, scale, false);
+    
+    update(theta.Wn_, X_theta_.Wn_, G_theta_.Wn_, gradient.theta_.Wn_, scale, lambda_ != 0.0);
+    update(theta.Bn_, X_theta_.Bn_, G_theta_.Bn_, gradient.theta_.Bn_, scale, false);
+    
+    update(theta.Bi_, X_theta_.Bi_, G_theta_.Bi_, gradient.theta_.Bi_, scale, false);
+    
+    finalize(weights, W, theta);
+  }
+
+  template <typename Theta, typename XVar, typename GradVar, typename Grad>
+  struct update_visitor_regularize
+  {
+    update_visitor_regularize(Eigen::MatrixBase<Theta>& theta,
+			      Eigen::MatrixBase<XVar>& X,
+			      Eigen::MatrixBase<GradVar>& G,
+			      const Eigen::MatrixBase<Grad>& g,
+			      const double& scale,
+			      const double& lambda,
+			      const double& eta0)
+      : theta_(theta), X_(X), G_(G), g_(g), scale_(scale), lambda_(lambda), eta0_(eta0) {}
+    
+    void init(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      operator()(value, i, j);
+    }
+    
+    void operator()(const tensor_type::Scalar& value, tensor_type::Index i, tensor_type::Index j)
+    {
+      if (g_(i, j) == 0) return;
+      
+      G_(i, j) = G_(i, j) * 0.95 + g_(i, j) * g_(i, j) * scale_ * scale_;
+      
+      const double rate = std::sqrt(eta0_ + X_(i, j)) / std::sqrt(eta0_ + G_(i, j));
+      const double x1 = theta_(i, j) - rate * scale_ * g_(i, j);
+      const double x2 = utils::mathop::sgn(x1) * std::max(0.0, std::fabs(x1) - rate * lambda_);
+      
+      X_(i, j) = X_(i, j) * 0.95 + (x2 - theta_(i, j)) * (x2 - theta_(i, j));
+      
+      theta_(i, j) = x2;
+    }
+    
+    Eigen::MatrixBase<Theta>&      theta_;
+    Eigen::MatrixBase<XVar>&       X_;
+    Eigen::MatrixBase<GradVar>&    G_;
+    const Eigen::MatrixBase<Grad>& g_;
+    
+    const double scale_;
+    const double lambda_;
+    const double eta0_;
+  };
+
+  template <typename Theta, typename XVar, typename GradVar, typename Grad>
+  void update(Eigen::MatrixBase<Theta>& theta,
+	      Eigen::MatrixBase<XVar>& X,
+	      Eigen::MatrixBase<GradVar>& G,
+	      const Eigen::MatrixBase<Grad>& g,
+	      const double scale,
+	      const bool regularize)
+  {
+    update_visitor_regularize<Theta, XVar, GradVar, Grad> visitor(theta, X, G, g, scale, regularize ? lambda_ : 0.0, eta0_);
+    
+    theta.visit(visitor);
+  }
+  
+  double lambda_;
+  double eta0_;
+
+  weight_set_type X_weights_;
+  tree_rnn_type   X_theta_;
+  
+  weight_set_type G_weights_;
+  tree_rnn_type   G_theta_;
+};
+
 struct LearnAdaDec : public LearnBase
 {
   LearnAdaDec(const tree_rnn_type& theta,
@@ -1529,7 +1659,7 @@ struct LearnAdaDec : public LearnBase
 	double& G = G_weights_[giter->first];
 	double& x = weights[giter->first];
 	
-	G = G * 0.99 + giter->second * giter->second * scale * scale;
+	G = G * 0.95 + giter->second * giter->second * scale * scale;
 	
 	const double rate = eta0_ / std::sqrt(double(1.0) + G);
 	const double f = x - rate * scale * giter->second;
@@ -1575,7 +1705,7 @@ struct LearnAdaDec : public LearnBase
     {
       if (g_(i, j) == 0) return;
       
-      G_(i, j) = G_(i, j) * 0.99 + g_(i, j) * g_(i, j) * scale_ * scale_;
+      G_(i, j) = G_(i, j) * 0.95 + g_(i, j) * g_(i, j) * scale_ * scale_;
       
       const double rate = eta0_ / std::sqrt(double(1.0) + G_(i, j));
       const double f = theta_(i, j) - rate * scale_ * g_(i, j);
@@ -1617,7 +1747,7 @@ struct LearnAdaDec : public LearnBase
       
       theta.visit(visitor);
     } else {
-      G = G.array() * 0.99 + g.array().square() * scale * scale;
+      G = G.array() * 0.95 + g.array().square() * scale * scale;
       theta.array() -= scale * g.array() * G.array().unaryExpr(learning_rate(eta0_));
     }
   }

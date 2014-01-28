@@ -990,6 +990,54 @@ struct LearnAdaGrad : public LearnBase
   weight_set_type G_weights_;
 };
 
+struct LearnAdaDelta : public LearnBase
+{
+  LearnAdaDelta(const double lambda,
+		const double eta0)
+    : lambda_(lambda),
+      eta0_(eta0),
+      G_weights_()
+  {
+    X_weights_.clear();
+    G_weights_.clear();
+  }
+  
+  void learn(weight_set_type& weights,
+	     const gradient_type& gradient)
+  {
+    if (! gradient.count_) return;
+    
+    const double scale = 1.0 / gradient.count_;
+    
+    // update weights
+    feature_set_type::const_iterator giter_end = gradient.weights_.end();
+    for (feature_set_type::const_iterator giter = gradient.weights_.begin(); giter != giter_end; ++ giter) 
+      if (giter->second != 0.0) {
+	double& X = X_weights_[giter->first];
+	double& G = G_weights_[giter->first];
+	double& x = weights[giter->first];
+	
+	G = G * 0.95 + giter->second * giter->second * scale * scale;
+	
+	const double rate = std::sqrt(eta0_ + X) / std::sqrt(eta0_ + G);
+	const double x1 = x - rate * scale * giter->second;
+	const double x2 = utils::mathop::sgn(x1) * std::max(0.0, std::fabs(x1) - rate * lambda_);
+	
+	X = X * 0.95 + (x2 - x) * (x2 - x);
+	
+	x = x2;
+      }
+    
+    finalize(weights);
+  }
+  
+  double lambda_;
+  double eta0_;
+  
+  weight_set_type X_weights_;
+  weight_set_type G_weights_;
+};
+
 struct LearnAdaDec : public LearnBase
 {
   LearnAdaDec(const double lambda,
@@ -1015,7 +1063,7 @@ struct LearnAdaDec : public LearnBase
 	double& G = G_weights_[giter->first];
 	double& x = weights[giter->first];
 	
-	G = G * 0.99 + giter->second * giter->second * scale * scale;
+	G = G * 0.95 + giter->second * giter->second * scale * scale;
 	
 	const double rate = eta0_ / std::sqrt(double(1.0) + G);
 	const double f = x - rate * scale * giter->second;
