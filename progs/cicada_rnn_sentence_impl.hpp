@@ -1420,11 +1420,18 @@ struct Data
   size_type size() const { return index_.size(); }
   bool empty() const { return index_.empty(); }
   
-  const_iterator begin(size_type pos) const { return data_.begin() + (pos == 0 ? size_type(0) : index_[pos - 1]); }
-  const_iterator end(size_type pos) const { return data_.begin() + index_[pos]; }
+  inline const_iterator begin(size_type pos) const { return data_.begin() + (pos == 0 ? size_type(0) : index_[pos - 1]); }
+  inline       iterator begin(size_type pos)       { return data_.begin() + (pos == 0 ? size_type(0) : index_[pos - 1]); }
+  inline const_iterator end(size_type pos) const { return data_.begin() + index_[pos]; }
+  inline       iterator end(size_type pos)       { return data_.begin() + index_[pos]; }
 
   iterator begin() { return data_.begin(); }
   iterator end() { return data_.end(); }
+
+  void erase(iterator first, iterator last)
+  {
+    data_.erase(first, last);
+  }
   
   data_type  buffer_;
   data_type  data_;
