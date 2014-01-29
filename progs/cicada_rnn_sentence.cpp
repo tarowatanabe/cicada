@@ -62,7 +62,7 @@ bool mix_simple = false;
 bool mix_average = false;
 
 int iteration = 10;
-int batch_size = 8;
+int batch_size = 4;
 int samples = 100;
 int cutoff = 3;
 double lambda = 0;
@@ -251,7 +251,7 @@ struct TaskAccumulate
 	  found = true;
 	}
       
-      if (! learn_finished && mapper_.pop(batch, true)) {
+      if (! learn_finished && ((grad = allocate()) != 0) && mapper_.pop(batch, true)) {
 	
 	found = true;
 	
@@ -262,19 +262,6 @@ struct TaskAccumulate
 	  
 	  learn_finished = true;
 	} else {
-	  gradient_type* grad = 0;
-	  
-	  for (size_type j = 0; j != gradients_.size(); ++ j)
-	    if (gradients_[j].shared() == shard_size) {
-	      grad = &gradients_[j];
-	      break;
-	    }
-	  
-	  if (! grad) {
-	    gradients_.push_back(gradient_type(theta_.dimension_));
-	    grad = &gradients_.back();
-	  }
-	  
 	  grad->clear();
 	  
 	  // use of batch from batch * batch_size and (batch + 1) * batch_size
@@ -299,6 +286,24 @@ struct TaskAccumulate
     
     // rescale current model
     theta_.rescale();
+  }
+
+  gradient_type* allocate()
+  {
+    gradient_type* grad = 0;
+    
+    for (size_type j = 0; j != gradients_.size(); ++ j)
+      if (gradients_[j].shared() >= mergers_.size() || gradients_[j].shared() == 0) {
+	grad = &gradients_[j];
+	break;
+      }
+    
+    if (! grad && gradients_.size() < 128) {
+      gradients_.push_back(gradient_type(theta_.dimension_));
+      grad = &gradients_.back();
+    }
+    
+    return grad;
   }
   
   inline
