@@ -129,7 +129,7 @@ namespace cicada
 			   Extract extract,
 			   Skipper skipper) const
       {
-	tensor_type layer = tensor_type::Zero(embedding_->dimension(), 0);
+	tensor_type layer = tensor_type::Zero(embedding_->dimension(), 1);
 	
 	for (/**/; first != last; ++ first)
 	  if (first->is_terminal() && ! skipper(*first))

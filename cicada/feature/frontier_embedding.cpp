@@ -206,7 +206,7 @@ namespace cicada
 	  const phrase_type& phrase_target = cache_phrase(frontier_target, cache_target_, skipper);
 	  
 	  if (! phrase_source.empty()) {
-	    tensor_type layer = tensor_type::Zero(embedding_source_->dimension(), 0);
+	    tensor_type layer = tensor_type::Zero(embedding_source_->dimension(), 1);
 	    
 	    phrase_type::const_iterator piter_end = phrase_source.end();
 	    for (phrase_type::const_iterator piter = phrase_source.begin(); piter != piter_end; ++ piter)
@@ -220,7 +220,7 @@ namespace cicada
 	  }
 	  
 	  if (! phrase_target.empty()) {
-	    tensor_type layer = tensor_type::Zero(embedding_target_->dimension(), 0);
+	    tensor_type layer = tensor_type::Zero(embedding_target_->dimension(), 1);
 	    
 	    phrase_type::const_iterator piter_end = phrase_target.end();
 	    for (phrase_type::const_iterator piter = phrase_target.begin(); piter != piter_end; ++ piter)
