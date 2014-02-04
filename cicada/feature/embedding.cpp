@@ -10,12 +10,10 @@
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 
-#include "utils/array_power2.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/bithack.hpp"
-#include "utils/small_vector.hpp"
 #include "utils/random_seed.hpp"
 
 namespace cicada

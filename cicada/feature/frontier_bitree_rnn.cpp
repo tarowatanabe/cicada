@@ -10,7 +10,6 @@
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 
-#include "utils/array_power2.hpp"
 #include "utils/hashmurmur3.hpp"
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -133,6 +132,9 @@ namespace cicada
 	no_bos_eos    = x.no_bos_eos;
 	skip_sgml_tag = x.skip_sgml_tag;
 	feature_names = x.feature_names;
+
+	cache_source.clear();
+	cache_target.clear();
 	
 	return *this;
       }
