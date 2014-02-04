@@ -17,6 +17,7 @@
 #include "feature/depeval.hpp"
 #include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
+#include "feature/embedding.hpp"
 #include "feature/frontier_bigram.hpp"
 #include "feature/frontier_bitree_rnn.hpp"
 #include "feature/frontier_lexicon.hpp"
@@ -106,6 +107,10 @@ distortion: phrase-based distortion\n\
 frontier-bigram: sparse frontier source side bigram\n\
 \tsource=[true|false] source side bigram (this is a default)\n\
 \ttarget=[true|false] target side bigram (you can specify both)\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-bigram)\n\
+embedding: embedding feature\n\
+\tfile=<embedding file>\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-bigram)\n\
 frontier-bitree-rnn: frontier-bitree-rnn feature\n\
@@ -342,6 +347,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Dependency(parameter));
     else if (param_name == "depeval")
       return feature_function_ptr_type(new feature::Depeval(parameter));
+    else if (param_name == "embedding")
+      return feature_function_ptr_type(new feature::Embedding(parameter));
     else if (param_name == "frontier-bigram")
       return feature_function_ptr_type(new feature::FrontierBigram(parameter));
     else if (param_name == "frontier-bitree-rnn")

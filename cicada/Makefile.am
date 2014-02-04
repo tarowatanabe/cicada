@@ -142,6 +142,7 @@ feature/dependency.hpp \
 feature/depeval.hpp \
 feature/deletion.hpp \
 feature/distortion.hpp \
+feature/embedding.hpp \
 feature/feature_builder.hpp \
 feature/frontier_bigram.hpp \
 feature/frontier_lexicon.hpp \
@@ -184,6 +185,7 @@ feature/distortion.cpp \
 feature/dependency.cpp \
 feature/depeval.cpp \
 feature/deletion.cpp \
+feature/embedding.cpp \
 feature/frontier_bigram.cpp \
 feature/frontier_lexicon.cpp \
 feature/frontier_pair.cpp \
