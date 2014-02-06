@@ -696,6 +696,11 @@ class Alignment:
                     command += " --final-and"
                 else:
                     command += " --final"
+            
+            if ('one2many' in alignment) or ('one-many' in alignment):
+                command += " --one2many"
+            if ('many2one' in alignment) or ('many-one' in alignment):
+                command += " --many2one"
 
         if 'itg' in alignment:
             command += " --itg"

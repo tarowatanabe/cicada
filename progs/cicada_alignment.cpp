@@ -136,8 +136,12 @@ bool grow_mode = false;
 bool final_mode = false;
 bool diag_mode = false;
 bool final_and_mode = false;
+bool one2many_mode = false;
+bool many2one_mode = false;
+
 bool closure_mode = false;
 bool invert_mode = false;
+
 bool moses_mode = false;
 
 double prob_null         = 0.01;
@@ -205,6 +209,9 @@ int main(int argc, char ** argv)
       // defaul to intersection
       if (int(intersection_mode) + union_mode + grow_mode + itg_mode + max_match_mode + source_target_mode + target_source_mode == 0)
 	intersection_mode = true;
+
+      if (one2many_mode && many2one_mode)
+	throw std::runtime_error("one of one2many|many2one");
 
       if (grow_mode) {
 	if (final_mode && final_and_mode)
@@ -455,7 +462,7 @@ struct __Grow
 	  point.target += neighbours[n].target;
 	  
 	  if (0 <= point.source && point.source < source_size && 0 <= point.target && point.target < target_size) 
-	    if ((! aligned_source[point.source]) || (! aligned_target[point.target]))
+	    if ((! aligned_source[point.source] && ! one2many_mode) || (! aligned_target[point.target] && ! many2one_mode))
 	      if (has_alignment(bitext_source_target, point.source, point.target)
 		  || has_alignment(bitext_target_source, point.target, point.source)) {
 		align_new.insert(point);
@@ -554,6 +561,9 @@ struct __Final
 	
 	if (filter(aligned_source[src - 1], aligned_target[trg - 1])) continue;
 	
+	if (one2many_mode && aligned_target[trg - 1]) continue;
+	if (many2one_mode && aligned_source[src - 1]) continue;
+	
 	align.insert(point_type(src - 1, trg - 1));
 	aligned_source[src - 1] = true;
 	aligned_target[trg - 1] = true;
@@ -568,6 +578,9 @@ struct __Final
 	const int src = *siter;
 	
 	if (filter(aligned_source[src - 1], aligned_target[trg - 1])) continue;
+
+	if (one2many_mode && aligned_target[trg - 1]) continue;
+	if (many2one_mode && aligned_source[src - 1]) continue;
 	
 	align.insert(point_type(src - 1, trg - 1));
 	aligned_source[src - 1] = true;
@@ -1950,6 +1963,9 @@ void options(int argc, char** argv)
     ("diag",         po::bool_switch(&diag_mode),         "diag")
     ("final",        po::bool_switch(&final_mode),        "final")
     ("final-and",    po::bool_switch(&final_and_mode),    "final-and")
+    ("one2many",     po::bool_switch(&one2many_mode),     "constrain the heuristic alingment by one-to-many (from source)")
+    ("many2one",    po::bool_switch(&many2one_mode),     "constrain the heuristic alingment by many-to-one (from source)")
+    
     ("closure",      po::bool_switch(&closure_mode),      "closure")
     ("invert",       po::bool_switch(&invert_mode),       "invert alignment")
     
