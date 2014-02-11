@@ -1,3 +1,7 @@
+2014-2-12
+---------
+- Bug fix for accidental header removal (why?)
+
 2014-1-12
 ---------
 - Bug fix for max-scope constraint computation for GHKM/Tree
