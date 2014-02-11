@@ -556,6 +556,7 @@ rule.hpp \
 sample.hpp \
 sample_uniform.hpp \
 semiring.hpp \
+sentence.hpp \
 sentence_vector.hpp \
 signature.hpp \
 sort.hpp \
