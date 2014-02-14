@@ -1945,6 +1945,7 @@ struct PosteriorReducer : public PosteriorMapReduce
   
   void write(std::ostream& os, const posterior_type& posterior)
   {
+#if 0
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
@@ -1966,8 +1967,8 @@ struct PosteriorReducer : public PosteriorMapReduce
       karma::generate(iter, karma::lit(')'));
     }
     karma::generate(iter, karma::lit('\n'));
-
-#if 0
+#endif
+#if 1
     const matrix_type& matrix = posterior.matrix;
     
     if (matrix.empty())
