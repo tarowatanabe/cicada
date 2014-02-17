@@ -1091,10 +1091,10 @@ void learn_online_root(const Learner& learner,
       
       // mapping of bitexts...
       if (! bitext_finished)
-	for (int rank = 1; rank != mpi_size && id != bitexts.size(); ++ rank)
+	for (int rank = 1; rank != mpi_size && id != ids.size(); ++ rank)
 	  if (bitext_ostream[rank]->test()) {
-	    bitext.id_     = id;
-	    bitext.bitext_ = bitexts[id];
+	    bitext.id_     = ids[id];
+	    bitext.bitext_ = bitexts[ids[id]];
 	    bitext.derivation_.clear();
 	    
 	    codec.encode(bitext, line);
@@ -1108,9 +1108,9 @@ void learn_online_root(const Learner& learner,
 	  }
       
       if (! bitext_finished)
-	if (bitext_mapper.empty() && id != bitexts.size()) {
-	  bitext.id_     = id;
-	  bitext.bitext_ = bitexts[id];
+	if (bitext_mapper.empty() && id != ids.size()) {
+	  bitext.id_     = ids[id];
+	  bitext.bitext_ = bitexts[ids[id]];
 	  bitext.derivation_.clear();
 
 	  //std::cerr << "rank: " << mpi_rank << " bitext: " << bitext.id_ << std::endl;
@@ -1125,7 +1125,7 @@ void learn_online_root(const Learner& learner,
 	}
       
       // finished bitext mapping
-      if (! bitext_finished && id == bitexts.size()) {
+      if (! bitext_finished && id == ids.size()) {
 	bitext_mapper.push(bitext_derivation_type());
 	bitext_finished = true;
       }

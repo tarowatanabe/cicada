@@ -1069,10 +1069,10 @@ void learn_online_root(const Learner& learner,
       
       // mapping of bitexts...
       if (! bitext_finished)
-	for (int rank = 1; rank != mpi_size && id != bitexts.size(); ++ rank)
+	for (int rank = 1; rank != mpi_size && id != ids.size(); ++ rank)
 	  if (bitext_ostream[rank]->test()) {
-	    bitext.id_     = id;
-	    bitext.bitext_ = bitexts[id];
+	    bitext.id_     = ids[id];
+	    bitext.bitext_ = bitexts[ids[id]];
 	    bitext.alignment_source_target_.clear();
 	    bitext.alignment_target_source_.clear();
 	    
@@ -1087,9 +1087,9 @@ void learn_online_root(const Learner& learner,
 	  }
       
       if (! bitext_finished)
-	if (bitext_mapper.empty() && id != bitexts.size()) {
-	  bitext.id_     = id;
-	  bitext.bitext_ = bitexts[id];
+	if (bitext_mapper.empty() && id != ids.size()) {
+	  bitext.id_     = ids[id];
+	  bitext.bitext_ = bitexts[ids[id]];
 	  bitext.alignment_source_target_.clear();
 	  bitext.alignment_target_source_.clear();
 
@@ -1105,7 +1105,7 @@ void learn_online_root(const Learner& learner,
 	}
       
       // finished bitext mapping
-      if (! bitext_finished && id == bitexts.size()) {
+      if (! bitext_finished && id == ids.size()) {
 	bitext_mapper.push(bitext_alignment_type());
 	bitext_finished = true;
       }
