@@ -370,7 +370,7 @@ if __name__ == '__main__':
 
     if options.pbs:
         # we use pbs to run jobs
-        pbs = PBS(queue=options.pbs_queue)
+        pbs = PBS(queue=options.pbs_queue, non_block=options.pbs_non_block)
     
         for line in sys.stdin:
             line = line.strip()
