@@ -30,9 +30,7 @@ quicklz.hpp \
 codec_impl.hpp \
 fastlz.h \
 lz4.h \
-lz4_encoder.h \
 lz4hc.h \
-lz4hc_encoder.h \
 quicklz.h
 
 noinst_PROGRAMS = \
