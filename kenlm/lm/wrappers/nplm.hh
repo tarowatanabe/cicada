@@ -1,5 +1,5 @@
-#ifndef LM_WRAPPER_NPLM__
-#define LM_WRAPPER_NPLM__
+#ifndef LM_WRAPPERS_NPLM_H
+#define LM_WRAPPERS_NPLM_H
 
 #include "lm/facade.hh"
 #include "lm/max_order.hh"
@@ -34,8 +34,12 @@ class Vocabulary : public base::Vocabulary {
       return Index(std::string(str.data(), str.size()));
     }
 
+    lm::WordIndex NullWord() const { return null_word_; }
+
   private:
     const nplm::vocabulary &vocab_;
+
+    const lm::WordIndex null_word_;
 };
 
 // Sorry for imposing my limitations on your code.
@@ -74,4 +78,4 @@ class Model : public lm::base::ModelFacade<Model, State, Vocabulary> {
 } // namespace np
 } // namespace lm
 
-#endif // LM_WRAPPER_NPLM__
+#endif // LM_WRAPPERS_NPLM_H

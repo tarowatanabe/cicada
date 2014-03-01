@@ -1,5 +1,5 @@
-#ifndef LM_BUILDER_INTERPOLATE__
-#define LM_BUILDER_INTERPOLATE__
+#ifndef LM_BUILDER_INTERPOLATE_H
+#define LM_BUILDER_INTERPOLATE_H
 
 #include <stdint.h>
 
@@ -14,7 +14,9 @@ namespace lm { namespace builder {
  */
 class Interpolate {
   public:
-    explicit Interpolate(uint64_t unigram_count, const ChainPositions &backoffs);
+    // Normally the unigram count-1 (since p(<s>) = 0) but might be larger to
+    // set a consistent vocabulary size.
+    explicit Interpolate(uint64_t vocab_size, const ChainPositions &backoffs);
 
     void Run(const ChainPositions &positions);
 
@@ -24,4 +26,4 @@ class Interpolate {
 };
 
 }} // namespaces
-#endif // LM_BUILDER_INTERPOLATE__
+#endif // LM_BUILDER_INTERPOLATE_H
