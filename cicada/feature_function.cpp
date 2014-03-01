@@ -17,7 +17,10 @@
 #include "feature/depeval.hpp"
 #include "feature/deletion.hpp"
 #include "feature/distortion.hpp"
+#include "feature/embedding.hpp"
 #include "feature/frontier_bigram.hpp"
+#include "feature/frontier_bitree_rnn.hpp"
+#include "feature/frontier_embedding.hpp"
 #include "feature/frontier_lexicon.hpp"
 #include "feature/frontier_pair.hpp"
 #include "feature/frontier_shape.hpp"
@@ -40,6 +43,7 @@
 #include "feature/span.hpp"
 #include "feature/sparse_lexicon.hpp"
 #include "feature/sparse_ngram.hpp"
+#include "feature/tree_rnn.hpp"
 #include "feature/variational.hpp"
 #include "feature/vocabulary.hpp"
 
@@ -101,11 +105,29 @@ depeval: dependency evaluation feature\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
 distortion: phrase-based distortion\n\
+embedding: embedding feature\n\
+\tfile=<embedding file>\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: embedding)\n\
 frontier-bigram: sparse frontier source side bigram\n\
 \tsource=[true|false] source side bigram (this is a default)\n\
 \ttarget=[true|false] target side bigram (you can specify both)\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: frontier-bigram)\n\
+frontier-bitree-rnn: frontier-bitree-rnn feature\n\
+\tfile=<model file>\n\
+\tembedding-source-file=<source embedding file>\n\
+\tembedding-target-file=<target embedding file>\n\
+\tdimension-hidden=<dimension for hidden states>\n\
+\tdimension-embedding=<dimension for word embedding>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-bitree-rnn)\n\
+frontier-embedding: embedding feature\n\
+\tsource=<source embedding file>\n\
+\ttarget=<target embedding file>\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: frontier-embedding)\n\
 frontier-lexicon: sparse lexicon feature from frontiers\n\
 \tcluster-source=[word class file] word-class for source side\n\
 \tcluster-target=[word class file] word-class for target side\n\
@@ -243,6 +265,14 @@ sparse-ngram: sparse ngram feature\n\
 \tname=feature-name-prefix (default: sparse-ngram)\n\
 \tcluster=[word class file] word-class for ngram\n\
 \tstemmer=[stemmer spec] stemming for ngram\n\
+tree-rnn: tree-rnn feature\n\
+\tfile=<model file>\n\
+\tembedding-file=<embedding file>\n\
+\tdimension-hidden=<dimension for hidden states>\n\
+\tdimension-embedding=<dimension for word embedding>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: tree-rnn)\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
@@ -323,8 +353,14 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::Dependency(parameter));
     else if (param_name == "depeval")
       return feature_function_ptr_type(new feature::Depeval(parameter));
+    else if (param_name == "embedding")
+      return feature_function_ptr_type(new feature::Embedding(parameter));
     else if (param_name == "frontier-bigram")
       return feature_function_ptr_type(new feature::FrontierBigram(parameter));
+    else if (param_name == "frontier-bitree-rnn")
+      return feature_function_ptr_type(new feature::FrontierBiTreeRNN(parameter));
+    else if (param_name == "frontier-embedding")
+      return feature_function_ptr_type(new feature::FrontierEmbedding(parameter));
     else if (param_name == "frontier-lexicon")
       return feature_function_ptr_type(new feature::FrontierLexicon(parameter));
     else if (param_name == "frontier-pair")
@@ -378,6 +414,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::SparseLexicon(parameter));
     else if (param_name == "sparse-ngram")
       return feature_function_ptr_type(new feature::SparseNGram(parameter));
+    else if (param_name == "tree-rnn")
+      return feature_function_ptr_type(new feature::TreeRNN(parameter));
     else
       throw std::runtime_error("unknown feature: " + parameter);
     

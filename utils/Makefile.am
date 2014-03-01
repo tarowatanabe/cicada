@@ -59,6 +59,7 @@ compress_stream.hpp \
 config.hpp \
 double_base64_generator.hpp \
 double_base64_parser.hpp \
+fastonebigheader.h \
 filesystem.hpp \
 getline.hpp \
 group_aligned_code.hpp \

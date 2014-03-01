@@ -100,6 +100,9 @@ bin_PROGRAMS = \
 	cicada_learn_kbest_mpi \
 	cicada_learn_online_mpi \
 	cicada_learn_online_kbest_mpi \
+	cicada_learn_bitree_rnn_mpi \
+	cicada_learn_tree_rnn_mpi \
+	cicada_learn_tree_mpi \
 	cicada_lexicon \
 	cicada_lexicon_pair \
 	cicada_lexicon_dice \
@@ -393,6 +396,23 @@ cicada_learn_online_kbest_mpi_SOURCES  = \
 cicada_learn_online_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_online_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR) $(LIBLBFGS) $(LIBCG_DESCENT)
 
+cicada_learn_bitree_rnn_mpi_SOURCES  = \
+	cicada_learn_bitree_rnn_mpi.cpp \
+	cicada_learn_bitree_rnn_impl.hpp 
+cicada_learn_bitree_rnn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_bitree_rnn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
+
+cicada_learn_tree_rnn_mpi_SOURCES  = \
+	cicada_learn_tree_rnn_mpi.cpp \
+	cicada_learn_tree_rnn_impl.hpp 
+cicada_learn_tree_rnn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_tree_rnn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
+
+cicada_learn_tree_mpi_SOURCES  = \
+	cicada_learn_tree_mpi.cpp \
+	cicada_learn_tree_impl.hpp 
+cicada_learn_tree_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 cicada_learn_online_mpi_SOURCES  = \
 	cicada_learn_online_mpi.cpp \

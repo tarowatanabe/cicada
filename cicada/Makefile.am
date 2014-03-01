@@ -142,11 +142,14 @@ feature/dependency.hpp \
 feature/depeval.hpp \
 feature/deletion.hpp \
 feature/distortion.hpp \
+feature/embedding.hpp \
 feature/feature_builder.hpp \
 feature/frontier_bigram.hpp \
+feature/frontier_embedding.hpp \
 feature/frontier_lexicon.hpp \
 feature/frontier_pair.hpp \
 feature/frontier_shape.hpp \
+feature/frontier_bitree_rnn.hpp \
 feature/global_lexicon.hpp \
 feature/insertion.hpp \
 feature/kenlm.hpp \
@@ -167,6 +170,7 @@ feature/sgml_tag.hpp \
 feature/span.hpp \
 feature/sparse_lexicon.hpp \
 feature/sparse_ngram.hpp \
+feature/tree_rnn.hpp \
 feature/variational.hpp \
 feature/vocabulary.hpp
 
@@ -182,10 +186,13 @@ feature/distortion.cpp \
 feature/dependency.cpp \
 feature/depeval.cpp \
 feature/deletion.cpp \
+feature/embedding.cpp \
 feature/frontier_bigram.cpp \
+feature/frontier_embedding.cpp \
 feature/frontier_lexicon.cpp \
 feature/frontier_pair.cpp \
 feature/frontier_shape.cpp \
+feature/frontier_bitree_rnn.cpp \
 feature/global_lexicon.cpp \
 feature/insertion.cpp \
 feature/kenlm.cpp \
@@ -205,6 +212,7 @@ feature/sgml_tag.cpp \
 feature/span.cpp \
 feature/sparse_lexicon.cpp \
 feature/sparse_ngram.cpp \
+feature/tree_rnn.cpp \
 feature/variational.cpp \
 feature/vocabulary.cpp
 
@@ -448,6 +456,7 @@ binarize_dependency.hpp \
 binarize_left.hpp \
 binarize_right.hpp \
 bitext.hpp \
+bitree_rnn.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
 compose.hpp \
@@ -579,6 +588,7 @@ tree_grammar_mutable.hpp \
 tree_grammar_static.hpp \
 tree_grammar_shared.hpp \
 tree_grammar_simple.hpp \
+tree_rnn.hpp \
 tree_rule.hpp \
 tree_rule_codec.hpp \
 tree_rule_compact.hpp \
@@ -587,12 +597,14 @@ unite.hpp \
 verify.hpp \
 viterbi.hpp \
 vocab.hpp \
-weight_vector.hpp
+weight_vector.hpp \
+word_embedding.hpp 
 
 libcicada_la_SOURCES = \
 alignment.cpp \
 attribute.cpp \
 attribute_vector.cpp \
+bitree_rnn.cpp \
 cluster.cpp \
 dependency.cpp \
 feature.cpp \
@@ -633,10 +645,12 @@ symbol_vector.cpp \
 transducer.cpp \
 tree_grammar_mutable.cpp \
 tree_grammar_static.cpp \
+tree_rnn.cpp \
 tree_rule.cpp \
 tree_rule_compact.cpp \
 tree_transducer.cpp \
-vocab.cpp
+vocab.cpp \
+word_embedding.cpp
 
 libcicada_la_LDFLAGS = \
 	$(PTHREAD_FLAGS) \
