@@ -897,6 +897,7 @@ struct Unigram
     words_.reserve(word_counts.size());
     counts_.reserve(word_counts.size());
     logprobs_.reserve(word_type::allocated());
+    logprobs_.resize(word_type::allocated(), - std::numeric_limits<double>::infinity());
     
     word_count_set_type::const_iterator witer_end = word_counts.end();
     for (word_count_set_type::const_iterator witer = word_counts.begin(); witer != witer_end; ++ witer) {
