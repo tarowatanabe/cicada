@@ -137,7 +137,7 @@ namespace utils
     typedef __map_alloc_file        map_file_type;
     
     typedef utils::unordered_map<void*, map_file_type*, boost::hash<void*>, std::equal_to<void*>,
-				 std::allocator<std::pair<const void*, map_file_type*> > >::type mapped_type;
+				 std::allocator<std::pair<void* const, map_file_type*> > >::type mapped_type;
   
     typedef std::set<void*, std::less<void*>, std::allocator<void*> > removed_type;
     
