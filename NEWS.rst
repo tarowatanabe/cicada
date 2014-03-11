@@ -1,3 +1,9 @@
+2014-3-11
+---------
+- Bug fix for the latest clang and libc++.
+- Use of iostream, not boost.spirit for posterior output in word
+  alignment tools.
+
 2014-2-12
 ---------
 - Bug fix for accidental header removal (why?)
