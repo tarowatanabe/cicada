@@ -93,7 +93,7 @@ namespace cicada
     typedef std::deque<state_type, std::allocator<state_type> > queue_type;
 
     typedef utils::unordered_map<const coverage_type*, hypergraph_type::id_type, boost::hash<const coverage_type*>, std::equal_to<const coverage_type*>,
-				 std::allocator<std::pair<const coverage_type*, hypergraph_type::id_type> > >::type node_map_type;
+				 std::allocator<std::pair<const coverage_type* const, hypergraph_type::id_type> > >::type node_map_type;
     typedef utils::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
 				 std::allocator<coverage_type > >::type coverage_set_type;
 

@@ -243,10 +243,12 @@ namespace cicada
     typedef std::vector<tree_candidate_map_type, std::allocator<tree_candidate_map_type> > tree_candidate_table_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
 
-    typedef typename utils::unordered_set<const tree_candidate_type*, boost::hash<const tree_candidate_type*>, std::equal_to<const tree_candidate_type*>,
-					  std::allocator<const tree_candidate_type*> >::type unary_tree_set_type;
-    typedef typename utils::unordered_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
-					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
+    typedef typename utils::unordered_set<const tree_candidate_type*,
+					  boost::hash<const tree_candidate_type*>,
+					  std::equal_to<const tree_candidate_type*> >::type unary_tree_set_type;
+    typedef typename utils::unordered_set<const rule_candidate_type*,
+					  boost::hash<const rule_candidate_type*>,
+					  std::equal_to<const rule_candidate_type*> >::type unary_rule_set_type;
   
     typedef std::pair<symbol_type, int> symbol_level_type;
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
@@ -432,9 +434,9 @@ namespace cicada
 	return x == y ||(x && y && *x == *y);
       }
     };
-
+    
     typedef typename utils::unordered_map<const rule_type*, rule_ptr_type, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
-					  std::allocator<std::pair<const rule_type*, rule_ptr_type> > >::type rule_cache_type;
+					  std::allocator<std::pair<const rule_type* const, rule_ptr_type> > >::type rule_cache_type;
 
     typedef typename utils::unordered_map<rule_ptr_type, std::string, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
 					  std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;

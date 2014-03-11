@@ -176,12 +176,15 @@ namespace cicada
     typedef RuleCandidate rule_candidate_type;
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     
-    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type, boost::hash<transducer_type::id_type>, std::equal_to<transducer_type::id_type>,
+    typedef typename utils::unordered_map<transducer_type::id_type, rule_candidate_set_type,
+					  boost::hash<transducer_type::id_type>,
+					  std::equal_to<transducer_type::id_type>,
 					  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > >::type rule_candidate_map_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
-    typedef typename utils::unordered_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
-					  std::allocator<const rule_candidate_type*> >::type unary_rule_set_type;
+    typedef typename utils::unordered_set<const rule_candidate_type*,
+					  boost::hash<const rule_candidate_type*>,
+					  std::equal_to<const rule_candidate_type*> >::type unary_rule_set_type;
     
     typedef std::pair<symbol_type, int> symbol_level_type;
 

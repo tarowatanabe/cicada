@@ -96,7 +96,7 @@ struct PYPLM
   
   typedef std::vector<id_type, std::allocator<id_type> > history_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
-  typedef std::vector<prob_set_type, std::allocator<double> > prob_map_type;
+  typedef std::vector<prob_set_type, std::allocator<prob_set_type> > prob_map_type;
 
   typedef utils::pyp_parameter parameter_type;
   typedef std::vector<parameter_type, std::allocator<parameter_type> > parameter_set_type;

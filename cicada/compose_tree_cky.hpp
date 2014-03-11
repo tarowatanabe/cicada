@@ -252,7 +252,7 @@ namespace cicada
     };
     
     typedef utils::unordered_map<const rule_type*, rule_ptr_type, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
-				 std::allocator<std::pair<const rule_type*, rule_ptr_type> > >::type rule_cache_type;
+				 std::allocator<std::pair<const rule_type* const, rule_ptr_type> > >::type rule_cache_type;
 
     typedef utils::unordered_map<rule_ptr_type, std::string, ptr_hash<rule_type>, ptr_equal_to<rule_type>,
 				 std::allocator<std::pair<const rule_ptr_type, std::string> > >::type frontier_set_type;

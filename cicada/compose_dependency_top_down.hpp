@@ -60,7 +60,7 @@ namespace cicada
     typedef boost::fusion::tuple<const coverage_type*, int, int> state_type;
     
     typedef utils::unordered_map<state_type, hypergraph_type::id_type, utils::hashmurmur3<size_t>, std::equal_to<state_type>,
-				 std::allocator<std::pair<state_type, hypergraph_type::id_type> > >::type state_set_type;
+				 std::allocator<std::pair<const state_type, hypergraph_type::id_type> > >::type state_set_type;
   
     typedef utils::unordered_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
 				 std::allocator<coverage_type > >::type coverage_set_type;
