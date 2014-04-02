@@ -751,12 +751,15 @@ struct Lexicon
     for (size_t trg = 0; trg != target_size; ++ trg)
       if (target[trg].is_terminal()) {
 	
+	size_type norm = 1;
 	double score = lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]);
 	for (size_t src = 0; src != source_size; ++ src)
-	  if (source[src].is_terminal())
+	  if (source[src].is_terminal()) {
+	    ++ norm;
 	    score += lexicon_source_target(source[src], target[trg]);
+	  }
 	
-	score_source_target += utils::mathop::log(score);
+	score_source_target += utils::mathop::log(score) - utils::mathop::log(double(norm));
       }
     
     double score_target_source = 0.0;
@@ -764,12 +767,15 @@ struct Lexicon
     for (size_t src = 0; src != source_size; ++ src)
       if (source[src].is_terminal()) {
 	
+	size_type norm = 1;
 	double score = lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]);
 	for (size_t trg = 0; trg != target_size; ++ trg)
-	  if (target[trg].is_terminal())
+	  if (target[trg].is_terminal()) {
+	    ++ norm;
 	    score += lexicon_target_source(target[trg], source[src]);
+	  }
 	
-	score_target_source += utils::mathop::log(score);
+	score_target_source += utils::mathop::log(score) - utils::mathop::log(double(norm));
       }
     
     return std::make_pair(score_source_target, score_target_source);
