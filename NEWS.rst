@@ -1,3 +1,7 @@
+2014-4-3
+--------
+- Bugfix (hopefully) for random memory corrption for word aligner.
+
 2014-3-11
 ---------
 - Bug fix for the latest clang and libc++.
