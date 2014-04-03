@@ -143,8 +143,6 @@ vector_map.hpp \
 vector_set.hpp \
 vector2.hpp \
 vector3.hpp \
-vector2_aligned.hpp \
-vector3_aligned.hpp \
 vertical_coded_device.hpp \
 vertical_coded_vector.hpp
 
