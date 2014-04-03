@@ -13,8 +13,8 @@
 #include "cicada/semiring/logprob.hpp"
 
 #include "utils/bithack.hpp"
-#include "utils/vector2_aligned.hpp"
-#include "utils/vector3_aligned.hpp"
+#include "utils/vector2.hpp"
+#include "utils/vector3.hpp"
 #include "utils/mathop.hpp"
 #include "utils/aligned_allocator.hpp"
 #include "utils/vector_set.hpp"
@@ -296,24 +296,24 @@ struct LearnModel4 : public LearnBase
     
     typedef cicada::semiring::Logprob<double> logprob_type;
     
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > matrix_swap_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > matrix_move_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > matrix_swap_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > matrix_move_type;
     
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > ttable_cache_type;
-    typedef utils::vector3_aligned<double, utils::aligned_allocator<double> > dtable_head_cache_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > dtable_others_cache_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > ntable_cache_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > ttable_cache_type;
+    typedef utils::vector3<double, utils::aligned_allocator<double> > dtable_head_cache_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > dtable_others_cache_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > ntable_cache_type;
 
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > move_score_type;
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > swap_score_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > move_score_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > swap_score_type;
 
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > distortion_cache_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > distortion_cache_type;
     
-    typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > posterior_type;
+    typedef utils::vector2<double, utils::aligned_allocator<double> > posterior_type;
     typedef std::vector<double, std::allocator<double> > posterior_accum_type;
     
     typedef std::vector<char, std::allocator<char> > modified_type;
-    typedef utils::vector2_aligned<char, std::allocator<char> > computed_swap_type;
+    typedef utils::vector2<char, std::allocator<char> > computed_swap_type;
 
     void assign(const sentence_type& source,
 		const sentence_type& target,
@@ -1627,7 +1627,7 @@ struct LearnModel4SymmetricPosterior : public LearnBase
   LearnModel4SymmetricPosterior(const LearnBase& __base)
     : LearnBase(__base) {}
 
-  typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
+  typedef utils::vector2<double, utils::aligned_allocator<double> > phi_set_type;
 
   // sampling learning... we will compute a set of alignemnt, and perform summation
   void sample(const sentence_type& source,

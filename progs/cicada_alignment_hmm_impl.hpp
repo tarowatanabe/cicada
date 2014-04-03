@@ -10,8 +10,8 @@
 
 #include "cicada_alignment_impl.hpp"
 
-#include "utils/vector2_aligned.hpp"
-#include "utils/vector3_aligned.hpp"
+#include "utils/vector2.hpp"
+#include "utils/vector3.hpp"
 #include "utils/mathop.hpp"
 #include "utils/aligned_allocator.hpp"
 
@@ -29,15 +29,15 @@ struct LearnHMM : public LearnBase
 
   struct HMMData
   {
-    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > forward_type;
-    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > backward_type;
+    typedef utils::vector2<prob_type, utils::aligned_allocator<prob_type> > forward_type;
+    typedef utils::vector2<prob_type, utils::aligned_allocator<prob_type> > backward_type;
     
-    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > emission_type;
-    typedef utils::vector3_aligned<prob_type, utils::aligned_allocator<prob_type> > transition_type;
+    typedef utils::vector2<prob_type, utils::aligned_allocator<prob_type> > emission_type;
+    typedef utils::vector3<prob_type, utils::aligned_allocator<prob_type> > transition_type;
     
     typedef std::vector<prob_type, utils::aligned_allocator<prob_type> > scale_type;
     
-    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > posterior_type;
+    typedef utils::vector2<prob_type, utils::aligned_allocator<prob_type> > posterior_type;
 
     typedef std::set<int, std::less<int>, std::allocator<int> > point_set_type;
     typedef std::vector<point_set_type, std::allocator<point_set_type> > point_map_type;
@@ -1093,7 +1093,7 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     : LearnBase(__base) {}
   
   typedef LearnHMM::hmm_data_type hmm_data_type;
-  typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
+  typedef utils::vector2<double, utils::aligned_allocator<double> > phi_set_type;
 
   void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
   {
@@ -1448,10 +1448,10 @@ struct ViterbiHMM : public ViterbiBase
     ViterbiBase::shrink();
   }
 
-  typedef utils::vector2_aligned<prob_type, std::allocator<prob_type> > forward_type;
+  typedef utils::vector2<prob_type, std::allocator<prob_type> > forward_type;
   typedef std::vector<prob_type, std::allocator<prob_type> >    scale_type;
   
-  typedef utils::vector2_aligned<index_type, std::allocator<index_type> > backptr_type;
+  typedef utils::vector2<index_type, std::allocator<index_type> > backptr_type;
   
   forward_type  forward;
   backptr_type  backptr;
@@ -1673,8 +1673,8 @@ struct ViterbiPosteriorHMM : public ViterbiBase
     ViterbiBase::shrink();
   }
   
-  typedef utils::vector2_aligned<prob_type, std::allocator<prob_type> > maximum_type;
-  typedef utils::vector2_aligned<index_type, std::allocator<index_type> > backptr_type;
+  typedef utils::vector2<prob_type, std::allocator<prob_type> > maximum_type;
+  typedef utils::vector2<index_type, std::allocator<index_type> > backptr_type;
   
   maximum_type  maximum;
   backptr_type  backptr;
