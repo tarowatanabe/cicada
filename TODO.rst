@@ -262,3 +262,6 @@ NCE for autoencoding
 
 Neural Network Alignment model
 - re-implement by summation and Viterbi approximation
+
+Update CG_DESCENT to 6.6
+- Very hard, since we need to tweak the code a lot.
