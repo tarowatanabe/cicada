@@ -16,26 +16,28 @@ void exit_with_help()
 	"Usage: train [options] training_set_file [model_file]\n"
 	"options:\n"
 	"-s type : set type of solver (default 1)\n"
+	"  for multi-class classification\n"
 	"	 0 -- L2-regularized logistic regression (primal)\n"
-	"	 1 -- L2-regularized L2-loss support vector classification (dual)\n"	
+	"	 1 -- L2-regularized L2-loss support vector classification (dual)\n"
 	"	 2 -- L2-regularized L2-loss support vector classification (primal)\n"
 	"	 3 -- L2-regularized L1-loss support vector classification (dual)\n"
-	"	 4 -- multi-class support vector classification by Crammer and Singer\n"
+	"	 4 -- support vector classification by Crammer and Singer\n"
 	"	 5 -- L1-regularized L2-loss support vector classification\n"
 	"	 6 -- L1-regularized logistic regression\n"
 	"	 7 -- L2-regularized logistic regression (dual)\n"
-	"	11 -- L2-regularized L2-loss epsilon support vector regression (primal)\n"
-	"	12 -- L2-regularized L2-loss epsilon support vector regression (dual)\n"
-	"	13 -- L2-regularized L1-loss epsilon support vector regression (dual)\n"
+	"  for regression\n"
+	"	11 -- L2-regularized L2-loss support vector regression (primal)\n"
+	"	12 -- L2-regularized L2-loss support vector regression (dual)\n"
+	"	13 -- L2-regularized L1-loss support vector regression (dual)\n"
 	"-c cost : set the parameter C (default 1)\n"
-	"-p epsilon : set the epsilon in loss function of epsilon-SVR (default 0.1)\n"
+	"-p epsilon : set the epsilon in loss function of SVR (default 0.1)\n"
 	"-e epsilon : set tolerance of termination criterion\n"
-	"	-s 0 and 2\n" 
-	"		|f'(w)|_2 <= eps*min(pos,neg)/l*|f'(w0)|_2,\n" 
-	"		where f is the primal function and pos/neg are # of\n" 
+	"	-s 0 and 2\n"
+	"		|f'(w)|_2 <= eps*min(pos,neg)/l*|f'(w0)|_2,\n"
+	"		where f is the primal function and pos/neg are # of\n"
 	"		positive/negative data (default 0.01)\n"
 	"	-s 11\n"
-	"		|f'(w)|_2 <= eps*|f'(w0)|_2 (default 0.001)\n" 
+	"		|f'(w)|_2 <= eps*|f'(w0)|_2 (default 0.001)\n"
 	"	-s 1, 3, 4, and 7\n"
 	"		Dual maximal violation <= eps; similar to libsvm (default 0.1)\n"
 	"	-s 5 and 6\n"
@@ -64,7 +66,7 @@ static int max_line_len;
 static char* readline(FILE *input)
 {
 	int len;
-	
+
 	if(fgets(line,max_line_len,input) == NULL)
 		return NULL;
 
@@ -139,26 +141,26 @@ void do_cross_validation()
 	double *target = Malloc(double, prob.l);
 
 	cross_validation(&prob,&param,nr_fold,target);
-	if(param.solver_type == L2R_L2LOSS_SVR || 
-	   param.solver_type == L2R_L1LOSS_SVR_DUAL || 
+	if(param.solver_type == L2R_L2LOSS_SVR ||
+	   param.solver_type == L2R_L1LOSS_SVR_DUAL ||
 	   param.solver_type == L2R_L2LOSS_SVR_DUAL)
 	{
 		for(i=0;i<prob.l;i++)
-                {
-                        double y = prob.y[i];
-                        double v = target[i];
-                        total_error += (v-y)*(v-y);
-                        sumv += v;
-                        sumy += y;
-                        sumvv += v*v;
-                        sumyy += y*y;
-                        sumvy += v*y;
-                }
-                printf("Cross Validation Mean squared error = %g\n",total_error/prob.l);
-                printf("Cross Validation Squared correlation coefficient = %g\n",
-                        ((prob.l*sumvy-sumv*sumy)*(prob.l*sumvy-sumv*sumy))/
-                        ((prob.l*sumvv-sumv*sumv)*(prob.l*sumyy-sumy*sumy))
-                        );
+		{
+			double y = prob.y[i];
+			double v = target[i];
+			total_error += (v-y)*(v-y);
+			sumv += v;
+			sumy += y;
+			sumvv += v*v;
+			sumyy += y*y;
+			sumvy += v*y;
+		}
+		printf("Cross Validation Mean squared error = %g\n",total_error/prob.l);
+		printf("Cross Validation Squared correlation coefficient = %g\n",
+				((prob.l*sumvy-sumv*sumy)*(prob.l*sumvy-sumv*sumy))/
+				((prob.l*sumvv-sumv*sumv)*(prob.l*sumyy-sumy*sumy))
+			  );
 	}
 	else
 	{
@@ -269,20 +271,20 @@ void parse_command_line(int argc, char **argv, char *input_file_name, char *mode
 	{
 		switch(param.solver_type)
 		{
-			case L2R_LR: 
+			case L2R_LR:
 			case L2R_L2LOSS_SVC:
 				param.eps = 0.01;
 				break;
 			case L2R_L2LOSS_SVR:
 				param.eps = 0.001;
 				break;
-			case L2R_L2LOSS_SVC_DUAL: 
-			case L2R_L1LOSS_SVC_DUAL: 
-			case MCSVM_CS: 
-			case L2R_LR_DUAL: 
+			case L2R_L2LOSS_SVC_DUAL:
+			case L2R_L1LOSS_SVC_DUAL:
+			case MCSVM_CS:
+			case L2R_LR_DUAL:
 				param.eps = 0.1;
 				break;
-			case L1R_L2LOSS_SVC: 
+			case L1R_L2LOSS_SVC:
 			case L1R_LR:
 				param.eps = 0.01;
 				break;
@@ -387,7 +389,7 @@ void read_problem(const char *filename)
 	{
 		prob.n=max_index+1;
 		for(i=1;i<prob.l;i++)
-			(prob.x[i]-2)->index = prob.n; 
+			(prob.x[i]-2)->index = prob.n;
 		x_space[j-2].index = prob.n;
 	}
 	else
