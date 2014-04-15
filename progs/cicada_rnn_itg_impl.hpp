@@ -33,6 +33,7 @@
 #include "cicada/vocab.hpp"
 #include "cicada/alignment.hpp"
 #include "cicada/bitext.hpp"
+#include "cicada/semiring/logprob.hpp"
 
 #include "utils/alloc_vector.hpp"
 #include "utils/lexical_cast.hpp"
@@ -2336,6 +2337,7 @@ struct ITG
 		  gradient_type& gradient,
 		  Gen& gen)
   {
+    typedef cicada::semiring::Logprob<double> weight_type;
     typedef Eigen::Map<tensor_type> matrix_type;
     
 #if 0
@@ -2371,31 +2373,39 @@ struct ITG
     
     state_set_type::const_iterator miter_begin = states_mistake.begin();
     state_set_type::const_iterator miter_end   = states_mistake.end();
-        
-    size_type num_loss   = 0;
-    size_type num_errors = 0;
+    
+    // no errors!
+    if (citer_begin == citer_end || miter_begin == miter_end) return 0.0;
+    
+    weight_type Z_correct;
+    weight_type Z_mistake;
+    size_type num_mistake = 0;
+    
     for (state_set_type::const_iterator miter = miter_begin; miter != miter_end; ++ miter)
       if ((*miter)->error_ > 0) {
-	for (state_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) 
-	  num_loss += double((*miter)->error_) - ((*citer)->score_ - (*miter)->score_) > 0.0;
-	
-	++ num_errors;
+	Z_mistake += cicada::semiring::traits<weight_type>::exp((*miter)->score_);
+	++ num_mistake;
       }
     
-    if (num_loss == 0)
-      return 0.0;
+    if (! num_mistake) return 0.0;
     
-    //const double error_factor = 1.0 / (num_errors * (citer_end - citer_begin));
-    const double error_factor = 1.0 / num_loss;
-    
+    for (state_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) 
+      Z_correct += cicada::semiring::traits<weight_type>::exp((*citer)->score_);
+
+    bool found = false;
     double loss = 0.0;
     
     for (state_set_type::const_iterator miter = miter_begin; miter != miter_end; ++ miter)
       if ((*miter)->error_ > 0)
 	for (state_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
-	  const double error = std::max(double((*miter)->error_) - ((*citer)->score_ - (*miter)->score_), 0.0) * error_factor;
+	  const double error = std::max(double((*miter)->error_) - ((*citer)->score_ - (*miter)->score_), 0.0);
 	  
 	  if (error == 0.0) continue;
+	  
+	  const weight_type prob_correct = cicada::semiring::traits<weight_type>::exp((*citer)->score_) / Z_correct;
+	  const weight_type prob_mistake = cicada::semiring::traits<weight_type>::exp((*miter)->score_) / Z_mistake;
+	  
+	  const double error_factor = prob_correct * prob_mistake;
 	  
 	  backwards_[length_max].insert(*citer);
 	  backwards_[length_max].insert(*miter);
@@ -2408,8 +2418,11 @@ struct ITG
 	  if (! (*miter)->delta_.rows())
 	    const_cast<state_type&>(*(*miter)).delta_ = tensor_type::Zero(hidden_size, 1);
 	  
-	  loss += error;
+	  loss += error * error_factor;
+	  found = true;
 	}
+    
+    if (! found) return 0.0;
     
     //std::cerr << "loss: " << loss << std::endl;
     
@@ -2594,6 +2607,8 @@ struct LearnAdaGrad
     typedef gradient_type::embedding_type gradient_embedding_type;
 
     if (! gradient.count_) return;
+
+    LearnAdaGrad& optimizer = const_cast<LearnAdaGrad&>(*this);
     
     const double scale = 1.0 / gradient.count_;
 
@@ -2601,7 +2616,7 @@ struct LearnAdaGrad
     for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
       update(siter->first,
 	     theta.source_,
-	     const_cast<tensor_type&>(source_),
+	     optimizer.source_,
 	     siter->second,
 	     scale);
     
@@ -2609,21 +2624,21 @@ struct LearnAdaGrad
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first,
 	     theta.target_,
-	     const_cast<tensor_type&>(target_),
+	     optimizer.target_,
 	     titer->second,
 	     scale);
 
-    update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
-    update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
+    update(theta.Wc_, optimizer.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, optimizer.bc_, gradient.bc_, scale, false);
     
-    update(theta.Ws_, const_cast<tensor_type&>(Ws_), gradient.Ws_, scale, lambda_ != 0.0);
-    update(theta.bs_, const_cast<tensor_type&>(bs_), gradient.bs_, scale, false);
+    update(theta.Ws_, optimizer.Ws_, gradient.Ws_, scale, lambda_ != 0.0);
+    update(theta.bs_, optimizer.bs_, gradient.bs_, scale, false);
 
-    update(theta.Wi_, const_cast<tensor_type&>(Wi_), gradient.Wi_, scale, lambda_ != 0.0);
-    update(theta.bi_, const_cast<tensor_type&>(bi_), gradient.bi_, scale, false);
+    update(theta.Wi_, optimizer.Wi_, gradient.Wi_, scale, lambda_ != 0.0);
+    update(theta.bi_, optimizer.bi_, gradient.bi_, scale, false);
     
-    update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
-    update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
+    update(theta.Wt_, optimizer.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
+    update(theta.bt_, optimizer.bt_, gradient.bt_, scale, false);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -2804,6 +2819,8 @@ struct LearnAdaDelta
     typedef gradient_type::embedding_type gradient_embedding_type;
 
     if (! gradient.count_) return;
+
+    LearnAdaDelta& optimizer = const_cast<LearnAdaDelta&>(*this);
     
     const double scale = 1.0 / gradient.count_;
 
@@ -2811,8 +2828,8 @@ struct LearnAdaDelta
     for (gradient_embedding_type::const_iterator siter = gradient.source_.begin(); siter != siter_end; ++ siter)
       update(siter->first,
 	     theta.source_,
-	     const_cast<tensor_type&>(gsource_),
-	     const_cast<tensor_type&>(xsource_),
+	     optimizer.gsource_,
+	     optimizer.xsource_,
 	     siter->second,
 	     scale);
     
@@ -2820,22 +2837,22 @@ struct LearnAdaDelta
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
       update(titer->first,
 	     theta.target_,
-	     const_cast<tensor_type&>(gtarget_),
-	     const_cast<tensor_type&>(xtarget_),
+	     optimizer.gtarget_,
+	     optimizer.xtarget_,
 	     titer->second,
 	     scale);
 
-    update(theta.Wc_, const_cast<tensor_type&>(gWc_), const_cast<tensor_type&>(xWc_), gradient.Wc_, scale, lambda_ != 0.0);
-    update(theta.bc_, const_cast<tensor_type&>(gbc_), const_cast<tensor_type&>(xbc_), gradient.bc_, scale, false);
+    update(theta.Wc_, optimizer.gWc_, optimizer.xWc_, gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, optimizer.gbc_, optimizer.xbc_, gradient.bc_, scale, false);
     
-    update(theta.Ws_, const_cast<tensor_type&>(gWs_), const_cast<tensor_type&>(xWs_), gradient.Ws_, scale, lambda_ != 0.0);
-    update(theta.bs_, const_cast<tensor_type&>(gbs_), const_cast<tensor_type&>(xbs_), gradient.bs_, scale, false);
+    update(theta.Ws_, optimizer.gWs_, optimizer.xWs_, gradient.Ws_, scale, lambda_ != 0.0);
+    update(theta.bs_, optimizer.gbs_, optimizer.xbs_, gradient.bs_, scale, false);
 
-    update(theta.Wi_, const_cast<tensor_type&>(gWi_), const_cast<tensor_type&>(xWi_), gradient.Wi_, scale, lambda_ != 0.0);
-    update(theta.bi_, const_cast<tensor_type&>(gbi_), const_cast<tensor_type&>(xbi_), gradient.bi_, scale, false);
+    update(theta.Wi_, optimizer.gWi_, optimizer.xWi_, gradient.Wi_, scale, lambda_ != 0.0);
+    update(theta.bi_, optimizer.gbi_, optimizer.xbi_, gradient.bi_, scale, false);
     
-    update(theta.Wt_, const_cast<tensor_type&>(gWt_), const_cast<tensor_type&>(xWt_), gradient.Wt_, scale, lambda_ != 0.0);
-    update(theta.bt_, const_cast<tensor_type&>(gbt_), const_cast<tensor_type&>(xbt_), gradient.bt_, scale, false);
+    update(theta.Wt_, optimizer.gWt_, optimizer.xWt_, gradient.Wt_, scale, lambda_ != 0.0);
+    update(theta.bt_, optimizer.gbt_, optimizer.xbt_, gradient.bt_, scale, false);
   }
 
   template <typename Theta, typename GradVar, typename XVar, typename Grad>
