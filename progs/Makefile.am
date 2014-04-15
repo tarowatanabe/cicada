@@ -117,8 +117,6 @@ bin_PROGRAMS = \
 	cicada_mert_kbest_mpi \
 	cicada_nn_alignment \
 	cicada_nn_alignment_mpi \
-	cicada_nn_joint_alignment \
-	cicada_nn_joint_alignment_mpi \
 	cicada_nn_ngram \
 	cicada_nn_ngram_mpi \
 	cicada_oracle \
@@ -131,8 +129,6 @@ bin_PROGRAMS = \
 	cicada_rnn_bow_itg_mpi \
 	cicada_rnn_itg \
 	cicada_rnn_itg_mpi \
-	cicada_rnn_joint_alignment \
-	cicada_rnn_joint_alignment_mpi \
 	cicada_rnn_ngram \
 	cicada_rnn_ngram_mpi \
 	cicada_rnn_sentence \
@@ -509,13 +505,6 @@ cicada_nn_alignment_mpi_SOURCES  = cicada_nn_alignment_mpi.cpp cicada_nn_alignme
 cicada_nn_alignment_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_nn_alignment_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_nn_joint_alignment_SOURCES = cicada_nn_joint_alignment.cpp cicada_nn_joint_alignment_impl.hpp
-cicada_nn_joint_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_nn_joint_alignment_mpi_SOURCES  = cicada_nn_joint_alignment_mpi.cpp cicada_nn_joint_alignment_impl.hpp
-cicada_nn_joint_alignment_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_nn_joint_alignment_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
-
 cicada_nn_ngram_SOURCES = cicada_nn_ngram.cpp cicada_nn_ngram_impl.hpp
 cicada_nn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
@@ -543,13 +532,6 @@ cicada_rnn_itg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(p
 cicada_rnn_itg_mpi_SOURCES  = cicada_rnn_itg_mpi.cpp cicada_rnn_itg_impl.hpp
 cicada_rnn_itg_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_rnn_itg_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_rnn_joint_alignment_SOURCES = cicada_rnn_joint_alignment.cpp cicada_rnn_joint_alignment_impl.hpp
-cicada_rnn_joint_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_rnn_joint_alignment_mpi_SOURCES  = cicada_rnn_joint_alignment_mpi.cpp cicada_rnn_joint_alignment_impl.hpp
-cicada_rnn_joint_alignment_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_rnn_joint_alignment_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_rnn_ngram_SOURCES = cicada_rnn_ngram.cpp cicada_rnn_ngram_impl.hpp
 cicada_rnn_ngram_LDADD   = $(LIBCICADA) $(LIBUTILS) $(LIBCODEC) $(boost_LDADD) $(perftools_LDADD)

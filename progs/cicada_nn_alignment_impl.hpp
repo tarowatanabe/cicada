@@ -33,6 +33,7 @@
 #include "utils/mathop.hpp"
 #include "utils/unordered_map.hpp"
 #include "utils/repository.hpp"
+#include "utils/random_seed.hpp"
 #include "utils/compress_stream.hpp"
 
 #include "codec/lz4.hpp"
@@ -85,14 +86,16 @@ struct Gradient
 			       boost::hash<word_type>, std::equal_to<word_type>,
 			       std::allocator<std::pair<const word_type, tensor_type> > >::type embedding_type;
   
-  Gradient() : embedding_(0), window_(0), count_(0), shared_(0) {}
+  Gradient() : embedding_(0), hidden_(0), window_(0), count_(0), shared_(0) {}
   Gradient(const size_type& embedding,
+	   const size_type& hidden,
 	   const size_type& window) 
     : embedding_(embedding),
+      hidden_(hidden),
       window_(window),
       count_(0),
       shared_(0)
-  { initialize(embedding, window); }
+  { initialize(embedding, hidden, window); }
   
   Gradient& operator-=(const Gradient& x)
   {
@@ -120,9 +123,17 @@ struct Gradient
       Wt_ = tensor_type::Zero(x.Wt_.rows(), x.Wt_.cols());
     if (! bt_.rows())
       bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
+
+    if (! Wc_.rows())
+      Wc_ = tensor_type::Zero(x.Wc_.rows(), x.Wc_.cols());
+    if (! bc_.rows())
+      bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
     
     Wt_ -= x.Wt_;
     bt_ -= x.bt_;
+
+    Wc_ -= x.Wc_;
+    bc_ -= x.bc_;
 
     count_ -= x.count_;
 
@@ -156,8 +167,16 @@ struct Gradient
     if (! bt_.rows())
       bt_ = tensor_type::Zero(x.bt_.rows(), x.bt_.cols());
 
+    if (! Wc_.rows())
+      Wc_ = tensor_type::Zero(x.Wc_.rows(), x.Wc_.cols());
+    if (! bc_.rows())
+      bc_ = tensor_type::Zero(x.bc_.rows(), x.bc_.cols());
+
     Wt_ += x.Wt_;
     bt_ += x.bt_;
+
+    Wc_ += x.Wc_;
+    bc_ += x.bc_;
     
     count_ += x.count_;
 
@@ -173,9 +192,13 @@ struct Gradient
     Wt_.setZero();
     bt_.setZero();
 
+    Wc_.setZero();
+    bc_.setZero();
+    
     count_ = 0;
     shared_ = 0;
   }
+
   
   tensor_type& source(const word_type& word)
   {
@@ -190,32 +213,36 @@ struct Gradient
   {
     tensor_type& embedding = target_[word];
     if (! embedding.cols())
-      embedding = tensor_type::Zero(embedding_ + 1, 1);
+      embedding = tensor_type::Zero(embedding_, 1);
     
     return embedding;
   }
 
   
-  void initialize(const size_type embedding, const size_type window)
+  void initialize(const size_type embedding, const size_type hidden, const size_type window)
   {
     if (embedding <= 0)
       throw std::runtime_error("invalid dimension");
     
     embedding_ = embedding;
+    hidden_    = hidden;
     window_    = window;
     
     clear();
     
-    const size_type state_size = embedding * (window * 2 + 1);
+    const size_type state_size = embedding * (window * 2 + 1) * 2;
     
     // initialize...
-    Wt_ = tensor_type::Zero(embedding_, state_size);
-    bt_ = tensor_type::Zero(embedding_, 1);
-
+    Wt_ = tensor_type::Zero(hidden_, state_size);
+    bt_ = tensor_type::Zero(hidden_, 1);
+    
+    Wc_ = tensor_type::Zero(1, hidden_);
+    bc_ = tensor_type::Zero(1, 1);
+    
     count_ = 0;
     shared_ = 0;
   }
-  
+ 
 public:
   void increment()
   {
@@ -230,6 +257,7 @@ public:
   }
 
 public:
+  
   typedef std::vector<char, std::allocator<char> > buffer_type;
 
   buffer_type buffer_;
@@ -277,14 +305,18 @@ private:
   void write(std::ostream& os) const
   {
     os.write((char*) &embedding_, sizeof(size_type));
+    os.write((char*) &hidden_,    sizeof(size_type));
     os.write((char*) &window_,    sizeof(size_type));
     os.write((char*) &count_,     sizeof(size_type));
     
     write(os, Wt_);
     write(os, bt_);
+
+    write(os, Wc_);
+    write(os, bc_);
     
-    write(os, source_, false);
-    write(os, target_, true);
+    write(os, source_);
+    write(os, target_);
   }
   
   void read(std::istream& is)
@@ -292,17 +324,21 @@ private:
     clear();
     
     is.read((char*) &embedding_, sizeof(size_type));
+    is.read((char*) &hidden_,    sizeof(size_type));
     is.read((char*) &window_,    sizeof(size_type));
     is.read((char*) &count_,     sizeof(size_type));
     
     read(is, Wt_);
     read(is, bt_);
+
+    read(is, Wc_);
+    read(is, bc_);
     
-    read(is, source_, false);
-    read(is, target_, true);
+    read(is, source_);
+    read(is, target_);
   }
 
-  void write(std::ostream& os, const embedding_type& embedding, const bool bias_last) const
+  void write(std::ostream& os, const embedding_type& embedding) const
   {
     const size_type size = embedding.size();
     
@@ -318,7 +354,7 @@ private:
     }
   }
 
-  void read(std::istream& is, embedding_type& embedding, const bool bias_last)
+  void read(std::istream& is, embedding_type& embedding)
   {
     buffer_type& buffer = const_cast<buffer_type&>(buffer_);
     
@@ -337,7 +373,7 @@ private:
       
       tensor_type& matrix = embedding[word_type(buffer.begin(), buffer.end())];
       
-      matrix.resize(embedding_ + bias_last, 1);
+      matrix.resize(embedding_, 1);
       
       is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * matrix.rows());
     }
@@ -366,10 +402,11 @@ private:
     
     is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
   }
-  
+
 public:
   // dimension...
   size_type embedding_;
+  size_type hidden_;
   size_type window_;
   
   // embedding
@@ -378,6 +415,9 @@ public:
   
   tensor_type Wt_;
   tensor_type bt_;
+
+  tensor_type Wc_;
+  tensor_type bc_;
   
   size_type count_;
   size_type shared_;
@@ -403,8 +443,8 @@ struct Embedding
     
     const size_type vocabulary_size = word_type::allocated();
     
-    source_ = tensor_type::Zero(embedding_    , vocabulary_size);
-    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size);
+    source_ = tensor_type::Zero(embedding_, vocabulary_size);
+    target_ = tensor_type::Zero(embedding_, vocabulary_size);
   }
 
   template <typename Model>
@@ -450,17 +490,19 @@ struct Model
 
   typedef std::vector<bool, std::allocator<bool> > word_unique_type;
   
-  Model() : embedding_(0), window_(0), scale_(1) {}  
+  Model() : embedding_(0), hidden_(0), window_(0), scale_(1) {}  
   template <typename Words, typename Gen>
   Model(const size_type& embedding,
+	const size_type& hidden,
 	const size_type& window,
 	Words& words_source,
 	Words& words_target,
 	Gen& gen) 
     : embedding_(embedding),
+      hidden_(hidden),
       window_(window),
       scale_(1)
-  { initialize(embedding, window, words_source, words_target, gen); }
+  { initialize(embedding, hidden, window, words_source, words_target, gen); }
   
   void clear()
   {
@@ -470,7 +512,10 @@ struct Model
     
     Wt_.setZero();
     bt_.setZero();
-        
+
+    Wc_.setZero();
+    bc_.setZero();
+    
     scale_ = 1.0;
   }
   
@@ -492,6 +537,7 @@ struct Model
   
   template <typename Words, typename Gen>
   void initialize(const size_type embedding,
+		  const size_type hidden,
 		  const size_type window,
 		  Words& words_source,
 		  Words& words_target,
@@ -501,15 +547,17 @@ struct Model
       throw std::runtime_error("invalid dimension");
     
     embedding_ = embedding;
+    hidden_    = hidden;
     window_    = window;
     
     clear();
     
     const size_type vocabulary_size = word_type::allocated();
-    const size_type state_size = embedding_ * (window * 2 + 1);
+    const size_type state_size = embedding_ * (window * 2 + 1) * 2;
     
     const double range_e = std::sqrt(6.0 / (embedding_ + 1));
-    const double range_t = std::sqrt(6.0 / (embedding_ + state_size));
+    const double range_t = std::sqrt(6.0 / (hidden_ + state_size));
+    const double range_c = std::sqrt(6.0 / (1 + hidden_));
 
     words_source_.clear();
     words_target_.clear();
@@ -528,13 +576,15 @@ struct Model
     for (typename Words::const_iterator titer = words_target.begin(); titer != words_target.end(); ++ titer)
       words_target_[titer->id()] = true;
  
-    source_ = tensor_type::Zero(embedding_,     vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
-    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
-    target_.row(embedding_).setZero();
+    source_ = tensor_type::Zero(embedding_, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
+    target_ = tensor_type::Zero(embedding_, vocabulary_size).array().unaryExpr(randomize<Gen>(gen, range_e));
     
-    Wt_ = tensor_type::Zero(embedding_, state_size).array().unaryExpr(randomize<Gen>(gen, range_t));
-    bt_ = tensor_type::Zero(embedding_, 1);
+    Wt_ = tensor_type::Zero(hidden_, state_size).array().unaryExpr(randomize<Gen>(gen, range_t));
+    bt_ = tensor_type::Zero(hidden_, 1);
 
+    Wc_ = tensor_type::Zero(1, hidden_).array().unaryExpr(randomize<Gen>(gen, range_c));
+    bc_ = tensor_type::Zero(1, 1);
+    
     scale_ = 1.0;
   }
   
@@ -547,7 +597,7 @@ struct Model
 
     scale_ = 1.0;    
   }
-  
+
   Model& operator+=(const Model& x)
   {
     if (scale_ != x.scale_)
@@ -559,6 +609,9 @@ struct Model
     Wt_ += x.Wt_;
     bt_ += x.bt_;
     
+    Wc_ += x.Wc_;
+    bc_ += x.bc_;
+    
     return *this;
   }
 
@@ -569,10 +622,13 @@ struct Model
     
     Wt_ *= x;
     bt_ *= x;
+
+    Wc_ *= x;
+    bc_ *= x;
     
     return *this;
   }
-
+  
   struct real_policy : boost::spirit::karma::real_policies<parameter_type>
   {
     static unsigned int precision(parameter_type)
@@ -686,6 +742,7 @@ struct Model
     repository_type rep(path, repository_type::write);
     
     rep["embedding"] = utils::lexical_cast<std::string>(embedding_);
+    rep["hidden"]    = utils::lexical_cast<std::string>(hidden_);
     rep["window"]    = utils::lexical_cast<std::string>(window_);
     rep["scale"]     = utils::lexical_cast<std::string>(scale_);
     
@@ -694,9 +751,11 @@ struct Model
     
     write(rep.path("Wt.txt.gz"), rep.path("Wt.bin"), Wt_);
     write(rep.path("bt.txt.gz"), rep.path("bt.bin"), bt_);
+
+    write(rep.path("Wc.txt.gz"), rep.path("Wc.bin"), Wc_);
+    write(rep.path("bc.txt.gz"), rep.path("bc.bin"), bc_);
   }
   
-private:
   void write_embedding(const path_type& path_text,
 		       const path_type& path_binary,
 		       const path_type& path_vocab,
@@ -752,7 +811,7 @@ private:
       os.write((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
     }
   }
-
+  
 public:
   typedef std::vector<char, std::allocator<char> > buffer_type;
 
@@ -801,14 +860,18 @@ private:
   void write(std::ostream& os) const
   {
     os.write((char*) &embedding_, sizeof(size_type));
+    os.write((char*) &hidden_,    sizeof(size_type));
     os.write((char*) &window_,    sizeof(size_type));
     os.write((char*) &scale_,     sizeof(double));
     
     write(os, Wt_);
     write(os, bt_);
+
+    write(os, Wc_);
+    write(os, bc_);
     
-    write_embedding(os, source_, false);
-    write_embedding(os, target_, true);
+    write_embedding(os, source_);
+    write_embedding(os, target_);
   }
 
   void read(std::istream& is)
@@ -816,19 +879,23 @@ private:
     clear();
     
     is.read((char*) &embedding_, sizeof(size_type));
+    is.read((char*) &hidden_,    sizeof(size_type));
     is.read((char*) &window_,    sizeof(size_type));
     is.read((char*) &scale_,     sizeof(double));
 
     read(is, Wt_);
     read(is, bt_);
-    
-    read_embedding(is, source_, false);
-    read_embedding(is, target_, true);
 
+    read(is, Wc_);
+    read(is, bc_);
+    
+    read_embedding(is, source_);
+    read_embedding(is, target_);
+    
     // checking...
   }
 
-  void write_embedding(std::ostream& os, const tensor_type& embedding, const bool bias_last) const
+  void write_embedding(std::ostream& os, const tensor_type& embedding) const
   {
     const size_type rows = embedding.rows();
     const size_type cols = embedding.cols();
@@ -846,7 +913,7 @@ private:
     }
   }
 
-  void read_embedding(std::istream& is, tensor_type& embedding, const bool bias_last)
+  void read_embedding(std::istream& is, tensor_type& embedding)
   {
     buffer_type& buffer = const_cast<buffer_type&>(buffer_);
     
@@ -854,7 +921,7 @@ private:
     is.read((char*) &cols, sizeof(size_type));
     
     if (cols > embedding.cols())
-      embedding.conservativeResize(embedding_ + bias_last, cols);
+      embedding.conservativeResize(embedding_, cols);
     
     for (size_type i = 0; i != cols; ++ i) {
       size_type word_size = 0;
@@ -866,9 +933,9 @@ private:
       const word_type word(buffer.begin(), buffer.end());
 
       if (word.id() >= embedding.cols())
-	embedding.conservativeResize(embedding_ + bias_last, word.id() + 1);
+	embedding.conservativeResize(embedding_, word.id() + 1);
       
-      is.read((char*) embedding.col(word.id()).data(), sizeof(tensor_type::Scalar) * (embedding_ + bias_last));
+      is.read((char*) embedding.col(word.id()).data(), sizeof(tensor_type::Scalar) * (embedding_));
     }
   }
 
@@ -896,9 +963,10 @@ private:
     is.read((char*) matrix.data(), sizeof(tensor_type::Scalar) * rows * cols);
   }
 
-public:  
+public:
   // dimension...
   size_type embedding_;
+  size_type hidden_;
   size_type window_;
 
   word_unique_type words_source_;
@@ -911,6 +979,9 @@ public:
   tensor_type Wt_;
   tensor_type bt_;
 
+  tensor_type Wc_;
+  tensor_type bc_;
+  
   double scale_;
 };
 
@@ -971,7 +1042,7 @@ struct Dictionary
       prob_set_type probs;
       words_.reserve(word_probs.size());
       probs.reserve(word_probs.size());
-      
+
       word_prob_set_type::const_iterator witer_end = word_probs.end();
       for (word_prob_set_type::const_iterator witer = word_probs.begin(); witer != witer_end; ++ witer) {
 	words_.push_back(witer->first);
@@ -1076,7 +1147,7 @@ struct Lexicon
   typedef std::vector<parameter_type, std::allocator<parameter_type> > layer_type;
   typedef std::vector<double, std::allocator<double> > score_set_type;
 
-  typedef Average log_likelihood_type;
+  typedef Average loss_type;
   
   Lexicon(const dictionary_type& dict,
 	  const size_type samples)
@@ -1090,9 +1161,13 @@ struct Lexicon
   layer_type layer_input_;
   layer_type layer_hidden_;
   layer_type delta_hidden_;
-
+  
+  layer_type layer_input_sampled_;
+  layer_type layer_hidden_sampled_;
+  layer_type delta_hidden_sampled_;
+  
   score_set_type scores_;
-  score_set_type noises_;
+  score_set_type errors_;
   
   struct tanh
   {
@@ -1153,67 +1228,183 @@ struct Lexicon
   
   template <typename Embedding>
   void copy_embedding(const sentence_type& source,
-		      const difference_type pos,
+		      const sentence_type& target,
+		      const difference_type src,
+		      const difference_type trg,
 		      const model_type& theta,
 		      Eigen::MatrixBase<Embedding>& embedding)
   {
     const difference_type source_size    = source.size();
+    const difference_type target_size    = target.size();
     const difference_type window_size    = theta.window_;
     const difference_type embedding_size = theta.embedding_;
-    
-    if (pos == 0) {
+
+    const difference_type offset_source = 0;
+    const difference_type offset_target = embedding_size * (window_size * 2 + 1);
+
+    if (src == 0) {
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
-	embedding.block(embedding_size * i, 0, embedding_size, 1) = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
+	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1)
+	  = theta.source_.col(vocab_type::EPSILON.id()) * theta.scale_;
     } else {
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
 	const difference_type shift = i - window_size;
-	const word_type& word = (pos + shift <= 0
+	const word_type& word = (src + shift <= 0
 				 ? vocab_type::BOS
-				 : (pos + shift > source_size
+				 : (src + shift > source_size
 				    ? vocab_type::EOS
-				    : source[pos + shift - 1]));
+				    : source[src + shift - 1]));
 	
-	embedding.block(embedding_size * i, 0, embedding_size, 1) = theta.source_.col(word.id()) * theta.scale_;
+	embedding.block(offset_source + embedding_size * i, 0, embedding_size, 1)
+	  = theta.source_.col(word.id()) * theta.scale_;
+      }
+    }
+    
+    if (trg == 0) {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
+	embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1)
+	  = theta.target_.col(vocab_type::EPSILON.id()) * theta.scale_;
+    } else {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	const difference_type shift = i - window_size;
+	const word_type& word = (trg + shift <= 0
+				 ? vocab_type::BOS
+				 : (trg + shift > target_size
+				    ? vocab_type::EOS
+				    : target[trg + shift - 1]));
+	
+	embedding.block(offset_target + embedding_size * i, 0, embedding_size, 1)
+	  = theta.target_.col(word.id()) * theta.scale_;
+      }
+    }
+  }
+  
+  template <typename Embedding>
+  void propagate_embedding(const sentence_type& source,
+			   const sentence_type& target,
+			   const difference_type src,
+			   const difference_type trg,
+			   const model_type& theta,
+			   gradient_type& gradient,
+			   const Eigen::MatrixBase<Embedding>& delta)
+  {
+    const difference_type source_size    = source.size();
+    const difference_type target_size    = target.size();
+    
+    const difference_type embedding_size = theta.embedding_;
+    const difference_type hidden_size    = theta.hidden_;
+    const difference_type window_size    = theta.window_;
+
+    const difference_type offset_source = 0;
+    const difference_type offset_target = embedding_size * (window_size * 2 + 1);
+    
+    if (src == 0) {
+      tensor_type& dembedding = gradient.source(vocab_type::EPSILON.id());
+      
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
+	dembedding
+	  += theta.Wt_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
+    } else {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	const difference_type shift = i - window_size;
+	const word_type& word = (src + shift <= 0
+				 ? vocab_type::BOS
+				 : (src + shift > source_size
+				    ? vocab_type::EOS
+				    : source[src + shift - 1]));
+	gradient.source(word.id())
+	  += theta.Wt_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
+      }
+    }
+    
+    if (trg == 0) {
+      tensor_type& dembedding = gradient.target(vocab_type::EPSILON.id());
+      
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
+	dembedding
+	  += theta.Wt_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
+    } else {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	const difference_type shift = i - window_size;
+	const word_type& word = (trg + shift <= 0
+				 ? vocab_type::BOS
+				 : (trg + shift > target_size
+				    ? vocab_type::EOS
+				    : target[trg + shift - 1]));
+	gradient.target(word.id())
+	  += theta.Wt_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
       }
     }
   }
 
   template <typename Embedding>
   void propagate_embedding(const sentence_type& source,
-			   const difference_type pos,
+			   const sentence_type& target,
+			   const difference_type src,
+			   const difference_type trg,
+			   const word_type& sampled,
 			   const model_type& theta,
 			   gradient_type& gradient,
 			   const Eigen::MatrixBase<Embedding>& delta)
   {
     const difference_type source_size    = source.size();
-    const difference_type window_size    = theta.window_;
-    const difference_type embedding_size = theta.embedding_;
+    const difference_type target_size    = target.size();
     
-    if (pos == 0) {
+    const difference_type embedding_size = theta.embedding_;
+    const difference_type hidden_size    = theta.hidden_;
+    const difference_type window_size    = theta.window_;
+
+    const difference_type offset_source = 0;
+    const difference_type offset_target = embedding_size * (window_size * 2 + 1);
+    
+    if (src == 0) {
       tensor_type& dembedding = gradient.source(vocab_type::EPSILON.id());
       
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
-	dembedding += theta.Wt_.block(0, i * embedding_size, embedding_size, embedding_size).transpose() * delta;
+	dembedding
+	  += theta.Wt_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
     } else {
       for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
 	const difference_type shift = i - window_size;
-	const word_type& word = (pos + shift <= 0
+	const word_type& word = (src + shift <= 0
 				 ? vocab_type::BOS
-				 : (pos + shift > source_size
+				 : (src + shift > source_size
 				    ? vocab_type::EOS
-				    : source[pos + shift - 1]));
-	gradient.source(word.id()) += theta.Wt_.block(0, i * embedding_size, embedding_size, embedding_size).transpose() * delta;
+				    : source[src + shift - 1]));
+	gradient.source(word.id())
+	  += theta.Wt_.block(0, offset_source + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
+      }
+    }
+    
+    if (trg == 0) {
+      tensor_type& dembedding = gradient.target(vocab_type::EPSILON.id());
+      
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i)
+	dembedding
+	  += theta.Wt_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
+    } else {
+      for (difference_type i = 0; i != window_size * 2 + 1; ++ i) {
+	const difference_type shift = i - window_size;
+	const word_type& word = (i == window_size
+				 ? sampled
+				 : (trg + shift <= 0
+				    ? vocab_type::BOS
+				    : (trg + shift > target_size
+				       ? vocab_type::EOS
+				       : target[trg + shift - 1])));
+	gradient.target(word.id())
+	  += theta.Wt_.block(0, offset_target + i * embedding_size, hidden_size, embedding_size).transpose() * delta;
       }
     }
   }
   
   template <typename Generator>
-  log_likelihood_type learn(const sentence_type& source,
-			    const sentence_type& target,
-			    const model_type& theta,
-			    gradient_type& gradient,
-			    alignment_type& alignment,
-			    Generator& gen)
+  loss_type learn(const sentence_type& source,
+		  const sentence_type& target,
+		  const model_type& theta,
+		  gradient_type& gradient,
+		  alignment_type& alignment,
+		  Generator& gen)
   {
     typedef Eigen::Map<tensor_type> matrix_type;
     
@@ -1221,27 +1412,26 @@ struct Lexicon
     const size_type target_size = target.size();
     
     const size_type embedding_size = theta.embedding_;
+    const size_type hidden_size    = theta.hidden_;
     const size_type window_size    = theta.window_;
     
-    const size_type state_size = embedding_size * (window_size * 2 + 1);
+    const size_type state_size = embedding_size * (window_size * 2 + 1) * 2;
     
-    log_likelihood_type log_likelihood;
+    const size_type offset_source = 0;
+    const size_type offset_target = embedding_size * (window_size * 2 + 1);
+
+    loss_type loss;
     
     alignment.clear();
     
     // construct source-side input and hidden layers
     layer_input_.resize((source_size + 1) * state_size);
-    layer_hidden_.resize((source_size + 1) * embedding_size);
-    delta_hidden_.resize((source_size + 1) * embedding_size);
-    
-    for (size_type src = 0; src <= source_size; ++ src) {
-      matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-      matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
-      
-      copy_embedding(source, src, theta, embedding);
-      
-      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
-    }
+    layer_hidden_.resize((source_size + 1) * hidden_size);
+    delta_hidden_.resize((source_size + 1) * hidden_size);
+
+    layer_input_sampled_.resize((source_size + 1) * state_size);
+    layer_hidden_sampled_.resize((source_size + 1) * hidden_size);
+    delta_hidden_sampled_.resize((source_size + 1) * hidden_size);
     
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     
@@ -1252,28 +1442,24 @@ struct Lexicon
       size_type align_best = 0;
       double    score_best = - std::numeric_limits<double>::infinity();
       
-      double score_sum = - std::numeric_limits<double>::infinity();
-      double noise_sum = - std::numeric_limits<double>::infinity();
-
       scores_.clear();
-      noises_.clear();
+
+      errors_.clear();
+      errors_.resize(source_size + 1, 0.0);
       
       for (size_type src = 0; src <= source_size; ++ src) {
 	const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
 	
-	const matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
+	matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
+	matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
 	
-	const double score = ((theta.target_.col(word_target.id()).block(0, 0, embedding_size, 1).transpose()
-			       * hidden
-			       * theta.scale_)
-			      + theta.target_.col(word_target.id()).block(embedding_size, 0, 1, 1))(0, 0);
-	const double noise = log_samples_ + dict_.logprob(word_source, word_target);
+	copy_embedding(source, target, src, trg, theta, embedding);
 	
-	score_sum = utils::mathop::logsum(score_sum, score);
-	noise_sum = utils::mathop::logsum(noise_sum, noise);
+	hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
+	
+	const double score = (theta.Wc_ * hidden + theta.bc_)(0, 0);
 	
 	scores_.push_back(score);
-	noises_.push_back(noise);
 	
 	if (score > score_best) {
 	  align_best = src;
@@ -1281,35 +1467,16 @@ struct Lexicon
 	}
       }
       
-      const double z = utils::mathop::logsum(score_sum, noise_sum);
-      const double loss = - 1.0 + std::exp(score_sum - z);
-      
-      double log_likelihood_target = score_sum - z;
-      
       if (align_best)
 	alignment.push_back(std::make_pair(align_best - 1, trg - 1));
       
-      for (size_type src = 0; src <= source_size; ++ src) {
-	const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	
-	const matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
-	/**/  matrix_type delta(&(*delta_hidden_.begin()) + embedding_size * src, embedding_size, 1);
-	
-	// propagate the loss for each alignment...
-	// we will partition by the relative log-likelihood
-	
-	const double loss_partitioned = loss * std::exp(scores_[src] - score_sum);
-	
-	tensor_type& dembedding = gradient.target(word_target);
-	
-	dembedding.block(0, 0, embedding_size, 1).array() += loss_partitioned * hidden.array();
-	dembedding.block(embedding_size, 0, 1, 1).array() += loss_partitioned;
-	
-	delta = (hidden.array().unaryExpr(dhinge())
-		 * (theta.target_.col(word_target.id()).block(0, 0, embedding_size, 1)
-		    * loss_partitioned
-		    * theta.scale_).array());
-      }
+      // we treat the loss uniformly, which is not correct (we need to weight by the expectation of alignment scores)
+      const double loss_factor = 1.0 / ((source_size + 1) * samples_);
+      
+      double loss_target = 0.0;
+      
+      // copy input layer
+      layer_input_sampled_ = layer_input_;
       
       // perform sampling
       for (size_type k = 0; k != samples_; ++ k) {
@@ -1319,76 +1486,71 @@ struct Lexicon
 	word_type sampled_target = dict_.draw(source[uniform_source(gen)], gen);
 	while (sampled_target == word_target)
 	  sampled_target = dict_.draw(source[uniform_source(gen)], gen);
-
-	double score_sum = - std::numeric_limits<double>::infinity();
-	double noise_sum = - std::numeric_limits<double>::infinity();
 	
-	scores_.clear();
-	noises_.clear();
-	
-	for (size_type src = 0; src <= source_size; ++ src) {
-	  const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	for (size_type src_sampled = 0; src_sampled <= source_size; ++ src_sampled) {
+	  const word_type sampled_source(src_sampled == 0 ? vocab_type::EPSILON : source[src_sampled - 1]);
 	  
-	  matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
+	  matrix_type embedding_sampled(&(*layer_input_sampled_.begin()) + state_size * src_sampled, state_size, 1);
+	  matrix_type hidden_sampled(&(*layer_hidden_sampled_.begin()) + hidden_size * src_sampled, hidden_size, 1);
+	  matrix_type delta_sampled(&(*delta_hidden_sampled_.begin()) + hidden_size * src_sampled, hidden_size, 1);
 	  
-	  const double score = ((theta.target_.col(sampled_target.id()).block(0, 0, embedding_size, 1).transpose()
-				 * hidden
-				 * theta.scale_)
-				+ theta.target_.col(sampled_target.id()).block(embedding_size, 0, 1, 1))(0, 0);
-	  const double noise = log_samples_ + dict_.logprob(word_source, sampled_target);
+	  embedding_sampled.block(offset_target + embedding_size * window_size, 0, embedding_size, 1)
+	    = theta.target_.col(sampled_target.id()) * theta.scale_;
 	  
-	  score_sum = utils::mathop::logsum(score_sum, score);
-	  noise_sum = utils::mathop::logsum(noise_sum, noise);
+	  hidden_sampled = (theta.Wt_ * embedding_sampled + theta.bt_).array().unaryExpr(hinge());
 	  
-	  scores_.push_back(score);
-	  noises_.push_back(noise);
-	}
-	
-	const double z = utils::mathop::logsum(score_sum, noise_sum);
-	const double loss = std::exp(score_sum - z);
-      
-	log_likelihood_target += noise_sum - z;
-	
-	for (size_type src = 0; src <= source_size; ++ src) {
-	  const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	  const double score = (theta.Wc_ * hidden_sampled + theta.bc_)(0, 0);
 	  
-	  const matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
-	  /**/  matrix_type delta(&(*delta_hidden_.begin()) + embedding_size * src, embedding_size, 1);
+	  double errors = 0.0;
 	  
-	  // propagate the loss for each alignment...
-	  // we will partition by the relative log-likelihood
+	  for (size_type src = 0; src <= source_size; ++ src) {
+	    const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	    
+	    const double error = std::max(1.0 - (scores_[src] - score), 0.0) * loss_factor;
+	    
+	    if (error == 0.0) continue;
+	    
+	    errors       += error;
+	    errors_[src] -= error;
+	  }
 	  
-	  const double loss_partitioned = loss * std::exp(scores_[src] - score_sum);
+	  loss_target += errors;
+	    
+	  // we will propagate - error for correct instance, and error for sampled instance
 	  
-	  tensor_type& dembedding = gradient.target(sampled_target);
+	  gradient.Wc_.array() += errors * hidden_sampled.transpose().array();
+	  gradient.bc_.array() += errors;
 	  
-	  dembedding.block(0, 0, embedding_size, 1).array() += loss_partitioned * hidden.array();
-	  dembedding.block(embedding_size, 0, 1, 1).array() += loss_partitioned;
+	  delta_sampled = (hidden_sampled.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * errors).array());
 	  
-	  delta.array() += (hidden.array().unaryExpr(dhinge())
-			    * (theta.target_.col(word_target.id()).block(0, 0, embedding_size, 1)
-			       * loss_partitioned
-			       * theta.scale_).array());
+	  gradient.Wt_.noalias() += delta_sampled * embedding_sampled.transpose();
+	  gradient.bt_.noalias() += delta_sampled;
+	  
+	  propagate_embedding(source, target, src_sampled, trg, sampled_target, theta, gradient, delta_sampled);
 	}
       }
 
       for (size_type src = 0; src <= source_size; ++ src) {
-	const word_type word_source(src == 0 ? vocab_type::EPSILON : source[src - 1]);
-	
 	const matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-	const matrix_type delta(&(*delta_hidden_.begin()) + embedding_size * src, embedding_size, 1);
+	const matrix_type hidden(&(*layer_hidden_.begin()) + hidden_size * src, hidden_size, 1);
+	/**/  matrix_type delta(&(*delta_hidden_.begin()) + hidden_size * src, hidden_size, 1);
 	
-	gradient.Wt_ += delta * embedding.transpose();
-	gradient.bt_ += delta;
+	gradient.Wc_.array() += errors_[src] * hidden.transpose().array();
+	gradient.bc_.array() += errors_[src];
 	
-	propagate_embedding(source, src, theta, gradient, delta);
+	delta = (hidden.array().unaryExpr(dhinge()) * (theta.Wc_.transpose() * errors_[src]).array());
+	
+	gradient.Wt_.noalias() += delta * embedding.transpose();
+	gradient.bt_.noalias() += delta;
+	
+	propagate_embedding(source, target, src, trg, theta, gradient, delta);
       }
       
       ++ gradient.count_;
-      log_likelihood += log_likelihood_target;
+      loss += loss_target;
     }
     
-    return log_likelihood;
+    return loss;
   }
   
     
@@ -1403,26 +1565,18 @@ struct Lexicon
     const size_type target_size = target.size();
     
     const size_type embedding_size = theta.embedding_;
+    const size_type hidden_size    = theta.hidden_;
     const size_type window_size    = theta.window_;
     
-    const size_type state_size = embedding_size * (window_size * 2 + 1);
-
+    const size_type state_size = embedding_size * (window_size * 2 + 1) * 2;
+    
     double total = 0.0;
     
     alignment.clear();
     
     // construct source-side input and hidden layers
     layer_input_.resize((source_size + 1) * state_size);
-    layer_hidden_.resize((source_size + 1) * embedding_size);
-    
-    for (size_type src = 0; src <= source_size; ++ src) {
-      matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
-      matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
-      
-      copy_embedding(source, src, theta, embedding);
-      
-      hidden = (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge());
-    }
+    layer_hidden_.resize((source_size + 1) * hidden_size);
     
     // enumerate target side
     for (size_type trg = 1; trg <= target_size; ++ trg) {
@@ -1432,10 +1586,12 @@ struct Lexicon
       double    score_best = - std::numeric_limits<double>::infinity();
       
       for (size_type src = 0; src <= source_size; ++ src) {
-	matrix_type hidden(&(*layer_hidden_.begin()) + embedding_size * src, embedding_size, 1);
+	matrix_type embedding(&(*layer_input_.begin()) + state_size * src, state_size, 1);
 	
-	const double score = (theta.target_.col(word.id()).block(0, 0, embedding_size, 1).transpose() * hidden * theta.scale_
-			      + theta.target_.col(word.id()).block(embedding_size, 0, 1, 1))(0, 0);
+	copy_embedding(source, target, src, trg, theta, embedding);
+	
+	const double score = (theta.Wc_ * (theta.Wt_ * embedding + theta.bt_).array().unaryExpr(hinge()).matrix()
+			      + theta.bc_)(0, 0);
 	
 	if (score > score_best) {
 	  align_best = src;
@@ -1469,11 +1625,13 @@ struct LearnAdaGrad
   typedef model_type::tensor_type tensor_type;
   
   LearnAdaGrad(const size_type& embedding,
+	       const size_type& hidden,
 	       const size_type& window,
 	       const double& lambda,
 	       const double& lambda2,
 	       const double& eta0)
     : embedding_(embedding),
+      hidden_(hidden),
       window_(window),
       lambda_(lambda),
       lambda2_(lambda2),
@@ -1490,13 +1648,16 @@ struct LearnAdaGrad
 
     const size_type vocabulary_size = word_type::allocated();
     
-    source_ = tensor_type::Zero(embedding_,     vocabulary_size);
-    target_ = tensor_type::Zero(embedding_ + 1, vocabulary_size);
+    source_ = tensor_type::Zero(embedding_, vocabulary_size);
+    target_ = tensor_type::Zero(embedding_, vocabulary_size);
 
-    const size_type state_size = embedding * (window * 2 + 1);
+    const size_type state_size = embedding * (window * 2 + 1) * 2;
     
-    Wt_ = tensor_type::Zero(embedding_, state_size);
-    bt_ = tensor_type::Zero(embedding_, 1);
+    Wt_ = tensor_type::Zero(hidden_, state_size);
+    bt_ = tensor_type::Zero(hidden_, 1);
+
+    Wc_ = tensor_type::Zero(1, hidden_);
+    bc_ = tensor_type::Zero(1, 1);
   }
 
   
@@ -1515,8 +1676,7 @@ struct LearnAdaGrad
 	     const_cast<tensor_type&>(source_),
 	     siter->second,
 	     embedding.target_.col(siter->first.id()),
-	     scale,
-	     false);
+	     scale);
     
     gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
@@ -1525,11 +1685,13 @@ struct LearnAdaGrad
 	     const_cast<tensor_type&>(target_),
 	     titer->second,
 	     embedding.source_.col(titer->first.id()),
-	     scale,
-	     true);
+	     scale);
     
     update(theta.Wt_, const_cast<tensor_type&>(Wt_), gradient.Wt_, scale, lambda_ != 0.0);
     update(theta.bt_, const_cast<tensor_type&>(bt_), gradient.bt_, scale, false);
+
+    update(theta.Wc_, const_cast<tensor_type&>(Wc_), gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, const_cast<tensor_type&>(bc_), gradient.bc_, scale, false);
   }
 
   template <typename Theta, typename GradVar, typename Grad>
@@ -1605,11 +1767,10 @@ struct LearnAdaGrad
 	      Eigen::MatrixBase<GradVar>& G,
 	      const Eigen::MatrixBase<Grad>& g,
 	      const Eigen::MatrixBase<GradCross>& c,
-	      const double scale,
-	      const bool bias_last=false) const
+	      const double scale) const
   {
     if (lambda2_ > 0.0) {
-      for (int row = 0; row != g.rows() - bias_last; ++ row) 
+      for (int row = 0; row != g.rows(); ++ row) 
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
 	  
@@ -1623,7 +1784,7 @@ struct LearnAdaGrad
 	  theta(row, word.id()) = utils::mathop::sgn(diff) * std::max(0.0, std::fabs(diff) - rate * lambda2_) + shared;
 	}
     } else {
-      for (int row = 0; row != g.rows() - bias_last; ++ row) 
+      for (int row = 0; row != g.rows(); ++ row) 
 	if (g(row, 0) != 0) {
 	  G(row, word.id()) +=  g(row, 0) * g(row, 0) * scale * scale;
 	  
@@ -1632,19 +1793,11 @@ struct LearnAdaGrad
 	  
 	  theta(row, word.id()) = utils::mathop::sgn(f) * std::max(0.0, std::fabs(f) - rate * lambda_);
 	}
-    }
-    
-    if (bias_last) {
-      const int row = g.rows() - 1;
-      
-      if (g(row, 0) != 0) {
-	G(row, word.id()) += g(row, 0) * g(row, 0) * scale * scale;
-	theta(row, word.id()) -= eta0_ * scale * g(row, 0) / std::sqrt(double(1.0) + G(row, word.id()));
-      }
-    }
+    }    
   }
   
   size_type embedding_;
+  size_type hidden_;
   size_type window_;
   
   double lambda_;
@@ -1657,6 +1810,9 @@ struct LearnAdaGrad
   
   tensor_type Wt_;
   tensor_type bt_;
+
+  tensor_type Wc_;
+  tensor_type bc_;
 };
 
 struct LearnSGD
@@ -1672,7 +1828,6 @@ struct LearnSGD
   typedef cicada::Vocab    vocab_type;
   
   typedef model_type::tensor_type tensor_type;
-
   
   LearnSGD(const double& lambda,
 	   const double& lambda2,
@@ -1713,8 +1868,7 @@ struct LearnSGD
 	     siter->second,
 	     embedding.target_.col(siter->first.id()),
 	     scale,
-	     theta.scale_,
-	     false);
+	     theta.scale_);
     
     gradient_embedding_type::const_iterator titer_end = gradient.target_.end();
     for (gradient_embedding_type::const_iterator titer = gradient.target_.begin(); titer != titer_end; ++ titer)
@@ -1723,11 +1877,13 @@ struct LearnSGD
 	     titer->second,
 	     embedding.source_.col(titer->first.id()),
 	     scale,
-	     theta.scale_,
-	     true);
+	     theta.scale_);
     
     update(theta.Wt_, gradient.Wt_, scale, lambda_ != 0.0);
     update(theta.bt_, gradient.bt_, scale, false);
+
+    update(theta.Wc_, gradient.Wc_, scale, lambda_ != 0.0);
+    update(theta.bc_, gradient.bc_, scale, false);
   }
 
   template <typename Theta, typename Grad>
@@ -1750,33 +1906,14 @@ struct LearnSGD
 	      const Eigen::MatrixBase<Grad>& g,
 	      const Eigen::MatrixBase<GradCross>& c,
 	      const double scale,
-	      const double theta_scale,
-	      const bool bias_last=false) const
+	      const double theta_scale) const
   {
     const double eta = eta0_ / (epoch_ + 1);
     
-    if (lambda2_ != 0.0) {
-      const size_type rows = g.rows();
-      
-      if (bias_last) {
-	theta.col(word.id()).block(0, 0, rows - 1, 1) -= eta * lambda2_ * (theta.col(word.id()).block(0, 0, rows - 1, 1)
-									   - c.block(0, 0, rows - 1, 1) / theta_scale);
-	theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
-	theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
-      } else {
-	theta.col(word.id()) -= eta * lambda2_ * (theta.col(word.id()) - c.block(0, 0, rows, 1) / theta_scale);
-	theta.col(word.id()) -= (eta * scale / theta_scale) * g;
-      }
-      
-    } else {
-      if (bias_last) {
-	const size_type rows = g.rows();
-	
-	theta.col(word.id()).block(0, 0, rows - 1, 1) -= (eta * scale / theta_scale) * g.block(0, 0, rows - 1, 1);
-	theta.col(word.id()).block(rows - 1, 0, 1, 1) -= eta * scale * g.block(rows - 1, 0, 1, 1);
-      } else
-	theta.col(word.id()) -= (eta * scale / theta_scale) * g;
-    }
+    if (lambda2_ != 0.0)
+      theta.col(word.id()) -= eta * lambda2_ * (theta.col(word.id()) - c / theta_scale);
+
+    theta.col(word.id()) -= (eta * scale / theta_scale) * g;
   }
 
   double lambda_;
@@ -1785,6 +1922,5 @@ struct LearnSGD
   
   size_type epoch_;
 };
-
 
 #endif

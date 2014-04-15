@@ -59,6 +59,9 @@ path_type target_file;
 path_type embedding_source_file;
 path_type embedding_target_file;
 
+path_type model_source_target_file;
+path_type model_target_source_file;
+
 path_type output_source_target_file;
 path_type output_target_source_file;
 path_type alignment_source_target_file;
@@ -75,7 +78,7 @@ bool optimize_adagrad = false;
 int iteration = 10;
 int baby_steps = 1;
 int batch_size = 4;
-int sample_size = 10;
+int sample_size = 5;
 int beam_size = 50;
 int cutoff = 3;
 double lambda = 0;
@@ -116,7 +119,7 @@ int main(int argc, char** argv)
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
+
   try {
     options(argc, argv);
 
@@ -125,7 +128,9 @@ int main(int argc, char** argv)
     if (dimension_hidden <= 0)
       throw std::runtime_error("dimension must be positive");
     if (alignment <= 1)
-      throw std::runtime_error("order size should be positive");
+      throw std::runtime_error("alignment size should be greater than one");
+    if (window < 0)
+      throw std::runtime_error("window size should be zero or positive");
 
     if (sample_size <= 0)
       throw std::runtime_error("invalid sample size");
@@ -179,9 +184,9 @@ int main(int argc, char** argv)
       std::cerr << "# of unique source words: " << sources.size() << std::endl
 		<< "# of unique target words: " << targets.size() << std::endl
 		<< "# of sentences: " << bitexts.size() << std::endl;
-
-    model_type theta_source_target(dimension_embedding, dimension_hidden, alignment, sources, targets, generator);
-    model_type theta_target_source(dimension_embedding, dimension_hidden, alignment, targets, sources, generator);
+    
+    model_type theta_source_target(dimension_embedding, dimension_hidden, window, alignment, sources, targets, generator);
+    model_type theta_target_source(dimension_embedding, dimension_hidden, window, alignment, targets, sources, generator);
     
     if (mpi_rank == 0) {
       const size_t cols = utils::bithack::min(utils::bithack::min(theta_source_target.source_.cols(),
@@ -207,12 +212,18 @@ int main(int argc, char** argv)
 	theta_target_source.read_embedding(embedding_target_file, embedding_source_file);
       }
     
+    if (mpi_rank == 0 && ! model_source_target_file.empty())
+      theta_source_target.read(model_source_target_file);
+    
+    if (mpi_rank == 0 && ! model_target_source_file.empty())
+      theta_target_source.read(model_target_source_file);
+    
     bcast_model(theta_source_target);
     bcast_model(theta_target_source);
     
     if (iteration > 0) {
       if (optimize_adagrad)
-	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, alignment, lambda, lambda2, eta0),
+	learn_online(LearnAdaGrad(dimension_embedding, dimension_hidden, window, alignment, lambda, lambda2, eta0),
 		     bitexts,
 		     dict_source_target,
 		     dict_target_source,
@@ -253,7 +264,7 @@ enum {
   bitext_tag = 1000,
   model_tag,
   gradient_tag,
-  log_likelihood_tag,
+  loss_tag,
   file_tag,
 };
 
@@ -340,7 +351,6 @@ struct MapReduce
     }
   };
   typedef std::set<value_type, compare_value, std::allocator<value_type> > bitext_reduced_type;
-  
   
   struct codec_type
   {
@@ -654,12 +664,12 @@ struct TaskAccumulate
 
   typedef HMM hmm_type;
 
-  typedef hmm_type::log_likelihood_type log_likelihood_type;
+  typedef hmm_type::loss_type loss_type;
   
   typedef cicada::Sentence sentence_type;
   typedef cicada::Symbol   word_type;
   typedef cicada::Vocab    vocab_type;
-
+  
   typedef MapReduce map_reduce_type;
   
   typedef map_reduce_type::queue_type queue_bitext_type;
@@ -668,9 +678,9 @@ struct TaskAccumulate
   typedef std::string encoded_type;
   
   typedef utils::lockfree_list_queue<encoded_type, std::allocator<encoded_type> > queue_gradient_type;
-
+  
   typedef std::vector<char, std::allocator<char> > buffer_type;
-
+  
   TaskAccumulate(const Learner& learner,
 		 const dictionary_type& dict_source_target,
 		 const dictionary_type& dict_target_source,
@@ -694,10 +704,22 @@ struct TaskAccumulate
       gradient_reducer_(gradient_reducer),
       hmm_source_target_(dict_source_target, sample_size, beam_size),
       hmm_target_source_(dict_target_source, sample_size, beam_size),
-      gradient_source_target_(theta_source_target.embedding_, theta_source_target.hidden_, theta_source_target.alignment_),
-      gradient_target_source_(theta_target_source.embedding_, theta_target_source.hidden_, theta_target_source.alignment_),
-      gradient_source_target_batch_(theta_source_target.embedding_, theta_source_target.hidden_, theta_source_target.alignment_),
-      gradient_target_source_batch_(theta_target_source.embedding_, theta_target_source.hidden_, theta_target_source.alignment_),
+      gradient_source_target_(theta_source_target.embedding_,
+			      theta_source_target.hidden_,
+			      theta_source_target.window_,
+			      theta_source_target.alignment_),
+      gradient_target_source_(theta_target_source.embedding_,
+			      theta_target_source.hidden_,
+			      theta_target_source.window_,
+			      theta_target_source.alignment_),
+      gradient_source_target_batch_(theta_source_target.embedding_,
+				    theta_source_target.hidden_,
+				    theta_source_target.window_,
+				    theta_source_target.alignment_),
+      gradient_target_source_batch_(theta_target_source.embedding_,
+				    theta_target_source.hidden_,
+				    theta_target_source.window_,
+				    theta_target_source.alignment_),
       batch_size_(batch_size),
       rank_(rank)
   {
@@ -707,7 +729,7 @@ struct TaskAccumulate
   void operator()()
   {
     clear();
-    
+
     bitext_alignment_type bitext;
     size_type batch_learn = 0;
     
@@ -717,7 +739,7 @@ struct TaskAccumulate
     bool learn_finished = false;
     
     int non_found_iter = 0;
-    
+
     while (! merge_finished || ! learn_finished) {
       bool found = false;
       
@@ -754,22 +776,30 @@ struct TaskAccumulate
 	  bitext.alignment_target_source_.clear();
 	  
 	  if (! source.empty() && ! target.empty()) {
-	    hmm_source_target_.forward(source, target, theta_source_target_, bitext.alignment_source_target_);
-	    hmm_target_source_.forward(target, source, theta_target_source_, bitext.alignment_target_source_);
-	    
-	    log_likelihood_source_target_
-		+= hmm_source_target_.backward(source,
-					       target,
-					       theta_source_target_,
-					       gradient_source_target_batch_,
-					       generator_);
-	    
-	    log_likelihood_target_source_
-	      += hmm_target_source_.backward(target,
-					     source,
-					     theta_target_source_,
-					     gradient_target_source_batch_,
-					     generator_);
+	    loss_source_target_
+		+= hmm_source_target_.forward(source,
+					      target,
+					      theta_source_target_,
+					      bitext.alignment_source_target_,
+					      generator_);
+	      loss_target_source_
+		+= hmm_target_source_.forward(target,
+					      source,
+					      theta_target_source_,
+					      bitext.alignment_target_source_,
+					      generator_);
+	      
+	      hmm_source_target_.backward(source,
+					  target,
+					  theta_source_target_,
+					  gradient_source_target_batch_,
+					  generator_);
+	      
+	      hmm_target_source_.backward(target,
+					  source,
+					  theta_target_source_,
+					  gradient_target_source_batch_,
+					  generator_);
 	    
 	    ++ batch_learn;
 	  }
@@ -841,8 +871,8 @@ struct TaskAccumulate
 
   void clear()
   {
-    log_likelihood_source_target_ = log_likelihood_type();
-    log_likelihood_target_source_ = log_likelihood_type();
+    loss_source_target_ = loss_type();
+    loss_target_source_ = loss_type();
 
     gradient_source_target_.clear();
     gradient_target_source_.clear();
@@ -865,14 +895,14 @@ struct TaskAccumulate
   
   hmm_type hmm_source_target_;
   hmm_type hmm_target_source_;
-
+  
   gradient_type gradient_source_target_;
   gradient_type gradient_target_source_;
   gradient_type gradient_source_target_batch_;
   gradient_type gradient_target_source_batch_;
   
-  log_likelihood_type log_likelihood_source_target_;
-  log_likelihood_type log_likelihood_target_source_;
+  loss_type loss_source_target_;
+  loss_type loss_target_source_;
 
   size_type      batch_size_;
   int            rank_;
@@ -943,7 +973,7 @@ void learn_online_root(const Learner& learner,
 
   typedef typename task_type::bitext_alignment_type bitext_alignment_type;
   
-  typedef typename task_type::log_likelihood_type log_likelihood_type;
+  typedef typename task_type::loss_type loss_type;
   
   typedef typename task_type::encoded_type buffer_type;
 
@@ -1116,7 +1146,7 @@ void learn_online_root(const Learner& learner,
 	}
       
       // finished bitext mapping
-      if (! bitext_finished && id == bitexts.size()) {
+      if (! bitext_finished && id == ids.size()) {
 	bitext_mapper.push(bitext_alignment_type());
 	bitext_finished = true;
       }
@@ -1221,30 +1251,26 @@ void learn_online_root(const Learner& learner,
 
     bitext_reducer.push(bitext_alignment_type());
     
-    log_likelihood_type log_likelihood_source_target = task.log_likelihood_source_target_;
-    log_likelihood_type log_likelihood_target_source = task.log_likelihood_target_source_;
+    loss_type loss_source_target = task.loss_source_target_;
+    loss_type loss_target_source = task.loss_target_source_;
 
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      log_likelihood_type llst;
-      log_likelihood_type llts;
+      loss_type lst;
+      loss_type lts;
       
       boost::iostreams::filtering_istream is;
-      is.push(utils::mpi_device_source(rank, log_likelihood_tag, 4096));
-      is.read((char*) &llst, sizeof(log_likelihood_type));
-      is.read((char*) &llts, sizeof(log_likelihood_type));
+      is.push(utils::mpi_device_source(rank, loss_tag, 4096));
+      is.read((char*) &lst, sizeof(loss_type));
+      is.read((char*) &lts, sizeof(loss_type));
       
-      log_likelihood_source_target += llst;
-      log_likelihood_target_source += llts;
+      loss_source_target += lst;
+      loss_target_source += lts;
     }
     
     if (debug)
-      std::cerr << "log-likelihood P(target | source): " << static_cast<double>(log_likelihood_source_target) << std::endl
-		<< "entropy        P(target | source): " << std::exp(- static_cast<double>(log_likelihood_source_target)) << std::endl
-		<< "perplexity     P(target | source): " << (- static_cast<double>(log_likelihood_source_target) / std::log(2.0)) << std::endl
-		<< "log-likelihood P(source | target): " << static_cast<double>(log_likelihood_target_source) << std::endl
-		<< "entropy        P(source | target): " << std::exp(- static_cast<double>(log_likelihood_target_source)) << std::endl
-		<< "perplexity     P(source | target): " << (- static_cast<double>(log_likelihood_target_source) / std::log(2.0)) << std::endl;
-    
+      std::cerr << "loss P(target | source): " << static_cast<double>(loss_source_target) << std::endl
+		<< "loss P(source | target): " << static_cast<double>(loss_target_source) << std::endl;
+
     if (debug)
       std::cerr << "cpu time:    " << end.cpu_time() - start.cpu_time() << std::endl
 		<< "user time:   " << end.user_time() - start.user_time() << std::endl;
@@ -1252,7 +1278,7 @@ void learn_online_root(const Learner& learner,
     // shuffle bitexts!
     {
       boost::random_number_generator<boost::mt19937> gen(task.generator_);
-
+      
       typename id_set_type::iterator biter     = ids.begin();
       typename id_set_type::iterator biter_end = ids.end();
       
@@ -1292,7 +1318,7 @@ void learn_online_others(const Learner& learner,
 
   typedef typename task_type::bitext_alignment_type bitext_alignment_type;
   
-  typedef typename task_type::log_likelihood_type log_likelihood_type;
+  typedef typename task_type::loss_type loss_type;
   
   typedef typename task_type::encoded_type buffer_type;
 
@@ -1486,9 +1512,9 @@ void learn_online_others(const Learner& learner,
     // reduce loss and # of parsed
     {
       boost::iostreams::filtering_ostream os;
-      os.push(utils::mpi_device_sink(0, log_likelihood_tag, 4096));
-      os.write((char*) &task.log_likelihood_source_target_, sizeof(log_likelihood_type));
-      os.write((char*) &task.log_likelihood_target_source_, sizeof(log_likelihood_type));
+      os.push(utils::mpi_device_sink(0, loss_tag, 4096));
+      os.write((char*) &task.loss_source_target_, sizeof(loss_type));
+      os.write((char*) &task.loss_target_source_, sizeof(loss_type));
     }
 
     // mixing
@@ -1496,6 +1522,7 @@ void learn_online_others(const Learner& learner,
     bcast_model(theta_target_source);
   }
 }
+
 
 template <typename Learner>
 void learn_online(const Learner& learner,
@@ -1511,6 +1538,7 @@ void learn_online(const Learner& learner,
     learn_online_others(learner, bitexts, dict_source_target, dict_target_source, theta_source_target, theta_target_source);
 }
 
+
 struct TaskViterbi
 {
   typedef size_t    size_type;
@@ -1525,10 +1553,10 @@ struct TaskViterbi
   typedef cicada::Vocab    vocab_type;
 
   typedef MapReduce map_reduce_type;
-
+  
   typedef map_reduce_type::queue_type queue_type;
   typedef map_reduce_type::value_type bitext_alignment_type;
-  
+
   TaskViterbi(const dictionary_type& dict_source_target,
 	      const dictionary_type& dict_target_source,
 	      const model_type& theta_source_target,
@@ -1572,16 +1600,16 @@ struct TaskViterbi
     if (rank_)
       reducer_.push(bitext_alignment_type());
   }
-
+  
   void clear()
   {
   }
-
+  
   const model_type& theta_source_target_;
   const model_type& theta_target_source_;
-  
+
   queue_type&           mapper_;
-  queue_type&           reducer_;
+  queue_type&           reducer_;  
   
   hmm_type hmm_source_target_;
   hmm_type hmm_target_source_;
@@ -1721,7 +1749,7 @@ void viterbi_root(const bitext_set_type& bitexts,
       terminated = true;
       found = true;
     }
-    
+
     // termination!
     for (int rank = 1; rank != mpi_size; ++ rank)
       if (ostream[rank] && ostream[rank]->test()) {
@@ -1987,7 +2015,7 @@ void read_data(const path_type& source_file,
       if (! src || ! trg) break;
       
       bitexts.push_back(bitext_type(source, target));
-      
+
       if (source.empty() || target.empty()) continue;
       
       sentence_type::const_iterator siter_begin = source.begin();
@@ -2100,14 +2128,14 @@ void read_data(const path_type& source_file,
 	    *titer = vocab_type::UNK;	
       }
     }
-
+      
     dict_source_target[vocab_type::BOS][vocab_type::BOS] = 1;
     dict_source_target[vocab_type::EOS][vocab_type::EOS] = 1;
     
     dict_target_source[vocab_type::BOS][vocab_type::BOS] = 1;
     dict_target_source[vocab_type::EOS][vocab_type::EOS] = 1;
   }
-  
+
   // bcast dict_source_target and dict_target_source
   bcast_dict(dict_source_target);
   bcast_dict(dict_target_source);
@@ -2115,7 +2143,6 @@ void read_data(const path_type& source_file,
   dict_source_target.initialize();
   dict_target_source.initialize();
 }
-
 
 void options(int argc, char** argv)
 {
@@ -2129,6 +2156,9 @@ void options(int argc, char** argv)
     ("embedding-source", po::value<path_type>(&embedding_source_file), "initial source embedding")
     ("embedding-target", po::value<path_type>(&embedding_target_file), "initial target embedding")
     
+    ("model-source-target", po::value<path_type>(&model_source_target_file), "model parameter for P(target | source)")
+    ("model-target-source", po::value<path_type>(&model_target_source_file), "model parameter for P(source | target)")
+
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output model parameter for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output model parameter for P(source | target)")
 
@@ -2147,11 +2177,11 @@ void options(int argc, char** argv)
     ("baby-steps",        po::value<int>(&baby_steps)->default_value(baby_steps),   "# of baby steps")
     ("batch",             po::value<int>(&batch_size)->default_value(batch_size),   "mini-batch size")
     ("sample",            po::value<int>(&sample_size)->default_value(sample_size), "sampling size")
-    ("beam",              po::value<int>(&beam_size)->default_value(beam_size),     "histogram beam size")
-    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),           "cutoff count for vocabulary (<= 1 to keep all)")
-    ("lambda",            po::value<double>(&lambda)->default_value(lambda),        "regularization constant")
-    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),      "regularization constant for bilingual agreement")
-    ("eta0",              po::value<double>(&eta0)->default_value(eta0),            "\\eta_0 for decay")
+    ("beam",              po::value<int>(&beam_size)->default_value(beam_size),   "histogram beam size")
+    ("cutoff",            po::value<int>(&cutoff)->default_value(cutoff),         "cutoff count for vocabulary (<= 1 to keep all)")
+    ("lambda",            po::value<double>(&lambda)->default_value(lambda),      "regularization constant")
+    ("lambda2",           po::value<double>(&lambda2)->default_value(lambda2),    "regularization constant for bilingual agreement")
+    ("eta0",              po::value<double>(&eta0)->default_value(eta0),          "\\eta_0 for decay")
 
     ("moses",      po::bool_switch(&moses_mode),       "dump alignment in Moses format")
     ("giza",       po::bool_switch(&giza_mode),        "dump alignment in Giza format")
