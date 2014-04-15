@@ -744,7 +744,7 @@ struct TaskAccumulate
     while (! merge_finished || ! learn_finished) {
       bool found = false;
       
-      if (! merge_finished)
+      if (! merge_finished && ! batch_learn)
 	while (gradient_reducer_.pop(buffer, true)) {
 	  if (buffer.empty())
 	    merge_finished = true;
