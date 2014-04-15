@@ -92,7 +92,7 @@ double beta = 0.01;
 int dimension_embedding = 32;
 int dimension_hidden = 128;
 int span = 8;
-int window = 1;
+int window = 0;
 
 bool optimize_sgd = false;
 bool optimize_adagrad = false;
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
       throw std::runtime_error("dimension must be positive");
     if (span < 0)
       throw std::runtime_error("span context size should be positive or zero");
-    if (window <= 0)
+    if (window < 0)
       throw std::runtime_error("window size should be positive");
 
     if (samples <= 0)

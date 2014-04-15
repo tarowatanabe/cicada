@@ -12,8 +12,6 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
-#include <set>
-
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
@@ -27,6 +25,7 @@
 #include "cicada/vocab.hpp"
 #include "cicada/alignment.hpp"
 #include "cicada/bitext.hpp"
+#include "cicada/semiring/logprob.hpp"
 
 #include "utils/alloc_vector.hpp"
 #include "utils/lexical_cast.hpp"
@@ -1811,6 +1810,7 @@ struct HMM
 		 alignment_type& alignment,
 		 Gen& gen)
   {
+    typedef cicada::semiring::Logprob<double> weight_type;
     typedef Eigen::Map<tensor_type> matrix_type;
    
 #if 0
@@ -1957,7 +1957,7 @@ struct HMM
 		while (target_sampled == target_next)
 		  target_sampled = dict_.draw(source_next, gen);
 		
-		if (! sampled_.insert(target_sampled).second) continue;
+		if (targets_.find(target_sampled) != targets_.end() || ! sampled_.insert(target_sampled).second) continue;
 		
 		state_type state_sampled = state_allocator_.allocate();
 		state_sampled.prev() = state;
@@ -2024,11 +2024,10 @@ struct HMM
 	    for (size_type k = 0; k != sample_; ++ k) {
 	      word_type target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      //while (targets_.find(target_sampled) != targets_.end())
 	      while (target_sampled == target_next)
 		target_sampled = dict_.draw(source[uniform_source(gen)], gen);
 	      
-	      if (! sampled_.insert(target_sampled).second) continue;
+	      if (targets_.find(target_sampled) != targets_.end() || ! sampled_.insert(target_sampled).second) continue;
 	      
 	      state_type state_sampled = state_allocator_.allocate();
 	      state_sampled.prev() = state;
@@ -2187,54 +2186,60 @@ struct HMM
     state_set_type& states = states_[target_size + 1];
     
     double loss = 0.0;
-
-    size_type num_loss   = 0;
-    size_type num_errors = 0;
-    for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
-      if (miter->error() > 0) {
-	for (heap_type::iterator citer = viter; citer != viter_end; ++ citer)
-	  num_loss += double(miter->error()) - (citer->score() - miter->score()) > 0.0;
-	
-	++ num_errors;
-      }
     
-    if (num_loss) {
-      //const double error_factor = 1.0 / (num_errors * (viter_end - viter));
-      const double error_factor = 1.0 / num_loss;
+    if (hiter != hiter_end && viter != viter_end) {
+      weight_type Z_correct;
+      weight_type Z_mistake;
+      size_type num_mistake = 0;
       
       for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
-	if (miter->error() > 0)
-	  for (heap_type::iterator citer = viter; citer != viter_end; ++ citer) {
-	    const double error = std::max(double(miter->error()) - (citer->score() - miter->score()), 0.0) * error_factor;
-	    
-	    if (error == 0.0) continue;
-	    
-	    state_set_type::iterator siter_c = states.find(*citer);
-	    if (siter_c != states.end())
-	      siter_c->second.loss() += - error_factor;
-	    else {
-	      state_type buffer = state_allocator_.allocate();
+	if (miter->error() > 0) {
+	  Z_mistake += cicada::semiring::traits<weight_type>::exp(miter->score());
+	  ++ num_mistake;
+	}
+      
+      for (heap_type::iterator citer = viter; citer != viter_end; ++ citer)
+	Z_correct += cicada::semiring::traits<weight_type>::exp(citer->score());
+      
+      if (num_mistake)
+	for (heap_type::iterator miter = hiter; miter != hiter_end; ++ miter) 
+	  if (miter->error() > 0)
+	    for (heap_type::iterator citer = viter; citer != viter_end; ++ citer) {
+	      const double error = std::max(double(miter->error()) - (citer->score() - miter->score()), 0.0);
 	      
-	      buffer.loss() = - error_factor;
-	      matrix_type(buffer.matrix(), state_size, 1).setZero();
+	      if (error == 0.0) continue;
 	      
-	      states[*citer] = buffer;
+	      const weight_type prob_correct = cicada::semiring::traits<weight_type>::exp(citer->score()) / Z_correct;
+	      const weight_type prob_mistake = cicada::semiring::traits<weight_type>::exp(miter->score()) / Z_mistake;
+	      
+	      const double error_factor = prob_correct * prob_mistake;
+	      
+	      state_set_type::iterator siter_c = states.find(*citer);
+	      if (siter_c != states.end())
+		siter_c->second.loss() += - error_factor;
+	      else {
+		state_type buffer = state_allocator_.allocate();
+		
+		buffer.loss() = - error_factor;
+		matrix_type(buffer.matrix(), state_size, 1).setZero();
+		
+		states[*citer] = buffer;
+	      }
+	      
+	      state_set_type::iterator siter_m = states.find(*miter);
+	      if (siter_m != states.end())
+		siter_m->second.loss() += error_factor;
+	      else {
+		state_type buffer = state_allocator_.allocate();
+		
+		buffer.loss() = error_factor;
+		matrix_type(buffer.matrix(), state_size, 1).setZero();
+		
+		states[*miter] = buffer;
+	      }
+	    
+	      loss += error * error_factor;
 	    }
-	    
-	    state_set_type::iterator siter_m = states.find(*miter);
-	    if (siter_m != states.end())
-	      siter_m->second.loss() += error_factor;
-	    else {
-	      state_type buffer = state_allocator_.allocate();
-	      
-	      buffer.loss() = error_factor;
-	      matrix_type(buffer.matrix(), state_size, 1).setZero();
-	      
-	      states[*miter] = buffer;
-	    }
-	    
-	    loss += error;
-	  }
     }
     
     //std::cerr << "# of pairs: " << pairs << " loss: " << loss << std::endl;
@@ -2283,7 +2288,7 @@ struct HMM
     if (states_[target_size + 1].empty()) return 0.0;
     
     double loss = 0.0;
-        
+    
     ++ gradient.count_;
     
     for (size_type trg = target_size + 1; trg > 0; -- trg) {
@@ -2600,7 +2605,9 @@ struct LearnAdaGrad
 		  const embedding_type& embedding) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
-
+    
+    if (! gradient.count_) return;
+    
     const double scale = 1.0 / gradient.count_;
 
     gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
@@ -2797,6 +2804,8 @@ struct LearnSGD
 		  const embedding_type& embedding) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+
+    if (! gradient.count_) return;
 
     //++ const_cast<size_type&>(epoch_);
 

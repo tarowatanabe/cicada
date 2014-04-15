@@ -1666,6 +1666,8 @@ struct LearnAdaGrad
 		  const embedding_type& embedding) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+
+    if (! gradient.count_) return;
     
     const double scale = 1.0 / gradient.count_;
 
@@ -1852,6 +1854,8 @@ struct LearnSGD
 		  const embedding_type& embedding) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+
+    if (! gradient.count_) return;
 
     //++ const_cast<size_type&>(epoch_);
     

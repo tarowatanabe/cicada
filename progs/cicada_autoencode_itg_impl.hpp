@@ -2343,6 +2343,8 @@ struct LearnAdaGrad
 		  const gradient_type& gradient) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+
+    if (! gradient.count_) return;
     
     const double scale = 1.0 / gradient.count_;
 
@@ -2583,6 +2585,8 @@ struct LearnAdaDelta
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
     
+    if (! gradient.count_) return;
+    
     const double scale = 1.0 / gradient.count_;
 
     gradient_embedding_type::const_iterator siter_end = gradient.source_.end();
@@ -2782,6 +2786,8 @@ struct LearnSGD
 		  const gradient_type& gradient) const
   {
     typedef gradient_type::embedding_type gradient_embedding_type;
+
+    if (! gradient.count_) return;
 
     //++ const_cast<size_type&>(epoch_);
 

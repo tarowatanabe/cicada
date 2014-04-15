@@ -1409,8 +1409,6 @@ struct ITG
       samples_(samples),
       beam_(beam) 
   {
-    if (window <= 0)
-      throw std::runtime_error("window size must be positive");
   }
   
   const dictionary_type& dict_source_target_;
@@ -2146,18 +2144,17 @@ struct ITG
     chart_sampled_(span.source_.first_, span.source_.last_, span.target_.first_, span.target_.last_).push_back(&state);
     agenda_[span.size()].push_back(&state);
     errors_[span.size()] |= (state.error_ > 0);
-
+    
     boost::random::uniform_int_distribution<> uniform_source(0, source_size - 1);
     boost::random::uniform_int_distribution<> uniform_target(0, target_size - 1);
     
     if (! span.source_.empty() && dict_target_source_.size(word_target) > 1) {
       sampled_.clear();
-
+      
       for (size_type sample = 0; sample != samples_; ++ sample) {
 	word_type sampled_source = word_source;
 	
 	if (word_target == vocab_type::EPSILON) {
-	  //while (sources.find(sampled_source) != sources.end())
 	  while (sampled_source == word_source)
 	    sampled_source = dict_target_source_.draw(target[uniform_target(gen)], gen);
 	} else {
@@ -2166,9 +2163,7 @@ struct ITG
 	}
 	
 	// check if already sampled...
-	if (! sampled_.empty() && sampled_.find(sampled_source) != sampled_.end()) continue;
-	
-	sampled_.insert(sampled_source);
+	if (sources.find(sampled_source) != sources.end() || ! sampled_.insert(sampled_source).second) continue;
 	
 	state_type& state = allocate();
 	
@@ -2212,7 +2207,6 @@ struct ITG
 	word_type sampled_target = word_target;
 	
 	if (word_source == vocab_type::EPSILON) {
-	  //while (targets.find(sampled_target) != targets.end())
 	  while (sampled_target == word_target)
 	    sampled_target = dict_source_target_.draw(source[uniform_source(gen)], gen);
 	} else {
@@ -2221,9 +2215,7 @@ struct ITG
 	}
 	
 	// check if already sampled...
-	if (! sampled_.empty() && sampled_.find(sampled_target) != sampled_.end()) continue;
-	
-	sampled_.insert(sampled_target);
+	if (targets.find(sampled_target) != targets.end() || ! sampled_.insert(sampled_target).second) continue;
 	
 	state_type& state = allocate();
 	
@@ -2407,8 +2399,8 @@ struct ITG
 	  
 	  const double error_factor = prob_correct * prob_mistake;
 	  
-	  backwards_[length_max].insert(*citer);
-	  backwards_[length_max].insert(*miter);
+	  backwards_[(*citer)->span_.size()].insert(*citer);
+	  backwards_[(*miter)->span_.size()].insert(*miter);
 	  
 	  const_cast<state_type&>(*(*citer)).loss_ -= error_factor;
 	  const_cast<state_type&>(*(*miter)).loss_ += error_factor;
