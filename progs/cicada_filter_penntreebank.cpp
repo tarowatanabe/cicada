@@ -79,14 +79,21 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
+
+    comment_last %= qi::no_skip[!(*standard::blank >> qi::lit('(')) >> *(standard::char_ - qi::eol) >> qi::eoi];
+    comment      %= qi::no_skip[*(!(*standard::blank >> qi::lit('(')) >> *(standard::char_ - qi::eol) >> qi::eol) >> -comment_last];
     
     cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
     treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
-    root %= (qi::hold['(' >> cat >> +treebank >> ')']
-	     | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')']
-	     | qi::hold[qi::lit('(') >> qi::attr("") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')]
-	     | cat);
+    root %= (qi::omit[comment]
+	     >> (qi::hold['(' >> cat >> +treebank >> ')']
+		 | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')']
+		 | qi::hold[qi::lit('(') >> qi::attr("") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')])
+	     >> qi::omit[comment]);
   }
+  
+  boost::spirit::qi::rule<Iterator, std::string()> comment;
+  boost::spirit::qi::rule<Iterator, std::string()> comment_last;
   
   boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;
   boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> treebank;
@@ -431,22 +438,6 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
   transform_span(treebank, spans, terminal, config, 0);
 }
 
-bool treebank_validate(const treebank_type& treebank)
-{
-  if (treebank.cat.empty() && treebank.antecedents.empty())
-    return true;
-  
-  if (treebank.antecedents.empty())
-    return false;
-  
-  treebank_type::antecedents_type::const_iterator aiter_end = treebank.antecedents.end();
-  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != aiter_end; ++ aiter)
-    if (aiter->antecedents.empty())
-      return false;
-  
-  return true;
-}
-
 std::ostream& treebank_output(const treebank_type& treebank, std::ostream& os)
 {
   if (treebank.antecedents.empty())
@@ -564,9 +555,6 @@ int main(int argc, char** argv)
 	throw std::runtime_error("parsing failed: " + buffer);
       }
 
-      // skip invalid treebank...
-      if (! treebank_validate(parsed))
-	continue;
       
       if (ms) {
 	if (! utils::getline(*ms, line))
