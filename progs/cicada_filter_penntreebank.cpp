@@ -211,8 +211,13 @@ void transform_cycle(treebank_type& treebank)
     transform_cycle(*aiter);
 
   // unary rule + the same category...
-  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat)
-    treebank.antecedents = treebank.antecedents.front().antecedents;
+  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat) {
+    treebank_type::antecedents_type antecedents;
+    
+    antecedents.swap(treebank.antecedents.front().antecedents);
+    
+    treebank.antecedents.swap(antecedents);
+  }
 }
 
 void transform_collapse(treebank_type& treebank)
@@ -224,8 +229,13 @@ void transform_collapse(treebank_type& treebank)
     transform_collapse(*aiter);
   
   // unary rule + the same category...
-  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1)
-    treebank.antecedents = treebank.antecedents.front().antecedents;
+  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1) {
+    treebank_type::antecedents_type antecedents;
+
+    antecedents.swap(treebank.antecedents.front().antecedents);
+    
+    treebank.antecedents.swap(antecedents);
+  }
 }
 
 template <typename Iterator>
