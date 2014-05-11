@@ -318,25 +318,27 @@ namespace cicada
       // pruning ...
       position_set_type positions_removed(removed.nodes.size(), -1);
       const size_type  num_nodes_removed = dfs(removed, 0, positions_removed);
+      
+      const int goal_removed = positions_removed.back();
 
-      if (positions_removed.back() != 0)
-	std::cerr << "WARNING: DFS resulted in wrong lattice (1st step)" << std::endl;
+      if (goal_removed < 0)
+	throw std::runtime_error("DFS resulted in wrong lattice (1st step)");
       
       // after dfs, positons_removed is numberd by post-traversal order... thus,
       // we can automatically transpose the graph!
 
-      graph_type transposed(num_nodes_removed);
+      graph_type transposed(num_nodes_removed - goal_removed);
       
       for (size_t i = 0; i != positions_removed.size(); ++ i)
-	if (positions_removed[i] >= 0) {
+	if (positions_removed[i] >= goal_removed) {
 	  graph_type::node_type::edge_set_type::const_iterator eiter_end = removed.nodes[i].edges.end();
 	  for (graph_type::node_type::edge_set_type::const_iterator eiter = removed.nodes[i].edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const graph_type::edge_type& edge = removed.edges[*eiter];
 	    
-	    if (positions_removed[edge.tail] >= 0) {
-	      graph_type::edge_type& edge_new = transposed.add_edge(edge.label, edge.features, positions_removed[i]);
+	    if (positions_removed[edge.tail] >= goal_removed) {
+	      graph_type::edge_type& edge_new = transposed.add_edge(edge.label, edge.features, positions_removed[i] - goal_removed);
 	      
-	      transposed.nodes[positions_removed[edge.tail]].edges.push_back(edge_new.id);
+	      transposed.nodes[positions_removed[edge.tail] - goal_removed].edges.push_back(edge_new.id);
 	    }
 	  }
 	}
@@ -344,24 +346,26 @@ namespace cicada
       position_set_type positions_transposed(transposed.nodes.size(), -1);
       const size_type num_nodes_transposed = dfs(transposed, 0, positions_transposed);
 
-      if (positions_transposed.back() != 0)
-	std::cerr << "WARNING: DFS resulted in wrong lattice (2nd step)" << std::endl;
+      const int goal_transposed = positions_transposed.back();
+
+      if (goal_transposed < 0)
+	throw std::runtime_error("DFS resulted in wrong lattice (2nd step)");
       
       // after dfs, positons_transposed is numberd by post-traversal order... thus,
       // we can automatically transpose the graph... combined with the previous transposition,
       // we can uncover original pruned graph!
       
-      target.resize(num_nodes_transposed - 1);
+      target.resize(num_nodes_transposed - 1 - goal_transposed);
       
       for (size_t i = 0; i != positions_transposed.size(); ++ i)
-	if (positions_transposed[i] >= 0) {
+	if (positions_transposed[i] >= goal_transposed) {
 	  graph_type::node_type::edge_set_type::const_iterator eiter_end = transposed.nodes[i].edges.end();
 	  for (graph_type::node_type::edge_set_type::const_iterator eiter = transposed.nodes[i].edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const graph_type::edge_type& edge = transposed.edges[*eiter];
 	    
-	    if (positions_transposed[edge.tail] >= 0) {
-	      const int first = positions_transposed[edge.tail];
-	      const int last  = positions_transposed[i];
+	    if (positions_transposed[edge.tail] >= goal_transposed) {
+	      const int first = positions_transposed[edge.tail] - goal_transposed;
+	      const int last  = positions_transposed[i] - goal_transposed;
 	      
 	      target[first].push_back(lattice_type::arc_type(edge.label, edge.features, last - first));
 	    }
