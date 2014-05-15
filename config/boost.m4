@@ -1124,11 +1124,13 @@ if test x$boost_cv_inc_path != xno; then
   # the same defines as GCC's).
   for i in \
     _BOOST_apple_clang_test(4, 2) \
+    _BOOST_clang_test(3, 5) \
     _BOOST_clang_test(3, 4) \
     _BOOST_clang_test(3, 3) \
     _BOOST_clang_test(3, 2) \
     _BOOST_clang_test(3, 1) \
     _BOOST_clang_test(3, 0) \
+    _BOOST_gcc_test(4, 9) \
     _BOOST_gcc_test(4, 8) \
     _BOOST_gcc_test(4, 7) \
     _BOOST_gcc_test(4, 6) \
