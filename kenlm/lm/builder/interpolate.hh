@@ -1,9 +1,11 @@
 #ifndef LM_BUILDER_INTERPOLATE_H
 #define LM_BUILDER_INTERPOLATE_H
 
-#include <stdint.h>
+#include "util/stream/multi_stream.hh"
 
-#include "lm/builder/multi_stream.hh"
+#include <vector>
+
+#include <stdint.h>
 
 namespace lm { namespace builder {
  
@@ -14,15 +16,16 @@ namespace lm { namespace builder {
  */
 class Interpolate {
   public:
-    // Normally the unigram count-1 (since p(<s>) = 0) but might be larger to
-    // set a consistent vocabulary size.
-    explicit Interpolate(uint64_t vocab_size, const ChainPositions &backoffs);
+    // Normally vocab_size is the unigram count-1 (since p(<s>) = 0) but might
+    // be larger when the user specifies a consistent vocabulary size.
+    explicit Interpolate(uint64_t vocab_size, const util::stream::ChainPositions &backoffs, const std::vector<uint64_t> &prune_thresholds);
 
-    void Run(const ChainPositions &positions);
+    void Run(const util::stream::ChainPositions &positions);
 
   private:
     float uniform_prob_;
-    ChainPositions backoffs_;
+    util::stream::ChainPositions backoffs_;
+    const std::vector<uint64_t> prune_thresholds_;
 };
 
 }} // namespaces

@@ -24,6 +24,7 @@ file.cc \
 file_piece.cc \
 mmap.cc \
 murmur_hash.cc \
+parallel_read.cc \
 pool.cc \
 read_compressed.cc \
 scoped.cc \
@@ -47,6 +48,7 @@ stream/config.hh \
 stream/io.hh \
 stream/line_input.hh \
 stream/multi_progress.hh \
+stream/multi_stream.hh \
 stream/sort.hh \
 stream/stream.hh \
 stream/timer.hh \
@@ -66,12 +68,14 @@ exception.hh \
 fake_ofstream.hh \
 file.hh \
 file_piece.hh \
+fixed_array.hh \
 getopt.hh \
 have.hh \
 joint_sort.hh \
 mmap.hh \
 multi_intersection.hh \
 murmur_hash.hh \
+parallel_read.hh \
 pcqueue.hh \
 pool.hh \
 probing_hash_table.hh \
@@ -84,6 +88,7 @@ string_piece.hh \
 string_piece_hash.hh \
 thread_pool.hh \
 tokenize_piece.hh \
+unistd.hh \
 usage.hh
 
 EXTRA_DIST = \
