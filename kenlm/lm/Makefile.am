@@ -76,6 +76,7 @@ cicada_kenlm_lmplz_SOURCES = \
 builder/adjust_counts.hh \
 builder/corpus_count.hh \
 builder/discount.hh \
+builder/hash_gamma.hh \
 builder/header_info.hh \
 builder/initial_probabilities.hh \
 builder/interpolate.hh \
