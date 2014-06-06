@@ -2684,9 +2684,9 @@ struct PosteriorReducer : public PosteriorMapReduce
     }
   }
   
-  struct real_precision : boost::spirit::karma::real_policies<double>
+  struct real_precision : boost::spirit::karma::real_policies<long double>
   {
-    static unsigned int precision(double) 
+    static unsigned int precision(long double) 
     { 
       return 20;
     }
@@ -2702,7 +2702,7 @@ struct PosteriorReducer : public PosteriorMapReduce
     
     const matrix_type& matrix = posterior.matrix;
 
-    karma::real_generator<double, real_precision> real;
+    karma::real_generator<long double, real_precision> real;
     iterator_type iter(os);
 
     if (! matrix.empty()) {
@@ -2710,6 +2710,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       for (size_type i = 0; i != matrix.size1(); ++ i) {
 	if (i)
 	  karma::generate(iter, karma::lit(", "));
+	
 	karma::generate(iter, '(' << (real % ", ") << ')',
 			boost::make_iterator_range(matrix.begin(i), matrix.end(i)));
       }
