@@ -2252,15 +2252,16 @@ struct ViterbiReducer : public ViterbiMapReduce
   
   ostream_ptr_type os;
   queue_type& queue;
+  bool flush_;
   
-  ViterbiReducer(const path_type& path, queue_type& __queue) : os(), queue(__queue)
+  ViterbiReducer(const path_type& path, queue_type& __queue) : os(), queue(__queue), flush_(false)
   {
     if (! path.empty()) {
-      const bool flush_output = (path == "-"
-				 || (boost::filesystem::exists(path)
-				     && ! boost::filesystem::is_regular_file(path)));
+      flush_ = (path == "-"
+		|| (boost::filesystem::exists(path)
+		    && ! boost::filesystem::is_regular_file(path)));
       
-      os.reset(new utils::compress_ostream(path, 1024 * 1024 * (! flush_output)));
+      os.reset(new utils::compress_ostream(path, 1024 * 1024));
     }
   }
   
@@ -2340,17 +2341,24 @@ struct ViterbiReducer : public ViterbiMapReduce
 	queue.pop_swap(bitext);
 	if (bitext.id == size_type(-1)) break;
 	
+	bool written = false;
+	
 	if (bitext.id == id) {
 	  write(*os, bitext);
+	  written = true;
 	  ++ id;
 	} else
 	  bitexts.insert(bitext);
 	
 	while (! bitexts.empty() && bitexts.begin()->id == id) {
 	  write(*os, *bitexts.begin());
+	  written = true;
 	  bitexts.erase(bitexts.begin());
 	  ++ id;
 	}
+
+	if (written && flush_)
+	  *os << std::flush;
       }
       
       while (! bitexts.empty() && bitexts.begin()->id == id) {
@@ -2358,6 +2366,9 @@ struct ViterbiReducer : public ViterbiMapReduce
 	bitexts.erase(bitexts.begin());
 	++ id;
       }
+
+      if (flush_)
+	*os << std::flush;
       
       if (! bitexts.empty())
 	throw std::runtime_error("error while writeing viterbi output?");
@@ -2521,11 +2532,23 @@ struct PosteriorMapReduce
       id = size_type(-1);
       matrix.clear();
     }
-    
+
     void swap(posterior_type& x)
     {
       std::swap(id, x.id);
       matrix.swap(x.matrix);
+    }
+
+    friend
+    bool operator<(const posterior_type& x, const posterior_type& y)
+    {
+      return x.id < y.id;
+    }
+    
+    friend
+    bool operator>(const posterior_type& x, const posterior_type& y)
+    {
+      return x.id > y.id;
     }
   };
   
@@ -2617,28 +2640,22 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
 
 struct PosteriorReducer : public PosteriorMapReduce
 {
-  struct less_posterior
-  {
-    bool operator()(const posterior_type& x, const posterior_type& y) const
-    {
-      return x.id < y.id;
-    }
-  };
-  typedef std::set<posterior_type, less_posterior, std::allocator<posterior_type> > posterior_set_type;
+  typedef std::set<posterior_type, std::less<posterior_type>, std::allocator<posterior_type> > posterior_set_type;
 
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
   queue_reducer_type& queue;
+  bool flush_;
   
-  PosteriorReducer(const path_type& path, queue_reducer_type& __queue) : os(), queue(__queue)
+  PosteriorReducer(const path_type& path, queue_reducer_type& __queue) : os(), queue(__queue), flush_(false)
   {
     if (! path.empty()) {
-      const bool flush_output = (path == "-"
-				 || (boost::filesystem::exists(path)
-				     && ! boost::filesystem::is_regular_file(path)));
+      flush_ = (path == "-"
+		|| (boost::filesystem::exists(path)
+		    && ! boost::filesystem::is_regular_file(path)));
       
-      os.reset(new utils::compress_ostream(path, 1024 * 1024 * (! flush_output)));
+      os.reset(new utils::compress_ostream(path, 1024 * 1024));
       os->precision(20);
     }
   }
@@ -2659,18 +2676,25 @@ struct PosteriorReducer : public PosteriorMapReduce
       for (;;) {
 	queue.pop_swap(posterior);
 	if (posterior.id == size_type(-1)) break;
-
+	
+	bool written = false;
+	
 	if (posterior.id == id) {
 	  write(*os, posterior);
+	  written = true;
 	  ++ id;
 	} else
 	  posteriors.insert(posterior);
 	
 	while (! posteriors.empty() && posteriors.begin()->id == id) {
 	  write(*os, *posteriors.begin());
+	  written = true;
 	  posteriors.erase(posteriors.begin());
 	  ++ id;
 	}
+	
+	if (written && flush_)
+	  *os << std::flush;
       }
       
       while (! posteriors.empty() && posteriors.begin()->id == id) {
@@ -2678,6 +2702,9 @@ struct PosteriorReducer : public PosteriorMapReduce
 	posteriors.erase(posteriors.begin());
 	++ id;
       }
+      
+      if (flush_)
+	*os << std::flush;
       
       if (! posteriors.empty())
 	throw std::runtime_error("error while writeing posterior output?");
@@ -2694,7 +2721,6 @@ struct PosteriorReducer : public PosteriorMapReduce
   
   void write(std::ostream& os, const posterior_type& posterior)
   {
-#if 1
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
@@ -2717,29 +2743,6 @@ struct PosteriorReducer : public PosteriorMapReduce
       karma::generate(iter, karma::lit(')'));
     }
     karma::generate(iter, karma::lit('\n'));
-#endif
-#if 0
-    const matrix_type& matrix = posterior.matrix;
-    
-    if (matrix.empty())
-      os << '\n';
-    else {
-      os << '(';
-      for (size_type i = 0; i != matrix.size1(); ++ i) {
-	if (i)
-	  os << ", ";
-	os << '(';
-	matrix_type::const_iterator iter_begin = matrix.begin(i);
-	matrix_type::const_iterator iter_end   = matrix.end(i);
-	if (iter_begin != iter_end) {
-	  std::copy(iter_begin, iter_end - 1, std::ostream_iterator<double>(os, ", "));
-	  os << *(iter_end - 1);
-	}
-	os << ')';
-      }
-      os << ')' << '\n';
-    }
-#endif
   }
 };
 
