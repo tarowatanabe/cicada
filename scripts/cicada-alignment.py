@@ -623,6 +623,196 @@ class Giza:
                                              name="giza",
                                              logfile=logfile)
 
+class AlignmentHeuristic:
+
+    def __init__(self,
+                 cicada=None,
+                 corpus=None,
+                 cluster=None,
+                 giza=None,
+                 alignment_dir="",
+                 alignment="grow-diag-final-and",
+                 threads=8,
+                 mpi=None,
+                 pbs=None,
+                 debug=0):
+
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
+
+        if not os.path.exists(alignment_dir):
+            os.makedirs(alignment_dir)
+        
+        command = cicada.cicada_alignment
+        command += " --source-target \"%s\"" %(compressed_file(giza.viterbi_source_target))
+        command += " --target-source \"%s\"" %(compressed_file(giza.viterbi_target_source))
+
+        if os.path.exists(corpus.source_span):
+            command += " --span-source \"%s\"" %(corpus.source_span)
+        if os.path.exists(corpus.target_span):
+            command += " --span-target \"%s\"" %(corpus.target_span)
+        
+        self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
+
+        command += " --output \"%s\"" %(self.alignment)
+        
+        if 'f2e' in alignment:
+            command += " --f2e"
+        if 'e2f' in alignment:
+            command += " --e2f"
+        
+        if 'union' in alignment:
+            command += " --union"
+        elif 'intersection' in alignment:
+            command += " --intersection"
+        elif 'grow' in alignment:
+            command += " --grow"
+            if 'diag' in alignment:
+                command += ' --diag'
+            if 'final' in alignment:
+                if 'final-and' in alignment:
+                    command += " --final-and"
+                else:
+                    command += " --final"
+
+        if 'itg' in alignment:
+            command += " --itg"
+        if 'max-match' in alignment:
+            command += " --max-match"
+        if 'closure' in alignment:
+            command += " --closure"
+        
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="align-heu",
+                                             logfile=self.alignment+'.log')
+
+
+class AlignmentPosterior:
+
+    def __init__(self,
+                 cicada=None,
+                 corpus=None,
+                 cluster=None,
+                 giza=None,
+                 alignment_dir="",
+                 alignment="grow-diag-final-and",
+                 threads=8,
+                 mpi=None,
+                 pbs=None,
+                 debug=0):
+
+        self.mpi = mpi
+        self.pbs = pbs
+        self.threads = threads
+
+        if not os.path.exists(alignment_dir):
+            os.makedirs(alignment_dir)
+
+        learn_hmm = None
+        learn_model4 = None
+        if hasattr(giza, 'alignment_source_target'):
+            learn_hmm = 1
+        if hasattr(giza, 'distortion_source_target'):
+            learn_model4 = 1
+            
+        
+        command = cicada.cicada_lexicon_model1
+        if learn_hmm:
+            command = cicada.cicada_lexicon_hmm
+        if learn_model4:
+            command = cicada.cicada_lexicon_model4
+           
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+
+        if os.path.exists(corpus.source_span):
+            command += " --span-source \"%s\"" %(corpus.source_span)
+        if os.path.exists(corpus.target_span):
+            command += " --span-target \"%s\"" %(corpus.target_span)
+
+        if learn_hmm or learn_model4:
+            command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
+            command += " --classes-target \"%s\"" %(compressed_file(cluster.target.cluster))
+
+        command += " --lexicon-source-target \"%s\"" %(compressed_file(giza.lexicon_source_target))
+        command += " --lexicon-target-source \"%s\"" %(compressed_file(giza.lexicon_target_source))
+
+        if learn_hmm or learn_model4:
+            command += " --alignment-source-target \"%s\"" %(compressed_file(giza.alignment_source_target))
+            command += " --alignment-target-source \"%s\"" %(compressed_file(giza.alignment_target_source))
+
+        if learn_model4:
+            command += " --insertion-source-target %.20g" %(giza.insertion_p0)
+            command += " --insertion-target-source %.20g" %(giza.insertion_p0)
+            command += " --distortion-source-target \"%s\"" %(compressed_file(giza.distortion_source_target))
+            command += " --distortion-target-source \"%s\"" %(compressed_file(giza.distortion_target_source))
+            command += " --fertility-source-target \"%s\"" %(compressed_file(giza.fertility_source_target))
+            command += " --fertility-target-source \"%s\"" %(compressed_file(giza.fertility_target_source))
+        
+        self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
+        
+        command += " --viterbi-source-target \"%s\"" %(self.alignment)
+        # we do not specify an alternative alignment!
+        # command += " --viterbi-target-source /dev/null"
+
+        if learn_model4:
+            command += " --iteration-model4 0"
+            command += " --iteration-model1 0"
+            command += " --iteration-hmm 0"
+        elif learn_hmm:
+            command += " --iteration-model1 0"
+            command += " --iteration-hmm 0"
+        else:
+            command += " --iteration 0"
+            
+        command += " --p0 %.20g" %(giza.p0)
+        command += " --prior-lexicon %.20g"  %(giza.prior_lexicon)
+        command += " --smooth-lexicon %.20g" %(giza.smooth_lexicon)
+        if learn_hmm or learn_model4:
+            command += " --prior-alignment %.20g"  %(giza.prior_alignment)
+            command += " --smooth-alignment %.20g" %(giza.smooth_alignment)
+
+        if learn_model4:
+            command += " --prior-distortion %.20g"  %(giza.prior_distortion)
+            command += " --smooth-distortion %.20g" %(giza.smooth_distortion)
+            command += " --prior-fertility %.20g"  %(giza.prior_fertility)
+            command += " --smooth-fertility %.20g" %(giza.smooth_fertility)
+
+        if 'itg' in alignment:
+            command += " --itg"
+        if 'max-match' in alignment:
+            command += " --max-match"
+
+        ## dump in moses mode
+        command += " --moses"
+        
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        QSub(mpi=self.mpi, pbs=self.pbs).run(self.command,
+                                             threads=self.threads,
+                                             name="align-post",
+                                             logfile=self.alignment+'.log')
+
 class Alignment:
 
     def __init__(self,
@@ -939,6 +1129,28 @@ if __name__ == '__main__':
         giza.run(os.path.join(options.alignment_dir, 'giza.log'))
         print "(2) running giza finished @", time.ctime()
     
+    #alignment=None
+    #if "posterior" in options.alignment:
+    #    alignment = AlignmentPosterior(cicada=cicada,
+    #                                   corpus=corpus,
+    #                                   cluster=prepare,
+    #                                   giza=giza,
+    #                                   alignment_dir=options.alignment_dir,
+    #                                   alignment=options.alignment,
+    #                                   threads=options.threads,
+    #                                   pbs=pbs,
+    #                                   debug=options.debug)
+    #else:
+    #    alignment = AlignmentHeuristic(cicada=cicada,
+    #                                   corpus=corpus,
+    #                                   cluster=prepare,
+    #                                   giza=giza,
+    #                                   alignment_dir=options.alignment_dir,
+    #                                   alignment=options.alignment,
+    #                                   threads=options.threads,
+    #                                   pbs=pbs,
+    #                                   debug=options.debug)
+
     alignment = Alignment(cicada=cicada,
                           corpus=corpus,
                           cluster=prepare,

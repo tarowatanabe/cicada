@@ -43,6 +43,8 @@
 #include "utils/vector2.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/getline.hpp"
+#include "utils/double_base64_parser.hpp"
+#include "utils/double_base64_generator.hpp"
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
@@ -1516,11 +1518,16 @@ struct MapReducePosterior
     {
       namespace qi = boost::spirit::qi;
       
-      vector %= ('(' >> -(qi::double_ % ',') >> -(qi::lit(',')) >> ')') | ('[' >> -(qi::double_ % ',') >> -(qi::lit(',')) >> ']');
+      posterior %= 'B' >> base64 | qi::double_;
+      
+      vector %= ('(' >> -(posterior % ',') >> -(qi::lit(',')) >> ')') | ('[' >> -(posterior % ',') >> -(qi::lit(',')) >> ']');
       matrix %= ('(' >> -(vector % ',') >> -(qi::lit(',')) >> ')') | ('[' >> -(vector % ',') >> -(qi::lit(',')) >> ']');
     }
     
     typedef boost::spirit::standard::blank_type blank_type;
+    
+    utils::double_base64_parser<Iterator> base64;
+    boost::spirit::qi::rule<Iterator, double(), blank_type> posterior;
     
     boost::spirit::qi::rule<Iterator, vector_parsed_type(), blank_type> vector;
     boost::spirit::qi::rule<Iterator, matrix_parsed_type(), blank_type> matrix;

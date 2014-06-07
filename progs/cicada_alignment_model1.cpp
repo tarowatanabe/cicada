@@ -9,6 +9,8 @@
 #include "utils/compress_stream.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
+#include "utils/double_base64_parser.hpp"
+#include "utils/double_base64_generator.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -1550,6 +1552,8 @@ struct PosteriorReducer : public PosteriorMapReduce
     const matrix_type& matrix = posterior.matrix;
 
     karma::real_generator<long double, real_precision> real;
+    utils::double_base64_generator<iterator_type> base64;
+    
     iterator_type iter(os);
 
     if (! matrix.empty()) {
@@ -1557,7 +1561,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       for (size_type i = 0; i != matrix.size1(); ++ i) {
 	if (i)
 	  karma::generate(iter, karma::lit(", "));
-	karma::generate(iter, '(' << (real % ", ") << ')',
+	karma::generate(iter, '(' << (('B' << base64) % ", ") << ')',
 			boost::make_iterator_range(matrix.begin(i), matrix.end(i)));
       }
       karma::generate(iter, karma::lit(')'));
