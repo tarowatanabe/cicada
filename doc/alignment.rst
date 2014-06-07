@@ -130,6 +130,33 @@ be estimated by first generating posteriors:
 	  --posterior-source-target <posteriors for P(target | source)> \
 	  --posterior-target-source <posteriors for P(source | target)>
 
+The posterior probabilities are encoded by a variant of base64 for
+faster output:
+
+.. code::
+
+ ((BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA),
+  (BOt6deP8ZNjY, BxCaxPXuuVj8, BzUiQOgdyuD8, B8P8ytb+X7D8, BkJgHdwmqgz8, BFPk16J3ibSw, B+vJ6/wDegDU),
+  (Bn73fUUsEFTU, Bee1KAQ2y6yI, BnQAlHbua4iI, BTiE5AoyPtDU, BAAAAAAAA8D8, B3nsVxMxdmTU, BRycFC+VWays),
+  (BPKvgtOMSwD4, BcUjVdQHvdTU, B6JMjnTJlrz4, BkJgHdwmqgz8, Bq/NX3lGx7z8, BSw5D7lK0yDU, BbQNS59z6Fz4),
+  (B/1Rz1KsjejU, Bid6TCsHARSw, Bgt9eQq6vQCw, BIgSwLz5sJDU, BAAAAAAAA8D8, BHl5G3plkvTU, BKizUASpb+TQ),
+  (BPy4hl7Gf7T8, BUSLB/IT0ezY, BHWMehlVFnT8, BOqZCBC+0nj8, B8lfLAERPJjY, B64eBzGTZuDY, ByC55kUgQkD8),
+  (BWBsRiKhJcTU, B+jlodVAA1Sw, B1yI+lLOX2DU, BqrfGuOPsFzU, BGMwuXgo5DTY, BAAAAAAAA8D8, BblJQxB4PtjU),
+  (BZ8syrJdB0D4, BZVlC9YIBSzY, BUAc0pdEqlDU, BqmaIdrR0Fj4, BZQcbJifTXjU, BuObcWrOq6TU, BQ4SA3vf/7z8))
+
+The column indicates the target (or foreign) sentence position and
+each row corresponds to the source (or English) sentence position
+including NULL word. Each value is prefixed by 'B' followed by 11 byte
+base64 encoded string. To uncover double value, for instance in
+python, you can try:
+
+.. code:: python
+
+  struct.unpack('d', base64.b64decode(('BOt6deP8ZNjY' + 'A')[1:])[:-1])
+
+in which we will pad extra byte ('A') and strip off the prefix ('B'),
+then strip off the final byte of decoded byte string.
+
 Then, use a threshold to combine them:
 
 .. code:: bash
