@@ -133,7 +133,7 @@ be estimated by first generating posteriors:
 The posterior probabilities are encoded by a variant of base64 for
 faster output:
 
-.. code::
+::
 
  ((BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA, BAAAAAAAAAAA),
   (BOt6deP8ZNjY, BxCaxPXuuVj8, BzUiQOgdyuD8, B8P8ytb+X7D8, BkJgHdwmqgz8, BFPk16J3ibSw, B+vJ6/wDegDU),
