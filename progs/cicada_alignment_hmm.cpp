@@ -1137,27 +1137,22 @@ struct ViterbiMapReduce
   
   struct bitext_type
   {
-    bitext_type() : id(size_type(-1)), source(), target(), alignment() {}
+    bitext_type() : id(size_type(-1)), source(), target() {}
     bitext_type(const size_type& __id, const sentence_type& __source, const sentence_type& __target)
-      : id(__id), source(__source), target(__target), alignment() {}
-    bitext_type(const size_type& __id, const sentence_type& __source, const sentence_type& __target, const alignment_type& __alignment)
-      : id(__id), source(__source), target(__target), alignment(__alignment) {}
+      : id(__id), source(__source), target(__target) {}
     
     bitext_type(const size_type& __id,
 		const sentence_type& __source, const sentence_type& __target,
-		const span_set_type& __span_source, const span_set_type& __span_target,
-		const alignment_type& __alignment)
+		const span_set_type& __span_source, const span_set_type& __span_target)
       : id(__id),
 	source(__source), target(__target),
-	span_source(__span_source), span_target(__span_target),
-	alignment(__alignment) {}
+	span_source(__span_source), span_target(__span_target) {}
     
     size_type     id;
     sentence_type source;
     sentence_type target;
     span_set_type span_source;
     span_set_type span_target;
-    alignment_type alignment;
 
     void clear()
     {
@@ -1166,7 +1161,6 @@ struct ViterbiMapReduce
       target.clear();
       span_source.clear();
       span_target.clear();
-      alignment.clear();
     }
     
     void swap(bitext_type& x)
@@ -1176,7 +1170,6 @@ struct ViterbiMapReduce
       target.swap(x.target);
       span_source.swap(x.span_source);
       span_target.swap(x.span_target);
-      alignment.swap(x.alignment);
     }
     
     friend
@@ -1192,8 +1185,42 @@ struct ViterbiMapReduce
     }
   };
   
-  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
-  typedef std::vector<queue_type, std::allocator<queue_type> > queue_set_type;
+  struct viterbi_type
+  {
+    size_type id;
+    std::string output;
+    
+    viterbi_type() : id(size_type(-1)), output() {}
+    
+    void clear()
+    {
+      id = size_type(-1);
+      output.clear();
+    }
+
+    void swap(viterbi_type& x)
+    {
+      std::swap(id, x.id);
+      output.swap(x.output);
+    }
+
+    friend
+    bool operator<(const viterbi_type& x, const viterbi_type& y)
+    {
+      return x.id < y.id;
+    }
+    
+    friend
+    bool operator>(const viterbi_type& x, const viterbi_type& y)
+    {
+      return x.id > y.id;
+    }
+  };
+
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_mapper_type;
+  typedef utils::lockfree_list_queue<viterbi_type, std::allocator<viterbi_type> > queue_reducer_type;
+  
+  typedef std::vector<queue_reducer_type, std::allocator<queue_reducer_type> > queue_reducer_set_type;
 };
 
 namespace std
@@ -1203,16 +1230,25 @@ namespace std
   {
     x.swap(y);
   }
+
+  inline
+  void swap(ViterbiMapReduce::viterbi_type& x, ViterbiMapReduce::viterbi_type& y)
+  {
+    x.swap(y);
+  }
 };
 
 template <typename Aligner>
 struct ViterbiMapper : public ViterbiMapReduce, public Aligner
 {
-  queue_type& mapper;
-  queue_type& reducer_source_target;
-  queue_type& reducer_target_source;
+  queue_mapper_type& mapper;
+  queue_reducer_type& reducer_source_target;
+  queue_reducer_type& reducer_target_source;
   
-  ViterbiMapper(const Aligner& __aligner, queue_type& __mapper, queue_type& __reducer_source_target, queue_type& __reducer_target_source)
+  ViterbiMapper(const Aligner& __aligner,
+		queue_mapper_type& __mapper,
+		queue_reducer_type& __reducer_source_target,
+		queue_reducer_type& __reducer_target_source)
     : Aligner(__aligner),
       mapper(__mapper),
       reducer_source_target(__reducer_source_target),
@@ -1222,8 +1258,12 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
   void operator()()
   {
     bitext_type bitext;
+    
     alignment_type alignment_source_target;
     alignment_type alignment_target_source;
+    
+    viterbi_type viterbi_source_target;
+    viterbi_type viterbi_target_source;
 
     const int iter_mask = (1 << 8) - 1;
     
@@ -1237,41 +1277,130 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
       if (! bitext.source.empty() && ! bitext.target.empty())
 	Aligner::operator()(bitext.source, bitext.target, bitext.span_source, bitext.span_target, alignment_source_target, alignment_target_source);
       
-      reducer_source_target.push(bitext_type(bitext.id, bitext.source, bitext.target, alignment_source_target));
-      reducer_target_source.push(bitext_type(bitext.id, bitext.target, bitext.source, alignment_target_source));
+      viterbi_source_target.id = bitext.id;
+      viterbi_target_source.id = bitext.id;
+      
+      write(viterbi_source_target, bitext.id, bitext.source, bitext.target, alignment_source_target);
+      write(viterbi_target_source, bitext.id, bitext.target, bitext.source, alignment_target_source);
+      
+      reducer_source_target.push_swap(viterbi_source_target);
+      reducer_target_source.push_swap(viterbi_target_source);
 
       if ((iter & iter_mask) == iter_mask)
 	Aligner::shrink();
     }
 
-    reducer_source_target.push(bitext_type());
-    reducer_target_source.push(bitext_type());
+    reducer_source_target.push(viterbi_type());
+    reducer_target_source.push(viterbi_type());
+  }
+
+  typedef int index_type;
+  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
+  typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
+  typedef std::set<index_type, std::less<index_type>, std::allocator<index_type> > align_none_type;
+
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
+  align_set_type  aligns;
+  align_none_type aligns_none;
+
+  buffer_type buffer;
+
+  void write(viterbi_type& viterbi,
+	     const size_type& id,
+	     const sentence_type& source,
+	     const sentence_type& target,
+	     const alignment_type& alignment)
+  {
+    typedef std::ostream_iterator<char> oiter_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
+    buffer.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::back_inserter(buffer));
+    
+    if (moses_mode)
+      os << alignment << '\n';
+    else {
+      os << "# Sentence pair (" << (id + 1) << ')'
+	 << " source length " << source.size()
+	 << " target length " << target.size()
+	 << " alignment score : " << 0 << '\n';
+      os << target << '\n';
+    
+      if (source.empty() || target.empty() || alignment.empty()) {
+	os << "NULL";
+	os << " ({";
+	for (size_type trg = 0; trg != target.size(); ++ trg)
+	  os << ' ' << (trg + 1);
+	os << " })";
+	
+	for (size_type src = 0; src != source.size(); ++ src) {
+	  os << ' ' << source[src];
+	  os << " ({ })";
+	}
+	os << '\n';
+      } else {
+	aligns.clear();
+	aligns.resize(source.size());
+      
+	aligns_none.clear();
+	for (size_type trg = 0; trg != target.size(); ++ trg)
+	  aligns_none.insert(trg + 1);
+      
+	alignment_type::const_iterator aiter_end = alignment.end();
+	for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	  aligns[aiter->source].push_back(aiter->target + 1);
+	  aligns_none.erase(aiter->target + 1);
+	}
+      
+	os << "NULL";
+	os << " ({ ";
+	std::copy(aligns_none.begin(), aligns_none.end(), std::ostream_iterator<index_type>(os, " "));
+	os << "})";
+      
+	for (size_type src = 0; src != source.size(); ++ src) {
+	  os << ' ' << source[src];
+	  os << " ({ ";
+	  std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<index_type>(os, " "));
+	  os << "})";
+	}
+	os << '\n';
+      }
+    }
+    
+    os.reset();
+    
+    viterbi.output = std::string(buffer.begin(), buffer.end());
   }
 };
 
 struct ViterbiReducer : public ViterbiMapReduce
 {
-  typedef std::pair<bitext_type, queue_type*> bitext_queue_type;
-  typedef std::vector<bitext_queue_type, std::allocator<bitext_queue_type> > bitext_queue_set_type;
+  typedef std::pair<viterbi_type, queue_reducer_type*> viterbi_queue_type;
+  typedef std::vector<viterbi_queue_type, std::allocator<viterbi_queue_type> > viterbi_queue_set_type;
 
   struct heap_compare_type
   {
-    bool operator()(const bitext_queue_type* x, const bitext_queue_type* y) const
+    bool operator()(const viterbi_queue_type* x, const viterbi_queue_type* y) const
     {
       return x->first > y->first;
     }
   };
   
-  typedef std::vector<bitext_queue_type*, std::allocator<bitext_queue_type*> > heap_base_type;
-  typedef std::priority_queue<bitext_queue_type*, heap_base_type, heap_compare_type> heap_type;
+  typedef std::vector<viterbi_queue_type*, std::allocator<viterbi_queue_type*> > heap_base_type;
+  typedef std::priority_queue<viterbi_queue_type*, heap_base_type, heap_compare_type> heap_type;
   
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
-  queue_set_type& queues;
+  queue_reducer_set_type& queues;
   bool flush_;
   
-  ViterbiReducer(const path_type& path, queue_set_type& __queues) : os(), queues(__queues), flush_(false)
+  ViterbiReducer(const path_type& path, queue_reducer_set_type& __queues) : os(), queues(__queues), flush_(false)
   {
     if (! path.empty()) {
       flush_ = (path == "-"
@@ -1282,98 +1411,43 @@ struct ViterbiReducer : public ViterbiMapReduce
     }
   }
   
-  typedef int index_type;
-  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
-  typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
-  typedef std::set<index_type, std::less<index_type>, std::allocator<index_type> > align_none_type;
-  
-  align_set_type  aligns;
-  align_none_type aligns_none;
-  
-  void write(std::ostream& os, const bitext_type& bitext)
-  {
-    if (moses_mode)
-      os << bitext.alignment << '\n';
-    else {
-      os << "# Sentence pair (" << (bitext.id + 1) << ')'
-	 << " source length " << bitext.source.size()
-	 << " target length " << bitext.target.size()
-	 << " alignment score : " << 0 << '\n';
-      os << bitext.target << '\n';
-    
-      if (bitext.alignment.empty() || bitext.source.empty() || bitext.target.empty()) {
-	os << "NULL ({ })";
-	sentence_type::const_iterator siter_end = bitext.source.end();
-	for (sentence_type::const_iterator siter = bitext.source.begin(); siter != siter_end; ++ siter)
-	  os << ' ' << *siter << " ({ })";
-	os << '\n';
-      } else {
-	aligns.clear();
-	aligns.resize(bitext.source.size());
-      
-	aligns_none.clear();
-	for (size_type trg = 0; trg != bitext.target.size(); ++ trg)
-	  aligns_none.insert(trg + 1);
-      
-	alignment_type::const_iterator aiter_end = bitext.alignment.end();
-	for (alignment_type::const_iterator aiter = bitext.alignment.begin(); aiter != aiter_end; ++ aiter) {
-	  aligns[aiter->source].push_back(aiter->target + 1);
-	  aligns_none.erase(aiter->target + 1);
-	}
-      
-	os << "NULL";
-	os << " ({ ";
-	std::copy(aligns_none.begin(), aligns_none.end(), std::ostream_iterator<index_type>(os, " "));
-	os << "})";
-      
-	for (size_type src = 0; src != bitext.source.size(); ++ src) {
-	  os << ' ' << bitext.source[src];
-	  os << " ({ ";
-	  std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<index_type>(os, " "));
-	  os << "})";
-	}
-	os << '\n';
-      }
-    }
-  }
-  
   void operator()()
   {
     std::ostream* stream = os.get();
 
-    bitext_queue_set_type bitexts(queues.size());
+    viterbi_queue_set_type viterbis(queues.size());
     heap_type heap;
 
     size_type id = 0;
     
     for (size_type shard = 0; shard != queues.size(); ++ shard) {
-      bitexts[shard].second = &queues[shard];
+      viterbis[shard].second = &queues[shard];
       
-      queues[shard].pop_swap(bitexts[shard].first);
+      queues[shard].pop_swap(viterbis[shard].first);
       
-      if (bitexts[shard].first.id != size_type(-1))
-	heap.push(&bitexts[shard]);
+      if (viterbis[shard].first.id != size_type(-1))
+	heap.push(&viterbis[shard]);
     }
     
     while (! heap.empty()) {
-      bitext_queue_type* bitext_queue = heap.top();
+      viterbi_queue_type* viterbi_queue = heap.top();
       heap.pop();
 
-      if (bitext_queue->first.id != id)
+      if (viterbi_queue->first.id != id)
 	throw std::runtime_error("invalid id");
       ++ id;
       
       if (stream) {
-	write(*stream, bitext_queue->first);
+	*stream << viterbi_queue->first.output;
 	
 	if (flush_)
 	  *stream << std::flush;
       }
       
-      bitext_queue->second->pop_swap(bitext_queue->first);
+      viterbi_queue->second->pop_swap(viterbi_queue->first);
       
-      if (bitext_queue->first.id != size_type(-1))
-	heap.push(bitext_queue);
+      if (viterbi_queue->first.id != size_type(-1))
+	heap.push(viterbi_queue);
     }
   }
 };
@@ -1390,14 +1464,16 @@ void viterbi(const ttable_type& ttable_source_target,
   typedef ViterbiMapper<Aligner> mapper_type;
   
   typedef reducer_type::bitext_type    bitext_type;
-  typedef reducer_type::queue_type     queue_type;
-  typedef reducer_type::queue_set_type queue_set_type;
+
+  typedef reducer_type::queue_mapper_type      queue_mapper_type;
+  typedef reducer_type::queue_reducer_type     queue_reducer_type;
+  typedef reducer_type::queue_reducer_set_type queue_reducer_set_type;
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
-  queue_type queue(threads * 1024);
-  queue_set_type queue_source_target(threads, queue_type(1024));
-  queue_set_type queue_target_source(threads, queue_type(1024));
+  queue_mapper_type     queue(threads * 1024);
+  queue_reducer_set_type queue_source_target(threads, queue_reducer_type(1024));
+  queue_reducer_set_type queue_target_source(threads, queue_reducer_type(1024));
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
@@ -1465,12 +1541,6 @@ void viterbi(const ttable_type& ttable_source_target,
   }
 
   mapper.join_all();
-
-  //bitext.clear();
-  //queue_source_target.push_swap(bitext);
-  //bitext.clear();
-  //queue_target_source.push_swap(bitext);
-  
   reducer.join_all();
 
   utils::resource viterbi_end;
@@ -1935,22 +2005,22 @@ struct PosteriorMapper : public PosteriorMapReduce
     }
   };
   
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  buffer_type buffer;
+
   void write(posterior_type& posterior, const matrix_type& matrix)
   {
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
-    
-    typedef std::ostream_iterator<char> iterator_type;
+   
+    typedef std::back_insert_iterator<buffer_type> iterator_type;
     
     //karma::real_generator<long double, real_precision> real;
     utils::double_base64_generator<iterator_type> base64;
 
-    posterior.output.clear();
-    
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::back_inserter(posterior.output));
-    
-    iterator_type iter(os);
+    buffer.clear();
+    iterator_type iter(buffer);
 
     if (! matrix.empty()) {
       karma::generate(iter, karma::lit('('));
@@ -1964,6 +2034,8 @@ struct PosteriorMapper : public PosteriorMapReduce
       karma::generate(iter, karma::lit(')'));
     }
     karma::generate(iter, karma::lit('\n'));
+
+    posterior.output = std::string(buffer.begin(), buffer.end());
   }
 };
 
@@ -2118,10 +2190,6 @@ void posterior(const ttable_type& ttable_source_target,
     queue.push_swap(bitext);
   }
   mapper.join_all();
-  
-  //queue_source_target.push(posterior_type());
-  //queue_target_source.push(posterior_type());
-
   reducer.join_all();
 
   utils::resource posterior_end;
