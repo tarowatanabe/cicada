@@ -5,6 +5,8 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
+#include <queue>
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 
@@ -2155,9 +2157,22 @@ struct ViterbiMapReduce
       span_target.swap(x.span_target);
       alignment.swap(x.alignment);
     }
+    
+    friend
+    bool operator<(const bitext_type& x, const bitext_type& y)
+    {
+      return x.id < y.id;
+    }
+
+    friend
+    bool operator>(const bitext_type& x, const bitext_type& y)
+    {
+      return x.id > y.id;
+    }
   };
   
   typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
+  typedef std::vector<queue_type, std::allocator<queue_type> > queue_set_type;
 };
 
 namespace std
@@ -2236,27 +2251,35 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
 	Aligner::shrink();
       }
     }
+    
+    reducer_source_target.push(bitext_type());
+    reducer_target_source.push(bitext_type());
   }
 };
 
 struct ViterbiReducer : public ViterbiMapReduce
 {
-  struct less_bitext
+  typedef std::pair<bitext_type, queue_type*> bitext_queue_type;
+  typedef std::vector<bitext_queue_type, std::allocator<bitext_queue_type> > bitext_queue_set_type;
+
+  struct heap_compare_type
   {
-    bool operator()(const bitext_type& x, const bitext_type& y) const
+    bool operator()(const bitext_queue_type* x, const bitext_queue_type* y) const
     {
-      return x.id < y.id;
+      return x->first > y->first;
     }
   };
-  typedef std::set<bitext_type, less_bitext, std::allocator<bitext_type> > bitext_set_type;
+  
+  typedef std::vector<bitext_queue_type*, std::allocator<bitext_queue_type*> > heap_base_type;
+  typedef std::priority_queue<bitext_queue_type*, heap_base_type, heap_compare_type> heap_type;
 
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
-  queue_type& queue;
+  queue_set_type& queues;
   bool flush_;
   
-  ViterbiReducer(const path_type& path, queue_type& __queue) : os(), queue(__queue), flush_(false)
+  ViterbiReducer(const path_type& path, queue_set_type& __queues) : os(), queues(__queues), flush_(false)
   {
     if (! path.empty()) {
       flush_ = (path == "-"
@@ -2329,51 +2352,41 @@ struct ViterbiReducer : public ViterbiMapReduce
   
   void operator()()
   {
-    if (! os) {
-      bitext_type bitext;
-      for (;;) {
-	queue.pop_swap(bitext);
-	if (bitext.id == size_type(-1)) break;
-      }
-    } else {
-      bitext_set_type bitexts;
-      size_type id = 0;
-      bitext_type bitext;
-      for (;;) {
-	queue.pop_swap(bitext);
-	if (bitext.id == size_type(-1)) break;
-	
-	bool written = false;
-	
-	if (bitext.id == id) {
-	  write(*os, bitext);
-	  written = true;
-	  ++ id;
-	} else
-	  bitexts.insert(bitext);
-	
-	while (! bitexts.empty() && bitexts.begin()->id == id) {
-	  write(*os, *bitexts.begin());
-	  written = true;
-	  bitexts.erase(bitexts.begin());
-	  ++ id;
-	}
+    std::ostream* stream = os.get();
 
-	if (written && flush_)
-	  *os << std::flush;
+    bitext_queue_set_type bitexts(queues.size());
+    heap_type heap;
+
+    size_type id = 0;
+    
+    for (size_type shard = 0; shard != queues.size(); ++ shard) {
+      bitexts[shard].second = &queues[shard];
+      
+      queues[shard].pop_swap(bitexts[shard].first);
+      
+      if (bitexts[shard].first.id != size_type(-1))
+	heap.push(&bitexts[shard]);
+    }
+    
+    while (! heap.empty()) {
+      bitext_queue_type* bitext_queue = heap.top();
+      heap.pop();
+
+      if (bitext_queue->first.id != id)
+	throw std::runtime_error("invalid id");
+      ++ id;
+      
+      if (stream) {
+	write(*stream, bitext_queue->first);
+	
+	if (flush_)
+	  *stream << std::flush;
       }
       
-      while (! bitexts.empty() && bitexts.begin()->id == id) {
-	write(*os, *bitexts.begin());
-	bitexts.erase(bitexts.begin());
-	++ id;
-      }
-
-      if (flush_)
-	*os << std::flush;
+      bitext_queue->second->pop_swap(bitext_queue->first);
       
-      if (! bitexts.empty())
-	throw std::runtime_error("error while writeing viterbi output?");
+      if (bitext_queue->first.id != size_type(-1))
+	heap.push(bitext_queue);
     }
   }
 };
@@ -2395,14 +2408,15 @@ void viterbi(const ttable_type& ttable_source_target,
   typedef ViterbiReducer               reducer_type;
   typedef ViterbiMapper<Aligner, Base> mapper_type;
   
-  typedef reducer_type::bitext_type bitext_type;
-  typedef reducer_type::queue_type  queue_type;
+  typedef reducer_type::bitext_type    bitext_type;
+  typedef reducer_type::queue_type     queue_type;
+  typedef reducer_type::queue_set_type queue_set_type;
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
-  queue_type queue(threads * 4096);
-  queue_type queue_source_target;
-  queue_type queue_target_source;
+  queue_type     queue(threads * 1024);
+  queue_set_type queue_source_target(threads, queue_type(1024));
+  queue_set_type queue_target_source(threads, queue_type(1024));
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
@@ -2420,8 +2434,8 @@ void viterbi(const ttable_type& ttable_source_target,
 							 atable_source_target, atable_target_source,
 							 classes_source, classes_target),
 						    queue,
-						    queue_source_target,
-						    queue_target_source)));
+						    queue_source_target[i],
+						    queue_target_source[i])));
     
   bitext_type bitext;
   bitext.id = 0;
@@ -2477,10 +2491,10 @@ void viterbi(const ttable_type& ttable_source_target,
 
   mapper.join_all();
 
-  bitext.clear();
-  queue_source_target.push_swap(bitext);
-  bitext.clear();
-  queue_target_source.push_swap(bitext);
+  //bitext.clear();
+  //queue_source_target.push_swap(bitext);
+  //bitext.clear();
+  //queue_target_source.push_swap(bitext);
   
   reducer.join_all();
 
@@ -2556,6 +2570,8 @@ struct PosteriorMapReduce
   
   typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> >       queue_mapper_type;
   typedef utils::lockfree_list_queue<posterior_type, std::allocator<posterior_type> > queue_reducer_type;
+
+  typedef std::vector<queue_reducer_type, std::allocator<queue_reducer_type> > queue_reducer_set_type;
 };
 
 namespace std
@@ -2637,20 +2653,35 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
 	Infer::shrink();
       }
     }
+    
+    reducer_source_target.push(posterior_type());
+    reducer_target_source.push(posterior_type());
   }
 };
 
 struct PosteriorReducer : public PosteriorMapReduce
 {
-  typedef std::set<posterior_type, std::less<posterior_type>, std::allocator<posterior_type> > posterior_set_type;
+  typedef std::pair<posterior_type, queue_reducer_type*> posterior_queue_type;
+  typedef std::vector<posterior_queue_type, std::allocator<posterior_queue_type> > posterior_queue_set_type;
 
+  struct heap_compare_type
+  {
+    bool operator()(const posterior_queue_type* x, const posterior_queue_type* y) const
+    {
+      return x->first > y->first;
+    }
+  };
+  
+  typedef std::vector<posterior_queue_type*, std::allocator<posterior_queue_type*> > heap_base_type;
+  typedef std::priority_queue<posterior_queue_type*, heap_base_type, heap_compare_type> heap_type;
+  
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
-  queue_reducer_type& queue;
+  queue_reducer_set_type& queues;
   bool flush_;
   
-  PosteriorReducer(const path_type& path, queue_reducer_type& __queue) : os(), queue(__queue), flush_(false)
+  PosteriorReducer(const path_type& path, queue_reducer_set_type& __queues) : os(), queues(__queues), flush_(false)
   {
     if (! path.empty()) {
       flush_ = (path == "-"
@@ -2664,52 +2695,41 @@ struct PosteriorReducer : public PosteriorMapReduce
   
   void operator()() throw()
   {
-    if (! os) {
-      posterior_type posterior;
-      for (;;) {
-	queue.pop_swap(posterior);
-	if (posterior.id == size_type(-1)) break;
-      }
-    } else {
-      posterior_set_type posteriors;
-      size_type      id = 0;
-      posterior_type posterior;
+    std::ostream* stream = os.get();
+
+    posterior_queue_set_type posteriors(queues.size());
+    heap_type heap;
+
+    size_type id = 0;
+    
+    for (size_type shard = 0; shard != queues.size(); ++ shard) {
+      posteriors[shard].second = &queues[shard];
       
-      for (;;) {
-	queue.pop_swap(posterior);
-	if (posterior.id == size_type(-1)) break;
+      queues[shard].pop_swap(posteriors[shard].first);
+      
+      if (posteriors[shard].first.id != size_type(-1))
+	heap.push(&posteriors[shard]);
+    }
+    
+    while (! heap.empty()) {
+      posterior_queue_type* posterior_queue = heap.top();
+      heap.pop();
+
+      if (posterior_queue->first.id != id)
+	throw std::runtime_error("invalid id");
+      ++ id;
+      
+      if (stream) {
+	write(*stream, posterior_queue->first);
 	
-	bool written = false;
-	
-	if (posterior.id == id) {
-	  write(*os, posterior);
-	  written = true;
-	  ++ id;
-	} else
-	  posteriors.insert(posterior);
-	
-	while (! posteriors.empty() && posteriors.begin()->id == id) {
-	  write(*os, *posteriors.begin());
-	  written = true;
-	  posteriors.erase(posteriors.begin());
-	  ++ id;
-	}
-	
-	if (written && flush_)
-	  *os << std::flush;
+	if (flush_)
+	  *stream << std::flush;
       }
       
-      while (! posteriors.empty() && posteriors.begin()->id == id) {
-	write(*os, *posteriors.begin());
-	posteriors.erase(posteriors.begin());
-	++ id;
-      }
+      posterior_queue->second->pop_swap(posterior_queue->first);
       
-      if (flush_)
-	*os << std::flush;
-      
-      if (! posteriors.empty())
-	throw std::runtime_error("error while writeing posterior output?");
+      if (posterior_queue->first.id != size_type(-1))
+	heap.push(posterior_queue);
     }
   }
   
@@ -2770,14 +2790,15 @@ void posterior(const ttable_type& ttable_source_target,
   typedef reducer_type::bitext_type    bitext_type;
   typedef reducer_type::posterior_type posterior_type;
   
-  typedef reducer_type::queue_mapper_type  queue_mapper_type;
-  typedef reducer_type::queue_reducer_type queue_reducer_type;
+  typedef reducer_type::queue_mapper_type      queue_mapper_type;
+  typedef reducer_type::queue_reducer_type     queue_reducer_type;
+  typedef reducer_type::queue_reducer_set_type queue_reducer_set_type;
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
   
-  queue_mapper_type  queue(threads * 4096);
-  queue_reducer_type queue_source_target;
-  queue_reducer_type queue_target_source;
+  queue_mapper_type  queue(threads * 1024);
+  queue_reducer_set_type queue_source_target(threads, queue_reducer_type(1024));
+  queue_reducer_set_type queue_target_source(threads, queue_reducer_type(1024));
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(posterior_source_target_file, queue_source_target)));
@@ -2795,8 +2816,8 @@ void posterior(const ttable_type& ttable_source_target,
 							 atable_source_target, atable_target_source,
 							 classes_source, classes_target),
 						    queue,
-						    queue_source_target,
-						    queue_target_source)));  
+						    queue_source_target[i],
+						    queue_target_source[i])));  
   
   bitext_type bitext;
   bitext.id = 0;
@@ -2838,8 +2859,8 @@ void posterior(const ttable_type& ttable_source_target,
   }
   mapper.join_all();
   
-  queue_source_target.push(posterior_type());
-  queue_target_source.push(posterior_type());
+  //queue_source_target.push(posterior_type());
+  //queue_target_source.push(posterior_type());
 
   reducer.join_all();
 
