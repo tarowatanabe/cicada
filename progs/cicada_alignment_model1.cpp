@@ -1380,22 +1380,22 @@ struct PosteriorMapReduce
   struct posterior_type
   {
     size_type id;
-    matrix_type matrix;
+    std::string output;
     
-    posterior_type() : id(size_type(-1)), matrix() {}
+    posterior_type() : id(size_type(-1)), output() {}
     
     void clear()
     {
       id = size_type(-1);
-      matrix.clear();
+      output.clear();
     }
-    
+
     void swap(posterior_type& x)
     {
       std::swap(id, x.id);
-      matrix.swap(x.matrix);
+      output.swap(x.output);
     }
-    
+
     friend
     bool operator<(const posterior_type& x, const posterior_type& y)
     {
@@ -1450,6 +1450,10 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
   void operator()()
   {
     bitext_type    bitext;
+    
+    matrix_type matrix_source_target;
+    matrix_type matrix_target_source;
+    
     posterior_type posterior_source_target;
     posterior_type posterior_target_source;
     
@@ -1459,14 +1463,17 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
       
-      posterior_source_target.clear();
-      posterior_target_source.clear();
+      matrix_source_target.clear();
+      matrix_target_source.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty())
-	Infer::operator()(bitext.source, bitext.target, posterior_source_target.matrix, posterior_target_source.matrix);
+	Infer::operator()(bitext.source, bitext.target, matrix_source_target, matrix_target_source);
       
       posterior_source_target.id = bitext.id;
       posterior_target_source.id = bitext.id;
+      
+      write(posterior_source_target, matrix_source_target);
+      write(posterior_target_source, matrix_target_source);
       
       reducer_source_target.push_swap(posterior_source_target);
       reducer_target_source.push_swap(posterior_target_source);
@@ -1477,6 +1484,45 @@ struct PosteriorMapper : public PosteriorMapReduce, public Infer
     
     reducer_source_target.push(posterior_type());
     reducer_target_source.push(posterior_type());
+  }
+  
+  struct real_precision : boost::spirit::karma::real_policies<long double>
+  {
+    static unsigned int precision(long double) 
+    { 
+      return 20;
+    }
+  };
+  
+  void write(posterior_type& posterior, const matrix_type& matrix)
+  {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    //karma::real_generator<long double, real_precision> real;
+    utils::double_base64_generator<iterator_type> base64;
+
+    posterior.output.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::back_inserter(posterior.output));
+    
+    iterator_type iter(os);
+
+    if (! matrix.empty()) {
+      karma::generate(iter, karma::lit('('));
+      for (size_type i = 0; i != matrix.size1(); ++ i) {
+	if (i)
+	  karma::generate(iter, karma::lit(", "));
+	
+	karma::generate(iter, '(' << (('B' << base64) % ", ") << ')',
+			boost::make_iterator_range(matrix.begin(i), matrix.end(i)));
+      }
+      karma::generate(iter, karma::lit(')'));
+    }
+    karma::generate(iter, karma::lit('\n'));
   }
 };
 
@@ -1541,7 +1587,7 @@ struct PosteriorReducer : public PosteriorMapReduce
       ++ id;
       
       if (stream) {
-	write(*stream, posterior_queue->first);
+	*stream << posterior_queue->first.output;
 	
 	if (flush_)
 	  *stream << std::flush;
@@ -1552,41 +1598,6 @@ struct PosteriorReducer : public PosteriorMapReduce
       if (posterior_queue->first.id != size_type(-1))
 	heap.push(posterior_queue);
     }
-  }
-
-  struct real_precision : boost::spirit::karma::real_policies<long double>
-  {
-    static unsigned int precision(long double) 
-    { 
-      return 20;
-    }
-  };
-  
-  void write(std::ostream& os, const posterior_type& posterior)
-  {
-    namespace karma = boost::spirit::karma;
-    namespace standard = boost::spirit::standard;
-    
-    typedef std::ostream_iterator<char> iterator_type;
-    
-    const matrix_type& matrix = posterior.matrix;
-
-    karma::real_generator<long double, real_precision> real;
-    utils::double_base64_generator<iterator_type> base64;
-    
-    iterator_type iter(os);
-
-    if (! matrix.empty()) {
-      karma::generate(iter, karma::lit('('));
-      for (size_type i = 0; i != matrix.size1(); ++ i) {
-	if (i)
-	  karma::generate(iter, karma::lit(", "));
-	karma::generate(iter, '(' << (('B' << base64) % ", ") << ')',
-			boost::make_iterator_range(matrix.begin(i), matrix.end(i)));
-      }
-      karma::generate(iter, karma::lit(')'));
-    }
-    karma::generate(iter, karma::lit('\n'));
   }
 };
 
