@@ -1394,6 +1394,8 @@ struct ViterbiReducer : public ViterbiMapReduce
   typedef std::vector<viterbi_queue_type*, std::allocator<viterbi_queue_type*> > heap_base_type;
   typedef std::priority_queue<viterbi_queue_type*, heap_base_type, heap_compare_type> heap_type;
   
+  typedef std::vector<viterbi_queue_type*, std::allocator<viterbi_queue_type*> > queue_type;
+  
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type os;
@@ -1411,44 +1413,82 @@ struct ViterbiReducer : public ViterbiMapReduce
     }
   }
   
-  void operator()()
+  void operator()() throw()
   {
     std::ostream* stream = os.get();
 
     viterbi_queue_set_type viterbis(queues.size());
+    
     heap_type heap;
+    queue_type queue;
+    queue_type queue_next;
 
     size_type id = 0;
     
     for (size_type shard = 0; shard != queues.size(); ++ shard) {
       viterbis[shard].second = &queues[shard];
       
-      queues[shard].pop_swap(viterbis[shard].first);
-      
-      if (viterbis[shard].first.id != size_type(-1))
-	heap.push(&viterbis[shard]);
+      queue.push_back(&viterbis[shard]);
     }
     
-    while (! heap.empty()) {
-      viterbi_queue_type* viterbi_queue = heap.top();
-      heap.pop();
+    int non_found_iter = 0;
+    while (! heap.empty() || ! queue.empty()) {
+      bool found = false;
 
-      if (viterbi_queue->first.id != id)
-	throw std::runtime_error("invalid id");
-      ++ id;
-      
-      if (stream) {
-	*stream << viterbi_queue->first.output;
+      if (! heap.empty() && heap.top()->first.id == id) {
+	viterbi_queue_type* viterbi_queue = heap.top();
+	heap.pop();
 	
-	if (flush_)
-	  *stream << std::flush;
+	++ id;
+	
+	if (stream) {
+	  *stream << viterbi_queue->first.output;
+	  
+	  if (flush_)
+	    *stream << std::flush;
+	}
+	
+	queue.push_back(viterbi_queue);
+	
+	found = true;
+      }
+
+      if (! queue.empty()) {
+	for (size_type i = 0; i != queue.size(); ++ i) {
+	  if (queue[i]->second->pop_swap(queue[i]->first, true)) {
+	    if (queue[i]->first.id != size_type(-1))
+	      heap.push(queue[i]);
+	    
+	    found = true;
+	  } else
+	    queue_next.push_back(queue[i]);
+	}
+	
+	queue.swap(queue_next);
+	queue_next.clear();
       }
       
-      viterbi_queue->second->pop_swap(viterbi_queue->first);
-      
-      if (viterbi_queue->first.id != size_type(-1))
-	heap.push(viterbi_queue);
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
+  }
+
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+  
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
 };
 
@@ -2054,6 +2094,8 @@ struct PosteriorReducer : public PosteriorMapReduce
   
   typedef std::vector<posterior_queue_type*, std::allocator<posterior_queue_type*> > heap_base_type;
   typedef std::priority_queue<posterior_queue_type*, heap_base_type, heap_compare_type> heap_type;
+
+  typedef std::vector<posterior_queue_type*, std::allocator<posterior_queue_type*> > queue_type;
   
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
@@ -2078,39 +2120,77 @@ struct PosteriorReducer : public PosteriorMapReduce
     std::ostream* stream = os.get();
 
     posterior_queue_set_type posteriors(queues.size());
+    
     heap_type heap;
+    queue_type queue;
+    queue_type queue_next;
 
     size_type id = 0;
     
     for (size_type shard = 0; shard != queues.size(); ++ shard) {
       posteriors[shard].second = &queues[shard];
       
-      queues[shard].pop_swap(posteriors[shard].first);
-      
-      if (posteriors[shard].first.id != size_type(-1))
-	heap.push(&posteriors[shard]);
+      queue.push_back(&posteriors[shard]);
     }
     
-    while (! heap.empty()) {
-      posterior_queue_type* posterior_queue = heap.top();
-      heap.pop();
+    int non_found_iter = 0;
+    while (! heap.empty() || ! queue.empty()) {
+      bool found = false;
 
-      if (posterior_queue->first.id != id)
-	throw std::runtime_error("invalid id");
-      ++ id;
-      
-      if (stream) {
-	*stream << posterior_queue->first.output;
+      if (! heap.empty() && heap.top()->first.id == id) {
+	posterior_queue_type* posterior_queue = heap.top();
+	heap.pop();
 	
-	if (flush_)
-	  *stream << std::flush;
+	++ id;
+	
+	if (stream) {
+	  *stream << posterior_queue->first.output;
+	  
+	  if (flush_)
+	    *stream << std::flush;
+	}
+	
+	queue.push_back(posterior_queue);
+	
+	found = true;
+      }
+
+      if (! queue.empty()) {
+	for (size_type i = 0; i != queue.size(); ++ i) {
+	  if (queue[i]->second->pop_swap(queue[i]->first, true)) {
+	    if (queue[i]->first.id != size_type(-1))
+	      heap.push(queue[i]);
+	    
+	    found = true;
+	  } else
+	    queue_next.push_back(queue[i]);
+	}
+	
+	queue.swap(queue_next);
+	queue_next.clear();
       }
       
-      posterior_queue->second->pop_swap(posterior_queue->first);
-      
-      if (posterior_queue->first.id != size_type(-1))
-	heap.push(posterior_queue);
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
+  }
+  
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+  
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
 };
 
