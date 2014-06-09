@@ -1190,30 +1190,43 @@ struct ProjectionMapReduce
       dependency_target.swap(x.dependency_target);
     }
   };
-  
+
   struct projected_type
   {
     size_type id;
-    dependency_type dependency;
+    std::string output;
     
-    projected_type() : id(size_type(-1)), dependency() {}
+    projected_type() : id(size_type(-1)), output() {}
     
     void clear()
     {
       id = size_type(-1);
-      dependency.clear();
+      output.clear();
     }
     
     void swap(projected_type& x)
     {
       std::swap(id, x.id);
-      dependency.swap(x.dependency);
+      output.swap(x.output);
+    }
+    
+    friend
+    bool operator<(const projected_type& x, const projected_type& y)
+    {
+      return x.id < y.id;
+    }
+    
+    friend
+    bool operator>(const projected_type& x, const projected_type& y)
+    {
+      return x.id > y.id;
     }
   };
   
-
   typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> >       queue_mapper_type;
   typedef utils::lockfree_list_queue<projected_type, std::allocator<projected_type> > queue_reducer_type;
+  
+  typedef std::vector<queue_reducer_type, std::allocator<queue_reducer_type> > queue_reducer_set_type;
 };
 
 namespace std
@@ -1250,6 +1263,10 @@ struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
   void operator()()
   {
     bitext_type bitext;
+
+    dependency_type dependency_source;
+    dependency_type dependency_target;
+    
     projected_type projected_source;
     projected_type projected_target;
     
@@ -1259,19 +1276,22 @@ struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
 
-      projected_source.clear();
-      projected_target.clear();
+      dependency_source.clear();
+      dependency_target.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty())
 	Analyzer::operator()(bitext.source,
 			     bitext.target,
 			     bitext.dependency_source,
 			     bitext.dependency_target,
-			     projected_source.dependency,
-			     projected_target.dependency);
+			     dependency_source,
+			     dependency_target);
       
       projected_source.id = bitext.id;
       projected_target.id = bitext.id;
+      
+      write(projected_source, dependency_source);
+      write(projected_target, dependency_target);
       
       reducer_source.push_swap(projected_source);
       reducer_target.push_swap(projected_target);
@@ -1279,28 +1299,54 @@ struct ProjectionMapper : public ProjectionMapReduce, public Analyzer
       if ((iter & iter_mask) == iter_mask)
 	Analyzer::shrink();
     }
+    
+    reducer_source.push(projected_type());
+    reducer_target.push(projected_type());
+  }
+
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
+  buffer_type buffer;
+  
+  void write(projected_type& projected, const dependency_type& dependency)
+  {
+    buffer.clear();
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::back_inserter(buffer));
+    
+    os << dependency << '\n';
+    
+    projected.output = std::string(buffer.begin(), buffer.end());
   }
   
 };
 
 struct ProjectionReducer : public ProjectionMapReduce
 {
-  struct less_projected
+  typedef std::pair<projected_type, queue_reducer_type*> projected_queue_type;
+  typedef std::vector<projected_queue_type, std::allocator<projected_queue_type> > projected_queue_set_type;
+
+  struct heap_compare_type
   {
-    bool operator()(const projected_type& x, const projected_type& y) const
+    bool operator()(const projected_queue_type* x, const projected_queue_type* y) const
     {
-      return x.id < y.id;
+      return x->first > y->first;
     }
   };
-  typedef std::set<projected_type, less_projected, std::allocator<projected_type> > projected_set_type;
+  
+  typedef std::vector<projected_queue_type*, std::allocator<projected_queue_type*> > heap_base_type;
+  typedef std::priority_queue<projected_queue_type*, heap_base_type, heap_compare_type> heap_type;
+
+  typedef std::vector<projected_queue_type*, std::allocator<projected_queue_type*> > queue_type;
   
   typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
   
   ostream_ptr_type    os;
-  queue_reducer_type& queue;
+  queue_reducer_set_type& queues;
   bool flush_;
   
-  ProjectionReducer(const path_type& path, queue_reducer_type& __queue) : os(), queue(__queue), flush_(false)
+  ProjectionReducer(const path_type& path, queue_reducer_set_type& __queues) : os(), queues(__queues), flush_(false)
   {
     if (! path.empty()) {
       flush_ = (path == "-"
@@ -1311,54 +1357,82 @@ struct ProjectionReducer : public ProjectionMapReduce
     }
   }
   
-  void operator()()
+  void operator()() throw()
   {
-    if (! os) {
-      projected_type projected;
-      for (;;) {
-	queue.pop_swap(projected);
-	if (projected.id == size_type(-1)) break;
-      }
-    } else { 
-      size_type id = 0;
-      projected_type     projected;
-      projected_set_type buffer;
-      for (;;) {
-	queue.pop_swap(projected);
-	if (projected.id == size_type(-1)) break;
+    std::ostream* stream = os.get();
 
-	bool written = false;
-       
-	if (projected.id == id) {
-	  *os << projected.dependency << '\n';
-	  written = true;
-	  ++ id;
-	} else
-	  buffer.insert(projected);
-       
-	while (! buffer.empty() && buffer.begin()->id == id) {
-	  *os << buffer.begin()->dependency << '\n';
-	  written = true;
-	  buffer.erase(buffer.begin());
-	  ++ id;
-	}
+    projected_queue_set_type projections(queues.size());
+    
+    heap_type heap;
+    queue_type queue;
+    queue_type queue_next;
 
-	if (written && flush_)
-	  *os << std::flush;
-      }
-     
-      while (! buffer.empty() && buffer.begin()->id == id) {
-	*os << buffer.begin()->dependency << '\n';
-	buffer.erase(buffer.begin());
-	++ id;
-      }
-
-      if (flush_)
-	*os << std::flush;
-     
-      if (! buffer.empty())
-	throw std::runtime_error("error while writing dependency output?");
+    size_type id = 0;
+    
+    for (size_type shard = 0; shard != queues.size(); ++ shard) {
+      projections[shard].second = &queues[shard];
+      
+      queue.push_back(&projections[shard]);
     }
+    
+    int non_found_iter = 0;
+    while (! heap.empty() || ! queue.empty()) {
+      bool found = false;
+
+      if (! heap.empty() && heap.top()->first.id == id) {
+	projected_queue_type* projected_queue = heap.top();
+	heap.pop();
+	
+	++ id;
+	
+	if (stream) {
+	  *stream << projected_queue->first.output;
+	  
+	  if (flush_)
+	    *stream << std::flush;
+	}
+	
+	queue.push_back(projected_queue);
+	
+	found = true;
+      }
+
+      if (! queue.empty()) {
+	for (size_type i = 0; i != queue.size(); ++ i) {
+	  if (queue[i]->second->pop_swap(queue[i]->first, true)) {
+	    if (queue[i]->first.id != size_type(-1))
+	      heap.push(queue[i]);
+	    
+	    found = true;
+	  } else
+	    queue_next.push_back(queue[i]);
+	}
+	
+	queue.swap(queue_next);
+	queue_next.clear();
+      }
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+  }
+  
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+  
+    if (non_found_iter >= 50) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
 };
 
@@ -1371,16 +1445,16 @@ void project_dependency(const ttable_type& ttable_source_target,
   
   typedef reducer_type::bitext_type    bitext_type;
   typedef reducer_type::projected_type projected_type;
-  
-  typedef reducer_type::queue_mapper_type  queue_mapper_type;
-  typedef reducer_type::queue_reducer_type queue_reducer_type;
+
+  typedef reducer_type::queue_mapper_type      queue_mapper_type;
+  typedef reducer_type::queue_reducer_type     queue_reducer_type;
+  typedef reducer_type::queue_reducer_set_type queue_reducer_set_type;
 
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
-  
-  
-  queue_mapper_type  queue(threads * 4096);
-  queue_reducer_type queue_source;
-  queue_reducer_type queue_target;
+
+  queue_mapper_type  queue(threads * 1024);
+  queue_reducer_set_type queue_source(threads, queue_reducer_type(1024));
+  queue_reducer_set_type queue_target(threads, queue_reducer_type(1024));
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(projected_source_file, queue_source)));
@@ -1390,8 +1464,8 @@ void project_dependency(const ttable_type& ttable_source_target,
   for (int i = 0; i != threads; ++ i)
     mapper.add_thread(new boost::thread(mapper_type(Analyzer(ttable_source_target, ttable_target_source),
 						    queue,
-						    queue_source,
-						    queue_target)));
+						    queue_source[i],
+						    queue_target[i])));
     
   bitext_type bitext;
   bitext.id = 0;
@@ -1445,9 +1519,6 @@ void project_dependency(const ttable_type& ttable_source_target,
     queue.push_swap(bitext);
   }
   mapper.join_all();
-  
-  queue_source.push(projected_type());
-  queue_target.push(projected_type());
   reducer.join_all();
 
   utils::resource projection_end;
