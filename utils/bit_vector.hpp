@@ -35,14 +35,14 @@ namespace utils
     const block_type* __masks() const 
     {
       static block_type __mask_blocks[__bitblock_bit_size] = {
-	0x00000001, 0x00000002, 0x00000004, 0x00000008,
-	0x00000010, 0x00000020, 0x00000040, 0x00000080,
-	0x00000100, 0x00000200, 0x00000400, 0x00000800,
-	0x00001000, 0x00002000, 0x00004000, 0x00008000,
-	0x00010000, 0x00020000, 0x00040000, 0x00080000,
-	0x00100000, 0x00200000, 0x00400000, 0x00800000,
-	0x01000000, 0x02000000, 0x04000000, 0x08000000,
-	0x10000000, 0x20000000, 0x40000000, 0x80000000,
+	0x00000001u, 0x00000002u, 0x00000004u, 0x00000008u,
+	0x00000010u, 0x00000020u, 0x00000040u, 0x00000080u,
+	0x00000100u, 0x00000200u, 0x00000400u, 0x00000800u,
+	0x00001000u, 0x00002000u, 0x00004000u, 0x00008000u,
+	0x00010000u, 0x00020000u, 0x00040000u, 0x00080000u,
+	0x00100000u, 0x00200000u, 0x00400000u, 0x00800000u,
+	0x01000000u, 0x02000000u, 0x04000000u, 0x08000000u,
+	0x10000000u, 0x20000000u, 0x40000000u, 0x80000000u,
       };
       return __mask_blocks;
     }
@@ -50,14 +50,14 @@ namespace utils
     const block_type* __masks_reverse() const 
     {
       static block_type __mask_blocks[__bitblock_bit_size] = {
-	~0x00000001, ~0x00000002, ~0x00000004, ~0x00000008,
-	~0x00000010, ~0x00000020, ~0x00000040, ~0x00000080,
-	~0x00000100, ~0x00000200, ~0x00000400, ~0x00000800,
-	~0x00001000, ~0x00002000, ~0x00004000, ~0x00008000,
-	~0x00010000, ~0x00020000, ~0x00040000, ~0x00080000,
-	~0x00100000, ~0x00200000, ~0x00400000, ~0x00800000,
-	~0x01000000, ~0x02000000, ~0x04000000, ~0x08000000,
-	~0x10000000, ~0x20000000, ~0x40000000, ~0x80000000,
+	~0x00000001u, ~0x00000002u, ~0x00000004u, ~0x00000008u,
+	~0x00000010u, ~0x00000020u, ~0x00000040u, ~0x00000080u,
+	~0x00000100u, ~0x00000200u, ~0x00000400u, ~0x00000800u,
+	~0x00001000u, ~0x00002000u, ~0x00004000u, ~0x00008000u,
+	~0x00010000u, ~0x00020000u, ~0x00040000u, ~0x00080000u,
+	~0x00100000u, ~0x00200000u, ~0x00400000u, ~0x00800000u,
+	~0x01000000u, ~0x02000000u, ~0x04000000u, ~0x08000000u,
+	~0x10000000u, ~0x20000000u, ~0x40000000u, ~0x80000000u,
       };
       return __mask_blocks;
     }
@@ -65,14 +65,14 @@ namespace utils
     const block_type* __masks_rank() const 
     {
       static block_type __mask_blocks[__bitblock_bit_size] = {
-	0x00000001, 0x00000003, 0x00000007, 0x0000000f,
-	0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff,
-	0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff,
-	0x00001fff, 0x00003fff, 0x00007fff, 0x0000ffff,
-	0x0001ffff, 0x0003ffff, 0x0007ffff, 0x000fffff,
-	0x001fffff, 0x003fffff, 0x007fffff, 0x00ffffff,
-	0x01ffffff, 0x03ffffff, 0x07ffffff, 0x0fffffff,
-	0x1fffffff, 0x3fffffff, 0x7fffffff, 0xffffffff,
+	0x00000001u, 0x00000003u, 0x00000007u, 0x0000000fu,
+	0x0000001fu, 0x0000003fu, 0x0000007fu, 0x000000ffu,
+	0x000001ffu, 0x000003ffu, 0x000007ffu, 0x00000fffu,
+	0x00001fffu, 0x00003fffu, 0x00007fffu, 0x0000ffffu,
+	0x0001ffffu, 0x0003ffffu, 0x0007ffffu, 0x000fffffu,
+	0x001fffffu, 0x003fffffu, 0x007fffffu, 0x00ffffffu,
+	0x01ffffffu, 0x03ffffffu, 0x07ffffffu, 0x0fffffffu,
+	0x1fffffffu, 0x3fffffffu, 0x7fffffffu, 0xffffffffu,
       };
       return __mask_blocks;
     }
@@ -124,7 +124,30 @@ namespace utils
       };
       return __mask_blocks;
     }
+  };
 
+  template <typename BitVector>
+  struct bit_vector_expr_or : public __bit_vector_base
+  {
+    bit_vector_expr_or(const BitVector& x, const BitVector& y)
+      : bv1(x), bv2(y) {}
+
+    size_type count() const
+    {
+      size_type sum = 0;
+
+      const block_type* iter1 = (const block_type*) bv1.begin();
+      const block_type* iter1_end = (const block_type*) bv1.end();
+
+      const block_type* iter2 = (const block_type*) bv2.begin();
+      for (/**/; iter1 != iter1_end; ++ iter1, ++ iter2)
+	sum += utils::bithack::bit_count(*iter1 | *iter2);
+      
+      return sum;
+    }
+    
+    const BitVector& bv1;
+    const BitVector& bv2;
   };
 
   
@@ -420,6 +443,13 @@ namespace utils
     
     inline const block_type* end(size_type bits) const { return __bitblock + ((bits + __bitblock_mask) >> __bitblock_shift); }
     inline       block_type* end(size_type bits)       { return __bitblock + ((bits + __bitblock_mask) >> __bitblock_shift); }
+
+  public:
+    friend
+    bit_vector_expr_or<bit_vector<NumBits> > operator|(const bit_vector<NumBits>& x, const bit_vector<NumBits>& y)
+    {
+      return bit_vector_expr_or<bit_vector<NumBits> >(x, y);
+    }
     
   private:
     block_type __bitblock[__bitblock_size];
