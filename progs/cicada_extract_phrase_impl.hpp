@@ -705,10 +705,10 @@ struct ExtractPhrase
       // monotone/swap counts are computed by "unique" monotone and "unique" swap
       
       counts[0] += 1;
-      counts[1] += (  connected_left_top && ! connected_right_top);
-      counts[2] += (! connected_left_top &&   connected_right_top);
-      counts[3] += (  connected_left_bottom && ! connected_right_bottom);
-      counts[4] += (! connected_left_bottom &&   connected_right_bottom);
+      counts[1] += (  connected_left_top && ! connected_right_top);       // prev-monotone
+      counts[2] += (! connected_left_top &&   connected_right_top);       // prev-swap
+      counts[3] += (  connected_right_bottom && ! connected_left_bottom); // next-monotone
+      counts[4] += (! connected_right_bottom &&   connected_left_bottom); // next-swap
     }
     
     uniques_pair.clear();
