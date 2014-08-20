@@ -20,7 +20,11 @@ namespace utils
   {
     struct double_base64_func
     {
+#if BOOST_PHOENIX_VERSION >= 0x3000
+      template<class>
+#else
       template<class, class>
+#endif
       struct result {
 	typedef void type;
       };

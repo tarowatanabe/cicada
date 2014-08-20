@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 
 #include <boost/random/mersenne_twister.hpp>

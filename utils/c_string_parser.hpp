@@ -22,7 +22,11 @@ namespace utils
     
     struct push_raw_func
     {
+#if BOOST_PHOENIX_VERSION >= 0x3000
+      template<class>
+#else
       template<class, class>
+#endif
       struct result {
 	typedef void type;
       };
@@ -35,7 +39,11 @@ namespace utils
     
     struct push_escaped_func
     {
-       template<class, class>
+#if BOOST_PHOENIX_VERSION >= 0x3000
+      template<class>
+#else
+      template<class, class>
+#endif
        struct result {
 	 typedef void type;
        };

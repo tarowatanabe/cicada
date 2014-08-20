@@ -1,6 +1,7 @@
 //
 //  Copyright(C) 2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+#include <iostream>
 
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/device/file.hpp>
