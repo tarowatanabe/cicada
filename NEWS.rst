@@ -1,3 +1,8 @@
+2014-8-20
+--------
+- Support boost 1.56. The problem is the use of phoenix V3 in
+  boost.spirit which relies on a different result_of implementation.
+
 2014-4-3
 --------
 - Bugfix (hopefully) for random memory corrption for word aligner.
