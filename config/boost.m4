@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 m4_define([_BOOST_SERIAL], [m4_translit([
-# serial 23
+# serial 24
 ], [#
 ], [])])
 
@@ -72,8 +72,25 @@ dnl strip `\n' with backquotes, not the `\r'.  This results in
 dnl boost_cv_lib_version='1_37\r' for instance, which breaks
 dnl everything else.
 dnl Cannot use 'dnl' after [$4] because a trailing dnl may break AC_CACHE_CHECK
+dnl
+dnl Beware that GCC 5, when expanding macros, may embed # line directives
+dnl a within single line:
+dnl
+dnl # 1 "conftest.cc"
+dnl # 1 "<built-in>"
+dnl # 1 "<command-line>"
+dnl # 1 "conftest.cc"
+dnl # 1 "/opt/local/include/boost/version.hpp" 1 3
+dnl # 2 "conftest.cc" 2
+dnl boost-lib-version =
+dnl # 2 "conftest.cc" 3
+dnl                    "1_56"
+dnl
+dnl So get rid of the # lines, and glue the remaining ones together.
 (eval "$ac_cpp conftest.$ac_ext") 2>&AS_MESSAGE_LOG_FD |
+  grep -v '#' |
   tr -d '\r' |
+  tr -s '\n' ' ' |
   $SED -n -e "$1" >conftest.i 2>&1],
   [$3],
   [$4])
@@ -208,7 +225,7 @@ AC_LANG_POP([C++])dnl
   AC_CACHE_CHECK([for Boost's header version],
     [boost_cv_lib_version],
     [m4_pattern_allow([^BOOST_LIB_VERSION$])dnl
-     _BOOST_SED_CPP([/^boost-lib-version = /{s///;s/\"//g;p;q;}],
+     _BOOST_SED_CPP([[/^boost-lib-version = /{s///;s/[\" ]//g;p;q;}]],
                     [#include <boost/version.hpp>
 boost-lib-version = BOOST_LIB_VERSION],
     [boost_cv_lib_version=`cat conftest.i`])])
@@ -216,7 +233,7 @@ boost-lib-version = BOOST_LIB_VERSION],
     boost_major_version=`echo "$boost_cv_lib_version" | sed 's/_//;s/_.*//'`
     case $boost_major_version in #(
       '' | *[[!0-9]]*)
-        AC_MSG_ERROR([invalid value: boost_major_version=$boost_major_version])
+        AC_MSG_ERROR([invalid value: boost_major_version='$boost_major_version'])
         ;;
     esac
 fi
@@ -564,6 +581,33 @@ LDFLAGS=$boost_filesystem_save_LDFLAGS
 ])# BOOST_CHRONO
 
 
+# BOOST_CONTEXT([PREFERRED-RT-OPT])
+# -----------------------------------
+# Look for Boost.Context.  For the documentation of PREFERRED-RT-OPT, see the
+# documentation of BOOST_FIND_LIB above.  This library was introduced in Boost
+# 1.51.0
+BOOST_DEFUN([Context],
+[BOOST_FIND_LIB([context], [$1],
+                [boost/context/all.hpp],[[
+// creates a stack
+void * stack_pointer = new void*[4096];
+std::size_t const size = sizeof(void*[4096]);
+
+// context fc uses f() as context function
+// fcontext_t is placed on top of context stack
+// a pointer to fcontext_t is returned
+fc = ctx::make_fcontext(stack_pointer, size, f);
+return ctx::jump_fcontext(&fcm, fc, 3) == 6;]],[dnl
+namespace ctx = boost::context;
+// context
+static ctx::fcontext_t fcm, *fc;
+// context-function
+static void f(intptr_t i) {
+    ctx::jump_fcontext(fc, &fcm, i * 2);
+}])
+])# BOOST_CONTEXT
+
+
 # BOOST_CONVERSION()
 # ------------------
 # Look for Boost.Conversion (cast / lexical_cast)
@@ -571,6 +615,44 @@ BOOST_DEFUN([Conversion],
 [BOOST_FIND_HEADER([boost/cast.hpp])
 BOOST_FIND_HEADER([boost/lexical_cast.hpp])
 ])# BOOST_CONVERSION
+
+
+# BOOST_COROUTINE([PREFERRED-RT-OPT])
+# -----------------------------------
+# Look for Boost.Coroutine.  For the documentation of PREFERRED-RT-OPT, see the
+# documentation of BOOST_FIND_LIB above.  This library was introduced in Boost
+# 1.53.0
+BOOST_DEFUN([Coroutine],
+[
+boost_coroutine_save_LIBS=$LIBS
+boost_coroutine_save_LDFLAGS=$LDFLAGS
+# Link-time dependency from coroutine to context
+BOOST_CONTEXT([$1])
+# Starting from Boost 1.55 a dependency on Boost.System is added
+if test $boost_major_version -ge 155; then
+  BOOST_SYSTEM([$1])
+fi
+m4_pattern_allow([^BOOST_(CONTEXT|SYSTEM)_(LIBS|LDFLAGS)])
+LIBS="$LIBS $BOOST_CONTEXT_LIBS $BOOST_SYSTEM_LIBS"
+LDFLAGS="$LDFLAGS $BOOST_CONTEXT_LDFLAGS"
+
+BOOST_FIND_LIB([coroutine], [$1],
+                [boost/coroutine/coroutine.hpp],
+                [boost::coroutines::coroutine< int(int) > coro; coro.empty();])
+
+# Link-time dependency from coroutine to context, existed only in 1.53, in 1.54
+# coroutine doesn't use context from its headers but from its library.
+if test $boost_major_version -eq 153 || test $enable_static_boost = yes && test $boost_major_version -ge 154; then
+  BOOST_COROUTINE_LIBS="$BOOST_COROUTINE_LIBS $BOOST_CONTEXT_LIBS"
+  BOOST_COROUTINE_LDFLAGS="$BOOST_COROUTINE_LDFLAGS $BOOST_CONTEXT_LDFLAGS"
+fi
+if test $enable_static_boost = yes && test $boost_major_version -ge 155; then
+  BOOST_COROUTINE_LIBS="$BOOST_COROUTINE_LIBS $BOOST_SYSTEM_LIBS"
+  BOOST_COROUTINE_LDFLAGS="$BOOST_COROUTINE_LDFLAGS $BOOST_SYSTEM_LDFLAGS"
+fi
+LIBS=$boost_coroutine_save_LIBS
+LDFLAGS=$boost_coroutine_save_LDFLAGS
+])# BOOST_COROUTINE
 
 
 # BOOST_CRC()
@@ -699,6 +781,15 @@ BOOST_DEFUN([Lambda],
 [BOOST_FIND_HEADER([boost/lambda/lambda.hpp])])
 
 
+# BOOST_LOCALE()
+# --------------
+# Look for Boost.Locale
+BOOST_DEFUN([Locale],
+[BOOST_FIND_LIB([locale], [$1],
+    [boost/locale.hpp],
+    [[boost::locale::generator gen; std::locale::global(gen(""));]])
+])# BOOST_LOCALE
+
 # BOOST_LOG([PREFERRED-RT-OPT])
 # -----------------------------
 # Look for Boost.Log.  For the documentation of PREFERRED-RT-OPT, see the
@@ -793,6 +884,12 @@ BOOST_DEFUN([Optional],
 BOOST_DEFUN([Preprocessor],
 [BOOST_FIND_HEADER([boost/preprocessor/repeat.hpp])])
 
+
+# BOOST_RANGE()
+# --------------------
+# Look for Boost.Range
+BOOST_DEFUN([Range],
+[BOOST_FIND_HEADER([boost/range/adaptors.hpp])])
 
 # BOOST_UNORDERED()
 # -----------------
@@ -1172,8 +1269,6 @@ m4_define([_BOOST_mingw_test],
          || defined __WIN32__ || defined __WINNT || defined __WINNT__) @ mgw$1$2"])dnl
 
 # _BOOST_clang_test(MAJOR, MINOR)
-#
-#
 m4_define([_BOOST_clang_test],
 ["defined __clang__ && __clang_major__ == $1 && __clang_minor__ == $2 @ clang$1$2"])dnl
 
@@ -1211,14 +1306,16 @@ if test x$boost_cv_inc_path != xno; then
   # the same defines as GCC's).
   for i in \
     _BOOST_apple_clang_test(4, 2) \
+    _BOOST_clang_test(3, 7) \
+    _BOOST_clang_test(3, 6) \
     _BOOST_clang_test(3, 5) \
     _BOOST_clang_test(3, 4) \
     _BOOST_clang_test(3, 3) \
     _BOOST_clang_test(3, 2) \
     _BOOST_clang_test(3, 1) \
     _BOOST_clang_test(3, 0) \
-    _BOOST_mingw_test(4, 11) \
-    _BOOST_gcc_test(4, 11) \
+    _BOOST_mingw_test(5, 0) \
+    _BOOST_gcc_test(5, 0) \
     _BOOST_mingw_test(4, 10) \
     _BOOST_gcc_test(4, 10) \
     _BOOST_mingw_test(4, 9) \
