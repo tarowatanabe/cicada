@@ -84,6 +84,7 @@ builder/joint_order.hh \
 builder/multi_stream.hh \
 builder/ngram.hh \
 builder/ngram_stream.hh \
+builder/output.hh \
 builder/pipeline.hh \
 builder/print.hh \
 builder/sort.hh \
@@ -91,6 +92,7 @@ builder/adjust_counts.cc \
 builder/corpus_count.cc \
 builder/initial_probabilities.cc \
 builder/interpolate.cc \
+builder/output.cc \
 builder/pipeline.cc \
 builder/print.cc \
 builder/lmplz_main.cc
