@@ -60,7 +60,7 @@ namespace cicada
       }
     }
     
-    Snowball::~Snowball() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Snowball::~Snowball() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     std::string Snowball::operator()(const utils::piece& word) const
     {

@@ -137,7 +137,7 @@ namespace cicada
       if (path.empty())
 	throw std::runtime_error("no global lexicon file? " + path.string());
       
-      std::auto_ptr<impl_type> global_lexicon_impl(new impl_type(path));
+      std::unique_ptr<impl_type> global_lexicon_impl(new impl_type(path));
       
       // no-context...
       base_type::__state_size = 0;
@@ -146,7 +146,7 @@ namespace cicada
       pimpl = global_lexicon_impl.release();
     }
     
-    GlobalLexicon::~GlobalLexicon() { std::auto_ptr<impl_type> tmp(pimpl); }
+    GlobalLexicon::~GlobalLexicon() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     
     GlobalLexicon::GlobalLexicon(const GlobalLexicon& x)

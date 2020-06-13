@@ -157,7 +157,7 @@ namespace cicada
       base_type::__feature_name = pimpl->feature;
     }
     
-    Distortion::~Distortion() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Distortion::~Distortion() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     Distortion::Distortion(const Distortion& x)
       : base_type(static_cast<const base_type&>(x)),

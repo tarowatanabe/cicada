@@ -88,7 +88,7 @@ namespace cicada
 	      const parser_type* parser = *piter;
 	      icu::ParsePosition pos(0);
 	      
-	      std::auto_ptr<icu::CurrencyAmount> curr(parser->parseCurrency(uphrase, pos));
+	      std::unique_ptr<icu::CurrencyAmount> curr(parser->parseCurrency(uphrase, pos));
 	      
 	      if (! curr.get() || pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
 
@@ -235,7 +235,7 @@ namespace cicada
     icu::NumberFormat* create_rbnf_instance(const Locale& locale, const Name& name)
     {
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(URBNF_SPELLOUT, locale, status));
+      std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(icu::URBNF_SPELLOUT, locale, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat: ") + u_errorName(status));
       
@@ -270,7 +270,7 @@ namespace cicada
       impl_map_type targets;
       
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<icu::RuleBasedNumberFormat> rbnf_source(new icu::RuleBasedNumberFormat(URBNF_SPELLOUT, locale_source, status));
+      std::unique_ptr<icu::RuleBasedNumberFormat> rbnf_source(new icu::RuleBasedNumberFormat(icu::URBNF_SPELLOUT, locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
@@ -306,7 +306,7 @@ namespace cicada
 	
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	
@@ -322,7 +322,7 @@ namespace cicada
 	
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	
@@ -339,7 +339,7 @@ namespace cicada
 
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	
@@ -357,7 +357,7 @@ namespace cicada
 
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	
@@ -381,7 +381,7 @@ namespace cicada
 	
 	status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat: ") + u_errorName(status)
 				   + std::string(" offset: ") + utils::lexical_cast<std::string>(perror.offset));
@@ -394,7 +394,7 @@ namespace cicada
 	  
 	  UErrorCode status = U_ZERO_ERROR;
 	  UParseError perror;
-	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	  
@@ -410,7 +410,7 @@ namespace cicada
 	  
 	  UErrorCode status = U_ZERO_ERROR;
 	  UParseError perror;
-	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	  
@@ -427,7 +427,7 @@ namespace cicada
 
 	  UErrorCode status = U_ZERO_ERROR;
 	  UParseError perror;
-	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	  
@@ -445,7 +445,7 @@ namespace cicada
 
 	  UErrorCode status = U_ZERO_ERROR;
 	  UParseError perror;
-	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  std::unique_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
 	  
@@ -456,7 +456,7 @@ namespace cicada
 
     
       status = U_ZERO_ERROR;
-      std::auto_ptr<icu::NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
+      std::unique_ptr<icu::NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
@@ -468,7 +468,7 @@ namespace cicada
       sources["any"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<icu::RuleBasedNumberFormat> rbnf_target(new icu::RuleBasedNumberFormat(URBNF_SPELLOUT, locale_target, status));
+      std::unique_ptr<icu::RuleBasedNumberFormat> rbnf_target(new icu::RuleBasedNumberFormat(icu::URBNF_SPELLOUT, locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
@@ -505,7 +505,7 @@ namespace cicada
 	
 	status = U_ZERO_ERROR;
 	UParseError perror;
-	std::auto_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
+	std::unique_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("RuleBasedNumberFormat: ") + u_errorName(status)
 				   + std::string(" offset: ") + utils::lexical_cast<std::string>(perror.offset));
@@ -516,7 +516,7 @@ namespace cicada
 
 	  status = U_ZERO_ERROR;
 	  UParseError perror;
-	  std::auto_ptr<icu::RuleBasedNumberFormat> formatter(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
+	  std::unique_ptr<icu::RuleBasedNumberFormat> formatter(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
 	  
 	  status = U_ZERO_ERROR;
 	  formatter->setDefaultRuleSet(uname, status);
@@ -535,7 +535,7 @@ namespace cicada
       }
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<icu::NumberFormat> nf_target(icu::NumberFormat::createInstance(locale_target, status));
+      std::unique_ptr<icu::NumberFormat> nf_target(icu::NumberFormat::createInstance(locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
@@ -554,14 +554,14 @@ namespace cicada
       
       for (int i = 0; i != sizeof(unum_style) / sizeof(UNumberFormatStyle) ; ++ i) {
 	UErrorCode status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, unum_style[i], status));
+	std::unique_ptr<icu::NumberFormat> curr_source(icu::NumberFormat::createInstance(locale_source, unum_style[i], status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
 	
 	curr_source->setLenient(true);
 	
 	status = U_ZERO_ERROR;
-	std::auto_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, unum_style[i], status));
+	std::unique_ptr<icu::NumberFormat> curr_target(icu::NumberFormat::createInstance(locale_target, unum_style[i], status));
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
 	

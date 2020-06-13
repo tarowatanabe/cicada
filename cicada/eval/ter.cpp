@@ -105,7 +105,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<TER> ter(new TER());
+      std::unique_ptr<TER> ter(new TER());
       ter->insertion    = boost::fusion::get<0>(parsed);
       ter->deletion     = boost::fusion::get<1>(parsed);
       ter->substitution = boost::fusion::get<2>(parsed);
@@ -700,7 +700,7 @@ namespace cicada
       
       double score_best = std::numeric_limits<double>::infinity();
 
-      std::auto_ptr<TER> ter(new TER());
+      std::unique_ptr<TER> ter(new TER());
       
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));

@@ -19,7 +19,7 @@ namespace utils
   {
     typedef boost::program_options::typed_value<bool> value_type;
     
-    std::auto_ptr<value_type> ret(new value_type(value));
+    std::unique_ptr<value_type> ret(new value_type(value));
     if (value)
       ret->default_value(*value, *value ? "true" : "false");
     else

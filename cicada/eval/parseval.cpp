@@ -93,7 +93,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<Parseval> parseval(new Parseval());
+      std::unique_ptr<Parseval> parseval(new Parseval());
       parseval->matched   = boost::fusion::get<0>(parsed);
       parseval->test      = boost::fusion::get<1>(parsed);
       parseval->reference = boost::fusion::get<2>(parsed);
@@ -269,7 +269,7 @@ namespace cicada
       
       double score_best = - std::numeric_limits<double>::infinity();
 
-      std::auto_ptr<Parseval> parseval(new Parseval());
+      std::unique_ptr<Parseval> parseval(new Parseval());
       
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));

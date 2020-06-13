@@ -102,7 +102,7 @@ namespace utils
   
   template <typename Tp,typename Alloc>
   inline
-  bool packed_sink<Tp,Alloc>::impl::is_open() const { return os_data; }
+  bool packed_sink<Tp,Alloc>::impl::is_open() const { return os_data.get(); }
   
   template <typename Tp,typename Alloc>
   inline

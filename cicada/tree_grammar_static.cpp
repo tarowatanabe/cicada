@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -1512,9 +1513,9 @@ namespace cicada
     
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
     
-    std::auto_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
-    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
-    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
+    std::unique_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
+    std::unique_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
+    std::unique_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
    
     TreeGrammarParser::feature_stream_type   feature_stream(path_feature_data);
     TreeGrammarParser::attribute_stream_type attribute_stream(path_attribute_data);
@@ -1839,9 +1840,9 @@ namespace cicada
     
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
     
-    std::auto_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
-    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
-    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
+    std::unique_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
+    std::unique_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
+    std::unique_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -2190,7 +2191,7 @@ namespace cicada
   TreeGrammarStatic::TreeGrammarStatic(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
   
-  TreeGrammarStatic::~TreeGrammarStatic() { std::auto_ptr<impl_type> tmp(pimpl); }
+  TreeGrammarStatic::~TreeGrammarStatic() { std::unique_ptr<impl_type> tmp(pimpl); }
   
   TreeGrammarStatic::TreeGrammarStatic(const TreeGrammarStatic& x)
     : pimpl(new impl_type(*x.pimpl)) {}

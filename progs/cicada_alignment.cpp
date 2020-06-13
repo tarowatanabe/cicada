@@ -195,8 +195,8 @@ int main(int argc, char ** argv)
 	if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
 	  throw std::runtime_error("no spna target file: " + span_target_file.string());
       
-      std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
-      std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
+      std::unique_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+      std::unique_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
       
       process_posterior(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
     } else  if (input_file == "-" || boost::filesystem::exists(input_file)) {
@@ -257,8 +257,8 @@ int main(int argc, char ** argv)
 	  if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
 	    throw std::runtime_error("no spna target file: " + span_target_file.string());
 	
-	std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
-	std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
 	
 	process_giza(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
       }

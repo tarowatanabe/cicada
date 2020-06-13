@@ -23,7 +23,7 @@ namespace cicada
       struct Matcher
       {
 	Matcher(const char* pattern) : matcher(0) { initialize(pattern); }
-	~Matcher() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
+	~Matcher() { std::unique_ptr<icu::RegexMatcher> tmp(matcher); }
 	
 	bool operator()(const icu::UnicodeString& x)
 	{
@@ -69,7 +69,7 @@ namespace cicada
     };
 
     Chinese::Chinese() : pimpl(new ChineseImpl()) {}
-    Chinese::~Chinese() { std::auto_ptr<ChineseImpl> tmp(static_cast<ChineseImpl*>(pimpl)); }
+    Chinese::~Chinese() { std::unique_ptr<ChineseImpl> tmp(static_cast<ChineseImpl*>(pimpl)); }
     
     std::string Chinese::operator()(const utils::piece& word) const
     {

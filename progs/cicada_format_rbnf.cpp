@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     }
     
     UErrorCode status = U_ZERO_ERROR;
-    std::auto_ptr<RuleBasedNumberFormat> formatter(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));
+    std::unique_ptr<RuleBasedNumberFormat> formatter(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));
     if (U_FAILURE(status))
       throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
     

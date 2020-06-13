@@ -254,7 +254,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for frontier pair: " << piter->first << "=" << piter->second << std::endl;
       }
             
-      std::auto_ptr<impl_type> pair_impl(new impl_type());
+      std::unique_ptr<impl_type> pair_impl(new impl_type());
 
       pair_impl->skip_sgml_tag = skip_sgml_tag;
       pair_impl->prefix = (name.empty() ? std::string("frontier-pair") : name);
@@ -266,7 +266,7 @@ namespace cicada
       pimpl = pair_impl.release();
     }
     
-    FrontierPair::~FrontierPair() { std::auto_ptr<impl_type> tmp(pimpl); }
+    FrontierPair::~FrontierPair() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     FrontierPair::FrontierPair(const FrontierPair& x)
       : base_type(static_cast<const base_type&>(x)),

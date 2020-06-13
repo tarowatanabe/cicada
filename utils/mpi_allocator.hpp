@@ -61,7 +61,8 @@ namespace utils
     allocate(size_type __n, const void* tmptmp= 0)
     {
       if (__n == 0) return 0;
-      pointer p = static_cast<pointer>(MPI::Alloc_mem(sizeof(_Tp) * __n, MPI_INFO_NULL));
+      pointer p = nullptr;
+      MPI_Alloc_mem(sizeof(_Tp) * __n, MPI_INFO_NULL, p);
       if (p == 0)
 	throw std::bad_alloc();
       return p;
@@ -71,7 +72,7 @@ namespace utils
     deallocate(pointer __p, size_type __n)
     {
       if (__p)
-	MPI::Free_mem(__p);
+	MPI_Free_mem(__p);
     }
   };
 };

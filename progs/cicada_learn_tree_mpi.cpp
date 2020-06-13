@@ -1145,7 +1145,7 @@ void cicada_learn(const Learner& learner,
 
   // prepare dumper for the root
   dumper_type::queue_type queue_dumper;
-  std::auto_ptr<boost::thread> dumper(dump_weights_mode && mpi_rank == 0
+  std::unique_ptr<boost::thread> dumper(dump_weights_mode && mpi_rank == 0
 				      ? new boost::thread(dumper_type(queue_dumper))
 				      : 0);
   

@@ -421,8 +421,8 @@ namespace succinctdb
     void clear() { close(); }
       
     bool is_open() const { return __succinct_trie || __succinct_writer; }
-    bool is_writer() const { return __succinct_writer; }
-    bool is_reader() const { return __succinct_trie; }
+    bool is_writer() const { return __succinct_writer.get(); }
+    bool is_reader() const { return __succinct_trie.get(); }
       
     size_type size() const { return (is_open() ? (is_reader() ? __succinct_trie->size() : __succinct_writer->size()) : size_type(0)); }
     bool empty() const { return size() == 0; }

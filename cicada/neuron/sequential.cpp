@@ -62,7 +62,7 @@ namespace cicada
 
     Sequential::layer_ptr_type Sequential::clone(const bool share) const
     {
-      std::auto_ptr<Sequential> cloned(new Sequential(*this));
+      std::unique_ptr<Sequential> cloned(new Sequential(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
 	cloned->layers[i] = layers[i]->clone(share);

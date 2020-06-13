@@ -51,8 +51,8 @@ private:
 	std::string source;
 	std::string target;
 
-	std::auto_ptr<LocaleDisplayNames> lsource(LocaleDisplayNames::createInstance(locale_source));
-	std::auto_ptr<LocaleDisplayNames> ltarget(LocaleDisplayNames::createInstance(locale_target));
+	std::unique_ptr<icu::LocaleDisplayNames> lsource(icu::LocaleDisplayNames::createInstance(locale_source));
+	std::unique_ptr<icu::LocaleDisplayNames> ltarget(icu::LocaleDisplayNames::createInstance(locale_target));
 	
 	for (const char* const* iter =  icu::Locale::getISOLanguages(); *iter; ++ iter) {
 	  lsource->languageDisplayName(*iter, usource);

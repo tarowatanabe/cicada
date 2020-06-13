@@ -2209,7 +2209,7 @@ int main(int argc, char ** argv)
 	  std::cerr << "burn-in iteration: " << (iter + 1) << std::endl;
       }
       
-      std::auto_ptr<boost::thread> dumper;
+      std::unique_ptr<boost::thread> dumper;
       
       if (sampling && ! output_sample_file.empty()) {
 	// assign path...
@@ -2256,7 +2256,7 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
       
-      std::auto_ptr<boost::progress_display> progress(debug
+      std::unique_ptr<boost::progress_display> progress(debug
 						      ? new boost::progress_display(positions.size(), std::cerr, "", "", "")
 						      : 0);
       

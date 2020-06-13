@@ -305,7 +305,7 @@ namespace cicada
       pimpl->no_bos_eos = no_bos_eos;
     }
     
-    Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Variational::~Variational() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     Variational::Variational(const Variational& x)
       : base_type(static_cast<const base_type&>(x)),

@@ -1827,7 +1827,7 @@ void learn_online(const Learner& learner,
     if (debug)
       std::cerr << "iteration: " << (t + 1) << std::endl;
     
-    std::auto_ptr<boost::progress_display> progress(debug
+    std::unique_ptr<boost::progress_display> progress(debug
 						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
 						    : 0);
 

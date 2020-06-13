@@ -74,7 +74,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-      std::auto_ptr<Combined> combined(new Combined());
+      std::unique_ptr<Combined> combined(new Combined());
 
       if (! qi::phrase_parse(iter, end, qi::lit('{') >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"combined\"") >> qi::lit(','), standard::space))
 	return score_ptr_type();

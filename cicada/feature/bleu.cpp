@@ -703,7 +703,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, skip_sgml_tag, tokenizer));
+      std::unique_ptr<impl_type> bleu_impl(new impl_type(order, exact, skip_sgml_tag, tokenizer));
       
       // two-side context + length + counts-id 
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) + sizeof(impl_type::id_type);
@@ -741,7 +741,7 @@ namespace cicada
       }
     }
     
-    Bleu::~Bleu() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Bleu::~Bleu() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     Bleu::Bleu(const Bleu& x)
       : base_type(static_cast<const base_type&>(x)),

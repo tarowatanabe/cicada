@@ -103,7 +103,7 @@ namespace cicada
       {
       public:
 	Replace(const char* pattern, const char* subst) : matcher(0) { initialize(pattern, subst); }
-	~Replace() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
+	~Replace() { std::unique_ptr<icu::RegexMatcher> tmp(matcher); }
       
 	const icu::UnicodeString& operator()(icu::UnicodeString& uline)
 	{
@@ -139,7 +139,7 @@ namespace cicada
   
       public:
 	ReplaceAll(const char* pattern, const char* subst) : matcher(0) { initialize(pattern, subst); }
-	~ReplaceAll() { std::auto_ptr<icu::RegexMatcher> tmp(matcher); }
+	~ReplaceAll() { std::unique_ptr<icu::RegexMatcher> tmp(matcher); }
 	
 	const icu::UnicodeString& operator()(icu::UnicodeString& uline)
 	{
@@ -212,7 +212,7 @@ namespace cicada
     };
 
     Arabic::Arabic() : pimpl(new impl_type()) {}
-    Arabic::~Arabic() { std::auto_ptr<impl_type>(pimpl); }
+    Arabic::~Arabic() { std::unique_ptr<impl_type>(pimpl); }
     
     std::string Arabic::operator()(const utils::piece& word) const
     {

@@ -44,7 +44,7 @@ namespace cicada
 
     Multiply::layer_ptr_type Multiply::clone(const bool share) const
     {
-      std::auto_ptr<Multiply> cloned(new Multiply(*this));
+      std::unique_ptr<Multiply> cloned(new Multiply(*this));
       
       if (! share)
 	cloned->weight.reset(new tensor_type(*weight));

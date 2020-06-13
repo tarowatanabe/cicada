@@ -140,7 +140,7 @@ int main(int argc, char** argv)
       tokens_type features_new;
       std::string feature_name;
 
-      std::auto_ptr<std::ostream> os;
+      std::unique_ptr<std::ostream> os;
       size_type id = size_type(-1);
       
       while (iter != iter_end) {

@@ -320,7 +320,7 @@ namespace cicada
       base_type::__feature_name = std::string("lexicalized-reordering");
     }
     
-    LexicalizedReordering::~LexicalizedReordering() { std::auto_ptr<impl_type> tmp(pimpl); }
+    LexicalizedReordering::~LexicalizedReordering() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     
     LexicalizedReordering::LexicalizedReordering(const LexicalizedReordering& x)

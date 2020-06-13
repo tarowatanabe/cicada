@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE 1
 #define PHOENIX_THREADSAFE 1
 

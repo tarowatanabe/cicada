@@ -92,7 +92,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<BleuS> bleus(new BleuS());
+      std::unique_ptr<BleuS> bleus(new BleuS());
       
       bleus->bleu = bleus_parsed.first;
       bleus->norm = bleus_parsed.second;
@@ -148,7 +148,7 @@ namespace cicada
       sentence_type sentence;
       tokenize(__sentence, sentence);
       
-      std::auto_ptr<BleuS> bleus(new BleuS());
+      std::unique_ptr<BleuS> bleus(new BleuS());
       counts_set_type counts(order);
       
       ngram_counts_type ngrams_hypothesis(order, 0);

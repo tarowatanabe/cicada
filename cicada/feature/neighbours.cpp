@@ -445,7 +445,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> neighbours_impl(new impl_type());
+      std::unique_ptr<impl_type> neighbours_impl(new impl_type());
       
       neighbours_impl->normalizers.swap(normalizers);
       neighbours_impl->alignment_mode = alignment_mode;
@@ -460,7 +460,7 @@ namespace cicada
       pimpl = neighbours_impl.release();
     }
     
-    Neighbours::~Neighbours() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Neighbours::~Neighbours() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     Neighbours::Neighbours(const Neighbours& x)
       : base_type(static_cast<const base_type&>(x)),

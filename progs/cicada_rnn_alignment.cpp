@@ -838,7 +838,7 @@ void learn_online(const Learner& learner,
       }
     }
 
-    std::auto_ptr<boost::progress_display> progress(debug
+    std::unique_ptr<boost::progress_display> progress(debug
 						    ? new boost::progress_display(batches_size, std::cerr, "", "", "")
 						    : 0);
 
@@ -1067,7 +1067,7 @@ void viterbi(const bitext_set_type& bitexts,
   if (debug)
     std::cerr << "Viterbi alignment" << std::endl;
 
-  std::auto_ptr<boost::progress_display> progress(debug
+  std::unique_ptr<boost::progress_display> progress(debug
 						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						  : 0);
   

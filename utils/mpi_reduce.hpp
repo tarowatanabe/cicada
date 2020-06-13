@@ -22,30 +22,32 @@ namespace utils
   namespace impl
   {
     template <typename Reducer, typename RankIterator>
-    void mpi_reduce_recv(Reducer& reducer, MPI::Comm& comm, RankIterator first, RankIterator last, int tag, size_t buffer_size);
+    void mpi_reduce_recv(Reducer& reducer, MPI_Comm& comm, RankIterator first, RankIterator last, int tag, size_t buffer_size);
     
     template <typename Reducer>
-    void mpi_reduce_recv(Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size);
+    void mpi_reduce_recv(Reducer& reducer, MPI_Comm& comm, int rank, int tag, size_t buffer_size);
     
     template <typename Reducer>
-    void mpi_reduce_send(const Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size);
+    void mpi_reduce_send(const Reducer& reducer, MPI_Comm& comm, int rank, int tag, size_t buffer_size);
   };
 
   template <typename Reducer>
   inline
   void mpi_reduce(const Reducer& reducer, int rank, int tag, size_t buffer_size=4096)
   {
-    mpi_reduce(reducer, MPI::COMM_WORLD, rank, tag, buffer_size);
+    mpi_reduce(reducer, MPI_COMM_WORLD, rank, tag, buffer_size);
   }
   
   template <typename Reducer>
   inline
-  void mpi_reduce(const Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096)
+  void mpi_reduce(const Reducer& reducer, MPI_Comm& comm, int rank, int tag, size_t buffer_size=4096)
   {
     typedef std::vector<int, std::allocator<int> > rank_set_type;
-    
-    const int mpi_rank = comm.Get_rank();
-    const int mpi_size = comm.Get_size();
+
+    int mpi_rank = 0;
+    int mpi_size = 0;
+    MPI_Comm_rank(comm, &mpi_rank);
+    MPI_Comm_size(comm, &mpi_size);
     
     // we will "swap" rank == 0 and rank!
     const int mpi_rank_logical = (mpi_rank == rank ? 0 : (mpi_rank == 0 ? rank : mpi_rank));
@@ -86,7 +88,7 @@ namespace utils
   {
     template <typename Reducer, typename RankIterator>
     inline
-    void mpi_reduce_recv(Reducer& reducer, MPI::Comm& comm, RankIterator first, RankIterator last, int tag, size_t buffer_size)
+    void mpi_reduce_recv(Reducer& reducer, MPI_Comm& comm, RankIterator first, RankIterator last, int tag, size_t buffer_size)
     {
       typedef utils::mpi_device_source            device_type;
       typedef boost::iostreams::filtering_istream stream_type;
@@ -144,7 +146,7 @@ namespace utils
         
     template <typename Reducer>
     inline
-    void mpi_reduce_recv(Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size)
+    void mpi_reduce_recv(Reducer& reducer, MPI_Comm& comm, int rank, int tag, size_t buffer_size)
     {
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::zlib_decompressor());
@@ -156,7 +158,7 @@ namespace utils
     
     template <typename Reducer>
     inline
-    void mpi_reduce_send(const Reducer& reducer, MPI::Comm& comm, int rank, int tag, size_t buffer_size)
+    void mpi_reduce_send(const Reducer& reducer, MPI_Comm& comm, int rank, int tag, size_t buffer_size)
     {
       boost::iostreams::filtering_ostream os;
       os.push(boost::iostreams::zlib_compressor());

@@ -543,7 +543,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, populate));
+      std::unique_ptr<impl_type> ngram_impl(new impl_type(path, populate));
 
       ngram_impl->no_bos_eos = no_bos_eos;
       ngram_impl->skip_sgml_tag = skip_sgml_tag;
@@ -567,7 +567,7 @@ namespace cicada
 
       // coarse ngram
       if (! coarse_path.empty()) {
-	std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
+	std::unique_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
 	
 	ngram_impl->no_bos_eos = no_bos_eos;
 	ngram_impl->skip_sgml_tag = skip_sgml_tag;
@@ -586,9 +586,9 @@ namespace cicada
     template <typename Model>
     KenLM<Model>::~KenLM()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
       if (pimpl_coarse)
-	std::auto_ptr<impl_type> tmp_coarse(pimpl_coarse);
+	std::unique_ptr<impl_type> tmp_coarse(pimpl_coarse);
     }
     
     template <typename Model>

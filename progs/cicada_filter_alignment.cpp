@@ -153,14 +153,14 @@ int main(int argc, char** argv)
       const bool has_alignment2 = ! alignment2_files.empty();
       
       for (size_t i = 0; i != alignment_files.size(); ++ i) {
-	std::auto_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
-	std::auto_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
 	
-	std::auto_ptr<std::istream> ps_source(has_permutation_source ? new utils::compress_istream(permutation_source_files[i], 1024 * 1024) : 0);
-	std::auto_ptr<std::istream> ps_target(has_permutation_target ? new utils::compress_istream(permutation_target_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> ps_source(has_permutation_source ? new utils::compress_istream(permutation_source_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> ps_target(has_permutation_target ? new utils::compress_istream(permutation_target_files[i], 1024 * 1024) : 0);
 	
 	utils::compress_istream is(alignment_files[i], 1024 * 1024);
-	std::auto_ptr<std::istream> is2(has_alignment2 ? new utils::compress_istream(alignment2_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is2(has_alignment2 ? new utils::compress_istream(alignment2_files[i], 1024 * 1024) : 0);
 	
 	for (;;) {
 	  is >> alignment;
@@ -268,11 +268,11 @@ int main(int argc, char** argv)
       const bool has_alignment2 = ! alignment2_files.empty();
       
       for (size_t i = 0; i != alignment_files.size(); ++ i) {
-	std::auto_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
-	std::auto_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_source(has_source ? new utils::compress_istream(source_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is_target(has_target ? new utils::compress_istream(target_files[i], 1024 * 1024) : 0);
 	
 	utils::compress_istream is(alignment_files[i], 1024 * 1024);
-	std::auto_ptr<std::istream> is2(has_alignment2 ? new utils::compress_istream(alignment2_files[i], 1024 * 1024) : 0);
+	std::unique_ptr<std::istream> is2(has_alignment2 ? new utils::compress_istream(alignment2_files[i], 1024 * 1024) : 0);
 	
 	for (;;) {
 	  is >> alignment;

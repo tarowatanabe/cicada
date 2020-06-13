@@ -53,34 +53,34 @@ namespace utils
 	if (c <= 0x7f)
 	  result += c;
 	else if (c <= 0x7ff) {
-	  const char buffer[2] = {((c >> 6) & 0x1f) | 0xc0,
-				  (c & 0x3f) | 0x80};
+	  const char buffer[2] = {static_cast<char>(((c >> 6) & 0x1f) | 0xc0),
+				  static_cast<char>((c & 0x3f) | 0x80)};
 	  result.append(buffer, 2);
 	} else if (c <= 0xffff) {
-	  const char buffer[3] = {((c >> 12) & 0x0f) | 0xe0,
-				  ((c >> 6)  & 0x3f) | 0x80,
-				  (c & 0x3f) | 0x80};
+	  const char buffer[3] = {static_cast<char>(((c >> 12) & 0x0f) | 0xe0),
+				  static_cast<char>(((c >> 6)  & 0x3f) | 0x80),
+				  static_cast<char>((c & 0x3f) | 0x80)};
 	  result.append(buffer, 3);
 	} else if (c <= 0x1fffff) {
-	  const char buffer[4] = {((c >> 18) & 0x07) | 0xf0,
-				  ((c >> 12) & 0x3f) | 0x80,
-				  ((c >> 6)  & 0x3f) | 0x80,
-				  (c & 0x3f) | 0x80};
+	  const char buffer[4] = {static_cast<char>(((c >> 18) & 0x07) | 0xf0),
+				  static_cast<char>(((c >> 12) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 6)  & 0x3f) | 0x80),
+				  static_cast<char>((c & 0x3f) | 0x80)};
 	  result.append(buffer, 4);
 	} else if (c <= 0x3ffffff) {
-	  const char buffer[5] = {((c >> 24) & 0x03) | 0xf8,
-				  ((c >> 18) & 0x3f) | 0x80,
-				  ((c >> 12) & 0x3f) | 0x80,
-				  ((c >> 6)  & 0x3f) | 0x80,
-				  (c & 0x3f) | 0x80};
+	  const char buffer[5] = {static_cast<char>(((c >> 24) & 0x03) | 0xf8),
+				  static_cast<char>(((c >> 18) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 12) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 6)  & 0x3f) | 0x80),
+				  static_cast<char>((c & 0x3f) | 0x80)};
 	  result.append(buffer, 5);
 	} else {
-	  const char buffer[6] = {((c >> 30) & 0x01) | 0xfc,
-				  ((c >> 24) & 0x3f) | 0x80,
-				  ((c >> 18) & 0x3f) | 0x80,
-				  ((c >> 12) & 0x3f) | 0x80,
-				  ((c >> 6)  & 0x3f) | 0x80,
-				  (c & 0x3f) | 0x80};
+	  const char buffer[6] = {static_cast<char>(((c >> 30) & 0x01) | 0xfc),
+				  static_cast<char>(((c >> 24) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 18) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 12) & 0x3f) | 0x80),
+				  static_cast<char>(((c >> 6)  & 0x3f) | 0x80),
+				  static_cast<char>((c & 0x3f) | 0x80)};
 	  result.append(buffer, 6);
 	}
       }

@@ -94,7 +94,7 @@ namespace cicada
 
     Lookup::layer_ptr_type Lookup::clone(const bool share) const
     {
-      std::auto_ptr<Lookup> cloned(new Lookup(*this));
+      std::unique_ptr<Lookup> cloned(new Lookup(*this));
       
       if (! share)
 	cloned->weight.reset(new tensor_type(*weight));

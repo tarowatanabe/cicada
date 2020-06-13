@@ -133,7 +133,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<Bleu> bleu(new Bleu(0));
+      std::unique_ptr<Bleu> bleu(new Bleu(0));
 
       bleu->length_hypothesis = bleu_parsed.first.front();
       bleu->ngrams_matched.insert(bleu->ngrams_matched.end(), bleu_parsed.first.begin() + 1, bleu_parsed.first.end());
@@ -192,7 +192,7 @@ namespace cicada
       sentence_type sentence;
       tokenize(__sentence, sentence);
 	
-      std::auto_ptr<Bleu> bleu(new Bleu(order));
+      std::unique_ptr<Bleu> bleu(new Bleu(order));
       counts_set_type counts(order);
 	
       const int hypothesis_size = sentence.size();

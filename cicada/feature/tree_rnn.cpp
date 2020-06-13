@@ -323,7 +323,7 @@ namespace cicada
 
       const bool model_mode = (! path.empty());
       
-      std::auto_ptr<impl_type> rnn_impl(model_mode
+      std::unique_ptr<impl_type> rnn_impl(model_mode
 					? new impl_type(path, name)
 					: new impl_type(hidden, embedding, path_embedding, name));
       
@@ -345,7 +345,7 @@ namespace cicada
     
     TreeRNN::~TreeRNN()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
     }
     
     TreeRNN::TreeRNN(const TreeRNN& x)

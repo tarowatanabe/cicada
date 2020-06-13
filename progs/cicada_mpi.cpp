@@ -88,9 +88,9 @@ void merge_statistics(const operation_set_type& operations, operation_set_type::
 int main(int argc, char ** argv)
 {
   utils::mpi_world mpi_world(argc, argv);
-  
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
   
   try {
     options(argc, argv);
@@ -217,7 +217,7 @@ int main(int argc, char ** argv)
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
-    MPI::COMM_WORLD.Abort(1);
+    utils::mpi_abort(1);
     return 1;
   }
 }
@@ -252,8 +252,8 @@ int loop_sleep(bool found, int non_found_iter)
 
 void merge_features()
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
   
   if (mpi_rank == 0) {
     typedef utils::mpi_device_source            device_type;
@@ -303,7 +303,7 @@ void merge_features()
   } else {
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::zlib_compressor());
-    os.push(utils::mpi_device_sink(0, feature_tag, 1024 * 1024));
+    os.push(utils::mpi_device_sink(utils::mpi_comm(), 0, feature_tag, 1024 * 1024));
     
     for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
       if (! feature_type(id).empty())
@@ -316,8 +316,8 @@ void merge_statistics(const operation_set_type& operations,
 {
   typedef operation_set_type::statistics_type statistics_type;
   
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
 
   statistics.clear();
   
@@ -408,7 +408,7 @@ void merge_statistics(const operation_set_type& operations,
   } else {
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::zlib_compressor());
-    os.push(utils::mpi_device_sink(0, stat_tag, 4096));
+    os.push(utils::mpi_device_sink(utils::mpi_comm(), 0, stat_tag, 4096));
     
     statistics_type::const_iterator siter_end = operations.get_statistics().end();
     for (statistics_type::const_iterator siter = operations.get_statistics().begin(); siter != siter_end; ++ siter) {
@@ -431,8 +431,8 @@ void merge_statistics(const operation_set_type& operations,
 
 void synchronize()
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
 
   if (mpi_rank == 0) {
     std::vector<MPI::Request, std::allocator<MPI::Request> > request_recv(mpi_size);
@@ -443,8 +443,8 @@ void synchronize()
     terminated_recv[0] = true;
     terminated_send[0] = true;
     for (int rank = 1; rank != mpi_size; ++ rank) {
-      request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
-      request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, rank, notify_tag);
+      request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI_INT, rank, notify_tag);
+      request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, MPI_INT, rank, notify_tag);
     }
     
     int non_found_iter = 0;
@@ -469,8 +469,8 @@ void synchronize()
       non_found_iter = loop_sleep(found, non_found_iter);
     }
   } else {
-    MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, 0, notify_tag);
-    MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, 0, notify_tag);
+    MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, MPI_INT, 0, notify_tag);
+    MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, MPI_INT, 0, notify_tag);
     
     bool terminated_send = false;
     bool terminated_recv = false;
@@ -755,8 +755,8 @@ struct ReduceFile
 
 void cicada_file(operation_set_type& operations)
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
   
   typedef TaskFile   task_type;
   
@@ -869,8 +869,8 @@ void cicada_file(operation_set_type& operations)
     thread_reduce.join();
     
   } else {
-    boost::shared_ptr<utils::mpi_istream>        is(new utils::mpi_istream(0, sample_tag, 4096));
-    boost::shared_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(0, result_tag, 4096));
+    boost::shared_ptr<utils::mpi_istream>        is(new utils::mpi_istream(utils::mpi_comm(), 0, sample_tag, 4096));
+    boost::shared_ptr<utils::mpi_ostream_simple> os(new utils::mpi_ostream_simple(utils::mpi_comm(), 0, result_tag, 4096));
     
     std::string line;
     bool terminated = false;
@@ -971,8 +971,8 @@ struct Task
 
 void cicada_directory(operation_set_type& operations)
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
   
   typedef Task  task_type;
   
@@ -1094,7 +1094,7 @@ void cicada_directory(operation_set_type& operations)
     }
     
   } else {
-    utils::mpi_istream is(0, sample_tag, 4096, true);
+    utils::mpi_istream is(utils::mpi_comm(), 0, sample_tag, 4096, true);
     
     std::string line;
     while (is.read(line)) {
@@ -1126,8 +1126,8 @@ struct deprecated
 
 void options(int argc, char** argv)
 {
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  const int mpi_rank = utils::mpi_comm().rank();
+  const int mpi_size = utils::mpi_comm().size();
 
   namespace po = boost::program_options;
 
@@ -1217,7 +1217,7 @@ void options(int argc, char** argv)
       std::cout << argv[0] << " [options]\n"
 		<< desc_visible << std::endl;
 
-    MPI::Finalize();
+    MPI_Finalize();
     exit(0);
   }
 }

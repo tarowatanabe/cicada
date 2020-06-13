@@ -191,7 +191,7 @@ namespace cicada
 	// compute score by characters...
 	double logprob = 0.0;
 	size_t num_char = 0;
-	StringCharacterIterator iter(uword);
+	icu::StringCharacterIterator iter(uword);
 	for (iter.setToStart(); iter.hasNext(); ++ num_char) {
 	  const UChar32 ch = iter.next32PostInc();
 

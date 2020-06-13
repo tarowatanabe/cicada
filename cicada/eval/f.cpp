@@ -97,7 +97,7 @@ namespace cicada
 
       if (boost::fusion::get<0>(parsed) == "sk") {
 	
-	std::auto_ptr<SK> sk(new SK());
+	std::unique_ptr<SK> sk(new SK());
 	sk->match_ref = boost::fusion::get<1>(parsed);
 	sk->norm_ref  = boost::fusion::get<2>(parsed);
 	sk->match_hyp = boost::fusion::get<3>(parsed);
@@ -105,7 +105,7 @@ namespace cicada
 	      
 	return score_ptr_type(sk.release());
       } else if (boost::fusion::get<0>(parsed) == "sb") {
-	std::auto_ptr<SB> sb(new SB());
+	std::unique_ptr<SB> sb(new SB());
 	sb->match_ref = boost::fusion::get<1>(parsed);
 	sb->norm_ref  = boost::fusion::get<2>(parsed);
 	sb->match_hyp = boost::fusion::get<3>(parsed);
@@ -113,7 +113,7 @@ namespace cicada
 	      
 	return score_ptr_type(sb.release());
       } else if (boost::fusion::get<0>(parsed) == "wlcs") {
-	std::auto_ptr<WLCS> wlcs(new WLCS());
+	std::unique_ptr<WLCS> wlcs(new WLCS());
 	wlcs->match_ref = boost::fusion::get<1>(parsed);
 	wlcs->norm_ref  = boost::fusion::get<2>(parsed);
 	wlcs->match_hyp = boost::fusion::get<3>(parsed);

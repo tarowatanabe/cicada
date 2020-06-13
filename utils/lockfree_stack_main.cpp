@@ -67,8 +67,8 @@ int main(int argc, char** argv)
 
   srandom(time() * getpid());
 
-  std::auto_ptr<boost::thread> consumer(new boost::thread(Consumer(stack, integers_consumer)));
-  std::auto_ptr<boost::thread> producer(new boost::thread(Producer(stack, integers_producer)));
+  std::unique_ptr<boost::thread> consumer(new boost::thread(Consumer(stack, integers_consumer)));
+  std::unique_ptr<boost::thread> producer(new boost::thread(Producer(stack, integers_producer)));
   
   if (integers_producer != integers_consumer)
     std::cerr << "different!" << std::endl;

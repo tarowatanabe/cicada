@@ -479,7 +479,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for sparse ngram: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type());
+      std::unique_ptr<impl_type> ngram_impl(new impl_type());
 
       ngram_impl->order = order;
       ngram_impl->no_bos_eos = no_bos_eos;
@@ -496,7 +496,7 @@ namespace cicada
       pimpl = ngram_impl.release();
     }
     
-    SparseNGram::~SparseNGram() { std::auto_ptr<impl_type> tmp(pimpl); }
+    SparseNGram::~SparseNGram() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     SparseNGram::SparseNGram(const SparseNGram& x)
       : base_type(static_cast<const base_type&>(x)),

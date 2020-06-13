@@ -425,7 +425,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for parent: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> parent_impl(new impl_type());
+      std::unique_ptr<impl_type> parent_impl(new impl_type());
       
       parent_impl->normalizers.swap(normalizers);
       
@@ -442,7 +442,7 @@ namespace cicada
       pimpl = parent_impl.release();
     }
     
-    Parent::~Parent() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Parent::~Parent() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     
     Parent::Parent(const Parent& x)

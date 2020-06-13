@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -1507,8 +1508,8 @@ namespace cicada
     utils::tempfile::insert(path_attribute_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 128));
-    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 128));
+    std::unique_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 128));
+    std::unique_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 128));
 
     GrammarParser::feature_stream_type   feature_stream(path_feature_data);
     GrammarParser::attribute_stream_type attribute_stream(path_attribute_data);
@@ -1785,8 +1786,8 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 128));
-    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 128));
+    std::unique_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 128));
+    std::unique_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 128));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -2117,7 +2118,7 @@ namespace cicada
   GrammarStatic::GrammarStatic(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
 
-  GrammarStatic::~GrammarStatic() { std::auto_ptr<impl_type> tmp(pimpl); }
+  GrammarStatic::~GrammarStatic() { std::unique_ptr<impl_type> tmp(pimpl); }
 
   GrammarStatic::GrammarStatic(const GrammarStatic& x)
     : pimpl(new impl_type(*x.pimpl)) {}

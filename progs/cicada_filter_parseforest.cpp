@@ -243,7 +243,7 @@ int main(int argc, char** argv)
       ms.reset(new utils::compress_istream(map_file, 1024 * 1024));
     }
 
-    const bool mapping = ms;
+    const bool mapping = ms.get();
     
     forest_parser<iter_type> parser;
 

@@ -111,7 +111,7 @@ namespace cicada
       if (path.empty() || (path != "-" && ! boost::filesystem::exists(path)))
 	throw std::runtime_error("no vocabulary file: " + path.string());
       
-      std::auto_ptr<impl_type> vocabulary_impl(new impl_type());
+      std::unique_ptr<impl_type> vocabulary_impl(new impl_type());
 
       {
 	utils::compress_istream is(path, 1024 * 1024);
@@ -136,7 +136,7 @@ namespace cicada
       pimpl = vocabulary_impl.release();
     }
     
-    Vocabulary::~Vocabulary() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Vocabulary::~Vocabulary() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     Vocabulary::Vocabulary(const Vocabulary& x)
       : base_type(static_cast<const base_type&>(x)),

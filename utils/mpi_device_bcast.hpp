@@ -20,7 +20,7 @@
 #include <boost/iostreams/categories.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include <mpi.h>
+#include <utils/mpi.hpp>
 #include <utils/mpi_allocator.hpp>
 
 namespace utils

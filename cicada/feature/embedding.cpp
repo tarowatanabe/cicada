@@ -185,7 +185,7 @@ namespace cicada
       if (name.empty())
 	name = "embedding";
       
-      std::auto_ptr<impl_type> embedding_impl(new impl_type(path, name));
+      std::unique_ptr<impl_type> embedding_impl(new impl_type(path, name));
       
       embedding_impl->skip_sgml_tag_ = skip_sgml_tag;
       
@@ -197,7 +197,7 @@ namespace cicada
     
     Embedding::~Embedding()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
     }
     
     Embedding::Embedding(const Embedding& x)

@@ -169,7 +169,7 @@ namespace cicada
       double precision_max = 0.0;
       double recall_max = 0.0;
       
-      std::auto_ptr<WLCS> wlcs(new WLCS());
+      std::unique_ptr<WLCS> wlcs(new WLCS());
       
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));

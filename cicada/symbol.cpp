@@ -4,6 +4,7 @@
 
 #include <iterator>
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>

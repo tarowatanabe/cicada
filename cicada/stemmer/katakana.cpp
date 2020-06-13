@@ -57,14 +57,14 @@ namespace cicada
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       }
-      ~KatakanaImpl() { std::auto_ptr<icu::Transliterator> tmp(trans); }
+      ~KatakanaImpl() { std::unique_ptr<icu::Transliterator> tmp(trans); }
       
     public:
       void operator()(icu::UnicodeString& data) { trans->transliterate(data); }
     };
     
     Katakana::Katakana() : pimpl(new impl_type()) {}
-    Katakana::~Katakana() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Katakana::~Katakana() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     std::string Katakana::operator()(const utils::piece& word) const
     {

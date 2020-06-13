@@ -88,7 +88,7 @@ namespace cicada
     
     transducer_ptr_type clone() const
     {
-      std::auto_ptr<GrammarUnknown> __tmp(new GrammarUnknown(*this));
+      std::unique_ptr<GrammarUnknown> __tmp(new GrammarUnknown(*this));
       
       __tmp->signature = &signature_type::create(signature->algorithm());
       if (__grammar_oov)

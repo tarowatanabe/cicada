@@ -15,6 +15,7 @@
 
 #include <stdexcept>
 
+#include <boost/core/noncopyable.hpp>
 #include <boost/thread.hpp>
 
 #include <utils/atomicop.hpp>

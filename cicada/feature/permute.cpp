@@ -103,7 +103,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;
       }
 
-      std::auto_ptr<impl_type> permute(new impl_type());
+      std::unique_ptr<impl_type> permute(new impl_type());
       
       if (! path.empty()) {
 	if (! boost::filesystem::exists(path))
@@ -124,7 +124,7 @@ namespace cicada
       //base_type::__sparse_feature = ! collapse;
     }
     
-    Permute::~Permute() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Permute::~Permute() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     Permute::Permute(const Permute& x)
       : base_type(static_cast<const base_type&>(x)),

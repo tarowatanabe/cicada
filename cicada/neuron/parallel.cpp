@@ -106,7 +106,7 @@ namespace cicada
 
     Parallel::layer_ptr_type Parallel::clone(const bool share) const
     {
-      std::auto_ptr<Parallel> cloned(new Parallel(*this));
+      std::unique_ptr<Parallel> cloned(new Parallel(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
 	cloned->layers[i] = layers[i]->clone(share);

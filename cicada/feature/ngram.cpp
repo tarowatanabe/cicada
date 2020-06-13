@@ -535,7 +535,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, populate));
+      std::unique_ptr<impl_type> ngram_impl(new impl_type(path, populate));
 
       if (ngram_impl->order <= 0)
 	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
@@ -566,7 +566,7 @@ namespace cicada
 
       // ...
       if (! coarse_path.empty()) {
-	std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
+	std::unique_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_populate));
 	
 	if (ngram_impl->order <= 0)
 	  throw std::runtime_error("invalid coarse ngram order: " + utils::lexical_cast<std::string>(ngram_impl->order));
@@ -588,9 +588,9 @@ namespace cicada
     
     NGram::~NGram()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
       if (pimpl_coarse)
-	std::auto_ptr<impl_type> tmp_coarse(pimpl_coarse);
+	std::unique_ptr<impl_type> tmp_coarse(pimpl_coarse);
     }
     
     NGram::NGram(const NGram& x)

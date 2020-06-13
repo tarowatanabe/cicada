@@ -245,7 +245,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
-    std::auto_ptr<boost::thread> merger(new boost::thread(merger_type(queue_reducer, os, threads)));
+    std::unique_ptr<boost::thread> merger(new boost::thread(merger_type(queue_reducer, os, threads)));
     
     for (size_t shard = 0; shard != queues.size(); ++ shard) {
       reducers.add_thread(new boost::thread(reducer_type(queue_reducer, queues[shard], *subprocess[shard])));

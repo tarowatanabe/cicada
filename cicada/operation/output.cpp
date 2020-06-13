@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 
+#include <boost/fusion/include/std_pair.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 

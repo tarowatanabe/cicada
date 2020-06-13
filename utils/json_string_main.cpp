@@ -5,6 +5,8 @@
 #include <iostream>
 #include <iterator>
 
+#include <boost/numeric/conversion/bounds.hpp>
+
 struct real_precision : boost::spirit::karma::real_policies<double>
 {
   static unsigned int precision(double) 

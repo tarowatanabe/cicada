@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -500,7 +501,7 @@ namespace cicada
   {
     pimpl->read(parameter);
   }
-  GrammarMutable::~GrammarMutable() { std::auto_ptr<impl_type> tmp(pimpl); }
+  GrammarMutable::~GrammarMutable() { std::unique_ptr<impl_type> tmp(pimpl); }
   
   GrammarMutable::GrammarMutable(const GrammarMutable& x)
     : pimpl(new impl_type(*x.pimpl)) {}

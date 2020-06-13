@@ -278,7 +278,7 @@ namespace cicada
       base_type::__sparse_feature = true;
     }
     
-    Span::~Span() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Span::~Span() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     Span::Span(const Span& x)
       : base_type(static_cast<const base_type&>(x)),

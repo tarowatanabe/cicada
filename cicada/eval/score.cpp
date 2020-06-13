@@ -223,7 +223,7 @@ depeval: dependency parse evaluation\n\
 	if (metrics.size() != weights.size())
 	  throw std::runtime_error("metrics and weights size do not match");
 	
-	std::auto_ptr<CombinedScorer> combined(new CombinedScorer());
+	std::unique_ptr<CombinedScorer> combined(new CombinedScorer());
 	
 	for (size_t i = 0; i != metrics.size(); ++ i) {
 	  combined->scorers.push_back(create(metrics[i]));

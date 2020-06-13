@@ -137,7 +137,7 @@ namespace cicada
 
       score_ptr_type clone() const
       {
-	std::auto_ptr<Combined> combined(new Combined());
+	std::unique_ptr<Combined> combined(new Combined());
 	
 	combined->scores.reserve(scores.size());
 	score_ptr_set_type::const_iterator siter_end = scores.end();
@@ -184,7 +184,7 @@ namespace cicada
       
       scorer_ptr_type clone() const
       {
-	std::auto_ptr<CombinedScorer> scorer(new CombinedScorer());
+	std::unique_ptr<CombinedScorer> scorer(new CombinedScorer());
 	
 	scorer->scorers.reserve(scorers.size());
 	scorer_ptr_set_type::const_iterator siter_end = scorers.end();
@@ -211,7 +211,7 @@ namespace cicada
       
       score_ptr_type score(const sentence_type& __sentence) const
       {
-	std::auto_ptr<Combined> combined(new Combined());
+	std::unique_ptr<Combined> combined(new Combined());
 	
 	combined->scores.reserve(scorers.size());
 	scorer_ptr_set_type::const_iterator siter_end = scorers.end();

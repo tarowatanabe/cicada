@@ -653,7 +653,7 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
+      std::unique_ptr<impl_type> ngram_impl(new impl_type(path, order, populate));
       
       ngram_impl->no_bos_eos     = no_bos_eos;
       ngram_impl->skip_sgml_tag  = skip_sgml_tag;
@@ -677,14 +677,14 @@ namespace cicada
 	  throw std::runtime_error("coarse order must be non-zero!");
 	
 	if (! coarse_path.empty()) {
-	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order, coarse_populate));
+	  std::unique_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order, coarse_populate));
 
 	  ngram_impl->no_bos_eos = no_bos_eos;
 	  ngram_impl->skip_sgml_tag = skip_sgml_tag;
 	  
 	  pimpl_coarse = ngram_impl.release();
 	} else {
-	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
+	  std::unique_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
 	  ngram_impl->order = coarse_order;
 	  
 	  pimpl_coarse = ngram_impl.release();
@@ -694,9 +694,9 @@ namespace cicada
     
     NGramRNN::~NGramRNN()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
       if (pimpl_coarse)
-	std::auto_ptr<impl_type> tmp_coarse(pimpl_coarse);
+	std::unique_ptr<impl_type> tmp_coarse(pimpl_coarse);
     }
     
     NGramRNN::NGramRNN(const NGramRNN& x)

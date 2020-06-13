@@ -170,7 +170,7 @@ namespace cicada
 	std::cerr << "WARNING: unsupported parameter for sgml-tag: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> sgml_tag(new impl_type());
+      std::unique_ptr<impl_type> sgml_tag(new impl_type());
       
       pimpl = sgml_tag.release();
       
@@ -178,7 +178,7 @@ namespace cicada
       base_type::__feature_name = "sgml-tag";
     }
     
-    SGMLTag::~SGMLTag() { std::auto_ptr<impl_type> tmp(pimpl); }
+    SGMLTag::~SGMLTag() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     SGMLTag::SGMLTag(const SGMLTag& x)
       : base_type(static_cast<const base_type&>(x)),

@@ -189,7 +189,7 @@ namespace cicada
 	throw std::runtime_error("invalid locale: " + locale_str_target);
       
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<icu::Calendar> calendar(icu::Calendar::createInstance(locale_source, status));
+      std::unique_ptr<icu::Calendar> calendar(icu::Calendar::createInstance(locale_source, status));
       if (U_FAILURE(status))
         throw std::runtime_error(std::string("Calendar::createInstance(): ") + u_errorName(status));
       
@@ -219,8 +219,8 @@ namespace cicada
 			      "full-relative"};
       
       for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
-	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
-	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
+	std::unique_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
+	std::unique_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
 	
 	date->setLenient(true);
 	time->setLenient(true);
@@ -233,8 +233,8 @@ namespace cicada
       }
 
       for (int i = 0; i != sizeof(date_styles) / sizeof(icu::DateFormat::EStyle); ++ i) {
-	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
-	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
+	std::unique_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
+	std::unique_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
 	
 	date->setLenient(true);
 	time->setLenient(true);
@@ -279,7 +279,7 @@ namespace cicada
 	    boost::algorithm::trim(pattern);
 	    
 	    UErrorCode status = U_ZERO_ERROR;
-	    std::auto_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_source, status));
+	    std::unique_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_source, status));
 	    if (U_FAILURE(status))
 	      throw std::runtime_error(std::string("SimpleDateFormat(): ") + u_errorName(status));
 	    
@@ -308,7 +308,7 @@ namespace cicada
 	    boost::algorithm::trim(pattern);
 	    
 	    UErrorCode status = U_ZERO_ERROR;
-	    std::auto_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_target, status));
+	    std::unique_ptr<icu::DateFormat> date(new icu::SimpleDateFormat(icu::UnicodeString::fromUTF8(pattern), locale_target, status));
 	    if (U_FAILURE(status))
 	      throw std::runtime_error(std::string("SimpleDateFormat(): ") + u_errorName(status));
 	    

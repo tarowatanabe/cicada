@@ -57,14 +57,14 @@ namespace cicada
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       }
-      ~LatinImpl() { std::auto_ptr<icu::Transliterator> tmp(trans); }
+      ~LatinImpl() { std::unique_ptr<icu::Transliterator> tmp(trans); }
       
     public:
       void operator()(icu::UnicodeString& data) { trans->transliterate(data); }
     };
     
     Latin::Latin() : pimpl(new impl_type()) {}
-    Latin::~Latin() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Latin::~Latin() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     std::string Latin::operator()(const utils::piece& word) const
     {

@@ -591,7 +591,7 @@ void learn(const Maximizer& maximizer,
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
-    std::auto_ptr<std::istream> is_align(! alignment_file.empty()
+    std::unique_ptr<std::istream> is_align(! alignment_file.empty()
 					 ? new utils::compress_istream(alignment_file, 1024 * 1024) : 0);
     
     bitext_type     bitext;
@@ -1103,9 +1103,9 @@ void viterbi(const ttable_type& ttable_source_target,
   utils::compress_istream is_src(source_file, 1024 * 1024);
   utils::compress_istream is_trg(target_file, 1024 * 1024);
 
-  std::auto_ptr<std::istream> is_span_src(! span_source_file.empty()
+  std::unique_ptr<std::istream> is_span_src(! span_source_file.empty()
 					  ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
-  std::auto_ptr<std::istream> is_span_trg(! span_target_file.empty()
+  std::unique_ptr<std::istream> is_span_trg(! span_target_file.empty()
 					  ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
   
   for (;;) {
@@ -1475,9 +1475,9 @@ void project_dependency(const ttable_type& ttable_source_target,
   utils::compress_istream is_src(source_file, 1024 * 1024);
   utils::compress_istream is_trg(target_file, 1024 * 1024);
   
-  std::auto_ptr<std::istream> is_dep_src(! dependency_source_file.empty()
+  std::unique_ptr<std::istream> is_dep_src(! dependency_source_file.empty()
 					 ? new utils::compress_istream(dependency_source_file, 1024 * 1024) : 0);
-  std::auto_ptr<std::istream> is_dep_trg(! dependency_target_file.empty()
+  std::unique_ptr<std::istream> is_dep_trg(! dependency_target_file.empty()
 					 ? new utils::compress_istream(dependency_target_file, 1024 * 1024) : 0);
   
   for (;;) {

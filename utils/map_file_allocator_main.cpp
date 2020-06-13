@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     
     std::cout << "iteration: " << i << std::endl;
 
-    std::auto_ptr<boost::thread> thread( new boost::thread(Task(array)));
+    std::unique_ptr<boost::thread> thread( new boost::thread(Task(array)));
     
     Task task(array2);
     task();

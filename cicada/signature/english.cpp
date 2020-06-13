@@ -20,7 +20,7 @@ namespace cicada
     English::English() : pimpl(0) 
     {
       UErrorCode status = U_ZERO_ERROR;
-      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
+      std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("Lower"), UTRANS_FORWARD, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       
@@ -29,7 +29,7 @@ namespace cicada
     
     English::~English()
     {
-      std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
+      std::unique_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(pimpl));
     }
     
     std::string English::operator()(const utils::piece& word) const

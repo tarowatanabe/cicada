@@ -253,7 +253,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for frontier shape: " << piter->first << "=" << piter->second << std::endl;
       }
             
-      std::auto_ptr<impl_type> shape_impl(new impl_type());
+      std::unique_ptr<impl_type> shape_impl(new impl_type());
 
       shape_impl->skip_sgml_tag = skip_sgml_tag;
       shape_impl->prefix = (name.empty() ? std::string("frontier-shape") : name);
@@ -265,7 +265,7 @@ namespace cicada
       pimpl = shape_impl.release();
     }
     
-    FrontierShape::~FrontierShape() { std::auto_ptr<impl_type> tmp(pimpl); }
+    FrontierShape::~FrontierShape() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     FrontierShape::FrontierShape(const FrontierShape& x)
       : base_type(static_cast<const base_type&>(x)),

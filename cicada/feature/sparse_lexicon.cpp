@@ -597,7 +597,7 @@ namespace cicada
       if (int(pair_mode) + prefix_mode + suffix_mode == 0)
 	pair_mode = true;
       
-      std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      std::unique_ptr<impl_type> lexicon_impl(new impl_type());
 
       lexicon_impl->normalizers_source.swap(normalizers_source);
       lexicon_impl->normalizers_target.swap(normalizers_target);
@@ -625,7 +625,7 @@ namespace cicada
       pimpl = lexicon_impl.release();
     }
     
-    SparseLexicon::~SparseLexicon() { std::auto_ptr<impl_type> tmp(pimpl); }
+    SparseLexicon::~SparseLexicon() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     SparseLexicon::SparseLexicon(const SparseLexicon& x)
       : base_type(static_cast<const base_type&>(x)),

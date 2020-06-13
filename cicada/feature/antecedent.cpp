@@ -350,7 +350,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for antecedent: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> antecedent_impl(new impl_type());
+      std::unique_ptr<impl_type> antecedent_impl(new impl_type());
       
       antecedent_impl->normalizers.swap(normalizers);
       antecedent_impl->alignment_mode = alignment_mode;
@@ -365,7 +365,7 @@ namespace cicada
       pimpl = antecedent_impl.release();
     }
     
-    Antecedent::~Antecedent() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Antecedent::~Antecedent() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     
     Antecedent::Antecedent(const Antecedent& x)

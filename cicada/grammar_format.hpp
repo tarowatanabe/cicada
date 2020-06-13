@@ -41,7 +41,7 @@ namespace cicada
     
     transducer_ptr_type clone() const
     {
-      std::auto_ptr<GrammarFormat> __tmp(new GrammarFormat(*this));
+      std::unique_ptr<GrammarFormat> __tmp(new GrammarFormat(*this));
       __tmp->format = &format_type::create(format->algorithm());
       return transducer_ptr_type(__tmp.release());
     }

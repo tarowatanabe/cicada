@@ -172,7 +172,7 @@ namespace cicada
       offsets(x.offsets),
       states_size(x.states_size) {}
   
-  Model::~Model() { std::auto_ptr<state_allocator_type> tmp(allocator); }
+  Model::~Model() { std::unique_ptr<state_allocator_type> tmp(allocator); }
   
   Model& Model::operator=(const Model& x)
   {

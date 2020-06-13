@@ -33,7 +33,7 @@ namespace utils
   
     void reset(Tp* new_value=0)
     {
-      std::auto_ptr<Tp> value(get());
+      std::unique_ptr<Tp> value(get());
       pthread_setspecific(key, new_value);
     }
 

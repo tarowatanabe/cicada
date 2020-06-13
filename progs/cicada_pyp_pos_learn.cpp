@@ -1045,7 +1045,7 @@ int main(int argc, char ** argv)
       
       model.initialize_cache(words.begin(), words.end());
       
-      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
+      std::unique_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;

@@ -218,7 +218,7 @@ namespace cicada
       if (path.empty())
 	throw std::runtime_error("no insertion file? " + path);
       
-      std::auto_ptr<impl_type> impl(new impl_type());
+      std::unique_ptr<impl_type> impl(new impl_type());
       
       impl->skip_sgml_tag = skip_sgml_tag;
       impl->unique_source = unique_source;
@@ -239,7 +239,7 @@ namespace cicada
       pimpl = impl.release();
     }
     
-    Insertion::~Insertion() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Insertion::~Insertion() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     Insertion::Insertion(const Insertion& x)
       : base_type(static_cast<const base_type&>(x)),

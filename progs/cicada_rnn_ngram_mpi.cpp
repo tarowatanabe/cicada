@@ -278,7 +278,7 @@ struct TaskAccumulate
     bool merge_finished = false;
     bool learn_finished = (batch == data_.size());
 
-    std::auto_ptr<boost::progress_display> progress(progress_
+    std::unique_ptr<boost::progress_display> progress(progress_
 						    ? new boost::progress_display(data_.size(), std::cerr, "", "", "")
 						    : 0);
     

@@ -357,7 +357,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for frontier lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
             
-      std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      std::unique_ptr<impl_type> lexicon_impl(new impl_type());
 
       lexicon_impl->normalizers_source.swap(normalizers_source);
       lexicon_impl->normalizers_target.swap(normalizers_target);
@@ -372,7 +372,7 @@ namespace cicada
       pimpl = lexicon_impl.release();
     }
     
-    FrontierLexicon::~FrontierLexicon() { std::auto_ptr<impl_type> tmp(pimpl); }
+    FrontierLexicon::~FrontierLexicon() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     FrontierLexicon::FrontierLexicon(const FrontierLexicon& x)
       : base_type(static_cast<const base_type&>(x)),

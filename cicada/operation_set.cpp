@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2013 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -447,7 +448,7 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::ExpandNGram(*piter, debug)));      
       else if (param_name == "output") {
 	// we do extra checking so that all the output directed to either the same directory or output-file
-	std::auto_ptr<operation::Output> output(new operation::Output(*piter, output_data, debug));
+	std::unique_ptr<operation::Output> output(new operation::Output(*piter, output_data, debug));
 	
 	if (output_initial) {
 	  output_data.file      = output->file;

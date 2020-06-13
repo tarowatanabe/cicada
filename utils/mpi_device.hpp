@@ -17,10 +17,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
-#include <mpi.h>
-
-#include <utils/mpi_allocator.hpp>
 #include <utils/atomicop.hpp>
+#include <utils/mpi.hpp>
+#include <utils/mpi_allocator.hpp>
 
 namespace utils
 {
@@ -104,7 +103,7 @@ namespace utils
     struct category : public boost::iostreams::source_tag,
 		      public boost::iostreams::closable_tag {};
     
-    mpi_device_source(MPI::Comm& comm,
+    mpi_device_source(const mpi_comm& comm,
 		      int rank,
 		      int tag,
 		      size_t buffer_size=4096)
@@ -134,7 +133,7 @@ namespace utils
       return __n;
     }
     void open(int rank, int tag, size_t buffer_size=4096) { pimpl->open(rank, tag, buffer_size); }
-    void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
+    void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
     bool is_open() const { return pimpl->is_open(); }
     void close() { pimpl->close(); }
     bool test() const { return pimpl->test(); }
@@ -147,7 +146,7 @@ namespace utils
       typedef unsigned int stream_size_type;
       typedef std::vector<char_type, utils::mpi_allocator<char_type> > buffer_type;
       
-      MPI::Prequest             request;
+      mpi_request               request;
       volatile stream_size_type recv_size;
       volatile size_type        buffer_offset;
       buffer_type buffer;
@@ -159,7 +158,7 @@ namespace utils
       
       std::streamsize read(char_type* s, std::streamsize n);
       void open(int rank, int tag, size_t buffer_size=4096);
-      void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096);
+      void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096);
       bool is_open() const;
       void close();
       bool test() const;
@@ -177,7 +176,7 @@ namespace utils
     struct category : public boost::iostreams::sink_tag,
 		      public boost::iostreams::closable_tag {};
     
-    mpi_device_sink(MPI::Comm& comm,
+    mpi_device_sink(const mpi_comm& comm,
 		    int rank, 
 		    int tag, 
 		    size_t buffer_size=4096, 
@@ -211,7 +210,7 @@ namespace utils
     {
       pimpl->open(rank, tag, buffer_size, terminate_on_close, overcommit);
     }
-    void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096, bool terminate_on_close=true, bool overcommit=false)
+    void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096, bool terminate_on_close=true, bool overcommit=false)
     {
       pimpl->open(comm, rank, tag, buffer_size, terminate_on_close, overcommit);
     }
@@ -232,7 +231,7 @@ namespace utils
       typedef unsigned int stream_size_type;
       typedef std::vector<char_type, utils::mpi_allocator<char_type> > buffer_type;
       
-      MPI::Prequest             request;
+      mpi_request               request;
       volatile stream_size_type send_size;
       volatile size_type        buffer_offset;
       buffer_type buffer;
@@ -247,7 +246,7 @@ namespace utils
       
       std::streamsize write(const char_type* s, std::streamsize n);
       void open(int rank, int tag, size_t buffer_size=4096, bool _terminate_on_close=true, bool _overcommit=false);
-      void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096, bool _terminate_on_close=true, bool _overcommit=false);
+      void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096, bool _terminate_on_close=true, bool _overcommit=false);
       bool is_open() const;
       void close();
       bool test() const;
@@ -265,11 +264,11 @@ namespace utils
   
   void mpi_device_sink::impl::wait() const
   {
-    if (! is_open() || ready)
+    if (!is_open() || ready)
       return;
 
-    if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
-      const_cast<mpi_device_sink::impl&>(*this).request.Wait();
+    if (!request.test())
+      request.wait();
 
     const_cast<bool&>(ready) = true;
     
@@ -278,11 +277,11 @@ namespace utils
 
   void mpi_device_source::impl::wait() const
   {
-    if (! is_open() || ready) 
+    if (!is_open() || ready) 
       return;
-    
-    if (! const_cast<mpi_device_source::impl&>(*this).request.Test())
-      const_cast<mpi_device_source::impl&>(*this).request.Wait();
+
+    if (!request.test())
+      request.wait();
     
     std::copy(buffer.end() - sizeof(stream_size_type), buffer.end(), (char_type*) &recv_size);
     const_cast<bool&>(ready) = true;
@@ -294,8 +293,8 @@ namespace utils
   {
     if (! is_open() || ready)
       return true;
-
-    if (! const_cast<mpi_device_sink::impl&>(*this).request.Test())
+    
+    if (!request.test())
       return false;
 
     const_cast<bool&>(ready) = true;
@@ -308,7 +307,7 @@ namespace utils
     if (! is_open() || ready) 
       return true;
     
-    if (! const_cast<mpi_device_source::impl&>(*this).request.Test())
+    if (!request.test())
       return false;
     
     std::copy(buffer.end() - sizeof(stream_size_type), buffer.end(), (char_type*) &recv_size);
@@ -375,8 +374,8 @@ namespace utils
 	buffer_offset = buffer_overcommit.size();
 	
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
-	
-	request.Start();
+
+	request.start();
 	ready = false;
 	
 	return send_size;
@@ -388,8 +387,8 @@ namespace utils
 	buffer_offset = 0;
 	
 	std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
-	
-	request.Start();
+
+	request.start();
 	ready = false;
 	
 	return send_size;
@@ -422,8 +421,8 @@ namespace utils
     send_size = 0;
     
     std::copy((char_type*) &send_size, ((char_type*) &send_size) + sizeof(stream_size_type), buffer.end() - sizeof(stream_size_type));
-    
-    request.Start();
+
+    request.start();
     ready = false;
   };
   
@@ -461,10 +460,10 @@ namespace utils
   
   void mpi_device_sink::impl::open(int rank, int tag, size_t buffer_size, bool _terminate_on_close, bool _overcommit)
   {
-    open(MPI::COMM_WORLD, rank, tag, buffer_size, _terminate_on_close, _overcommit);
+    open(mpi_comm(), rank, tag, buffer_size, _terminate_on_close, _overcommit);
   }
 
-  void mpi_device_sink::impl::open(MPI::Comm& comm, int rank, int tag, size_t buffer_size, bool _terminate_on_close, bool _overcommit)
+  void mpi_device_sink::impl::open(const mpi_comm& comm, int rank, int tag, size_t buffer_size, bool _terminate_on_close, bool _overcommit)
   {
     close();
     
@@ -477,8 +476,8 @@ namespace utils
     
     send_size = stream_size_type(-1);
     buffer_offset = 0;
-    
-    request = comm.Send_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
+
+    MPI_Send_init(&(*buffer.begin()), buffer.size(), MPI_CHAR, rank, tag, comm.comm, &request.request);
     ready = true;
     
     terminate_on_close = _terminate_on_close;
@@ -502,7 +501,7 @@ namespace utils
     buffer_offset += copy_size;
     
     if (buffer_offset == recv_size) {
-      request.Start();
+      request.start();
       ready = false;
       
       buffer_offset = 0;
@@ -523,10 +522,10 @@ namespace utils
 
   void mpi_device_source::impl::open(int rank, int tag, size_t buffer_size)
   {
-    open(MPI::COMM_WORLD, rank, tag, buffer_size);
+    open(mpi_comm(), rank, tag, buffer_size);
   }
   
-  void mpi_device_source::impl::open(MPI::Comm& comm, int rank, int tag, size_t buffer_size)
+  void mpi_device_source::impl::open(const mpi_comm& comm, int rank, int tag, size_t buffer_size)
   {
     close();
     
@@ -535,10 +534,10 @@ namespace utils
     
     recv_size = 0;
     buffer_offset = 0;
-    
-    request = comm.Recv_init(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, tag);
-    
-    request.Start();
+
+    MPI_Recv_init(&(*buffer.begin()), buffer.size(), MPI_CHAR, rank, tag, comm.comm, &request.request);
+
+    request.start();
     ready = false;
   }
 

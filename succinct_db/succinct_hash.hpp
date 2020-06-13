@@ -461,7 +461,7 @@ namespace succinctdb
       typedef typename _Data::value_type value_type;
       typedef typename Alloc::template rebind<value_type>::other value_alloc_type;
       
-      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+      std::unique_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
 #if BOOST_FILESYSTEM_VERSION == 2
       if (packed)
 	os->push(utils::packed_sink<value_type, value_alloc_type>(file));
@@ -667,7 +667,7 @@ namespace succinctdb
       typedef typename _Data::value_type value_type;
       typedef typename Alloc::template rebind<value_type>::other value_alloc_type;
       
-      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+      std::unique_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
 #if BOOST_FILESYSTEM_VERSION == 2
       if (packed)
 	os->push(utils::packed_sink<value_type, value_alloc_type>(file));

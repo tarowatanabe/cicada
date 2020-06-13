@@ -561,7 +561,7 @@ namespace utils
     inline
     void dump_file(const _Path& file, const _Data& data)
     {
-      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+      std::unique_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
       os->push(boost::iostreams::file_sink(file.native_file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
       
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();

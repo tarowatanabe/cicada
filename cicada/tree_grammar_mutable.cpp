@@ -2,6 +2,7 @@
 //  Copyright(C) 2010-2012 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -560,7 +561,7 @@ namespace cicada
   TreeGrammarMutable::TreeGrammarMutable(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
   
-  TreeGrammarMutable::~TreeGrammarMutable() { std::auto_ptr<impl_type> tmp(pimpl); }
+  TreeGrammarMutable::~TreeGrammarMutable() { std::unique_ptr<impl_type> tmp(pimpl); }
   
   TreeGrammarMutable::TreeGrammarMutable(const TreeGrammarMutable& x)
     : pimpl(new impl_type(*x.pimpl)) {}

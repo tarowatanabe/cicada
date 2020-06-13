@@ -93,7 +93,7 @@ namespace cicada
 
     Concat::layer_ptr_type Concat::clone(const bool share) const
     {
-      std::auto_ptr<Concat> cloned(new Concat(*this));
+      std::unique_ptr<Concat> cloned(new Concat(*this));
       
       for (size_type i = 0; i != layers.size(); ++ i)
 	cloned->layers[i] = layers[i]->clone(share);

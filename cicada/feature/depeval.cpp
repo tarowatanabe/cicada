@@ -215,7 +215,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.string());
       
-      std::auto_ptr<impl_type> depeval_impl(new impl_type());
+      std::unique_ptr<impl_type> depeval_impl(new impl_type());
       
       // matched count + total count
       base_type::__state_size = sizeof(impl_type::counts_index_type::index_type);
@@ -255,7 +255,7 @@ namespace cicada
       }
     }
     
-    Depeval::~Depeval() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Depeval::~Depeval() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     Depeval::Depeval(const Depeval& x)
       : base_type(static_cast<const base_type&>(x)),

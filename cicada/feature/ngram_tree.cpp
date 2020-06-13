@@ -374,7 +374,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> ngram_tree_impl(new impl_type());
+      std::unique_ptr<impl_type> ngram_tree_impl(new impl_type());
 
       ngram_tree_impl->normalizers.swap(normalizers);
       ngram_tree_impl->alignment_mode = alignment_mode;
@@ -389,7 +389,7 @@ namespace cicada
       pimpl = ngram_tree_impl.release();
     }
     
-    NGramTree::~NGramTree() { std::auto_ptr<impl_type> tmp(pimpl); }
+    NGramTree::~NGramTree() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     
     NGramTree::NGramTree(const NGramTree& x)

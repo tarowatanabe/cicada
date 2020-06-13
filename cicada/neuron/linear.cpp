@@ -89,7 +89,7 @@ namespace cicada
     
     Linear::layer_ptr_type Linear::clone(const bool share) const
     {
-      std::auto_ptr<Linear> cloned(new Linear(*this));
+      std::unique_ptr<Linear> cloned(new Linear(*this));
       
       if (! share) {
 	cloned->weight.reset(new tensor_type(*weight));

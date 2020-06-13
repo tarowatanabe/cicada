@@ -2046,7 +2046,7 @@ int main(int argc, char ** argv)
       if (! baby_finished)
 	std::sort(positions.begin(), positions.end(), less_size(sources, targets));
 
-      std::auto_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
+      std::unique_ptr<boost::thread> mapper(new boost::thread(TaskMapper(queue_mapper, positions)));
       
       for (size_type reduced = 0; reduced != positions.size(); ++ reduced) {
 	size_type pos = 0;

@@ -292,7 +292,7 @@ int main(int argc, char** argv)
     if (split_mark && merge_mark)
       throw std::runtime_error("You cannot split and merge mark");
 
-    std::auto_ptr<icu::Transliterator> trans(initialize());
+    std::unique_ptr<icu::Transliterator> trans(initialize());
 
     boost::iostreams::filtering_istream is;
     is.push(utils::icu_filter(codepage_from, "utf-8", utils::icu_filter::stop));
@@ -487,7 +487,7 @@ icu::Transliterator* initialize()
   if (remove_control) {
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("RemoveControls"),
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("RemoveControls"),
 										  icu::UnicodeString::fromUTF8("[[:C:]-[:White_Space:]] > ;"),
 										  UTRANS_FORWARD, status_parse, status));
     if (U_FAILURE(status))
@@ -514,7 +514,7 @@ icu::Transliterator* initialize()
     
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("SGMLEntities"),
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("SGMLEntities"),
 										  rules_entity,
 										  UTRANS_FORWARD, status_parse, status));
     if (U_FAILURE(status))
@@ -547,7 +547,7 @@ icu::Transliterator* initialize()
     
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGMLRules"),
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGMLRules"),
 										  rules_entity,
 										  UTRANS_FORWARD, status_parse, status));
     if (U_FAILURE(status)) {
@@ -563,7 +563,7 @@ icu::Transliterator* initialize()
     {
       UErrorCode status = U_ZERO_ERROR;
       UParseError status_parse;
-      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGML"),
+      std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntitySGML"),
 										    ":: [[:^Latin:]-[\\x00-\\x7f]] ; :: EntitySGMLRules ;",
 										    UTRANS_FORWARD, status_parse, status));
       if (U_FAILURE(status)) {
@@ -606,7 +606,7 @@ icu::Transliterator* initialize()
     
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("USPatentEntities"),
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("USPatentEntities"),
 										  rules_entity,
 										  UTRANS_FORWARD, status_parse, status));
     if (U_FAILURE(status))
@@ -632,7 +632,7 @@ icu::Transliterator* initialize()
     
     UErrorCode status = U_ZERO_ERROR;
     UParseError status_parse;
-    std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntityUSPatent"),
+    std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules(icu::UnicodeString::fromUTF8("EntityUSPatent"),
 										  rules_entity,
 										  UTRANS_REVERSE, status_parse, status));
     if (U_FAILURE(status))
@@ -672,7 +672,7 @@ icu::Transliterator* initialize()
     
   UErrorCode status = U_ZERO_ERROR;
   UParseError status_parse;
-  std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules("FullNormalizer", rules,
+  std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createFromRules("FullNormalizer", rules,
 										UTRANS_FORWARD, status_parse, status));
   
   if (U_FAILURE(status))

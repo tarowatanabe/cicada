@@ -57,14 +57,14 @@ namespace cicada
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       }
-      ~HiraganaImpl() { std::auto_ptr<icu::Transliterator> tmp(trans); }
+      ~HiraganaImpl() { std::unique_ptr<icu::Transliterator> tmp(trans); }
       
     public:
       void operator()(icu::UnicodeString& data) { trans->transliterate(data); }
     };
     
     Hiragana::Hiragana() : pimpl(new impl_type()) {}
-    Hiragana::~Hiragana() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Hiragana::~Hiragana() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     std::string Hiragana::operator()(const utils::piece& word) const
     {

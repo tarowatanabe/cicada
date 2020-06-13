@@ -497,7 +497,7 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order));
+      std::unique_ptr<impl_type> bleu_impl(new impl_type(order));
       
       // two-side context + length + counts-id
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) + sizeof(impl_type::id_type);
@@ -506,7 +506,7 @@ namespace cicada
       pimpl = bleu_impl.release();
     }
     
-    BleuExpected::~BleuExpected() { std::auto_ptr<impl_type> tmp(pimpl); }
+    BleuExpected::~BleuExpected() { std::unique_ptr<impl_type> tmp(pimpl); }
 
     BleuExpected::BleuExpected(const BleuExpected& x)
       : base_type(static_cast<const base_type&>(x)),

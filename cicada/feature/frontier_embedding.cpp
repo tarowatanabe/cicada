@@ -328,7 +328,7 @@ namespace cicada
       if (name.empty())
 	name = "frontier-embedding";
       
-      std::auto_ptr<impl_type> embedding_impl(new impl_type(path_source, path_target, name));
+      std::unique_ptr<impl_type> embedding_impl(new impl_type(path_source, path_target, name));
       
       embedding_impl->skip_sgml_tag_ = skip_sgml_tag;
       
@@ -340,7 +340,7 @@ namespace cicada
     
     FrontierEmbedding::~FrontierEmbedding()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
     }
     
     FrontierEmbedding::FrontierEmbedding(const FrontierEmbedding& x)

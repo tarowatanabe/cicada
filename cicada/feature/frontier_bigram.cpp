@@ -402,7 +402,7 @@ namespace cicada
       if (! source_mode && ! target_mode)
 	source_mode = true;
       
-      std::auto_ptr<impl_type> bigram_impl(new impl_type());
+      std::unique_ptr<impl_type> bigram_impl(new impl_type());
       
       bigram_impl->skip_sgml_tag = skip_sgml_tag;
       bigram_impl->prefix = (name.empty() ? std::string("frontier-bigram") : name);
@@ -416,7 +416,7 @@ namespace cicada
       pimpl = bigram_impl.release();
     }
     
-    FrontierBigram::~FrontierBigram() { std::auto_ptr<impl_type> tmp(pimpl); }
+    FrontierBigram::~FrontierBigram() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     FrontierBigram::FrontierBigram(const FrontierBigram& x)
       : base_type(static_cast<const base_type&>(x)),

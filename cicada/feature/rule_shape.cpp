@@ -207,7 +207,7 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
 	std::cerr << "WARNING: unsupported parameter for rule-shape: " << piter->first << "=" << piter->second << std::endl;
       
-      std::auto_ptr<impl_type> rule_shape_impl(new impl_type());
+      std::unique_ptr<impl_type> rule_shape_impl(new impl_type());
       
       base_type::__state_size = sizeof(impl_type::id_type);
       base_type::__feature_name = "rule-shape";
@@ -216,7 +216,7 @@ namespace cicada
       pimpl = rule_shape_impl.release();
     }
     
-    RuleShape::~RuleShape() { std::auto_ptr<impl_type> tmp(pimpl); }
+    RuleShape::~RuleShape() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     RuleShape::RuleShape(const RuleShape& x)
       : base_type(static_cast<const base_type&>(x)),

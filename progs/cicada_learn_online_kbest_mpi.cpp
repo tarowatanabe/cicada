@@ -1002,7 +1002,7 @@ void cicada_learn(Learner& learner,
   hypothesis_map_type kbests_all;
 
   dumper_type::queue_type queue_dumper;
-  std::auto_ptr<boost::thread> thread_dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
+  std::unique_ptr<boost::thread> thread_dumper(mpi_rank == 0 ? new boost::thread(dumper_type(queue_dumper)) : 0);
   
   // first, bcast weights...
   bcast_weights(weights);

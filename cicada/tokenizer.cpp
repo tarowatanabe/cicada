@@ -152,7 +152,7 @@ tokenize: use the chain of tokenization\n\
     } else if (utils::ipiece(param.name()) == "tokenize") {
       tokenizer_map_type::iterator iter = tokenizers_map.find(parameter);
       if (iter == tokenizers_map.end()) {
-	std::auto_ptr<tokenizer::Tokenize> tokenize(new tokenizer::Tokenize());
+	std::unique_ptr<tokenizer::Tokenize> tokenize(new tokenizer::Tokenize());
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "lower") {

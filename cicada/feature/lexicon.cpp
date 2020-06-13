@@ -261,7 +261,7 @@ namespace cicada
       if (path.empty())
 	throw std::runtime_error("no lexicon file? " + path);
       
-      std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      std::unique_ptr<impl_type> lexicon_impl(new impl_type());
       
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->unique_source = unique_source;
@@ -284,7 +284,7 @@ namespace cicada
       pimpl = lexicon_impl.release();
     }
     
-    Lexicon::~Lexicon() { std::auto_ptr<impl_type> tmp(pimpl); }
+    Lexicon::~Lexicon() { std::unique_ptr<impl_type> tmp(pimpl); }
     
     Lexicon::Lexicon(const Lexicon& x)
       : base_type(static_cast<const base_type&>(x)),

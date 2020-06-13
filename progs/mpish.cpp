@@ -158,7 +158,7 @@ int main(int argc, char** argv)
       
       queue_type queue(1);
       int busy = 0;
-      std::auto_ptr<thread_type> thread(new thread_type(task_type(queue, busy)));
+      std::unique_ptr<thread_type> thread(new thread_type(task_type(queue, busy)));
 
       if (input_files.empty())
 	input_files.push_back("-");

@@ -103,7 +103,7 @@ namespace cicada
     
     Convolution::layer_ptr_type Convolution::clone(const bool share) const
     {
-      std::auto_ptr<Convolution> cloned(new Convolution(*this));
+      std::unique_ptr<Convolution> cloned(new Convolution(*this));
       
       if (! share) {
 	cloned->weight.reset(new tensor_type(*weight));

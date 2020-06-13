@@ -32,8 +32,8 @@ struct worker
 
 int main(int argc, char** argv)
 {
-  std::auto_ptr<boost::thread> thread1(new boost::thread(worker<int, 512>()));
-  std::auto_ptr<boost::thread> thread2(new boost::thread(worker<int, 512>()));
+  std::unique_ptr<boost::thread> thread1(new boost::thread(worker<int, 512>()));
+  std::unique_ptr<boost::thread> thread2(new boost::thread(worker<int, 512>()));
   
   thread1->join();
   thread2->join();

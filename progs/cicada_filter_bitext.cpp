@@ -154,7 +154,7 @@ int main(int argc, char** argv)
 
     utils::compress_ostream os_src(output_source_file, 1024 * 1024);
     utils::compress_ostream os_trg(output_target_file, 1024 * 1024);
-    std::auto_ptr<utils::compress_ostream> os_align(alignment_mode ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
+    std::unique_ptr<utils::compress_ostream> os_align(alignment_mode ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
 
     typedef boost::spirit::istream_iterator iiter_type;
     typedef std::ostream_iterator<char>     oiter_type;

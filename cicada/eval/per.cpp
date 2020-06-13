@@ -97,7 +97,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<PER> per(new PER());
+      std::unique_ptr<PER> per(new PER());
       per->insertion    = boost::fusion::get<0>(parsed);
       per->deletion     = boost::fusion::get<1>(parsed);
       per->substitution = boost::fusion::get<2>(parsed);
@@ -241,7 +241,7 @@ namespace cicada
       tokenize(__sentence, sentence);
       
       double score_best = std::numeric_limits<double>::infinity();
-      std::auto_ptr<PER> per(new PER());
+      std::unique_ptr<PER> per(new PER());
       
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));

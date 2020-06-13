@@ -93,7 +93,7 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<Ribes> ribes(new Ribes());
+      std::unique_ptr<Ribes> ribes(new Ribes());
       ribes->distance = boost::fusion::get<0>(parsed);
       ribes->norm     = boost::fusion::get<1>(parsed);
       
@@ -380,7 +380,7 @@ namespace cicada
       sentence_type sentence;
       tokenize(__sentence, sentence);
       
-      std::auto_ptr<Ribes> ribes(new Ribes());
+      std::unique_ptr<Ribes> ribes(new Ribes());
       
       if (! impl.empty()) {
 	ribes->distance = - std::numeric_limits<double>::infinity();

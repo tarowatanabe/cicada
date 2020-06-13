@@ -1767,9 +1767,9 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024);
     
-    std::auto_ptr<std::ostream> os_src(! output_source_file.empty() ? new utils::compress_ostream(output_source_file, 1024 * 1024) : 0);
-    std::auto_ptr<std::ostream> os_trg(! output_target_file.empty() ? new utils::compress_ostream(output_target_file, 1024 * 1024) : 0);
-    std::auto_ptr<std::ostream> os_align(! output_alignment_file.empty() ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
+    std::unique_ptr<std::ostream> os_src(! output_source_file.empty() ? new utils::compress_ostream(output_source_file, 1024 * 1024) : 0);
+    std::unique_ptr<std::ostream> os_trg(! output_target_file.empty() ? new utils::compress_ostream(output_target_file, 1024 * 1024) : 0);
+    std::unique_ptr<std::ostream> os_align(! output_alignment_file.empty() ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
 
     is.unsetf(std::ios::skipws);
     os.precision(20);

@@ -75,7 +75,7 @@ int main(int argc, char** argv)
     
     for (int style = 0; style != UNUM_FORMAT_STYLE_COUNT; ++ style) {
       UErrorCode status = U_ZERO_ERROR;  
-      std::auto_ptr<icu::NumberFormat> format(icu::NumberFormat::createInstance(loc, UNumberFormatStyle(style), status));
+      std::unique_ptr<icu::NumberFormat> format(icu::NumberFormat::createInstance(loc, UNumberFormatStyle(style), status));
       
       if (U_FAILURE(status)) {
 	std::cerr << "no style: " << style << std::endl;
@@ -118,7 +118,7 @@ int main(int argc, char** argv)
 	
 	sink.write('\n');
 	icu::ParsePosition pos(0);
-	std::auto_ptr<icu::CurrencyAmount> curr(formatters[i].second->parseCurrency(formatted, pos));
+	std::unique_ptr<icu::CurrencyAmount> curr(formatters[i].second->parseCurrency(formatted, pos));
 	
 	if (curr.get() && pos.getIndex() == formatted.length()) {
 	  os << "re-format currency: ";

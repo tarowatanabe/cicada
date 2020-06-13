@@ -2,6 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_DISABLE_ASSERTS
+#define NDEBUG
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -21,6 +23,7 @@
 #include "utils/getline.hpp"
 
 #include "tree_rule.hpp"
+
 
 struct cicada_treebank_type
 {

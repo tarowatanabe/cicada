@@ -500,10 +500,10 @@ struct OutputAlignment : MapReduce
       bitext_alignment_type bitext;
       size_type id = 0;
       
-      std::auto_ptr<std::ostream> os_source_target(! path_source_target_.empty()
+      std::unique_ptr<std::ostream> os_source_target(! path_source_target_.empty()
 						   ? new utils::compress_ostream(path_source_target_, 1024 * 1024)
 						   : 0);
-      std::auto_ptr<std::ostream> os_target_source(! path_target_source_.empty()
+      std::unique_ptr<std::ostream> os_target_source(! path_target_source_.empty()
 						   ? new utils::compress_ostream(path_target_source_, 1024 * 1024)
 						   : 0);
       
@@ -1079,7 +1079,7 @@ void learn_online_root(const Learner& learner,
 	gradient_istream[rank].reset(new gradient_istream_type(rank, gradient_tag));
       }
     
-    std::auto_ptr<boost::progress_display> progress(debug
+    std::unique_ptr<boost::progress_display> progress(debug
 						    ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						    : 0);
 
@@ -1679,7 +1679,7 @@ void viterbi_root(const bitext_set_type& bitexts,
   if (debug)
     std::cerr << "Viterbi alignment" << std::endl;
 
-  std::auto_ptr<boost::progress_display> progress(debug
+  std::unique_ptr<boost::progress_display> progress(debug
 						  ? new boost::progress_display(bitexts.size(), std::cerr, "", "", "")
 						  : 0);
   

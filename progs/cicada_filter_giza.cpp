@@ -129,9 +129,9 @@ int main(int argc, char ** argv)
 
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
-    std::auto_ptr<std::ostream> os_source(! output_source_file.empty() ?
+    std::unique_ptr<std::ostream> os_source(! output_source_file.empty() ?
 					  new utils::compress_ostream(output_source_file, 1024 * 1024) : 0);
-    std::auto_ptr<std::ostream> os_target(! output_target_file.empty() ?
+    std::unique_ptr<std::ostream> os_target(! output_target_file.empty() ?
 					  new utils::compress_ostream(output_target_file, 1024 * 1024) : 0);
     
     

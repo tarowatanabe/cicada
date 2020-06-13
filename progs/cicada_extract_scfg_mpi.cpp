@@ -155,9 +155,9 @@ int main(int argc, char** argv)
       utils::compress_istream is_trg(target_file, 1024 * 1024);
       utils::compress_istream is_alg(alignment_file, 1024 * 1024);
       
-      std::auto_ptr<std::istream> is_span_src(boost::filesystem::exists(spans_source_file)
+      std::unique_ptr<std::istream> is_span_src(boost::filesystem::exists(spans_source_file)
 					      ? new utils::compress_istream(spans_source_file, 1024 * 1024) : 0);
-      std::auto_ptr<std::istream> is_span_trg(boost::filesystem::exists(spans_target_file)
+      std::unique_ptr<std::istream> is_span_trg(boost::filesystem::exists(spans_target_file)
 					      ? new utils::compress_istream(spans_target_file, 1024 * 1024) : 0);
       
       bitext_type bitext;

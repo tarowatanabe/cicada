@@ -48,7 +48,7 @@ namespace cicada
 
       UErrorCode status = U_ZERO_ERROR;
       
-      std::auto_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("AnyNFKC"), UTRANS_FORWARD, status));
+      std::unique_ptr<icu::Transliterator> trans(icu::Transliterator::createInstance(icu::UnicodeString::fromUTF8("AnyNFKC"), UTRANS_FORWARD, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
       
@@ -57,7 +57,7 @@ namespace cicada
 
     NFKC::~NFKC()
     {
-      std::auto_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(handle));
+      std::unique_ptr<icu::Transliterator> tmp(static_cast<icu::Transliterator*>(handle));
     }
 
     std::string NFKC::operator()(const utils::piece& word) const

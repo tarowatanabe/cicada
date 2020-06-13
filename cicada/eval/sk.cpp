@@ -166,7 +166,7 @@ namespace cicada
       double precision_max = 0.0;
       double recall_max = 0.0;
       
-      std::auto_ptr<SK> sk(new SK());
+      std::unique_ptr<SK> sk(new SK());
       
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));

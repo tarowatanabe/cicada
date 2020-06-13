@@ -479,7 +479,7 @@ namespace cicada
 
       const bool model_mode = (! path.empty());
       
-      std::auto_ptr<impl_type> rnn_impl(model_mode
+      std::unique_ptr<impl_type> rnn_impl(model_mode
 					? new impl_type(path, name)
 					: new impl_type(hidden, embedding, path_source, path_target, name));
       
@@ -501,7 +501,7 @@ namespace cicada
     
     FrontierBiTreeRNN::~FrontierBiTreeRNN()
     {
-      std::auto_ptr<impl_type> tmp(pimpl);
+      std::unique_ptr<impl_type> tmp(pimpl);
     }
     
     FrontierBiTreeRNN::FrontierBiTreeRNN(const FrontierBiTreeRNN& x)
