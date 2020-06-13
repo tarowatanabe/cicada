@@ -19,84 +19,84 @@ namespace utils
   struct mpi_traits<long double>
   {
     typedef long double value_type;
-    static inline MPI_Datatype data_type() { return MPI_LONG_DOUBLE; }
+    static inline MPI::Datatype data_type() { return MPI::LONG_DOUBLE; }
   };
   
   template <>
   struct mpi_traits<double>
   {
     typedef double value_type;
-    static inline MPI_Datatype data_type() { return MPI_DOUBLE; }
+    static inline MPI::Datatype data_type() { return MPI::DOUBLE; }
   };
   
   template <>
   struct mpi_traits<float>
   {
     typedef float value_type;
-    static inline MPI_Datatype data_type() { return MPI_FLOAT; }
+    static inline MPI::Datatype data_type() { return MPI::FLOAT; }
   };
 
   template <>
   struct mpi_traits<bool>
   {
     typedef bool value_type;
-    static inline MPI_Datatype data_type() { return MPI_BOOL; }
+    static inline MPI::Datatype data_type() { return MPI::BOOL; }
   };
 
   template <>
   struct mpi_traits<char>
   {
     typedef char value_type;
-    static inline MPI_Datatype data_type() { return MPI_CHAR; }
+    static inline MPI::Datatype data_type() { return MPI::CHAR; }
   };
   
   template <>
   struct mpi_traits<unsigned char>
   {
     typedef unsigned char value_type;
-    static inline MPI_Datatype data_type() { return MPI_UNSIGNED_CHAR; }
+    static inline MPI::Datatype data_type() { return MPI::UNSIGNED_CHAR; }
   };
   
   template <>
   struct mpi_traits<short>
   {
     typedef short value_type;
-    static inline MPI_Datatype data_type() { return MPI_SHORT; }
+    static inline MPI::Datatype data_type() { return MPI::SHORT; }
   };
   
   template <>
   struct mpi_traits<unsigned short>
   {
     typedef unsigned short value_type;
-    static inline MPI_Datatype data_type() { return MPI_UNSIGNED_SHORT; }
+    static inline MPI::Datatype data_type() { return MPI::UNSIGNED_SHORT; }
   };
   
   template <>
   struct mpi_traits<int>
   {
     typedef int value_type;
-    static inline MPI_Datatype data_type() { return MPI_INT; }
+    static inline MPI::Datatype data_type() { return MPI::INT; }
   };
   
   template <>
   struct mpi_traits<unsigned int>
   {
     typedef unsigned int value_type;
-    static inline MPI_Datatype data_type() { return MPI_UNSIGNED; }
+    static inline MPI::Datatype data_type() { return MPI::UNSIGNED; }
   };
 
   template <>
   struct mpi_traits<long>
   {
     typedef long value_type;
-    static inline MPI_Datatype data_type() { return MPI_LONG; }
+    static inline MPI::Datatype data_type() { return MPI::LONG; }
   };
   
   template <>
   struct mpi_traits<unsigned long>
   {
     typedef unsigned long value_type;
-    static inline MPI_Datatype data_type() { return MPI_UNSIGNED_LONG; }
+    static inline MPI::Datatype data_type() { return MPI::UNSIGNED_LONG; }
   };
   
 };

@@ -17,8 +17,9 @@
 
 #include <boost/thread.hpp>
 
+#include <mpi.h>
+
 #include <utils/atomicop.hpp>
-#include <utils/mpi.hpp>
 
 namespace utils
 {
@@ -45,12 +46,12 @@ namespace utils
     typedef ptrdiff_t difference_type;
     
   public:
-    basic_mpi_ostream_simple(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096) : pimpl(new impl()) { open(comm, rank, tag, buffer_size); }
+    basic_mpi_ostream_simple(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096) : pimpl(new impl()) { open(comm, rank, tag, buffer_size); }
     basic_mpi_ostream_simple(int rank, int tag, size_t buffer_size=4096) : pimpl(new impl()) { open(rank, tag, buffer_size); }
 
   public:
-    void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
-    void open(int rank, int tag, size_t buffer_size=4096) { pimpl->open(mpi_comm(), rank, tag, buffer_size); }
+    void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
+    void open(int rank, int tag, size_t buffer_size=4096) { pimpl->open(MPI::COMM_WORLD, rank, tag, buffer_size); }
     
     basic_mpi_ostream_simple& write(const std::string& data) { pimpl->write(data); return *this; }
     void close() { pimpl->close(); }
@@ -68,10 +69,10 @@ namespace utils
     {
       typedef std::vector<char, Alloc> buffer_type;
 
-      impl() : comm() {}
+      impl() : comm(0) {}
       ~impl() { close(); }
 
-      void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096);
+      void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096);
       void close();
 
       void write(const std::string& data);
@@ -84,7 +85,7 @@ namespace utils
 
       bool is_open() const;
 
-      std::unique_ptr<mpi_comm> comm;
+      MPI::Comm* comm;
       int        rank;
       int        tag;
       
@@ -92,8 +93,8 @@ namespace utils
       volatile int buffer_size;
       volatile int state;
       
-      MPI_Request request_size;
-      MPI_Request  request_buffer;
+      MPI::Prequest request_size;
+      MPI::Request  request_buffer;
     };
 
     boost::shared_ptr<impl> pimpl;
@@ -108,12 +109,12 @@ namespace utils
     buffer_size = data.size();
     buffer.clear();
     buffer.insert(buffer.end(), data.begin(), data.end());
-
-    MPI_Start(&request_size);
+    
+    request_size.Start();
     state = tag_size;
     
     if (! buffer.empty())
-      MPI_Isend(&(*buffer.begin()), buffer.size(), MPI_CHAR, rank, (tag << tag_shift) | tag_buffer, comm->comm, &request_buffer);
+      request_buffer = comm->Isend(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, (tag << tag_shift) | tag_buffer);
   }
   
   template <typename Alloc>
@@ -124,25 +125,25 @@ namespace utils
     
     if (! terminated()) {
       buffer_size = -1;
-      MPI_Start(&request_size);
+      request_size.Start();
       state = tag_size;
     }
   }
   
   template <typename Alloc>
   inline
-  void basic_mpi_ostream_simple<Alloc>::impl::open(const mpi_comm& __comm, int __rank, int __tag, size_t __buffer_size)
+  void basic_mpi_ostream_simple<Alloc>::impl::open(MPI::Comm& __comm, int __rank, int __tag, size_t __buffer_size)
   {
     close();
     
-    comm.reset(new mpi_comm(__comm));
+    comm = &__comm;
     rank = __rank;
     tag  = __tag;
     
     buffer.clear();
     buffer_size = 0;
     
-    MPI_Send_init(const_cast<int*>(&buffer_size), 1, MPI_INT, rank, (tag << tag_shift) | tag_size, comm->comm, &request_size);
+    request_size = comm->Send_init(const_cast<int*>(&buffer_size), 1, MPI::INT, rank, (tag << tag_shift) | tag_size);
     state = tag_ready;
   }
 
@@ -157,11 +158,11 @@ namespace utils
       }
       wait();
       
-      request_size.free();
-      request_buffer.free();
+      //request_size.Free();
+      //request_buffer.Free();
     }
     
-    comm.reset();
+    comm = 0;
     rank = -1;
     tag = -1;
     state = tag_ready;
@@ -178,23 +179,21 @@ namespace utils
   template <typename Alloc>
   bool basic_mpi_ostream_simple<Alloc>::impl::is_open() const
   {
-    return comm.get();
+    return comm;
   }
   
   template <typename Alloc>
   bool basic_mpi_ostream_simple<Alloc>::impl::test()
   {
     utils::atomicop::memory_barrier();
-
-    int test_flag = false;
-    MPI_Status status;
+    
+    MPI::Status status;
 
     switch (state) {
     case tag_size:
-      MPI_Test(&request_size, &test_flag, &status);
-      if (!test_flag) return false;
+      if (! request_size.Test(status)) return false;
       
-      if (status.MPI_ERROR != MPI_SUCCESS)
+      if (status.Get_error() != MPI::SUCCESS)
 	throw std::runtime_error("mpi_ostream_simple size-test error");
 
       if (buffer_size <= 0) {
@@ -203,10 +202,9 @@ namespace utils
       } else
 	state = tag_buffer;
     case tag_buffer:
-      MPI_Test(&request_buffer, &test_flag, &status);
-      if (!test_flag) return false;
+      if (! request_buffer.Test(status)) return false;
       
-      if (status.MPI_ERROR != MPI_SUCCESS)
+      if (status.Get_error() != MPI::SUCCESS)
 	throw std::runtime_error("mpi_ostream_simple buffer-test error");
 
       state = tag_ready;
@@ -240,14 +238,14 @@ namespace utils
     typedef ptrdiff_t difference_type;
     
   public:
-    basic_mpi_istream_simple(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096)
+    basic_mpi_istream_simple(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096)
       : pimpl(new impl()) { open(comm, rank, tag, buffer_size); }
     basic_mpi_istream_simple(int rank, int tag, size_t buffer_size=4096)
       : pimpl(new impl()) { open(rank, tag, buffer_size); }
     
   public:
-    void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
-    void open(int rank, int tag, size_t buffer_size=4096) { pimpl->open(mpi_comm(), rank, tag, buffer_size); }
+    void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096) { pimpl->open(comm, rank, tag, buffer_size); }
+    void open(int rank, int tag, size_t buffer_size=4096) { pimpl->open(MPI::COMM_WORLD, rank, tag, buffer_size); }
 
     basic_mpi_istream_simple& read(std::string& data) { pimpl->read(data); return *this; }
     void close() { pimpl->close(); }
@@ -262,10 +260,10 @@ namespace utils
     {
       typedef std::vector<char, Alloc> buffer_type;
 
-      impl() : comm() {}
+      impl() : comm(0) {}
       ~impl() { close(); }
 
-      void open(const mpi_comm& comm, int rank, int tag, size_t buffer_size=4096);
+      void open(MPI::Comm& comm, int rank, int tag, size_t buffer_size=4096);
       void close();
 
       void read(std::string& data);
@@ -275,7 +273,7 @@ namespace utils
 
       bool is_open() const;
 
-      std::unique_ptr<mpi_comm> comm;
+      MPI::Comm* comm;
       int        rank;
       int        tag;
 
@@ -283,8 +281,8 @@ namespace utils
       volatile int buffer_size;
       volatile int state;
       
-      MPI_Request request_size;
-      MPI_Request  request_buffer;
+      MPI::Prequest request_size;
+      MPI::Request  request_buffer;
     };
 
     boost::shared_ptr<impl> pimpl;
@@ -292,19 +290,19 @@ namespace utils
 
 
   template <typename Alloc>
-  void basic_mpi_istream_simple<Alloc>::impl::open(const mpi_comm& __comm, int __rank, int __tag, size_t __buffer_size)
+  void basic_mpi_istream_simple<Alloc>::impl::open(MPI::Comm& __comm, int __rank, int __tag, size_t __buffer_size)
   {
     close();
     
-    comm.reset(new mpi_comm(__comm));
+    comm = &__comm;
     rank = __rank;
     tag  = __tag;
     
     buffer.clear();
     buffer_size = -1;
     
-    MPI_Recv_init(const_cast<int*>(&buffer_size), 1, MPI_INT, rank, (tag << tag_shift) | tag_size, comm->comm, &request_size);
-    MPI_Start(&request_size);
+    request_size = comm->Recv_init(const_cast<int*>(&buffer_size), 1, MPI::INT, rank, (tag << tag_shift) | tag_size);
+    request_size.Start();
     state = tag_size;
   }
 
@@ -315,11 +313,11 @@ namespace utils
     if (comm) {
       wait();
       
-      request_size.free();
-      request_buffer.free();
+      //request_size.Free();
+      //request_buffer.Free();
     }
     
-    comm.reset();
+    comm = 0;
     rank = -1;
     tag = -1;
     state = tag_ready;
@@ -341,8 +339,8 @@ namespace utils
     else {
       data.insert(data.end(), buffer.begin(), buffer.end());
       buffer.clear();
-
-      MPI_Start(&request_size);
+      
+      request_size.Start();
       state = tag_size;
     }
   }
@@ -352,7 +350,7 @@ namespace utils
   inline
   bool basic_mpi_istream_simple<Alloc>::impl::is_open() const
   {
-    return comm.get();
+    return comm;
   }
   
   template <typename Alloc>
@@ -360,16 +358,14 @@ namespace utils
   bool basic_mpi_istream_simple<Alloc>::impl::test()
   {
     utils::atomicop::memory_barrier();
-
-    int test_flag = false;
-    MPI_Status status;
+    
+    MPI::Status status;
     
     switch (state) {
     case tag_size:
-      MPI_Test(&request_size, &test_flag, &status);
-      if (!test_flag) return false;
+      if (! request_size.Test(status)) return false;
       
-      if (status.MPI_ERROR != MPI_SUCCESS)
+      if (status.Get_error() != MPI::SUCCESS)
 	throw std::runtime_error("mpi_istream_simple size-test error");
 
       if (buffer_size <= 0) {
@@ -377,14 +373,13 @@ namespace utils
 	return true;
       } else {
 	buffer.resize(buffer_size);
-	MPI_Irecv(&(*buffer.begin()), buffer.size(), MPI_CHAR, rank, (tag << tag_shift) | tag_buffer, comm->comm, &request_buffer);
+	request_buffer = comm->Irecv(&(*buffer.begin()), buffer.size(), MPI::CHAR, rank, (tag << tag_shift) | tag_buffer);
 	state = tag_buffer;
       }
     case tag_buffer:
-      MPI_Test(&request_buffer, &test_flag, &status);
-      if (!test_flag) return false;
+      if (! request_buffer.Test(status)) return false;
 
-      if (status.MPI_ERROR != MPI_SUCCESS)
+      if (status.Get_error() != MPI::SUCCESS)
 	throw std::runtime_error("mpi_istream_simple buffer-test error");
       
       state = tag_ready;
