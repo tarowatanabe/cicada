@@ -22,6 +22,10 @@
 #include <memory>
 #include <deque>
 
+#define BOOST_DISABLE_ASSERTS
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>

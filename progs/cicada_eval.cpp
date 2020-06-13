@@ -7,6 +7,7 @@
 // (or, do we compute oracle bleu after bleu-composition?)
 //
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 

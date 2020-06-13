@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -113,13 +114,13 @@ int main(int argc, char** argv)
       
       std::string weight_prefix;
       std::string line;
-      bool consumed = utils::getline(is, line);
+      bool consumed = static_cast<bool>(utils::getline(is, line));
       while (consumed) {
 	xpressive::smatch what;
       
 	if (! xpressive::regex_match(line, what, pattern_section_weight)) {
 	  //os << line << '\n';
-	  consumed = utils::getline(is, line);
+	  consumed = static_cast<bool>(utils::getline(is, line));
 	  continue;
 	}
 	
@@ -134,7 +135,7 @@ int main(int argc, char** argv)
 	
 	int pos = 0;
 	do {
-	  consumed = utils::getline(is, line);
+	  consumed = static_cast<bool>(utils::getline(is, line));
 	  if (! consumed || xpressive::regex_match(line, what, pattern_section)) break;
 	  
 	  if (xpressive::regex_match(line, what, pattern_comment) || xpressive::regex_match(line, what, pattern_empty)) {
@@ -261,13 +262,13 @@ int main(int argc, char** argv)
 					   >> *xpressive::_s);
     
       std::string line;
-      bool consumed = utils::getline(is, line);
+      bool consumed = static_cast<bool>(utils::getline(is, line));
       while (consumed) {
 	xpressive::smatch what;
       
 	if (! xpressive::regex_match(line, what, pattern_section_weight)) {
 	  os << line << '\n';
-	  consumed = utils::getline(is, line);
+	  consumed = static_cast<bool>(utils::getline(is, line));
 	  continue;
 	}
       
@@ -285,7 +286,7 @@ int main(int argc, char** argv)
       
 	int pos = 0;
 	do {
-	  consumed = utils::getline(is, line);
+	  consumed = static_cast<bool>(utils::getline(is, line));
 	  if (! consumed || xpressive::regex_match(line, what, pattern_section)) break;
 	
 	  if (xpressive::regex_match(line, what, pattern_comment) || xpressive::regex_match(line, what, pattern_empty))

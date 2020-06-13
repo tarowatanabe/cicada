@@ -22,7 +22,7 @@
 
 typedef boost::filesystem::path path_type;
 
-struct ostream_sink : public ByteSink
+struct ostream_sink : public icu::ByteSink
 {
   
   ostream_sink(std::ostream& _os) : os(_os) {}
@@ -60,7 +60,7 @@ int main(int argc, char** argv)
     if (locale.empty())
       throw std::runtime_error("no locale?");
     
-    Locale loc(locale.c_str());
+    icu::Locale loc(locale.c_str());
     
     if (loc.isBogus())
       throw std::runtime_error("invalid ocale: " + locale);
@@ -98,13 +98,13 @@ int main(int argc, char** argv)
     }
     
     UErrorCode status = U_ZERO_ERROR;
-    std::unique_ptr<RuleBasedNumberFormat> formatter(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));
+    std::unique_ptr<icu::RuleBasedNumberFormat> formatter(new icu::RuleBasedNumberFormat(icu::URBNF_SPELLOUT, loc, status));
     if (U_FAILURE(status))
       throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
     
     if (! rule.empty()) {
       UErrorCode status = U_ZERO_ERROR;
-      formatter->setDefaultRuleSet(UnicodeString(rule.c_str()), status);
+      formatter->setDefaultRuleSet(icu::UnicodeString(rule.c_str()), status);
       
       if (U_FAILURE(status)) {
 	std::cerr << "# of rules: " << formatter->getNumberOfRuleSetNames() << std::endl;
@@ -128,9 +128,9 @@ int main(int argc, char** argv)
     ostream_sink sink(os);
     
     int64_t integer;
-    UnicodeString formatted;
+    icu::UnicodeString formatted;
     while (is >> integer) {
-      FieldPosition pos;
+      icu::FieldPosition pos;
       formatted.remove();
       formatter->format(integer, formatted, pos);
       formatted.toUTF8(sink);

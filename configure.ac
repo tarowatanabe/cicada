@@ -464,19 +464,29 @@ fi
 
 
 ### check for MPI
-AC_PATH_PROGS(MPI_CXX_COMPILER, [openmpic++ openmpicxx openmpiCC mpic++ mpicxx mpiCC], no)
-if test "x$MPI_CXX_COMPILER" = "xno"; then
-  AS_ERROR("no mpi...")
-fi 
+AC_ARG_ENABLE(mpi,
+        [AC_HELP_STRING([--enable-mpi], [enable MPI])],
+        [ac_enable_mpi=yes], [ac_enable_mpi=no])
 
-AC_MSG_CHECKING(mpi cppflags)
-MPI_CPPFLAGS=`$MPI_CXX_COMPILER -showme | $AWK '{for(i=1;i<=NF;i++){if($i~/^-I/ || $i~/^-D/){printf "%s ", $i;}}}'`
-AC_MSG_RESULT($MPI_CPPFLAGS)
+MPI_CXX_COMPILER="no"
+MPI_CPPFLAGS=""
+MPI_LDFLAGS=""
+
+if test "x$ac_enable_mpi" = "xyes"; then
+  AC_PATH_PROGS(MPI_CXX_COMPILER, [openmpic++ openmpicxx openmpiCC mpic++ mpicxx mpiCC], no)
+  if test "x$MPI_CXX_COMPILER" != "xno"; then
+    AC_MSG_CHECKING(mpi cppflags)
+    MPI_CPPFLAGS=`$MPI_CXX_COMPILER -showme | $AWK '{for(i=1;i<=NF;i++){if($i~/^-I/ || $i~/^-D/){printf "%s ", $i;}}}'`
+    AC_MSG_RESULT($MPI_CPPFLAGS)
+
+    AC_MSG_CHECKING(mpi ldflags)
+    MPI_LDFLAGS=`$MPI_CXX_COMPILER -showme | $AWK '{for(i=1;i<=NF;i++){if($i~/^-L/ || $i~/^-l/ || $i~/^-Wl/){printf "%s ", $i;}}}'`
+    AC_MSG_RESULT($MPI_LDFLAGS)
+  fi
+fi
+
+AM_CONDITIONAL(WITH_MPI, test "$MPI_CXX_COMPILER" != no)
 AC_SUBST(MPI_CPPFLAGS)
-
-AC_MSG_CHECKING(mpi ldflags)
-MPI_LDFLAGS=`$MPI_CXX_COMPILER -showme | $AWK '{for(i=1;i<=NF;i++){if($i~/^-L/ || $i~/^-l/ || $i~/^-Wl/){printf "%s ", $i;}}}'`
-AC_MSG_RESULT($MPI_LDFLAGS)
 AC_SUBST(MPI_LDFLAGS)
 
 AC_MSG_CHECKING([for __thread])

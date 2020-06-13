@@ -25,7 +25,7 @@
 
 typedef boost::filesystem::path path_type;
 
-struct ostream_sink : public ByteSink
+struct ostream_sink : public icu::ByteSink
 {
   
   ostream_sink(std::ostream& _os) : os(_os) {}
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
     ostream_sink sink(os);
     
     int64_t integer;
-    UnicodeString formatted;
+    icu::UnicodeString formatted;
     while (is >> integer) {
       for (size_t i = 0; i != formatters.size(); ++ i) {
 	{
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
 	os << formatters[i].first << ": ";
 	
 	{
-	  FieldPosition pos;
+	  icu::FieldPosition pos;
 	  formatted.remove();
 	  formatters[i].second->format(integer, formatted, pos);
 	  formatted.toUTF8(sink);

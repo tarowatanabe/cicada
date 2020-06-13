@@ -30,36 +30,66 @@ cicada_kbest_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_
 cicada_text_main_SOURCES = cicada_text_main.cpp cicada_text_impl.hpp
 cicada_text_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
+if WITH_MPI
+bin_programs_mpi = \
+	cicada_mpi \
+	cicada_autoencode_itg_mpi \
+	cicada_convex_hull_mpi \
+	cicada_convex_hull_kbest_mpi \
+	cicada_extract_ghkm_mpi \
+	cicada_extract_phrase_mpi \
+	cicada_extract_scfg_mpi \
+	cicada_extract_score_mpi \
+	cicada_extract_tree_mpi \
+	cicada_learn_mpi \
+	cicada_learn_asynchronous_mpi \
+	cicada_learn_asynchronous_kbest_mpi \
+	cicada_learn_kbest_mpi \
+	cicada_learn_online_mpi \
+	cicada_learn_online_kbest_mpi \
+	cicada_learn_bitree_rnn_mpi \
+	cicada_learn_tree_rnn_mpi \
+	cicada_learn_tree_mpi \
+	cicada_lexicon_global_mpi \
+	cicada_maxlike_mpi \
+	cicada_mert_mpi \
+	cicada_mert_kbest_mpi \
+	cicada_nn_alignment_mpi \
+	cicada_nn_ngram_mpi \
+	cicada_oracle_mpi \
+	cicada_oracle_kbest_mpi \
+	cicada_rnn_alignment_mpi \
+	cicada_rnn_bow_itg_mpi \
+	cicada_rnn_itg_mpi \
+	cicada_rnn_ngram_mpi \
+	\
+	mpimap \
+	mpish \
+	mpipe
+endif WITH_MPI
+
+
 bin_PROGRAMS = \
 	cicada \
-	cicada_mpi \
 	cicada_alignment \
 	cicada_alignment_hmm \
 	cicada_alignment_model1 \
 	cicada_alignment_model4 \
 	cicada_autoencode_itg \
-	cicada_autoencode_itg_mpi \
 	cicada_autoencode_lexicon \
 	cicada_autoencode_ngram \
 	cicada_clean \
 	cicada_cluster_word \
 	cicada_convex_hull \
-	cicada_convex_hull_mpi \
 	cicada_convex_hull_kbest \
-	cicada_convex_hull_kbest_mpi \
 	cicada_eval \
 	cicada_extract_ghkm \
-	cicada_extract_ghkm_mpi \
 	cicada_extract_phrase \
-	cicada_extract_phrase_mpi \
 	cicada_extract_rule \
 	cicada_extract_scfg \
-	cicada_extract_scfg_mpi \
 	cicada_extract_score \
-	cicada_extract_score_mpi \
 	cicada_extract_sort \
 	cicada_extract_tree \
-	cicada_extract_tree_mpi \
 	cicada_filter_alignment \
 	cicada_filter_bitext \
 	cicada_filter_chardet \
@@ -93,44 +123,23 @@ bin_PROGRAMS = \
 	cicada_index_lexicon \
 	cicada_index_tree_grammar \
 	cicada_learn \
-	cicada_learn_mpi \
-	cicada_learn_asynchronous_mpi \
-	cicada_learn_asynchronous_kbest_mpi \
 	cicada_learn_kbest \
-	cicada_learn_kbest_mpi \
-	cicada_learn_online_mpi \
-	cicada_learn_online_kbest_mpi \
-	cicada_learn_bitree_rnn_mpi \
-	cicada_learn_tree_rnn_mpi \
-	cicada_learn_tree_mpi \
 	cicada_lexicon \
 	cicada_lexicon_pair \
 	cicada_lexicon_dice \
 	cicada_lexicon_fisher \
 	cicada_lexicon_global \
-	cicada_lexicon_global_mpi \
 	cicada_maxlike \
-	cicada_maxlike_mpi \
 	cicada_mert \
-	cicada_mert_mpi \
 	cicada_mert_kbest \
-	cicada_mert_kbest_mpi \
 	cicada_nn_alignment \
-	cicada_nn_alignment_mpi \
 	cicada_nn_ngram \
-	cicada_nn_ngram_mpi \
 	cicada_oracle \
-	cicada_oracle_mpi \
 	cicada_oracle_kbest \
-	cicada_oracle_kbest_mpi \
 	cicada_rnn_alignment \
-	cicada_rnn_alignment_mpi \
 	cicada_rnn_bow_itg \
-	cicada_rnn_bow_itg_mpi \
 	cicada_rnn_itg \
-	cicada_rnn_itg_mpi \
 	cicada_rnn_ngram \
-	cicada_rnn_ngram_mpi \
 	cicada_rnn_sentence \
 	cicada_pyp_itg_learn \
 	cicada_pyp_ngram_learn \
@@ -151,11 +160,9 @@ bin_PROGRAMS = \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
 	\
-	mpimap \
-	mpish \
-	mpipe \
 	thrsh \
-	thrpe
+	thrpe \
+	$(bin_programs_mpi)
 
 noinst_DATA = .gitignore
 

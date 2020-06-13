@@ -364,7 +364,7 @@ struct CharacterString
   wide_type   wide;
 };
 
-struct ostream_sink : public ByteSink
+struct ostream_sink : public icu::ByteSink
 {
   
   ostream_sink(std::ostream& _os) : os(_os) {}

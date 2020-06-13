@@ -12,6 +12,10 @@
 #include <cfloat>
 #include <cmath>
 
+#define BOOST_DISABLE_ASSERTS
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <boost/program_options.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/math/constants/constants.hpp>

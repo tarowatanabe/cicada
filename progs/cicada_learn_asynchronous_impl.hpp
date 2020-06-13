@@ -5,7 +5,9 @@
 #ifndef __CICADA_LEARN_ASYNCHRONOUS_IMPL__HPP__
 #define __CICADA_LEARN_ASYNCHRONOUS_IMPL__HPP__ 1
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>

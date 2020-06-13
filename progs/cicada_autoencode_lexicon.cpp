@@ -22,11 +22,13 @@
 #include <cmath>
 #include <climits>
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
 #include <deque>
 
+#include <boost/fusion/tuple.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>

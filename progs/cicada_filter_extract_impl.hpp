@@ -7,6 +7,10 @@
 
 #include <stdexcept>
 
+#define BOOST_DISABLE_ASSERTS
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix.hpp>

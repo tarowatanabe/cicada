@@ -4,6 +4,10 @@
 
 // join lines with "|||"
 
+#define BOOST_DISABLE_ASSERTS
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <boost/spirit/include/karma.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>

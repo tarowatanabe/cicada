@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 
+#define BOOST_DISABLE_ASSERTS
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
