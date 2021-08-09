@@ -3,7 +3,7 @@
 #ifndef __CODEC__CODEC_IMPL_HPP__
 #define __CODEC__CODEC_IMPL_HPP__ 1
 
-#include <boost/detail/endian.hpp>
+#include <boost/endian.hpp>
 
 namespace codec
 {
